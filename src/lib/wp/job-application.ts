@@ -13,7 +13,7 @@ function isJobApplicationPath(path: string): boolean {
   return normalizeRoutePath(path).replace(/^\/en(?=\/)/, "") === JOB_APPLICATION_PATH;
 }
 
-export function applyJobApplicationNoticeOverride(
+function applyPreviousJobApplicationNoticeOverride(
   record: WpContentRecord,
 ): WpContentRecord {
   if (!isJobApplicationPath(record.path)) return record;
@@ -77,4 +77,60 @@ export function applyJobApplicationNoticeOverride(
   }
 
   return changed ? { ...record, contentHtml: $.html() } : record;
+}
+
+export function applyJobApplicationNoticeOverride(
+  record: WpContentRecord,
+): WpContentRecord {
+  const previous = applyPreviousJobApplicationNoticeOverride(record);
+  if (!isJobApplicationPath(previous.path)) return previous;
+
+  const $ = cheerio.load(previous.contentHtml, null, false);
+  const title =
+    "ประกาศสถาบันวิจัยและพัฒนาเทคโนโลยีระบบราง (องค์การมหาชน) เรื่อง ประกาศรายชื่อผู้มีสิทธิ์เข้ารับการสอบคัดเลือกเป็นเจ้าหน้าที่ของสถาบันฯ ตำแหน่ง นักวิเคราะห์วิชาการ / อาวุโส (วิศวกร)";
+  const tbody = $("tbody")
+    .filter((_, element) => $(element).find("tr td").length >= 6)
+    .first();
+  if (
+    !tbody.length ||
+    tbody
+      .find("tr")
+      .toArray()
+      .some((row) => $(row).text().includes(title))
+  ) {
+    return previous;
+  }
+
+  const row = $("<tr></tr>");
+  ["", "18 พฤศจิกายน 2569", title, "–", "–"].forEach((text) =>
+    row.append(
+      $("<td></td>")
+        .addClass("has-text-align-center")
+        .attr("data-align", "center")
+        .text(text),
+    ),
+  );
+  row.append(
+    $("<td></td>")
+      .addClass("has-text-align-center")
+      .attr("data-align", "center")
+      .append(
+        $("<a></a>")
+          .attr(
+            "href",
+            "/recruitment-documents/eligible-candidates-engineer-25691118.pdf",
+          )
+          .attr("target", "_blank")
+          .attr("rel", "noreferrer noopener")
+          .text("PDF"),
+      ),
+  );
+  tbody.prepend(row);
+  tbody.find("tr").each((index, element) => {
+    $(element)
+      .find("td")
+      .first()
+      .text(String(index + 1));
+  });
+  return { ...previous, contentHtml: $.html() };
 }

@@ -84,20 +84,6 @@ function procurementInvitationYearTableHtml(): string {
   `;
 }
 
-function rows(html: string): string[][] {
-  const $ = cheerio.load(html, null, false);
-  return $(".lightweight-accordion")
-    .first()
-    .find("tbody tr")
-    .toArray()
-    .map((row) =>
-      $(row)
-        .find("td")
-        .toArray()
-        .map((cell) => $(cell).text().replace(/\s+/g, " ").trim()),
-    );
-}
-
 function rowsForYear(html: string, year: string): string[][] {
   const $ = cheerio.load(html, null, false);
   const accordion = $(".lightweight-accordion")
@@ -343,36 +329,40 @@ describe("applyProcurementTableOverrides", () => {
     expect(applyProcurementTableOverrides(updated).contentHtml).toBe(updated.contentHtml);
   });
 
-  it("adds the October through June monthly procurement summary rows in reverse chronological order", () => {
+  it("places the October summary in 2570 and keeps older summaries in 2569", () => {
     const source = record(
       "/จัดซื้อจัดจ้าง/ประกาศจดซอจดจางตามแบบส",
       yearTableHtml(
-        `<tr><td>7</td><td>14 พฤษภาคม 2569</td><td>สรุปผลการดำเนินการจัดซื้อจัดจ้างในรอบเดือน เมษายน</td><td>เผยแพร่ขึ้นเว็บ</td><td><a href="/old.pdf">PDF</a></td></tr>`,
+        `<tr><td>1</td><td>9 พฤศจิกายน 2569</td><td>สรุปผลการดำเนินการจัดซื้อจัดจ้างในรอบเดือน ตุลาคม 2569</td><td>เผยแพร่ขึ้นเว็บ</td><td><a href="/old-october.pdf">PDF</a></td></tr><tr><td>7</td><td>14 พฤษภาคม 2569</td><td>สรุปผลการดำเนินการจัดซื้อจัดจ้างในรอบเดือน เมษายน</td><td>เผยแพร่ขึ้นเว็บ</td><td><a href="/old.pdf">PDF</a></td></tr>`,
       ),
     );
-    const updatedRows = rows(applyProcurementTableOverrides(source).contentHtml);
+    const updated = applyProcurementTableOverrides(source);
+    const updatedRows = rowsForYear(updated.contentHtml, "ปี 2569");
+    const currentRows = rowsForYear(updated.contentHtml, "ปี 2570");
 
-    expect(updatedRows.map((row) => row[0])).toEqual(["1", "2", "3", "4", "5", "6", "7"]);
-    expect(updatedRows[0]?.slice(1, 4)).toEqual([
+    expect(updatedRows.map((row) => row[0])).toEqual(["1", "2", "3", "4", "5", "6"]);
+    expect(currentRows).toHaveLength(1);
+    expect(currentRows[0]?.slice(1, 4)).toEqual([
       "9 พฤศจิกายน 2569",
       "สรุปผลการดำเนินการจัดซื้อจัดจ้างในรอบเดือน ตุลาคม 2569",
       "เผยแพร่ขึ้นเว็บ",
     ]);
-    expect(updatedRows[1]?.[1]).toBe("9 ตุลาคม 2569");
-    expect(updatedRows[1]?.[2]).toBe(
+    expect(updatedRows[0]?.[1]).toBe("9 ตุลาคม 2569");
+    expect(updatedRows[0]?.[2]).toBe(
       "สรุปผลการดำเนินการจัดซื้อจัดจ้างในรอบเดือน กันยายน 2569",
     );
-    expect(updatedRows[2]?.[1]).toBe("2 กันยายน 2569");
-    expect(updatedRows[2]?.[2]).toBe(
+    expect(updatedRows[1]?.[1]).toBe("2 กันยายน 2569");
+    expect(updatedRows[1]?.[2]).toBe(
       "สรุปผลการดำเนินการจัดซื้อจัดจ้างในรอบเดือน สิงหาคม 2569",
     );
-    expect(updatedRows[3]?.[1]).toBe("5 สิงหาคม 2569");
-    expect(updatedRows[3]?.[2]).toBe(
+    expect(updatedRows[2]?.[1]).toBe("5 สิงหาคม 2569");
+    expect(updatedRows[2]?.[2]).toBe(
       "สรุปผลการดำเนินการจัดซื้อจัดจ้างในรอบเดือน กรกฎาคม 2569",
     );
-    expect(updatedRows[4]?.[1]).toBe("3 กรกฎาคม 2569");
-    expect(updatedRows[5]?.[1]).toBe("11 มิถุนายน 2569");
-    expect(updatedRows[6]?.[1]).toBe("14 พฤษภาคม 2569");
+    expect(updatedRows[3]?.[1]).toBe("3 กรกฎาคม 2569");
+    expect(updatedRows[4]?.[1]).toBe("11 มิถุนายน 2569");
+    expect(updatedRows[5]?.[1]).toBe("14 พฤษภาคม 2569");
+    expect(applyProcurementTableOverrides(updated).contentHtml).toBe(updated.contentHtml);
     expect(applyProcurementTableOverrides(source).contentHtml).toContain(
       "/procurement-documents/procurement-summary-october-2569-20261109.pdf",
     );
