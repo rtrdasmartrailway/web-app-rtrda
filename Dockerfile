@@ -1,4 +1,4 @@
-FROM node:22-bookworm-slim AS deps
+FROM node:22.23.4-bookworm-slim AS deps
 WORKDIR /app
 
 # sharp needs libvips and build tooling for its native bindings.
@@ -35,7 +35,7 @@ ENV PR_CENTER_API_PORT=3100
 EXPOSE 3100
 CMD ["npm", "run", "pr-center:api"]
 
-FROM node:22-bookworm-slim AS runner
+FROM node:22.23.4-bookworm-slim AS runner
 WORKDIR /app
 ENV NODE_ENV=production
 ENV HOSTNAME=0.0.0.0
