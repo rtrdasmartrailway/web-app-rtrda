@@ -27,6 +27,16 @@ const uploadFile = (path: string) => `/wp-content/uploads/${path}`;
 
 const quarterlyRows: TableRowSpec[] = [
   {
+    matchText:
+      "ประกาศผลผู้ชนะการจัดซื้อจัดจ้างหรือผู้ได้รับการคัดเลือกและสาระสำคัญของสัญญาหรือข้อตกลงเป็นหนังสือ ประจำไตรมาสที่ 4",
+    cells: [
+      "9 ตุลาคม 2569",
+      "ประกาศผลผู้ชนะการจัดซื้อจัดจ้างหรือผู้ได้รับการคัดเลือกและสาระสำคัญของสัญญาหรือข้อตกลงเป็นหนังสือ ประจำไตรมาสที่ 4 (เดือนกรกฎาคม 2569 ถึง เดือนกันยายน 2569)",
+      PUBLISHED_STATUS,
+    ],
+    href: "/procurement-documents/procurement-quarterly-winner-q4-2569-20261009.pdf",
+  },
+  {
     matchText: "ประกาศผลผู้ชนะการจัดซื้อจัดจ้างหรือผู้ได้รับการคัดเลือก ประจำไตรมาสที่ 3",
     cells: [
       "7 กรกฎาคม 2569",
@@ -51,6 +61,15 @@ const procurementPriceRows: TableRowSpec[] = [
 ];
 
 const summaryRows: TableRowSpec[] = [
+  {
+    matchText: "9 ตุลาคม 2569 สรุปผลการดำเนินการจัดซื้อจัดจ้างในรอบเดือน กันยายน 2569",
+    cells: [
+      "9 ตุลาคม 2569",
+      "สรุปผลการดำเนินการจัดซื้อจัดจ้างในรอบเดือน กันยายน 2569",
+      PUBLISHED_STATUS,
+    ],
+    href: "/procurement-documents/procurement-summary-september-2569-20261009.pdf",
+  },
   {
     matchText: "2 กันยายน 2569 สรุปผลการดำเนินการจัดซื้อจัดจ้างในรอบเดือน สิงหาคม 2569",
     cells: [
@@ -702,15 +721,16 @@ function sortQuarterlyRowsDescending(
 
 function applyQuarterlyWinnerRows(record: WpContentRecord): WpContentRecord {
   const $ = cheerio.load(record.contentHtml, null, false);
+  const hasYear2569 = findYearTable($, YEAR_2569).length > 0;
   const hasYear2570 = findYearTable($, YEAR_2570).length > 0;
+  const year2569 = ensureYearTable($, YEAR_2569);
   const year2570 = ensureYearTable($, YEAR_2570);
-  if (year2570.length === 0) return record;
+  if (year2569.length === 0 || year2570.length === 0) return record;
 
-  const tbody = findYearTable($, YEAR_2569);
-  let changed = !hasYear2570;
-  changed = upsertRows($, tbody, quarterlyRows) || changed;
-  changed = sortQuarterlyRowsDescending($, tbody) || changed;
-  const quarterlyRowsInDisplayOrder = tbody.find("tr").toArray();
+  let changed = !hasYear2569 || !hasYear2570;
+  changed = upsertRows($, year2569, quarterlyRows) || changed;
+  changed = sortQuarterlyRowsDescending($, year2569) || changed;
+  const quarterlyRowsInDisplayOrder = year2569.find("tr").toArray();
   quarterlyRowsInDisplayOrder.forEach((row, index) => {
     const first = $(row).find("td").first();
     const nextNumber = String(quarterlyRowsInDisplayOrder.length - index);
