@@ -4,6 +4,16 @@ import { normalizeRoutePath } from "./url";
 
 const PROCUREMENT_PLAN_PATH = "/จัดซื้อจัดจ้าง/แผนการจัดซื้อจัดจ้าง";
 const PROCUREMENT_PLAN_YEAR = "ปี 2569";
+const PROCUREMENT_PLAN_ROWS_2570 = [
+  {
+    date: "23 พฤศจิกายน 2569",
+    href: "/procurement-documents/procurement-plan-2570-25691123.pdf",
+  },
+  {
+    date: "30 ตุลาคม 2569",
+    href: "/procurement-documents/procurement-plan-2570-25691030.pdf",
+  },
+];
 const PROCUREMENT_PLAN_ROWS_2569 = [
   {
     date: "3 กันยายน 2569",
@@ -54,25 +64,28 @@ export function applyProcurementPlanOverride(record: WpContentRecord): WpContent
   if (!hasYear2570) {
     const newAccordion = accordion.clone();
     newAccordion.find("summary h1").first().text("ปี 2570");
-    const row = $("<tr></tr>");
-    for (const value of [
-      "1",
-      "30 ตุลาคม 2569",
-      "เผยแพร่แผนการจัดซื้อจัดจ้าง ประจำปีงบประมาณ พ.ศ. 2570",
-      "เผยแพร่ขึ้นเว็บ",
-    ]) {
-      row.append($("<td></td>").text(value));
-    }
-    row.append(
-      $("<td></td>").append(
-        $("<a></a>")
-          .attr("href", "/procurement-documents/procurement-plan-2570-25691030.pdf")
-          .attr("target", "_blank")
-          .attr("rel", "noreferrer noopener")
-          .text("PDF"),
-      ),
-    );
-    newAccordion.find("tbody").first().empty().append(row);
+    const body = newAccordion.find("tbody").first().empty();
+    PROCUREMENT_PLAN_ROWS_2570.forEach(({ date, href }, index) => {
+      const row = $("<tr></tr>");
+      for (const value of [
+        String(index + 1),
+        date,
+        "เผยแพร่แผนการจัดซื้อจัดจ้าง ประจำปีงบประมาณ พ.ศ. 2570",
+        "เผยแพร่ขึ้นเว็บ",
+      ]) {
+        row.append($("<td></td>").text(value));
+      }
+      row.append(
+        $("<td></td>").append(
+          $("<a></a>")
+            .attr("href", href)
+            .attr("target", "_blank")
+            .attr("rel", "noreferrer noopener")
+            .text("PDF"),
+        ),
+      );
+      body.append(row);
+    });
     accordion.before(newAccordion);
     changed = true;
   }
