@@ -1,5 +1,15 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { INTRO_RETURN_COOKIE, introHomepageUrl } from "@/lib/intro-flow";
+import {
+  activityEnabled,
+  activityHostAllowed,
+  logActivityLater,
+} from "@/lib/analytics/activity-store";
+import {
+  activityPath,
+  isPageRequest,
+  isPublicDocumentPath,
+} from "@/lib/analytics/activity-contract";
 
 const BROKEN_O5_PATH =
   "/%25E0%25%2520%2520B8%2584%25E0%25B8%25B9%25E0%25%2520%2520B9%2588%25E0%25B8%25A1%25E0%25%2520%2520B8%25B7%25E0%25B8%25ADO5";
@@ -16,6 +26,7 @@ const ALLOWED_METHODS = "GET, HEAD, OPTIONS";
 const ANALYTICS_METHODS = "POST, OPTIONS";
 const DOWNLOAD_CAPTCHA_METHODS = "GET, POST, OPTIONS";
 const ANALYTICS_EVENT_PATH = "/api/analytics/events";
+const ACTIVITY_LOGOUT_PATH = "/api/analytics/activity-auth/logout";
 const DOWNLOAD_CAPTCHA_PATH = "/api/download-captcha";
 const PR_CENTER_API_PREFIX = "/api/pr-center/";
 const HEALTH_PATHS = new Set(["/healthz", "/api/health"]);
@@ -50,6 +61,7 @@ function httpsRedirect(request: NextRequest): NextResponse | null {
 function methodPolicy(request: NextRequest): NextResponse | null {
   const path = new URL(request.url).pathname;
   const analyticsRequest = path === ANALYTICS_EVENT_PATH;
+  const activityLogoutRequest = path === ACTIVITY_LOGOUT_PATH;
   const downloadCaptchaRequest = path === DOWNLOAD_CAPTCHA_PATH;
   const prCenterApiRequest = path.startsWith(PR_CENTER_API_PREFIX);
 
@@ -57,22 +69,25 @@ function methodPolicy(request: NextRequest): NextResponse | null {
     return new NextResponse(null, {
       status: 204,
       headers: {
-        Allow: prCenterApiRequest
-          ? "GET, POST, PATCH, DELETE, OPTIONS"
-          : analyticsRequest
-            ? ANALYTICS_METHODS
-            : downloadCaptchaRequest
-              ? DOWNLOAD_CAPTCHA_METHODS
-              : ALLOWED_METHODS,
+        Allow: activityLogoutRequest
+          ? ANALYTICS_METHODS
+          : prCenterApiRequest
+            ? "GET, POST, PATCH, DELETE, OPTIONS"
+            : analyticsRequest
+              ? ANALYTICS_METHODS
+              : downloadCaptchaRequest
+                ? DOWNLOAD_CAPTCHA_METHODS
+                : ALLOWED_METHODS,
       },
     });
   }
 
   if (
-    (analyticsRequest || downloadCaptchaRequest || prCenterApiRequest) &&
-    (request.method === "POST" ||
-      request.method === "PATCH" ||
-      request.method === "DELETE")
+    (activityLogoutRequest && request.method === "POST") ||
+    ((analyticsRequest || downloadCaptchaRequest || prCenterApiRequest) &&
+      (request.method === "POST" ||
+        request.method === "PATCH" ||
+        request.method === "DELETE"))
   )
     return null;
 
@@ -82,13 +97,15 @@ function methodPolicy(request: NextRequest): NextResponse | null {
       {
         status: 405,
         headers: {
-          Allow: prCenterApiRequest
-            ? "GET, POST, PATCH, DELETE, OPTIONS"
-            : analyticsRequest
-              ? ANALYTICS_METHODS
-              : downloadCaptchaRequest
-                ? DOWNLOAD_CAPTCHA_METHODS
-                : ALLOWED_METHODS,
+          Allow: activityLogoutRequest
+            ? ANALYTICS_METHODS
+            : prCenterApiRequest
+              ? "GET, POST, PATCH, DELETE, OPTIONS"
+              : analyticsRequest
+                ? ANALYTICS_METHODS
+                : downloadCaptchaRequest
+                  ? DOWNLOAD_CAPTCHA_METHODS
+                  : ALLOWED_METHODS,
         },
       },
     );
@@ -97,7 +114,7 @@ function methodPolicy(request: NextRequest): NextResponse | null {
   return null;
 }
 
-export function middleware(request: NextRequest) {
+export function proxy(request: NextRequest) {
   const methodResponse = methodPolicy(request);
   if (methodResponse) return methodResponse;
 
@@ -131,5 +148,37 @@ export function middleware(request: NextRequest) {
     return redirect;
   }
 
-  return NextResponse.next();
+  if (activityEnabled() && activityHostAllowed(request.headers)) {
+    const normalized = activityPath(rawPath);
+    if (normalized && (request.method === "GET" || request.method === "HEAD")) {
+      if (isPublicDocumentPath(normalized)) {
+        const destination = new URL(`/logged-files-internal${rawPath}`, request.url);
+        destination.protocol = "http:"; // The internal Next listener is HTTP behind TLS termination.
+        destination.search = "";
+        const response = NextResponse.rewrite(destination);
+        response.headers.set("Cache-Control", "private, no-store, max-age=0");
+        response.headers.set("CDN-Cache-Control", "no-store");
+        return response;
+      }
+      if (isPageRequest(normalized, request.headers))
+        logActivityLater(request, {
+          eventType: "page_request",
+          path: normalized,
+          channel: "server",
+          method: request.method,
+          outcome: "forwarded_status_unobserved",
+        });
+    }
+  }
+  const response = NextResponse.next();
+  if (
+    activityEnabled() &&
+    ["/api/analytics/events", "/api/analytics/reports", "/sdc_download", "/r"].some(
+      (base) => rawPath === base || rawPath.startsWith(`${base}/`),
+    )
+  ) {
+    response.headers.set("Cache-Control", "private, no-store, max-age=0");
+    response.headers.set("CDN-Cache-Control", "no-store");
+  }
+  return response;
 }

@@ -35,6 +35,15 @@ ENV PR_CENTER_API_PORT=3100
 EXPOSE 3100
 CMD ["npm", "run", "pr-center:api"]
 
+FROM deps AS activity-report-auth
+WORKDIR /app
+COPY . .
+ENV NODE_ENV=production
+ENV ACTIVITY_AUTH_HOST=0.0.0.0
+ENV ACTIVITY_AUTH_PORT=3101
+EXPOSE 3101
+CMD ["npm", "run", "activity-auth:api"]
+
 FROM node:22.23.4-bookworm-slim AS runner
 WORKDIR /app
 ENV NODE_ENV=production
