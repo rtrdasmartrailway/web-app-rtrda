@@ -75,6 +75,15 @@ const cancelWinnerRows: TableRowSpec[] = [
 
 const summaryRows: TableRowSpec[] = [
   {
+    matchText: "9 พฤศจิกายน 2569 สรุปผลการดำเนินการจัดซื้อจัดจ้างในรอบเดือน ตุลาคม 2569",
+    cells: [
+      "9 พฤศจิกายน 2569",
+      "สรุปผลการดำเนินการจัดซื้อจัดจ้างในรอบเดือน ตุลาคม 2569",
+      PUBLISHED_STATUS,
+    ],
+    href: "/procurement-documents/procurement-summary-october-2569-20261109.pdf",
+  },
+  {
     matchText: "9 ตุลาคม 2569 สรุปผลการดำเนินการจัดซื้อจัดจ้างในรอบเดือน กันยายน 2569",
     cells: [
       "9 ตุลาคม 2569",
