@@ -69,6 +69,47 @@ class OverlayTests(unittest.TestCase):
         self.assertEqual(app['environment']['ACTIVITY_RETENTION_ENABLED'], 'true')
         self.assertNotIn('s' * 48, json.dumps(services))
 
+    def test_uid1001_salt_is_validated_in_app_not_read_by_deploy_user(self):
+        import importlib.util
+        from unittest.mock import patch
+        from types import SimpleNamespace
+        import sys
+        spec = importlib.util.spec_from_file_location('activity_overlay', SCRIPT)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        original_lstat = pathlib.Path.lstat
+        original_read = pathlib.Path.read_text
+        def lstat(path):
+            if path == self.salt:
+                return SimpleNamespace(st_mode=stat.S_IFREG | 0o600, st_uid=1001)
+            return original_lstat(path)
+        def read(path, *args, **kwargs):
+            if path == self.salt:
+                raise PermissionError('deploy user cannot read UID1001 salt')
+            return original_read(path, *args, **kwargs)
+        argv = ['overlay', 'cloud', 'web-app-rtrda-preprod-cloud', 'db-preprod-cloud', str(self.base), str(self.overlay)]
+        env = dict(os.environ, ACTIVITY_DEPLOY_MODE='collect', ACTIVITY_RELEASE_SHA='a'*40,
+                   ACTIVITY_SALT_ENV_FILE=str(self.salt))
+        with patch.dict(os.environ, env), patch.object(sys, 'argv', argv), \
+             patch.object(pathlib.Path, 'lstat', lstat), patch.object(pathlib.Path, 'read_text', read):
+            module.main()
+        self.assertTrue(self.overlay.exists())
+        remote = SCRIPT.with_name('deploy-preprod-remote.sh').read_text()
+        attest = SCRIPT.with_name('attest-activity-target.sh').read_text()
+        self.assertIn('node -e', remote)
+        self.assertIn('ANALYTICS_HASH_SALT=', remote)
+        self.assertIn('ANALYTICS_HASH_SALT=', attest)
+        import ast
+        salt_line = next(line for line in attest.splitlines() if line.strip().startswith('salt_check = '))
+        js = ast.literal_eval(salt_line.strip().split(' = ', 1)[1])
+        syntax = subprocess.run(['node', '--check'], input=js, capture_output=True, text=True)
+        self.assertEqual(syntax.returncode, 0, syntax.stderr)
+        for salt, expected in (('s'*48, 0), ('placeholder'*5, 1), ('short', 1), ('s'*48 + '!', 1)):
+            stub = 'const fs={readFileSync:()=>"ANALYTICS_HASH_SALT=' + salt + '"};'
+            result = subprocess.run(['node', '-e', js.replace('const fs=require("node:fs");', stub)],
+                                    capture_output=True, text=True)
+            self.assertEqual(result.returncode == 0, expected == 0, (salt[:12], result.stderr))
+
     def test_collect_fails_closed_with_missing_or_invalid_salt(self):
         self.oidc.unlink()
         self.salt.unlink()
@@ -165,7 +206,8 @@ class OverlayTests(unittest.TestCase):
         self.assertIn('run_node npm ci', remote)
         self.assertIn('run_node npm run db:migrate', remote)
         self.assertIn('run_node npm run db:seed', remote)
-        self.assertIn('test -r /run/secrets/analytics-salt.env', remote)
+        self.assertIn('node -e', remote)
+        self.assertIn('ANALYTICS_HASH_SALT=', remote)
 
     def test_backup_manifest_includes_mode_and_overlay_integrity(self):
         backup = (SCRIPT.parents[2] / '.github/scripts/backup-rtrda02-production.sh').read_text()
