@@ -670,6 +670,33 @@ describe("applyProcurementTableOverrides", () => {
     expect(updated.contentHtml).not.toContain("<p>–</p>");
   });
 
+  it("shows the evacuation safety standard without its SS code and retains its original PDF", () => {
+    const source = record(
+      "/มาตรฐานระบบราง-สทร",
+      `<div class="lightweight-accordion"><details><summary class="lightweight-accordion-title"><strong>มาตรฐานงานเชื่อม</strong></summary><div class="lightweight-accordion-body"><p>–</p></div></details></div>`,
+    );
+    const updated = applyProcurementTableOverrides(source);
+    const $ = cheerio.load(updated.contentHtml, null, false);
+    const section = $(".rtrda-rail-safety-standards");
+
+    expect(section.find("h6").text()).toBe(
+      "มาตรฐานว่าด้วยการอพยพผู้ใช้บริการขนส่งทางราง กรณีเกิดเหตุอัคคีภัยหรือกรณีฉุกเฉิน",
+    );
+    expect(section.find("h6").text()).not.toContain("SS-1001:2569");
+    expect(section.find("img").attr("src")).toBe(
+      "/standards/ss-1001-2569-evacuation.jpg",
+    );
+    expect(
+      section
+        .find("a")
+        .map((_, element) => $(element).attr("href"))
+        .get(),
+    ).toEqual([
+      "/standards/ss-1001-2569-evacuation.pdf",
+      "/standards/ss-1001-2569-evacuation.pdf",
+    ]);
+  });
+
   it("adds development plan and standards compilation cards before high-speed rail", () => {
     const source = record(
       "/มาตรฐานระบบราง-สทร",

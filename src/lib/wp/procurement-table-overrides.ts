@@ -425,6 +425,16 @@ const railWeldingDocuments = [
   },
 ];
 
+const railSafetyTitle = "มาตรฐานระบบขนส่งทางรางด้านความปลอดภัย";
+const railSafetyDocuments = [
+  {
+    title:
+      "มาตรฐานว่าด้วยการอพยพผู้ใช้บริการขนส่งทางราง กรณีเกิดเหตุอัคคีภัยหรือกรณีฉุกเฉิน",
+    href: "/standards/ss-1001-2569-evacuation.pdf",
+    image: "/standards/ss-1001-2569-evacuation.jpg",
+  },
+];
+
 const otherRailStandardDocuments = [
   {
     title: "รายงานการพัฒนามาตรฐานระบบราง",
@@ -1066,7 +1076,7 @@ function buildRailStandardsCard(
       $("<a></a>")
         .addClass("simple-download-counter-link")
         .attr("data-pdf-reader-ignore", "true")
-        .attr("download", "")
+        .attr("download", document.href.split("/").pop() ?? "")
         .attr("href", document.href)
         .text("ดาวน์โหลดไฟล์"),
     );
@@ -1157,6 +1167,25 @@ function closeRailStandardsAccordions(record: WpContentRecord): WpContentRecord 
   return { ...record, contentHtml: $.html() };
 }
 
+function applyRailSafetyStandards(record: WpContentRecord): WpContentRecord {
+  const $ = cheerio.load(record.contentHtml, null, false);
+  const accordions = $(".lightweight-accordion");
+  const byTitle = (title: string) =>
+    accordions.filter(
+      (_, element) => $(element).find("summary").first().text().trim() === title,
+    );
+  if (byTitle(railSafetyTitle).length > 0) return record;
+
+  const welding = byTitle("มาตรฐานงานเชื่อม").first();
+  if (welding.length === 0) return record;
+  welding.before(
+    buildRailStandardsAccordion($, railSafetyTitle, railSafetyDocuments).addClass(
+      "rtrda-rail-safety-standards",
+    ),
+  );
+  return { ...record, contentHtml: $.html() };
+}
+
 export function applyProcurementTableOverrides(record: WpContentRecord): WpContentRecord {
   const path = normalized(record.path);
   if (path === QUARTERLY_WINNER_PATH || path === `/en${QUARTERLY_WINNER_PATH}`) {
@@ -1187,7 +1216,7 @@ export function applyProcurementTableOverrides(record: WpContentRecord): WpConte
     return applyCancelWinnerRows(record);
   }
   if (path === RAIL_STANDARDS_PATH || path === `/en${RAIL_STANDARDS_PATH}`) {
-    return closeRailStandardsAccordions(
+    const standards = closeRailStandardsAccordions(
       applyRailStandardsTables(
         applyRailDocumentCards(
           applyRailDocumentCards(
@@ -1202,6 +1231,7 @@ export function applyProcurementTableOverrides(record: WpContentRecord): WpConte
         ),
       ),
     );
+    return applyRailSafetyStandards(standards);
   }
   return record;
 }
