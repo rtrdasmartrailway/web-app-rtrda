@@ -30,6 +30,7 @@ describe("applyJobApplicationNoticeOverride", () => {
       `<table><tbody>
         <tr><td>1</td><td>28 กันยายน 2569</td><td>ประกาศเปิดรับสมัครงาน ตำแหน่ง เจ้าหน้าที่สนับสนุนงานนโยบายและแผน (จ้างเหมาบริการ)</td><td>1</td><td><a href="/old-form">สมัครงาน</a></td><td><a href="/old.pdf">PDF</a></td></tr>
         <tr><td>2</td><td>23 เมษายน 2569</td><td>ประกาศเดิม</td><td>–</td><td><a href="/older-form">สมัครงาน</a></td><td><a href="/older.pdf">PDF</a></td></tr>
+        <tr><td>3</td><td>23 พฤศจิกายน 2569</td><td>ประกาศรายชื่อผู้มีสิทธิ์เข้ารับการสอบคัดเลือกเป็นเจ้าหน้าที่ของสถาบันฯ ครั้งที่ 2/2569</td><td>–</td><td>–</td><td><a href="/old-eligible-candidates.pdf">PDF</a></td></tr>
       </tbody></table>`,
     );
 
@@ -48,12 +49,12 @@ describe("applyJobApplicationNoticeOverride", () => {
     ]);
     expect(eligibleCandidatesNotice.find("td").eq(1).text()).toBe("23 พฤศจิกายน 2569");
     expect(eligibleCandidatesNotice.find("td").eq(2).text()).toBe(
-      "ประกาศรายชื่อผู้มีสิทธิ์เข้ารับการสอบคัดเลือกเป็นเจ้าหน้าที่ของสถาบันฯ ครั้งที่ 2/2569",
+      "ประกาศรายชื่อผู้ผ่านการคัดเลือกเพื่อบรรจุแต่งตั้งเป็นเจ้าหน้าที่ของสถาบันฯ ตำแหน่ง นักวิเคราะห์วิชาการ / อาวุโส (วิศวกร)",
     );
     expect(eligibleCandidatesNotice.find("td").eq(3).text()).toBe("–");
     expect(eligibleCandidatesNotice.find("td").eq(4).text()).toBe("–");
     expect(eligibleCandidatesNotice.find("td").eq(5).find("a").attr("href")).toBe(
-      "/recruitment-documents/eligible-candidates-staff-selection-2-25691123.pdf",
+      "/recruitment-documents/selected-candidates-engineer-25691123.pdf",
     );
     expect(eligibleCandidatesNotice.find("td").eq(5).find("a").attr("target")).toBe(
       "_blank",

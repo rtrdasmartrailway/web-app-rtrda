@@ -8,11 +8,13 @@ const JOB_APPLICATION_PATH = "/ข่าวสาร-กิจกรรม/ร�
 const PREVIOUS_NOTICE_DATE = "28 กันยายน 2569";
 const TARGET_POSITION = "เจ้าหน้าที่สนับสนุนงานนโยบายและแผน";
 const NOTICE_DOCUMENT_URL = "/job-application-policy-planning-support-25691001.pdf";
-const ELIGIBLE_CANDIDATES_DATE = "23 พฤศจิกายน 2569";
-const ELIGIBLE_CANDIDATES_TITLE =
+const SELECTED_CANDIDATES_DATE = "23 พฤศจิกายน 2569";
+const PREVIOUS_SELECTED_CANDIDATES_TITLE =
   "ประกาศรายชื่อผู้มีสิทธิ์เข้ารับการสอบคัดเลือกเป็นเจ้าหน้าที่ของสถาบันฯ ครั้งที่ 2/2569";
-const ELIGIBLE_CANDIDATES_DOCUMENT_URL =
-  "/recruitment-documents/eligible-candidates-staff-selection-2-25691123.pdf";
+const SELECTED_CANDIDATES_TITLE =
+  "ประกาศรายชื่อผู้ผ่านการคัดเลือกเพื่อบรรจุแต่งตั้งเป็นเจ้าหน้าที่ของสถาบันฯ ตำแหน่ง นักวิเคราะห์วิชาการ / อาวุโส (วิศวกร)";
+const SELECTED_CANDIDATES_DOCUMENT_URL =
+  "/recruitment-documents/selected-candidates-engineer-25691123.pdf";
 
 function isJobApplicationPath(path: string): boolean {
   return normalizeRoutePath(path).replace(/^\/en(?=\/)/, "") === JOB_APPLICATION_PATH;
@@ -155,10 +157,10 @@ export function applyJobApplicationNoticeOverride(
   let changed = previous !== record;
   let row: Cheerio<AnyNode> = tbody
     .find("tr")
-    .filter(
-      (_, element) =>
-        $(element).find("td").eq(2).text().replace(/\s+/g, " ").trim() ===
-        ELIGIBLE_CANDIDATES_TITLE,
+    .filter((_, element) =>
+      [SELECTED_CANDIDATES_TITLE, PREVIOUS_SELECTED_CANDIDATES_TITLE].includes(
+        $(element).find("td").eq(2).text().replace(/\s+/g, " ").trim(),
+      ),
     )
     .first();
 
@@ -169,7 +171,7 @@ export function applyJobApplicationNoticeOverride(
   }
   if (!row.length || !row.find("td").length) {
     row = $("<tr></tr>");
-    ["", ELIGIBLE_CANDIDATES_DATE, ELIGIBLE_CANDIDATES_TITLE, "–", "–"].forEach(
+    ["", SELECTED_CANDIDATES_DATE, SELECTED_CANDIDATES_TITLE, "–", "–"].forEach(
       (text) => {
         row.append(
           $("<td></td>")
@@ -199,8 +201,8 @@ export function applyJobApplicationNoticeOverride(
       changed = true;
     }
   };
-  setCellText(1, ELIGIBLE_CANDIDATES_DATE);
-  setCellText(2, ELIGIBLE_CANDIDATES_TITLE);
+  setCellText(1, SELECTED_CANDIDATES_DATE);
+  setCellText(2, SELECTED_CANDIDATES_TITLE);
   setCellText(3, "–");
   setCellText(4, "–");
 
@@ -212,8 +214,8 @@ export function applyJobApplicationNoticeOverride(
     documentCell.append(documentLink);
     changed = true;
   }
-  if (documentLink.attr("href") !== ELIGIBLE_CANDIDATES_DOCUMENT_URL) {
-    documentLink.attr("href", ELIGIBLE_CANDIDATES_DOCUMENT_URL);
+  if (documentLink.attr("href") !== SELECTED_CANDIDATES_DOCUMENT_URL) {
+    documentLink.attr("href", SELECTED_CANDIDATES_DOCUMENT_URL);
     changed = true;
   }
   if (documentLink.text().trim() !== "PDF") {
