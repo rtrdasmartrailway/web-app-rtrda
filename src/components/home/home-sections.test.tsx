@@ -13,3 +13,12 @@ describe("home survey QR section", () => {
     expect(source).not.toContain("mot-5440");
   });
 });
+
+describe("service banner links", () => {
+  it("keeps the five internal service links on the current site", () => {
+    const links = [...source.matchAll(/href: "([^"]+)"/g)].map((match) => match[1]);
+    expect(links.filter((href) => href.startsWith("/"))).toHaveLength(5);
+    expect(links).not.toContainEqual(expect.stringContaining("test.rtrda.or.th"));
+    expect(links).toContain("https://nrail.rtrda.or.th/");
+  });
+});
