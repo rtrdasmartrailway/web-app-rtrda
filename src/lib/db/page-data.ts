@@ -36,6 +36,10 @@ import { applyItaHeadingsOverride } from "@/lib/wp/ita-headings-override";
 import { getStaticDownloadOverride } from "@/lib/wp/static-download-overrides";
 import { getSupplementalKnowledgePage } from "@/lib/wp/knowledge-supplemental-documents";
 import { getLandingGuidePage } from "@/lib/wp/landing-guide-pages";
+import {
+  isRailStrategyPublicationPath,
+  railStrategyPublicationGroups,
+} from "@/lib/wp/rail-strategy-publication";
 import { getMoralityReportPage } from "@/lib/wp/morality-report-documents";
 import { applyProcurementPlanOverride } from "@/lib/wp/procurement-plan";
 import { applyProcurementTableOverrides } from "@/lib/wp/procurement-table-overrides";
@@ -443,7 +447,9 @@ export const getPageData = cache(async (path: string): Promise<PageData | null> 
 
   const isHome = recordWithOverrides.path === "/" || recordWithOverrides.path === "/en";
   const isCategory = recordWithOverrides.kind === "category";
-  const isKnowledgeDocuments = isKnowledgeDocumentPath(recordWithOverrides.path);
+  const railStrategyPublication = isRailStrategyPublicationPath(recordWithOverrides.path);
+  const isKnowledgeDocuments =
+    isKnowledgeDocumentPath(recordWithOverrides.path) || railStrategyPublication;
   const isRailStandards = isRailStandardsPath(recordWithOverrides.path);
   const [
     childRecords,
@@ -495,15 +501,17 @@ export const getPageData = cache(async (path: string): Promise<PageData | null> 
     newsCards,
     categoryPagination,
     home,
-    knowledgeDocuments: isKnowledgeDocuments
-      ? buildKnowledgeDocumentGroups(recordWithOverrides.contentHtml, {
-          validDownloadIds: new Set(downloadIds),
-          excludedGroupTitles:
-            recordWithOverrides.path === "/คลังความรู้"
-              ? new Set(["มาตรฐานระบบราง สทร.", "ร่างมาตรฐานระบบราง สทร."])
-              : undefined,
-        })
-      : null,
+    knowledgeDocuments: railStrategyPublication
+      ? railStrategyPublicationGroups
+      : isKnowledgeDocuments
+        ? buildKnowledgeDocumentGroups(recordWithOverrides.contentHtml, {
+            validDownloadIds: new Set(downloadIds),
+            excludedGroupTitles:
+              recordWithOverrides.path === "/คลังความรู้"
+                ? new Set(["มาตรฐานระบบราง สทร.", "ร่างมาตรฐานระบบราง สทร."])
+                : undefined,
+          })
+        : null,
     boardExecutivePresentation: buildBoardExecutivePresentation(
       recordWithOverrides.path,
       recordWithOverrides.contentHtml,
