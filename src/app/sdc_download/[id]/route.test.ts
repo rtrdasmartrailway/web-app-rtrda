@@ -3,6 +3,7 @@ import {
   contentDisposition,
   contentTypeForDownload,
   isInlineRequest,
+  publicDownloadPath,
 } from "./download-response";
 import type { WpDownloadAsset } from "@/lib/wp/types";
 import { getStaticDownloadOverride } from "@/lib/wp/static-download-overrides";
@@ -49,5 +50,15 @@ describe("sdc_download route helpers", () => {
       expect(fallback?.localPath).toBe(`/sdc-downloads/${id}.pdf`);
       expect(fallback?.mimeType).toBe("application/pdf");
     }
+  });
+
+  it("serves the welding standard through the attachment download route", () => {
+    const fallback = getStaticDownloadOverride("ct-6002-6004-2568");
+
+    expect(fallback?.localPath).toBe("/wp-content/uploads/2026/01/CT-6002_6004_2568.pdf");
+    expect(contentDisposition(fallback!, false)).toContain("attachment;");
+    expect(publicDownloadPath(fallback!)).toMatch(
+      /public\/wp-content\/uploads\/2026\/01\/CT-6002_6004_2568\.pdf$/,
+    );
   });
 });

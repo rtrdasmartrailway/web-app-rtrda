@@ -69,6 +69,12 @@ export default function RootLayout({
   return (
     <html lang="th" className={thaiFont.variable}>
       <body>
+        <script
+          dangerouslySetInnerHTML={{
+            __html:
+              "document.documentElement.lang=location.pathname==='\/en'||location.pathname.startsWith('\/en/')?'en':'th';",
+          }}
+        />
         <WebAnalyticsTracker />
         {children}
       </body>

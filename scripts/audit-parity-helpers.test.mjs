@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   CATEGORY,
   classifyComparison,
+  detectRenderedPageKind,
   extractFlipbookPdfPath,
   extractPageSignals,
   extractRtrdaUrls,
@@ -90,6 +91,16 @@ describe("normalizeTitle", () => {
 
   it("strips new app suffix", () => {
     expect(normalizeTitle("ความเป็นมา | RTRDA")).toBe("ความเป็นมา");
+  });
+});
+
+describe("detectRenderedPageKind", () => {
+  it("detects the current Next.js content container", () => {
+    expect(detectRenderedPageKind('<main class="content-main">News</main>')).toBe("new");
+  });
+
+  it("keeps legacy WordPress markup on old selectors", () => {
+    expect(detectRenderedPageKind('<div class="siteContent">Legacy</div>')).toBe("old");
   });
 });
 

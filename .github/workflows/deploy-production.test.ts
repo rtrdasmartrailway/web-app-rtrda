@@ -14,6 +14,14 @@ const deployRemoteScript = readFileSync(
   join(process.cwd(), ".github/scripts/deploy-preprod-remote.sh"),
   "utf8",
 );
+const backupScript = readFileSync(
+  join(process.cwd(), ".github/scripts/backup-rtrda02-production.sh"),
+  "utf8",
+);
+const pruneBackupScript = readFileSync(
+  join(process.cwd(), ".github/scripts/prune-rtrda02-backups.sh"),
+  "utf8",
+);
 
 describe("Deploy rtrda.or.th production workflow", () => {
   it("deploys only an explicitly dispatched main SHA to cloud primary and rtrda02 fallback", () => {
@@ -67,5 +75,56 @@ describe("Deploy rtrda.or.th production workflow", () => {
     expect(deployTargetScript).toContain("public/wp-content/uploads/");
     expect(deployTargetScript).toContain("public/sdc-downloads/");
     expect(deployTargetScript).not.toContain("rsync -az --delete");
+  });
+
+  it("creates and verifies the RTRDA02 backup before replacing either production target", () => {
+    const backupIndex = workflow.indexOf("Backup current RTRDA02 production");
+    const cloudIndex = workflow.indexOf("Deploy exact main SHA to cloud primary");
+    const rtrda02Index = workflow.indexOf("Deploy exact main SHA to rtrda02 fallback");
+    expect(backupIndex).toBeGreaterThan(-1);
+    expect(backupIndex).toBeLessThan(cloudIndex);
+    expect(backupIndex).toBeLessThan(rtrda02Index);
+    expect(workflow).toContain("backup-rtrda02-production.sh");
+    expect(workflow).toContain("SHA256SUMS");
+  });
+
+  it("fails the backup closed and preserves rollback evidence", () => {
+    expect(backupScript).toContain('test "${#SOURCE_SHA}" -eq 40');
+    expect(backupScript).toContain('test "${#TARGET_SHA}" -eq 40');
+    expect(backupScript).toContain("pg_dump");
+    expect(backupScript).toContain("pg_restore --list");
+    expect(backupScript).toContain("cp -al");
+    expect(backupScript).toContain("public-assets.SHA256SUMS");
+    expect(backupScript).not.toContain("tar -czf");
+    expect(backupScript).toContain("release-manifest.json");
+    expect(backupScript).toContain('case "$IMAGE_REF" in');
+    expect(backupScript).toContain("sha256sum -c SHA256SUMS");
+    expect(backupScript).toContain("df -Pk");
+    expect(backupScript).toContain('stat -c %d "$TARGET_PATH"');
+    expect(backupScript).toContain('stat -c %d "$BACKUP_ROOT"');
+    expect(backupScript).toContain("RETENTION_COUNT=3");
+    expect(backupScript).not.toContain("rm -rf");
+    expect(backupScript).not.toContain(".env >");
+    expect(backupScript).not.toContain("cat .env");
+  });
+
+  it("prunes backups only after successful production verification", () => {
+    const verifyIndex = workflow.indexOf("Verify production parity and public health");
+    const integrityIndex = workflow.indexOf(
+      "Verify backup integrity after production deployment",
+    );
+    const pruneIndex = workflow.indexOf("Prune successful RTRDA02 backups");
+    expect(integrityIndex).toBeGreaterThan(verifyIndex);
+    expect(pruneIndex).toBeGreaterThan(integrityIndex);
+    expect(workflow).toContain("steps.backup.outputs.backup_dir");
+    expect(workflow).toContain("public-assets.SHA256SUMS");
+    expect(workflow).toContain("RELEASE_SUCCESS");
+    expect(pruneBackupScript).toContain("RETENTION_COUNT=3");
+    expect(pruneBackupScript).toContain("os.path.getmtime");
+    expect(pruneBackupScript).toContain("complete = os.path.isfile");
+    expect(pruneBackupScript).toContain('"RELEASE_SUCCESS"');
+    expect(pruneBackupScript).toContain("incomplete");
+    expect(pruneBackupScript).toContain('test "$old" != "$newest"');
+    expect(pruneBackupScript).toContain("rm -rf --");
   });
 });
