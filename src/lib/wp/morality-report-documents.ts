@@ -101,11 +101,15 @@ const corruptionRiskReportRoundOneTitle =
 const corruptionRiskReportRoundTwoPath = "/เอกสารเผยแพร่/report_2_2569";
 const corruptionRiskReportRoundTwoTitle =
   "รายงานการประเมินความเสี่ยงการทุจริต ประจำปีงบประมาณ พ.ศ. 2569 รอบที่ 2 รายงานผลการดำเนินการตามแผนบริหารจัดการความเสี่ยงการทุจริต";
+const noGiftPolicyReportPath = "/policy_no_gift_policy_2569";
+const noGiftPolicyReportTitle = "รายงานผลการดำเนินงานตามนโยบาย No Gift Policy 2569";
 
 const corruptionRiskReportRoundOnePdfPath =
   "/risk-reports/corruption-risk/report-1-2569.pdf?v=20260924";
 const corruptionRiskReportRoundTwoPdfPath =
   "/risk-reports/corruption-risk/report-2-2569.pdf?v=20260924-final";
+const noGiftPolicyReportPdfPath =
+  "/risk-reports/no-gift-policy/report-2569.pdf?v=20261008";
 
 function riskReportPdfContent(title: string, pdfPath: string): string {
   return `<div class="standalone-pdf-page"><p><a href="${pdfPath}" target="_blank" rel="noreferrer" data-pdf-reader-ignore="true">เปิด PDF ในแท็บใหม่</a></p><iframe src="${pdfPath}#toolbar=1&navpanes=1&view=FitH" title="${title}" loading="lazy"></iframe></div>`;
@@ -166,6 +170,13 @@ const moralityReportPages: MoralityReportPage[] = [
       corruptionRiskReportRoundTwoTitle,
       corruptionRiskReportRoundTwoPdfPath,
     ),
+  },
+  {
+    slug: "no-gift-policy-report-2569",
+    path: noGiftPolicyReportPath,
+    title: noGiftPolicyReportTitle,
+    groups: null,
+    contentHtml: riskReportPdfContent(noGiftPolicyReportTitle, noGiftPolicyReportPdfPath),
   },
 ];
 
