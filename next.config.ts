@@ -67,6 +67,14 @@ const nextConfig: NextConfig = {
         ],
       })),
       {
+        source: "/logged-files-internal/:path*",
+        headers: [
+          { key: "Cache-Control", value: "private, no-store" },
+          { key: "CDN-Cache-Control", value: "no-store" },
+          ...SAME_ORIGIN_FRAME_HEADERS,
+        ],
+      },
+      {
         source: "/documents/:path*",
         headers: [
           { key: "Cache-Control", value: "no-store" },
