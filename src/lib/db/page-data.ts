@@ -45,6 +45,10 @@ import { getMoralityReportPage } from "@/lib/wp/morality-report-documents";
 import { applyProcurementPlanOverride } from "@/lib/wp/procurement-plan";
 import { applyProcurementTableOverrides } from "@/lib/wp/procurement-table-overrides";
 import { applyProcurementWinnerOverride } from "@/lib/wp/procurement-winner";
+import {
+  applyPublicHearingDocumentsOverride,
+  isPublicHearingPath,
+} from "@/lib/wp/public-hearing-documents";
 import { normalizeRoutePath } from "@/lib/wp/url";
 import { extractPartnerLogos } from "@/lib/wp/home";
 import {
@@ -448,7 +452,7 @@ export const getPageData = cache(async (path: string): Promise<PageData | null> 
     ),
   );
   const overriddenRecord = applyProcurementTableOverrides(
-    applyProcurementWinnerOverride(record),
+    applyProcurementWinnerOverride(applyPublicHearingDocumentsOverride(record)),
   );
   const recordWithOverrides = {
     ...overriddenRecord,
@@ -459,7 +463,9 @@ export const getPageData = cache(async (path: string): Promise<PageData | null> 
   const isCategory = recordWithOverrides.kind === "category";
   const railStrategyPublication = isRailStrategyPublicationPath(recordWithOverrides.path);
   const isKnowledgeDocuments =
-    isKnowledgeDocumentPath(recordWithOverrides.path) || railStrategyPublication;
+    isKnowledgeDocumentPath(recordWithOverrides.path) ||
+    railStrategyPublication ||
+    isPublicHearingPath(recordWithOverrides.path);
   const isRailStandards = isRailStandardsPath(recordWithOverrides.path);
   const [
     childRecords,
@@ -516,6 +522,7 @@ export const getPageData = cache(async (path: string): Promise<PageData | null> 
       : isKnowledgeDocuments
         ? buildKnowledgeDocumentGroups(recordWithOverrides.contentHtml, {
             validDownloadIds: new Set(downloadIds),
+            compact: isPublicHearingPath(recordWithOverrides.path),
             excludedGroupTitles:
               recordWithOverrides.path === "/คลังความรู้"
                 ? new Set(["มาตรฐานระบบราง สทร.", "ร่างมาตรฐานระบบราง สทร."])
