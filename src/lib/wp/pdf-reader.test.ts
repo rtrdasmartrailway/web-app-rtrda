@@ -6,6 +6,19 @@ import {
 } from "./pdf-reader";
 
 describe("PDF reader helpers", () => {
+  it("pins the embedded recruitment notice to its approved document revision", async () => {
+    const path = "/recruitment-documents/recruitment-staff-selection-2-2569.pdf";
+    const targets = await buildPdfReaderTargets(
+      `<a href="${path}?v=20261028-65fb0227">PDF</a>`,
+      {
+        resolveDownload: async () => null,
+        resolveFlipbookPdf: async () => null,
+      },
+    );
+    expect(targets[0].inlineHref).toBe(`${path}?inline=1&v=65fb02272563f018`);
+    expect(targets[0].downloadHref).toBe(path);
+  });
+
   it("extracts download, direct PDF, and flipbook links while ignoring non-PDF links", () => {
     const links = extractPdfReaderLinks(`
       <a href="/sdc_download/5540">ดาวน์โหลดไฟล์</a>
