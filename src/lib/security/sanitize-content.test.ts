@@ -43,4 +43,13 @@ describe("sanitizeContentHtml", () => {
     expect(html).toContain('style="color:#003471"');
     expect(html).toContain('colspan="2"');
   });
+
+  it("preserves native download links", () => {
+    const html = sanitizeContentHtml(
+      '<a href="/wp-content/uploads/report.pdf" download="download" data-pdf-reader-ignore="true">ดาวน์โหลด</a>',
+    );
+
+    expect(html).toContain("download");
+    expect(html).toContain('data-pdf-reader-ignore="true"');
+  });
 });

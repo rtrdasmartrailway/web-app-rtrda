@@ -67,7 +67,9 @@
 .closeButton:hover,
 .closeButton:focus-visible,
 .toolbar a:hover,
-.toolbar a:focus-visible {
+.toolbar a:focus-visible,
+.toolbar button:hover,
+.toolbar button:focus-visible {
   outline: 3px solid rgba(46, 158, 255, 0.36);
   outline-offset: 2px;
 }
@@ -91,9 +93,15 @@
   text-decoration: none;
 }
 
-.toolbar a:last-child {
-  background: #eef5ff;
-  color: #063b80;
+.toolbar button {
+  background: linear-gradient(135deg, #006fc9, #063b80);
+  border: 0;
+  border-radius: 999px;
+  color: #fff;
+  cursor: pointer;
+  font: inherit;
+  font-weight: 800;
+  padding: 9px 16px;
 }
 
 .frameShell {
@@ -114,13 +122,39 @@
   z-index: 1;
 }
 
-.frame {
-  background: #fff;
-  border: 0;
+.pages {
+  align-items: center;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
   height: 100%;
+  overflow: auto;
+  padding: 16px;
   position: relative;
-  width: 100%;
   z-index: 2;
+}
+
+.page {
+  box-shadow: 0 3px 16px rgba(6, 43, 95, 0.24);
+  line-height: 0;
+  max-width: 100%;
+  width: 100%;
+}
+
+.page canvas {
+  display: block;
+  max-width: 100%;
+}
+
+.error {
+  color: #b42318;
+  font-weight: 700;
+  inset: 0;
+  margin: 0;
+  padding: 24px;
+  position: absolute;
+  text-align: center;
+  z-index: 3;
 }
 
 @media (max-width: 720px) {
@@ -150,6 +184,12 @@
   }
 
   .toolbar a {
+    flex: 1;
+    padding-inline: 10px;
+    text-align: center;
+  }
+
+  .toolbar button {
     flex: 1;
     padding-inline: 10px;
     text-align: center;

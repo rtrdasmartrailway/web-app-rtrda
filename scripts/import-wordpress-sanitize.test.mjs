@@ -54,4 +54,12 @@ describe("sanitizeAndRewrite", () => {
     expect($("th").text()).toBe("Header");
     expect($("td").text()).toBe("Cell");
   });
+
+  it("preserves the download attribute for local document links", () => {
+    const out = sanitizeAndRewrite(
+      '<a href="/wp-content/uploads/report.pdf" download="download">ดาวน์โหลด</a>',
+    );
+
+    expect(out).toContain("download");
+  });
 });

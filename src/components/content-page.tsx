@@ -6,6 +6,7 @@ import { ArticleCard } from "./article-card";
 import { BoardExecutiveContent } from "./board-executive-org-chart";
 import { CategoryNewsListing } from "./category-news-listing";
 import { CategoryPagination } from "./category-pagination";
+import { DownloadCaptcha } from "./download-captcha";
 import { HighSpeedRailStandardsContent } from "./high-speed-rail-standards";
 import { HomeHeroSlider } from "./home-hero-slider";
 import { HomeSections } from "./home/home-sections";
@@ -164,6 +165,7 @@ export function ContentPage({ data }: { data: PageData }) {
             )}
             <YutthLightbox />
             <PdfReader targets={data.pdfReaderTargets} language={record.language} />
+            <DownloadCaptcha siteKey={process.env.RECAPTCHA_SITE_KEY ?? ""} />
             <WpImageFallback />
 
             {/* Category listings already show their own news cards; skip related. */}
