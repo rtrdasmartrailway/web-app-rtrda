@@ -168,6 +168,14 @@ describe("applyProcurementTableOverrides", () => {
     expect(rowsForYear(updated.contentHtml, "ปี 2570")).toEqual([
       [
         "1",
+        "10 พฤศจิกายน 2569",
+        "การเช่าเช่ายานพาหนะ (รถตู้โดยสารขนาด 12 ที่นั่ง) จำนวน 1 คัน ตามประกาศ สถาบันวิจัยและพัฒนาเทคโนโลยีระบบราง (องค์การมหาชน)",
+        "1,485,000.00",
+        "สทร.02/2570",
+        "PDF",
+      ],
+      [
+        "2",
         "1 ตุลาคม 2569",
         "ประกวดราคาเช่ายานพาหนะ (รถตู้โดยสารขนาด 12 ที่นั่ง) จำนวน 1 คัน ด้วยวิธีประกวดราคาอิเล็กทรอนิกส์ (e-bidding)",
         "1,485,000.00",
@@ -177,6 +185,9 @@ describe("applyProcurementTableOverrides", () => {
     ]);
     expect(updated.contentHtml).toContain(
       'href="/procurement-invitation-van-rental-12-seat-2570-25691001.pdf"',
+    );
+    expect(updated.contentHtml).toContain(
+      'href="/procurement-invitation-van-rental-2570-25691110.pdf"',
     );
     expect(rowsForYear(updated.contentHtml, "ปี 2569")).toEqual([
       ["1", "4 มิถุนายน 2569", "ประกาศเดิม", "2,000,000.00", "–", "PDF"],
@@ -715,7 +726,7 @@ describe("applyProcurementTableOverrides", () => {
     );
   });
 
-  it("keeps the 2569 cancellation/winner table empty", () => {
+  it("adds the algorithm cancellation announcement to the 2570 table", () => {
     const source = record(
       "/จัดซื้อจัดจ้าง/ยกเลิกประกาศเชิญชวน-ผู้",
       `<div class="lightweight-accordion"><details><summary><h1><strong>ปี 2568</strong></h1></summary><div class="lightweight-accordion-body"><figure class="wp-block-table"><table><thead><tr><th>ลำดับ</th><th>วันที่ประกาศ</th><th>โครงการ</th><th>สถานะ</th><th>เอกสาร</th></tr></thead><tbody><tr><td>1</td><td>13 สิงหาคม 2568</td><td>รายการเดิม</td><td>เผยแพร่ขึ้นเว็บ</td><td><a href="/old.pdf">PDF</a></td></tr></tbody></table></figure></div></details></div>`,
@@ -724,11 +735,17 @@ describe("applyProcurementTableOverrides", () => {
     const $ = cheerio.load(updated.contentHtml, null, false);
     const firstAccordion = $(".lightweight-accordion").first();
 
-    expect(firstAccordion.find("summary").text()).toContain("ปี 2569");
-    expect(firstAccordion.find("tbody tr")).toHaveLength(0);
-    expect(updated.contentHtml).not.toContain(
-      "procurement-cancel-winner-consultant-ip-management-25690708.pdf",
+    expect(firstAccordion.find("summary").text()).toContain("ปี 2570");
+    const row = firstAccordion.find("tbody tr");
+    expect(row).toHaveLength(1);
+    expect(row.text()).toContain("5 พฤศจิกายน 2569");
+    expect(row.text()).toContain("งานจ้างที่ปรึกษาโครงการศึกษาพัฒนา Algorithm");
+    expect(row.text()).toContain("เผยแพร่ขึ้นเว็บ");
+    expect(row.find("a").text()).toBe("PDF");
+    expect(row.find("a").attr("href")).toBe(
+      "/procurement-documents/cancel-winner-algorithm-25691105.pdf",
     );
+    expect(applyProcurementTableOverrides(updated).contentHtml).toBe(updated.contentHtml);
   });
 
   it("adds the National Rolling Stock Company winner row for 2569", () => {

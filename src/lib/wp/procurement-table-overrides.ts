@@ -60,6 +60,19 @@ const procurementPriceRows: TableRowSpec[] = [
   },
 ];
 
+const cancelWinnerRows: TableRowSpec[] = [
+  {
+    matchText:
+      "งานจ้างที่ปรึกษาโครงการศึกษาพัฒนา Algorithm เพื่อตรวจจับและแจ้งเตือนการฝ่าฝืนไม้กั้นทางรถไฟ",
+    cells: [
+      "5 พฤศจิกายน 2569",
+      "งานจ้างที่ปรึกษาโครงการศึกษาพัฒนา Algorithm เพื่อตรวจจับและแจ้งเตือนการฝ่าฝืนไม้กั้นทางรถไฟ ณ จุดตัดทางรถไฟแนวระดับ โดยวิธีจ้างที่ปรึกษาโดยวิธีเฉพาะเจาะจง",
+      PUBLISHED_STATUS,
+    ],
+    href: "/procurement-documents/cancel-winner-algorithm-25691105.pdf",
+  },
+];
+
 const summaryRows: TableRowSpec[] = [
   {
     matchText: "9 ตุลาคม 2569 สรุปผลการดำเนินการจัดซื้อจัดจ้างในรอบเดือน กันยายน 2569",
@@ -123,7 +136,17 @@ const procurementDraftRows2570: TableRowSpec[] = [
 
 const procurementInvitationRows2570: TableRowSpec[] = [
   {
-    matchText: "รถตู้โดยสารขนาด 12 ที่นั่ง) จำนวน 1 คัน",
+    matchText: "สทร.02/2570",
+    cells: [
+      "10 พฤศจิกายน 2569",
+      "การเช่าเช่ายานพาหนะ (รถตู้โดยสารขนาด 12 ที่นั่ง) จำนวน 1 คัน ตามประกาศ สถาบันวิจัยและพัฒนาเทคโนโลยีระบบราง (องค์การมหาชน)",
+      "1,485,000.00",
+      "สทร.02/2570",
+    ],
+    href: "/procurement-invitation-van-rental-2570-25691110.pdf",
+  },
+  {
+    matchText: "ประกวดราคาเช่ายานพาหนะ (รถตู้โดยสารขนาด 12 ที่นั่ง) จำนวน 1 คัน",
     cells: [
       "1 ตุลาคม 2569",
       "ประกวดราคาเช่ายานพาหนะ (รถตู้โดยสารขนาด 12 ที่นั่ง) จำนวน 1 คัน ด้วยวิธีประกวดราคาอิเล็กทรอนิกส์ (e-bidding)",
@@ -654,18 +677,13 @@ function applyProcurementPriceRows(record: WpContentRecord): WpContentRecord {
   return changed ? { ...record, contentHtml: $.html() } : record;
 }
 
-function applyEmptyCancelWinnerTable(record: WpContentRecord): WpContentRecord {
+function applyCancelWinnerRows(record: WpContentRecord): WpContentRecord {
   const $ = cheerio.load(record.contentHtml, null, false);
-  const hasYearTable = findYearTable($, YEAR_2569).length > 0;
-  const tbody = ensureYearTable($, YEAR_2569);
+  ensureYearTable($, YEAR_2569);
+  const tbody = ensureYearTable($, YEAR_2570);
   if (tbody.length === 0) return record;
-
-  const hasRows = tbody.find("tr").length > 0;
-  if (hasRows) {
-    tbody.empty();
-  }
-
-  return !hasYearTable || hasRows ? { ...record, contentHtml: $.html() } : record;
+  upsertRows($, tbody, cancelWinnerRows);
+  return { ...record, contentHtml: $.html() };
 }
 
 function applyProcurementDraftYearTable(record: WpContentRecord): WpContentRecord {
@@ -1126,7 +1144,7 @@ export function applyProcurementTableOverrides(record: WpContentRecord): WpConte
     path === PROCUREMENT_CANCEL_WINNER_PATH ||
     path === `/en${PROCUREMENT_CANCEL_WINNER_PATH}`
   ) {
-    return applyEmptyCancelWinnerTable(record);
+    return applyCancelWinnerRows(record);
   }
   if (path === RAIL_STANDARDS_PATH || path === `/en${RAIL_STANDARDS_PATH}`) {
     return closeRailStandardsAccordions(
