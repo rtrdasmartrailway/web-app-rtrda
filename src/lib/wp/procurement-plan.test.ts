@@ -55,7 +55,7 @@ function firstColumnValues(html: string, accordionIndex: number): string[] {
 }
 
 describe("applyProcurementPlanOverride", () => {
-  it("prepends the 23 July 2569 procurement plan row with its PDF", () => {
+  it("prepends the 3 September 2569 procurement plan row with its PDF", () => {
     const updated = applyProcurementPlanOverride(record({}));
     const $ = cheerio.load(updated.contentHtml, null, false);
     const firstRowCells = $(".lightweight-accordion")
@@ -66,37 +66,44 @@ describe("applyProcurementPlanOverride", () => {
 
     expect(firstRowCells.map((_, cell) => $(cell).text().trim()).get()).toEqual([
       "1",
-      "23 กรกฎาคม 2569",
-      "จ้างที่ปรึกษาโครงการส่งเสริมการแข่งขันและส่งเสริมสภาพแวดล้อมระบบรางเพื่อส่งเสริมการใช้งานระบบราง",
+      "3 กันยายน 2569",
+      "เผยแพร่แผนการจัดซื้อจัดจ้าง ประจำปีงบประมาณ พ.ศ. 2570",
       "เผยแพร่ขึ้นเว็บ",
       "PDF",
     ]);
     expect(firstRowCells.last().find("a").attr("href")).toBe(
-      "/wp-content/uploads/2026/07/procurement-plan-rail-competition-25690723.pdf",
+      "/wp-content/uploads/2026/09/procurement-plan-fiscal-year-2570-25690903.pdf",
     );
   });
 
   it("renumbers only the 2569 procurement plan table from top to bottom", () => {
     const updated = applyProcurementPlanOverride(record({}));
 
-    expect(firstColumnValues(updated.contentHtml, 0)).toEqual(["1", "2", "3", "4", "5"]);
+    expect(firstColumnValues(updated.contentHtml, 0)).toEqual([
+      "1",
+      "2",
+      "3",
+      "4",
+      "5",
+      "6",
+    ]);
     expect(firstColumnValues(updated.contentHtml, 1)).toEqual(["1", "2"]);
   });
 
   it("preserves row order, project text, and PDF links", () => {
     const updated = applyProcurementPlanOverride(record({}));
     const $ = cheerio.load(updated.contentHtml, null, false);
-    const firstExistingRowCells = $(".lightweight-accordion")
+    const secondExistingRowCells = $(".lightweight-accordion")
       .first()
       .find("tbody tr")
-      .eq(1)
+      .eq(2)
       .find("td");
 
-    expect(firstExistingRowCells.eq(1).text().trim()).toBe("16 กรกฎาคม 2569");
-    expect(firstExistingRowCells.eq(2).text().trim()).toBe(
+    expect(secondExistingRowCells.eq(1).text().trim()).toBe("16 กรกฎาคม 2569");
+    expect(secondExistingRowCells.eq(2).text().trim()).toBe(
       "จ้างที่ปรึกษาศึกษาพัฒนา Algorithm เพื่อตรวจจับและแจ้งเตือนการฝ่าฝืนไม้กั้นทางรถไฟ ณ จุดตัดทางรถไฟแนวระดับ",
     );
-    expect(firstExistingRowCells.eq(4).find("a").attr("href")).toBe(
+    expect(secondExistingRowCells.eq(4).find("a").attr("href")).toBe(
       "/wp-content/uploads/2026/07/ประกาศแผนจัดซื้อจัดจ้าง_16_07_2569.pdf?v=20260716",
     );
   });

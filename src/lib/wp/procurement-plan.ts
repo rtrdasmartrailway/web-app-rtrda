@@ -6,6 +6,11 @@ const PROCUREMENT_PLAN_PATH = "/จัดซื้อจัดจ้าง/แ�
 const PROCUREMENT_PLAN_YEAR = "ปี 2569";
 const PROCUREMENT_PLAN_ROWS_2569 = [
   {
+    date: "3 กันยายน 2569",
+    project: "เผยแพร่แผนการจัดซื้อจัดจ้าง ประจำปีงบประมาณ พ.ศ. 2570",
+    href: "/wp-content/uploads/2026/09/procurement-plan-fiscal-year-2570-25690903.pdf",
+  },
+  {
     date: "23 กรกฎาคม 2569",
     project:
       "จ้างที่ปรึกษาโครงการส่งเสริมการแข่งขันและส่งเสริมสภาพแวดล้อมระบบรางเพื่อส่งเสริมการใช้งานระบบราง",
