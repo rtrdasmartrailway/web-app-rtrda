@@ -165,6 +165,13 @@ export function ContentPage({ data }: { data: PageData }) {
               <HomeSections home={data.home} language={record.language} />
             ) : isRailStandardsPath(record.path) ? (
               <HighSpeedRailStandardsContent html={record.contentHtml} />
+            ) : record.path === "/Recruitment_Announcement_rtrda_1" &&
+              inlineRiskReportTarget ? (
+              <InlineRiskReportPdf
+                target={inlineRiskReportTarget}
+                title={record.title}
+                allWidths
+              />
             ) : inlineRiskReportTarget ? (
               <>
                 <div className="risk-report-pdf-desktop">

@@ -6,9 +6,11 @@ import type { PdfReaderTarget } from "@/lib/wp/pdf-reader";
 export function InlineRiskReportPdf({
   target,
   title,
+  allWidths = false,
 }: {
   target: PdfReaderTarget;
   title: string;
+  allWidths?: boolean;
 }) {
   const pagesRef = useRef<HTMLDivElement>(null);
   const [isMobile, setIsMobile] = useState(false);
@@ -24,7 +26,7 @@ export function InlineRiskReportPdf({
 
   useEffect(() => {
     const pages = pagesRef.current;
-    if (!isMobile || !pages) return;
+    if ((!isMobile && !allWidths) || !pages) return;
 
     let cancelled = false;
     let observer: IntersectionObserver | undefined;
@@ -129,10 +131,14 @@ export function InlineRiskReportPdf({
       observer?.disconnect();
       void loadingTask?.destroy();
     };
-  }, [isMobile, target.inlineHref]);
+  }, [isMobile, allWidths, target.inlineHref]);
 
   return (
-    <section className="inline-risk-report" aria-label={title}>
+    <section
+      className="inline-risk-report"
+      aria-label={title}
+      style={allWidths ? { display: "grid" } : undefined}
+    >
       <div className="inline-risk-report-toolbar">
         <span>{title}</span>
         <a href={target.downloadHref} target="_blank" rel="noreferrer">
