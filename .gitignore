@@ -16,6 +16,8 @@
 # next.js
 /.next/
 /out/
+public/wp-content/uploads/
+src/data/wp-content.json
 
 # production
 /build

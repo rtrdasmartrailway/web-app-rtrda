@@ -1,0 +1,12 @@
+.git
+.github
+.next
+node_modules
+npm-debug.log*
+.env
+.env.*
+.DS_Store
+coverage
+public/wp-content/uploads
+.worktrees
+worktrees

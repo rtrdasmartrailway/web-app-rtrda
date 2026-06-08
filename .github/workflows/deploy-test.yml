@@ -1,0 +1,57 @@
+name: Deploy test.rtrda.or.th
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+concurrency:
+  group: web-app-rtrda-test
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Build and deploy test site
+    runs-on:
+      - self-hosted
+      - linux
+      - x64
+      - rtrda-web-test
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Import WordPress content
+        run: npm run import:wordpress
+
+      - name: Run unit tests
+        run: npm test
+
+      - name: Run lint
+        run: npm run lint
+
+      - name: Build and restart Docker Compose service
+        run: docker compose up -d --build web-app-rtrda-test
+
+      - name: Wait for local health check
+        run: |
+          for attempt in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:3020 >/dev/null; then
+              exit 0
+            fi
+            sleep 3
+          done
+          docker compose ps
+          docker compose logs --tail=120 web-app-rtrda-test
+          exit 1
