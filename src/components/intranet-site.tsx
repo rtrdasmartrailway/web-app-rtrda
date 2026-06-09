@@ -80,7 +80,7 @@ export function IntranetShell({ children }: { children: React.ReactNode }) {
     <div className="intranet-shell">
       <header className="intranet-header">
         <div className="intranet-header-inner">
-          <a href="/intranet" className="intranet-logo-link">
+          <a href="/rtrdaintranet" className="intranet-logo-link">
             <Image
               src="/intranet/icons/White-logo-02.png"
               alt="RTRDA INTRANET"
