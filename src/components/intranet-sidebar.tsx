@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { createPortal } from "react-dom";
 import { NAV } from "@/data/intranet";
 
 const SOCIAL = [
@@ -53,89 +54,128 @@ const SOCIAL = [
 
 export function IntranetSidebar() {
   const [open, setOpen] = useState(false);
+  const [mounted, setMounted] = useState(false);
+
+  // Portals need a DOM target, which only exists on the client.
+  useEffect(() => setMounted(true), []);
+
+  // Lock background scroll while the drawer is open.
+  useEffect(() => {
+    if (!open) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, [open]);
+
+  // Close on Escape.
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && setOpen(false);
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [open]);
 
   return (
     <>
-      {/* Hamburger button in header */}
+      {/* Hamburger button stays in the header */}
       <button
-        className="intranet-hamburger"
-        aria-label="Toggle sidebar & navigation"
+        type="button"
+        aria-label="Open navigation"
+        aria-expanded={open}
         onClick={() => setOpen(true)}
+        className="ml-auto flex h-10 w-10 flex-shrink-0 cursor-pointer flex-col justify-center gap-[5px] p-2"
       >
-        <span className="intranet-hamburger-bar" />
-        <span className="intranet-hamburger-bar" />
-        <span className="intranet-hamburger-bar" />
+        <span className="block h-0.5 w-[22px] rounded bg-white" />
+        <span className="block h-0.5 w-[22px] rounded bg-white" />
+        <span className="block h-0.5 w-[22px] rounded bg-white" />
       </button>
 
-      {/* Backdrop */}
-      {open && (
-        <div
-          className="intranet-sidebar-backdrop"
-          onClick={() => setOpen(false)}
-          aria-hidden="true"
-        />
-      )}
+      {/* Drawer is portaled to <body> so it overlays every other component. */}
+      {mounted &&
+        createPortal(
+          <div
+            aria-hidden={!open}
+            className={`fixed inset-0 z-[1000] ${open ? "" : "pointer-events-none"}`}
+          >
+            {/* Backdrop */}
+            <div
+              onClick={() => setOpen(false)}
+              aria-hidden="true"
+              className={`absolute inset-0 bg-black/50 transition-opacity duration-300 ${
+                open ? "opacity-100" : "opacity-0"
+              }`}
+            />
 
-      {/* Slide-out panel */}
-      <aside
-        className={`intranet-sidebar${open ? " intranet-sidebar--open" : ""}`}
-        aria-label="Navigation sidebar"
-      >
-        {/* Close button */}
-        <button
-          className="intranet-sidebar-close"
-          aria-label="Close navigation"
-          onClick={() => setOpen(false)}
-        >
-          <span className="intranet-hamburger-bar" />
-          <span className="intranet-hamburger-bar" />
-          <span className="intranet-hamburger-bar" />
-        </button>
+            {/* Right-side drawer panel */}
+            <aside
+              aria-label="Navigation sidebar"
+              className={`absolute right-0 top-0 flex h-[100dvh] w-[280px] max-w-[85vw] flex-col overflow-hidden border-l border-[#d9e1ea] bg-white shadow-2xl [font-family:'Amiko',sans-serif] transition-transform duration-300 ease-out ${
+                open ? "translate-x-0" : "translate-x-full"
+              }`}
+            >
+              {/* Close button */}
+              <button
+                type="button"
+                onClick={() => setOpen(false)}
+                aria-label="Close navigation"
+                className="m-3 ml-auto flex h-11 w-11 cursor-pointer items-center justify-center text-[#003b79]/80 transition-colors hover:text-[#003b79]"
+              >
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
+                  <path d="M6 6l12 12M18 6L6 18" />
+                </svg>
+              </button>
 
-        {/* Mobile nav — scrollable */}
-        <div className="intranet-sidenav-scroll">
-          <nav aria-label="Mobile Navigation">
-            <ul className="intranet-sidenav-list">
-              {NAV.map((group) => (
-                <li key={group.label} className="intranet-sidenav-group">
-                  <span className="intranet-sidenav-heading">{group.label}</span>
-                  <ul className="intranet-sidenav-children">
-                    {group.children.map((item) => (
-                      <li key={item.label}>
-                        <a
-                          href={item.href}
-                          className="intranet-sidenav-link"
-                          target={item.href !== "#" ? "_blank" : undefined}
-                          rel={item.href !== "#" ? "noopener noreferrer" : undefined}
-                          onClick={() => setOpen(false)}
-                        >
-                          {item.label}
-                        </a>
+              {/* Scrollable nav */}
+              <div className="flex-1 overflow-y-auto overscroll-contain">
+                <nav aria-label="Mobile Navigation">
+                  <ul className="list-none p-0 pb-4">
+                    {NAV.map((group) => (
+                      <li key={group.label} className="border-b border-[#d9e1ea]">
+                        <span className="block px-6 pb-1.5 pt-3 text-[13px] font-bold uppercase tracking-wider text-[#003b79]">
+                          {group.label}
+                        </span>
+                        <ul className="list-none pb-2">
+                          {group.children.map((item) => (
+                            <li key={item.label}>
+                              <a
+                                href={item.href}
+                                className="block px-6 py-2 text-[13px] text-[#1d2733] transition-colors hover:bg-[#f5f8fb] hover:text-[#003b79]"
+                                target={item.href !== "#" ? "_blank" : undefined}
+                                rel={item.href !== "#" ? "noopener noreferrer" : undefined}
+                                onClick={() => setOpen(false)}
+                              >
+                                {item.label}
+                              </a>
+                            </li>
+                          ))}
+                        </ul>
                       </li>
                     ))}
                   </ul>
-                </li>
-              ))}
-            </ul>
-          </nav>
-        </div>
+                </nav>
+              </div>
 
-        {/* Social links — always visible at bottom */}
-        <div className="intranet-sidebar-social">
-          {SOCIAL.map((s) => (
-            <a
-              key={s.label}
-              href={s.href}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="intranet-social-link"
-              aria-label={s.label}
-            >
-              {s.icon}
-            </a>
-          ))}
-        </div>
-      </aside>
+              {/* Social links pinned at the bottom */}
+              <div className="flex flex-shrink-0 items-center gap-3 border-t border-[#d9e1ea] px-6 py-4">
+                {SOCIAL.map((s) => (
+                  <a
+                    key={s.label}
+                    href={s.href}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    aria-label={s.label}
+                    className="text-[#003b79]/80 transition-colors hover:text-[#003b79]"
+                  >
+                    {s.icon}
+                  </a>
+                ))}
+              </div>
+            </aside>
+          </div>,
+          document.body,
+        )}
     </>
   );
 }
