@@ -71,3 +71,47 @@ Rail Technology Research and Development Agency (สทร.)
 ├── ประชาพิจารณ์ [https://www.rtrda.or.th/ประชาพิจารณ์] [EN: https://www.rtrda.or.th/en/ประชาพิจารณ์]
 ├── ช่องทางการแจ้งเรื่องร้องเรียน [https://www.rtrda.or.th/ช่องทางการแจ้งเรื่องร้] [EN: https://www.rtrda.or.th/en/ช่องทางการแจ้งเรื่องร้]
 └── ช่องทางการแจ้งเรื่องทุจริต [https://www.rtrda.or.th/ช่องทางการแจ้งเรื่องกา] [EN: https://www.rtrda.or.th/en/ช่องทางการแจ้งเรื่องกา]
+
+## RTRDA INTRANET (Staff Portal)
+
+Source: https://www.rtrda.or.th/rtrdaintranet/ (accessible on RTRDA internal network only)
+Next.js base route: /intranet
+
+RTRDA INTRANET
+├── (Homepage) RTRDA One Page [https://www.rtrda.or.th/rtrdaintranet/] [Next.js: /intranet]
+│   └── Icon grid: 11 shortcuts to internal systems
+│       ├── ปฏิทินกิจกรรม สทร. (Icon-Intranet-04) → Google Calendar
+│       ├── (Icon-Intranet-05) → Google Forms (form A)
+│       ├── (Icon-Intranet-06) → Google Forms (form B)
+│       ├── ระบบบริหารงานทรัพยากรองค์กรภาครัฐ (ERP) → https://erp.rtrda.or.th/login
+│       ├── ระบบเทคโนโลยีสารสนเทศเพื่อการติดตามและรายงานผลปฏิบัติงาน (e-Handbook) → https://ehandbook.rtrda.or.th/
+│       ├── ระบบบริหารงานบุคคล (ATHM) → https://rtrda.athm-hr.com/#/account/login
+│       ├── ระบบสารบรรณอิเล็กทรอนิกส์ (e-Saraban) → https://rtrda.e-office.cloud/portal/home
+│       ├── ระบบจดหมายอิเล็กทรอนิกส์ (e-mail) → https://outlook.office.com/mail/
+│       ├── ChatGPT → https://chatgpt.com/
+│       ├── ฐานข้อมูลด้านเทคโนโลยีระบบรางของประเทศ (NRAIL) → https://nrail.rtrda.or.th/
+│       └── Executive Report → https://rtrda.cloudhm.io/index.php/f/1003378
+├── SCHEDULE VAN [https://www.rtrda.or.th/rtrdaintranet/index.php/schedule-van/] [Next.js: /intranet/schedule-van]
+├── VICE PRESIDENT [https://www.rtrda.or.th/rtrdaintranet/index.php/vice-president/] [Next.js: /intranet/vice-president]
+├── Blog [https://www.rtrda.or.th/rtrdaintranet/index.php/blog/] [Next.js: /intranet/blog]
+│   └── Post: สถาบันวิจัยและพัฒนาเทคโนโลยีระบบราง (องค์การมหาชน)
+└── (unused) Front Page/Teluro [https://www.rtrda.or.th/rtrdaintranet/index.php/teluro/] — empty, not cloned
+
+Navigation (all links open external URLs in new tab):
+├── CALENDAR SYSTEM
+│   ├── RTRDA → Google Calendar (RTRDA org)
+│   ├── PRESIDENT → # (no link)
+│   └── DIRECTOR D1 → # (no link)
+├── MEETING ROOM
+│   ├── SCHEDULE → Google Calendar (meeting rooms)
+│   └── RESERVE → Google Forms
+├── CAR RESERVATION
+│   ├── SCHEDULE CAR → Google Calendar (car pool)
+│   ├── SCHEDULE VAN → Google Calendar (van pool)
+│   └── Booking → Google Forms
+├── STAFF
+│   └── RTRDA STAFF → Google Spreadsheet
+└── CLOUD DRIVE
+    ├── ONE DRIVE (ส่วนตัว) → OneDrive sign-in
+    ├── Cloud SHARE (ส่วนกลาง) → https://rtrda.cloudhm.io/
+    └── คู่มือการใช้งาน และตัวติดตั้ง Cloud Share (ส่วนกลาง) → https://rtrda.cloudhm.io/index.php/s/jtstEtq547bGpzA
