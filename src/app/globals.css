@@ -377,21 +377,33 @@ input {
 }
 
 .site-footer {
-  background: #102438;
-  color: #dce7f2;
-  padding: 42px 0;
+  background: var(--surface);
+  border-top: 4px solid var(--primary-dark);
+  color: var(--foreground);
+  padding: 48px 0 0;
 }
 
 .footer-grid {
   display: grid;
-  gap: 30px;
-  grid-template-columns: 1.4fr 1fr 1.2fr;
+  gap: 36px 40px;
+  grid-template-columns: 1.5fr 1fr 1fr 0.9fr;
+  padding-bottom: 40px;
 }
 
 .site-footer h2 {
-  color: #fff;
-  font-size: 18px;
-  margin: 0 0 12px;
+  color: var(--primary);
+  font-size: 15px;
+  font-weight: 700;
+  margin: 0 0 14px;
+}
+
+.site-footer h3 {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  margin: 18px 0 10px;
+  text-transform: uppercase;
 }
 
 .site-footer p,
@@ -401,15 +413,103 @@ input {
 
 .site-footer ul {
   display: grid;
-  gap: 8px;
+  gap: 9px;
+  font-size: 14px;
   list-style: none;
   padding: 0;
 }
 
-.freshness {
-  color: #9fb1c3;
+.site-footer a:hover {
+  color: var(--primary);
+  text-decoration: underline;
+}
+
+.footer-org-name {
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1.4;
+  margin: 10px 0 10px;
+}
+
+.footer-address {
+  color: var(--muted);
   font-size: 13px;
-  margin-top: 14px !important;
+  line-height: 1.6;
+  margin: 0 0 12px;
+}
+
+.footer-contact {
+  display: grid;
+  font-size: 14px;
+  gap: 6px;
+}
+
+.footer-visitor {
+  background: white;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-size: 13px;
+  margin-top: 20px;
+  padding: 14px 16px;
+}
+
+.footer-visitor-title {
+  color: var(--foreground);
+  font-size: 13px;
+  font-weight: 600;
+  margin-bottom: 10px;
+}
+
+.footer-visitor-row {
+  align-items: center;
+  color: var(--muted);
+  display: flex;
+  justify-content: space-between;
+  padding: 3px 0;
+}
+
+.footer-visitor-num {
+  color: var(--primary);
+  font-weight: 600;
+}
+
+.footer-visitor-total {
+  align-items: baseline;
+  border-top: 1px solid var(--border);
+  display: flex;
+  font-size: 14px;
+  font-weight: 700;
+  justify-content: space-between;
+  margin-top: 8px;
+  padding-top: 8px;
+}
+
+.footer-visitor-total-num {
+  color: var(--primary);
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.footer-visitor-sublabel {
+  color: var(--muted);
+  display: block;
+  font-size: 11px;
+  text-align: right;
+}
+
+.footer-bar {
+  background: white;
+  border-top: 1px solid var(--border);
+  color: var(--muted);
+  font-size: 13px;
+  padding: 16px 0;
+  text-align: center;
+}
+
+@media (max-width: 1024px) {
+  .footer-grid {
+    grid-template-columns: 1fr 1fr;
+  }
 }
 
 @media (max-width: 760px) {

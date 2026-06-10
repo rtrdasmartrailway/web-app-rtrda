@@ -1,7 +1,8 @@
 import Link from "next/link";
 import Image from "next/image";
 import type { WpContentRecord, WpImportManifest, WpLanguage } from "@/lib/wp/types";
-import { findContentByPath, getNavigationTree } from "@/lib/wp/content-store";
+import { findContentByPath } from "@/lib/wp/content-store";
+import { SiteFooter } from "./SiteFooter";
 
 const primaryNav = {
   th: [
@@ -77,9 +78,7 @@ export function SiteShell({
   path: string;
 }) {
   const language = currentLanguage(path);
-  const generatedDate = formatDate(manifest.generatedAt, language);
   const alternate = counterpartPath(manifest, path, language);
-  const navigationTree = getNavigationTree(manifest.records, language).slice(0, 8);
 
   return (
     <div className="site-shell">
@@ -135,40 +134,7 @@ export function SiteShell({
 
       <main>{children}</main>
 
-      <footer className="site-footer">
-        <div className="site-container footer-grid">
-          <section>
-            <h2>{language === "th" ? "สทร." : "RTRDA"}</h2>
-            <p>
-              {language === "th"
-                ? "หน่วยงานวิจัยและพัฒนาเทคโนโลยีระบบราง เพื่อยกระดับระบบรางไทยอย่างยั่งยืน"
-                : "Research and development for Thailand rail technology and sustainable rail systems."}
-            </p>
-            <p className="freshness">
-              {language === "th" ? "ข้อมูลนำเข้าล่าสุด" : "Imported"}: {generatedDate}
-            </p>
-          </section>
-          <section>
-            <h2>{language === "th" ? "เมนูหลัก" : "Main links"}</h2>
-            <ul>
-              {navigationTree.map((item) => (
-                <li key={item.path}>
-                  <Link href={item.path}>{item.label}</Link>
-                </li>
-              ))}
-            </ul>
-          </section>
-          <section>
-            <h2>{language === "th" ? "ติดต่อ" : "Contact"}</h2>
-            <p>เลขที่ 99 กระทรวงคมนาคม ถนนราชดำเนินนอก แขวงวัดโสมนัส เขตป้อมปราบศัตรูพ่าย กรุงเทพฯ</p>
-            <p>
-              <a href="https://www.rtrda.or.th" rel="noreferrer">
-                www.rtrda.or.th
-              </a>
-            </p>
-          </section>
-        </div>
-      </footer>
+      <SiteFooter language={language} />
     </div>
   );
 }
