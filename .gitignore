@@ -18,6 +18,7 @@
 /.next/
 /out/
 public/wp-content/uploads/
+public/sdc-downloads/
 src/data/wp-content.json
 
 # production

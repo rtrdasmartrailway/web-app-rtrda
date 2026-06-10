@@ -54,10 +54,7 @@ const SOCIAL = [
 
 export function IntranetSidebar() {
   const [open, setOpen] = useState(false);
-  const [mounted, setMounted] = useState(false);
-
-  // Portals need a DOM target, which only exists on the client.
-  useEffect(() => setMounted(true), []);
+  const portalTarget = typeof document === "undefined" ? null : document.body;
 
   // Lock background scroll while the drawer is open.
   useEffect(() => {
@@ -93,7 +90,7 @@ export function IntranetSidebar() {
       </button>
 
       {/* Drawer is portaled to <body> so it overlays every other component. */}
-      {mounted &&
+      {portalTarget &&
         createPortal(
           <div
             aria-hidden={!open}
@@ -174,7 +171,7 @@ export function IntranetSidebar() {
               </div>
             </aside>
           </div>,
-          document.body,
+          portalTarget,
         )}
     </>
   );

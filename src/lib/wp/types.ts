@@ -40,9 +40,23 @@ export interface WpMediaAsset {
   mimeType: string;
 }
 
+export interface WpDownloadAsset {
+  id: string;
+  sourceUrl: string;
+  localPath: string;
+  fileName: string;
+  mimeType: string;
+  sizeBytes: number;
+  title: string;
+  group: string;
+  sourcePages: string[];
+}
+
 export interface WpNavigationItem {
   label: string;
-  path: string;
+  href: string;
+  path: string | null;
+  external: boolean;
   children: WpNavigationItem[];
 }
 
@@ -55,8 +69,11 @@ export interface WpImportManifest {
     media: number;
     categories: number;
     flipbooks: number;
+    downloads: number;
   };
   records: WpContentRecord[];
   categories: WpCategory[];
   media: WpMediaAsset[];
+  downloads: WpDownloadAsset[];
+  navigation?: Record<WpLanguage, WpNavigationItem[]>;
 }

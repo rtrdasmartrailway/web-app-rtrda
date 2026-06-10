@@ -3,14 +3,27 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import * as cheerio from "cheerio";
 import sanitizeHtml from "sanitize-html";
+import {
+  createDownloadAssetRecord,
+  decodeSegment,
+  extractDownloadLinks,
+  extractLinksFromRecords,
+  getPathFromUrl,
+  getReferencedUploadPaths,
+  normalizeRoutePath,
+  rewriteSrcSet,
+  rewriteUrl,
+  shouldIgnoreRoute,
+  SOURCE_ORIGIN,
+} from "./import-wordpress-helpers.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const projectRoot = path.resolve(__dirname, "..");
 const manifestPath = path.join(projectRoot, "src/data/wp-content.json");
 const publicRoot = path.join(projectRoot, "public");
 const uploadRoot = path.join(publicRoot, "wp-content/uploads");
+const downloadRoot = path.join(publicRoot, "sdc-downloads");
 
-const SOURCE_ORIGIN = "https://www.rtrda.or.th";
 const TH_REST = `${SOURCE_ORIGIN}/wp-json/wp/v2`;
 const EN_REST = `${SOURCE_ORIGIN}/en/wp-json/wp/v2`;
 const USER_AGENT = "web-app-rtrda-importer/1.0";
@@ -37,6 +50,7 @@ const allowedTags = [
   "aside",
   "audio",
   "button",
+  "details",
   "div",
   "figure",
   "figcaption",
@@ -48,6 +62,7 @@ const allowedTags = [
   "section",
   "source",
   "span",
+  "summary",
   "table",
   "tbody",
   "td",
@@ -67,6 +82,7 @@ const allowedAttributes = {
     "data-*",
     "height",
     "id",
+    "open",
     "rowspan",
     "style",
     "title",
@@ -97,61 +113,6 @@ const allowedAttributes = {
     "width",
   ],
 };
-
-const uploadUrlPattern =
-  /https?:\/\/www\.rtrda\.or\.th\/wp-content\/uploads\/[^\s"'<>)]*/gi;
-
-function decodeSegment(segment) {
-  try {
-    return decodeURIComponent(segment);
-  } catch {
-    return segment;
-  }
-}
-
-function normalizeRoutePath(value) {
-  const trimmed = String(value ?? "").trim();
-  const withoutHash = trimmed.split("#")[0] ?? "";
-  const withoutSearch = withoutHash.split("?")[0] ?? "";
-  const withLeadingSlash = withoutSearch.startsWith("/")
-    ? withoutSearch
-    : `/${withoutSearch}`;
-  const segments = withLeadingSlash
-    .split("/")
-    .filter(Boolean)
-    .map(decodeSegment);
-  return segments.length === 0 ? "/" : `/${segments.join("/")}`;
-}
-
-function getPathFromUrl(value) {
-  if (value.startsWith("/") && !value.startsWith("//")) {
-    return normalizeRoutePath(value);
-  }
-
-  try {
-    const parsed = new URL(value);
-    if (!["www.rtrda.or.th", "rtrda.or.th"].includes(parsed.hostname)) {
-      return null;
-    }
-    return normalizeRoutePath(parsed.pathname);
-  } catch {
-    return null;
-  }
-}
-
-function rewriteUrl(value) {
-  return getPathFromUrl(value) ?? value;
-}
-
-function rewriteSrcSet(value) {
-  return value
-    .split(",")
-    .map((part) => {
-      const [url, ...descriptor] = part.trim().split(/\s+/);
-      return [rewriteUrl(url), ...descriptor].filter(Boolean).join(" ");
-    })
-    .join(", ");
-}
 
 function sanitizeAndRewrite(html) {
   return sanitizeHtml(html ?? "", {
@@ -194,10 +155,6 @@ function stripHtml(value) {
   return cheerio.load(`<body>${value ?? ""}</body>`)("body").text().trim();
 }
 
-function extractUploadUrls(html) {
-  return Array.from(new Set(String(html ?? "").match(uploadUrlPattern) ?? []));
-}
-
 function mediaUrlsFromItem(item) {
   const urls = new Set();
   if (item.source_url) {
@@ -214,21 +171,6 @@ function mediaUrlsFromItem(item) {
   }
 
   return Array.from(urls);
-}
-
-function shouldIgnoreRoute(pathname) {
-  return (
-    pathname.startsWith("/wp-content/uploads/") ||
-    pathname.startsWith("/cdn-cgi/") ||
-    pathname.startsWith("/sdc_download/") ||
-    pathname.startsWith("/en/sdc_download/") ||
-    pathname.startsWith("/wp-json") ||
-    pathname.startsWith("/en/wp-json") ||
-    pathname.startsWith("/wp-admin") ||
-    pathname.startsWith("/wp-login") ||
-    pathname.includes("/feed") ||
-    pathname.endsWith(".xml")
-  );
 }
 
 async function fetchWithRetry(url, init = {}, attempts = 3) {
@@ -330,46 +272,131 @@ async function fetchYoastSitemapRoutes() {
   return { urls: Array.from(urls), flipbookUrls };
 }
 
+function createNavigationItem($, element) {
+  const $item = $(element);
+  const $link = $item.children("a").first();
+  const rawHref = $link.attr("href") ?? "#";
+  const routePath = getPathFromUrl(rawHref);
+  const children = $item
+    .children("ul.sub-menu")
+    .first()
+    .children("li")
+    .map((_, child) => createNavigationItem($, child))
+    .get();
+
+  return {
+    label: htmlToText($link.html()),
+    href: routePath ?? rawHref,
+    path: routePath,
+    external: Boolean(rawHref && !routePath && !rawHref.startsWith("#")),
+    children,
+  };
+}
+
+async function fetchPrimaryNavigation(language) {
+  const sourceUrl = language === "en" ? `${SOURCE_ORIGIN}/en/` : `${SOURCE_ORIGIN}/`;
+  const html = await fetchText(sourceUrl);
+  const $ = cheerio.load(html);
+  const $menu = $("#menu-primary").first();
+
+  if (!$menu.length) {
+    throw new Error(`Could not find #menu-primary in ${sourceUrl}`);
+  }
+
+  const items = $menu
+    .children("li")
+    .map((_, item) => createNavigationItem($, item))
+    .get()
+    .filter((item) => item.label);
+
+  if (items.length === 0) {
+    throw new Error(`Primary navigation in ${sourceUrl} did not contain any items`);
+  }
+
+  return items;
+}
+
+function collectNavigationInternalPaths(items) {
+  const paths = new Set();
+
+  function visit(item) {
+    if (item.path && !shouldIgnoreRoute(item.path)) {
+      paths.add(item.path);
+    }
+
+    for (const child of item.children) {
+      visit(child);
+    }
+  }
+
+  for (const item of items) {
+    visit(item);
+  }
+
+  return Array.from(paths);
+}
+
 function createPageRecords(items, language) {
   const pathById = new Map(
     items.map((item) => [item.id, getPathFromUrl(item.link) ?? "/"]),
   );
+  const records = [];
+  const downloadLinks = [];
 
-  return items.map((item) => ({
-    id: `${language}-page-${item.id}`,
-    wpId: item.id,
-    language,
-    kind: "page",
-    path: getPathFromUrl(item.link) ?? "/",
-    sourceUrl: item.link,
-    title: htmlToText(item.title?.rendered),
-    excerpt: stripHtml(item.excerpt?.rendered),
-    contentHtml: sanitizeAndRewrite(item.content?.rendered),
-    modified: item.modified,
-    date: item.date,
-    parentPath: item.parent ? pathById.get(item.parent) ?? null : null,
-    categoryIds: [],
-    featuredMediaId: item.featured_media || null,
-  }));
+  for (const item of items) {
+    const routePath = getPathFromUrl(item.link) ?? "/";
+    const rawContent = item.content?.rendered ?? "";
+
+    downloadLinks.push(...extractDownloadLinks(rawContent, routePath));
+    records.push({
+      id: `${language}-page-${item.id}`,
+      wpId: item.id,
+      language,
+      kind: "page",
+      path: routePath,
+      sourceUrl: item.link,
+      title: htmlToText(item.title?.rendered),
+      excerpt: stripHtml(item.excerpt?.rendered),
+      contentHtml: sanitizeAndRewrite(rawContent),
+      modified: item.modified,
+      date: item.date,
+      parentPath: item.parent ? pathById.get(item.parent) ?? null : null,
+      categoryIds: [],
+      featuredMediaId: item.featured_media || null,
+    });
+  }
+
+  return { records, downloadLinks };
 }
 
 function createPostRecords(items, language) {
-  return items.map((item) => ({
-    id: `${language}-post-${item.id}`,
-    wpId: item.id,
-    language,
-    kind: "post",
-    path: getPathFromUrl(item.link) ?? `/${item.slug}`,
-    sourceUrl: item.link,
-    title: htmlToText(item.title?.rendered),
-    excerpt: stripHtml(item.excerpt?.rendered),
-    contentHtml: sanitizeAndRewrite(item.content?.rendered),
-    modified: item.modified,
-    date: item.date,
-    parentPath: null,
-    categoryIds: item.categories ?? [],
-    featuredMediaId: item.featured_media || null,
-  }));
+  const records = [];
+  const downloadLinks = [];
+
+  for (const item of items) {
+    const routePath = getPathFromUrl(item.link) ?? `/${item.slug}`;
+    const rawContent = item.content?.rendered ?? "";
+
+    downloadLinks.push(...extractDownloadLinks(rawContent, routePath));
+    records.push({
+      id: `${language}-post-${item.id}`,
+      wpId: item.id,
+      language,
+      kind: "post",
+      path: routePath,
+      sourceUrl: item.link,
+      title: htmlToText(item.title?.rendered),
+      excerpt: stripHtml(item.excerpt?.rendered),
+      contentHtml: sanitizeAndRewrite(rawContent),
+      modified: item.modified,
+      date: item.date,
+      parentPath: null,
+      categoryIds: item.categories ?? [],
+      featuredMediaId: item.featured_media || null,
+    });
+  }
+
+  return { records, downloadLinks };
 }
 
 function createCategories(items, language) {
@@ -488,28 +515,6 @@ async function fetchFlipbookRecord(url, index, language) {
   };
 }
 
-function extractLinksFromRecords(records) {
-  const paths = new Set();
-  const uploadUrls = new Set();
-
-  for (const record of records) {
-    for (const url of extractUploadUrls(record.contentHtml)) {
-      uploadUrls.add(url);
-    }
-
-    const $ = cheerio.load(record.contentHtml);
-    $("[href],[src]").each((_, element) => {
-      const href = $(element).attr("href") ?? $(element).attr("src");
-      if (!href) return;
-      const routePath = getPathFromUrl(href);
-      if (!routePath || shouldIgnoreRoute(routePath)) return;
-      paths.add(routePath);
-    });
-  }
-
-  return { paths: Array.from(paths), uploadUrls: Array.from(uploadUrls) };
-}
-
 async function fetchFallbackRecord(routePath, index) {
   const sourceUrl = `${SOURCE_ORIGIN}${routePath}`;
   const html = await fetchText(sourceUrl);
@@ -527,20 +532,23 @@ async function fetchFallbackRecord(routePath, index) {
     "";
 
   return {
-    id: `fallback-${index}`,
-    wpId: `fallback-${index}`,
-    language: routePath.startsWith("/en") ? "en" : "th",
-    kind: "fallback",
-    path: routePath,
-    sourceUrl,
-    title,
-    excerpt: "",
-    contentHtml: sanitizeAndRewrite(mainHtml),
-    modified: new Date().toISOString(),
-    date: new Date().toISOString(),
-    parentPath: null,
-    categoryIds: [],
-    featuredMediaId: null,
+    record: {
+      id: `fallback-${index}`,
+      wpId: `fallback-${index}`,
+      language: routePath.startsWith("/en") ? "en" : "th",
+      kind: "fallback",
+      path: routePath,
+      sourceUrl,
+      title,
+      excerpt: "",
+      contentHtml: sanitizeAndRewrite(mainHtml),
+      modified: new Date().toISOString(),
+      date: new Date().toISOString(),
+      parentPath: null,
+      categoryIds: [],
+      featuredMediaId: null,
+    },
+    downloadLinks: extractDownloadLinks(mainHtml, routePath),
   };
 }
 
@@ -584,6 +592,152 @@ async function mirrorAsset(url) {
   return routePath;
 }
 
+function decodeHeaderFileName(value) {
+  try {
+    const repaired = Buffer.from(value, "latin1").toString("utf8");
+    return repaired.includes("\uFFFD") ? value : repaired;
+  } catch {
+    return value;
+  }
+}
+
+function fileNameFromContentDisposition(value) {
+  if (!value) {
+    return null;
+  }
+
+  const encoded = value.match(/filename\*=UTF-8''([^;]+)/i)?.[1];
+  if (encoded) {
+    try {
+      return decodeURIComponent(encoded);
+    } catch {
+      return encoded;
+    }
+  }
+
+  const quoted = value.match(/filename="([^"]+)"/i)?.[1];
+  if (quoted) {
+    return decodeHeaderFileName(quoted);
+  }
+
+  const bare = value.match(/filename=([^;]+)/i)?.[1];
+  return bare ? decodeHeaderFileName(bare.trim()) : null;
+}
+
+function safeDownloadFileName(value, id) {
+  const fileName = path.basename(String(value ?? "").replace(/[/\\]/g, "-")).trim();
+  return fileName || `${id}.bin`;
+}
+
+function contentTypeFromResponse(response) {
+  return response.headers.get("content-type")?.split(";")[0]?.trim() || "application/octet-stream";
+}
+
+async function fetchDownloadMetadata(link) {
+  const response = await fetchWithRetry(link.sourceUrl, { method: "HEAD" });
+  const mimeType = contentTypeFromResponse(response);
+  const fileName = safeDownloadFileName(
+    fileNameFromContentDisposition(response.headers.get("content-disposition")),
+    link.id,
+  );
+  const contentLength = Number(response.headers.get("content-length") ?? "0");
+
+  return {
+    fileName,
+    mimeType,
+    sizeBytes: Number.isFinite(contentLength) ? contentLength : 0,
+  };
+}
+
+async function mirrorDownloadAsset(link) {
+  let metadata = await fetchDownloadMetadata(link);
+  let asset = createDownloadAssetRecord({
+    ...link,
+    ...metadata,
+    sourcePages: link.sourcePages,
+  });
+  const destination = path.join(publicRoot, asset.localPath);
+
+  try {
+    await readFile(destination);
+    return asset;
+  } catch {
+    // Continue and download missing assets.
+  }
+
+  const response = await fetchWithRetry(link.sourceUrl);
+  const bytes = Buffer.from(await response.arrayBuffer());
+
+  metadata = {
+    fileName: safeDownloadFileName(
+      fileNameFromContentDisposition(response.headers.get("content-disposition")) ??
+        metadata.fileName,
+      link.id,
+    ),
+    mimeType: contentTypeFromResponse(response) || metadata.mimeType,
+    sizeBytes: bytes.length,
+  };
+  asset = createDownloadAssetRecord({
+    ...link,
+    ...metadata,
+    sourcePages: link.sourcePages,
+  });
+
+  await mkdir(path.dirname(path.join(publicRoot, asset.localPath)), { recursive: true });
+  await writeFile(path.join(publicRoot, asset.localPath), bytes);
+  return asset;
+}
+
+function mergeDownloadLinks(links) {
+  const byId = new Map();
+
+  for (const link of links) {
+    const existing = byId.get(link.id);
+    if (!existing) {
+      byId.set(link.id, {
+        id: link.id,
+        sourceUrl: link.sourceUrl,
+        title: link.title,
+        group: link.group,
+        sourcePages: [link.sourcePage],
+      });
+      continue;
+    }
+
+    if (!existing.title && link.title) {
+      existing.title = link.title;
+    }
+    if (!existing.group && link.group) {
+      existing.group = link.group;
+    }
+    existing.sourcePages.push(link.sourcePage);
+  }
+
+  return Array.from(byId.values()).map((link) => ({
+    ...link,
+    sourcePages: Array.from(new Set(link.sourcePages)),
+  }));
+}
+
+async function findMissingReferencedUploadPaths(records) {
+  const missing = [];
+
+  for (const routePath of getReferencedUploadPaths(records)) {
+    try {
+      await readFile(path.join(publicRoot, routePath));
+    } catch (error) {
+      if (error instanceof Error && "code" in error && error.code === "ENOENT") {
+        missing.push(routePath);
+        continue;
+      }
+
+      throw error;
+    }
+  }
+
+  return missing;
+}
+
 function assertMinimum(name, actual, expected) {
   if (actual < expected) {
     throw new Error(`Expected at least ${expected} ${name}, got ${actual}`);
@@ -593,6 +747,7 @@ function assertMinimum(name, actual, expected) {
 async function main() {
   await mkdir(path.dirname(manifestPath), { recursive: true });
   await mkdir(uploadRoot, { recursive: true });
+  await mkdir(downloadRoot, { recursive: true });
 
   console.log("Fetching WordPress REST collections...");
   const [thPages, enPages, thPosts, enPosts, thCategories, enCategories, media] =
@@ -614,11 +769,27 @@ async function main() {
   const sitemap = await fetchYoastSitemapRoutes();
   assertMinimum("flipbooks", sitemap.flipbookUrls.length, EXPECTED_MINIMUMS.flipbooks);
 
+  console.log("Fetching WordPress primary navigation...");
+  const navigation = {
+    th: await fetchPrimaryNavigation("th"),
+    en: await fetchPrimaryNavigation("en"),
+  };
+
+  const thPageImport = createPageRecords(thPages.items, "th");
+  const enPageImport = createPageRecords(enPages.items, "en");
+  const thPostImport = createPostRecords(thPosts.items, "th");
+  const enPostImport = createPostRecords(enPosts.items, "en");
   const records = [
-    ...createPageRecords(thPages.items, "th"),
-    ...createPageRecords(enPages.items, "en"),
-    ...createPostRecords(thPosts.items, "th"),
-    ...createPostRecords(enPosts.items, "en"),
+    ...thPageImport.records,
+    ...enPageImport.records,
+    ...thPostImport.records,
+    ...enPostImport.records,
+  ];
+  const downloadLinks = [
+    ...thPageImport.downloadLinks,
+    ...enPageImport.downloadLinks,
+    ...thPostImport.downloadLinks,
+    ...enPostImport.downloadLinks,
   ];
   const categories = [
     ...createCategories(thCategories.items, "th"),
@@ -651,7 +822,11 @@ async function main() {
 
   console.log("Discovering additional internal links...");
   const discovered = extractLinksFromRecords(records);
-  const fallbackCandidates = discovered.paths.filter(
+  const navigationPaths = [
+    ...collectNavigationInternalPaths(navigation.th),
+    ...collectNavigationInternalPaths(navigation.en),
+  ];
+  const fallbackCandidates = Array.from(new Set([...discovered.paths, ...navigationPaths])).filter(
     (pathname) => !routePaths.has(normalizeRoutePath(pathname)),
   );
   const fallbackRecords = await withConcurrency(
@@ -666,7 +841,24 @@ async function main() {
       }
     },
   );
-  records.push(...fallbackRecords.filter(Boolean));
+  const fetchedFallbacks = fallbackRecords.filter(Boolean);
+  records.push(...fetchedFallbacks.map((fallback) => fallback.record));
+  for (const fallback of fetchedFallbacks) {
+    downloadLinks.push(...fallback.downloadLinks);
+  }
+
+  const finalRoutePaths = new Set(records.map((record) => normalizeRoutePath(record.path)));
+  const missingNavigationRoutes = navigationPaths.filter(
+    (pathname) => !finalRoutePaths.has(normalizeRoutePath(pathname)),
+  );
+
+  if (missingNavigationRoutes.length > 0) {
+    throw new Error(
+      `Importer did not create routes for primary menu URLs: ${missingNavigationRoutes
+        .slice(0, 20)
+        .join(", ")}`,
+    );
+  }
 
   const mediaAssets = createMediaAssets(media.items);
   const uploadUrls = new Set(discovered.uploadUrls);
@@ -677,13 +869,49 @@ async function main() {
   }
 
   console.log(`Mirroring ${uploadUrls.size} upload assets...`);
+  const failedMirrorPaths = new Set();
   const mirrored = await withConcurrency(Array.from(uploadUrls), 8, async (url) => {
     try {
       return await mirrorAsset(url);
     } catch (error) {
+      const routePath = getPathFromUrl(url);
+      if (routePath?.startsWith("/wp-content/uploads/")) {
+        failedMirrorPaths.add(routePath);
+      }
       console.warn(`Failed to mirror ${url}: ${error.message}`);
       return null;
     }
+  });
+
+  const missingReferencedUploadPaths = await findMissingReferencedUploadPaths(records);
+  const sourceMissingReferencedUploads = missingReferencedUploadPaths.filter((routePath) =>
+    failedMirrorPaths.has(routePath),
+  );
+  const missingReferencedUploads = missingReferencedUploadPaths.filter(
+    (routePath) => !failedMirrorPaths.has(routePath),
+  );
+
+  if (sourceMissingReferencedUploads.length > 0) {
+    console.warn(
+      `Source WordPress did not serve ${sourceMissingReferencedUploads.length} referenced upload assets: ${sourceMissingReferencedUploads
+        .slice(0, 20)
+        .join(", ")}`,
+    );
+  }
+
+  if (missingReferencedUploads.length > 0) {
+    throw new Error(
+      `Importer did not mirror referenced upload assets: ${missingReferencedUploads
+        .slice(0, 20)
+        .join(", ")}`,
+    );
+  }
+
+  const downloadRequests = mergeDownloadLinks(downloadLinks);
+  console.log(`Mirroring ${downloadRequests.length} WordPress download assets...`);
+  const downloadAssets = await withConcurrency(downloadRequests, 3, async (link) => {
+    const asset = await mirrorDownloadAsset(link);
+    return asset;
   });
 
   const manifest = {
@@ -695,17 +923,20 @@ async function main() {
       media: media.total,
       categories: thCategories.total,
       flipbooks: sitemap.flipbookUrls.length,
+      downloads: downloadAssets.length,
     },
     records: records
       .filter((record) => record.path)
       .sort((a, b) => a.path.localeCompare(b.path, "th")),
     categories,
     media: mediaAssets,
+    downloads: downloadAssets.sort((a, b) => a.id.localeCompare(b.id, "th")),
+    navigation,
   };
 
   await writeFile(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
   console.log(
-    `Wrote ${manifest.records.length} routes, ${manifest.media.length} media records, ${mirrored.filter(Boolean).length} mirrored assets.`,
+    `Wrote ${manifest.records.length} routes, ${manifest.media.length} media records, ${manifest.downloads.length} downloads, ${mirrored.filter(Boolean).length} mirrored assets.`,
   );
 }
 

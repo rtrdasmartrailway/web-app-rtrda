@@ -15,10 +15,16 @@ const emptyManifest: WpImportManifest = {
     media: 0,
     categories: 0,
     flipbooks: 0,
+    downloads: 0,
   },
   records: [],
   categories: [],
   media: [],
+  downloads: [],
+  navigation: {
+    th: [],
+    en: [],
+  },
 };
 
 export function findContentByPath(
@@ -41,13 +47,17 @@ export function getNavigationTree(
 
   return topLevelPages.map((record) => ({
     label: record.title,
+    href: record.path,
     path: record.path,
+    external: false,
     children: records
       .filter((child) => child.parentPath === record.path)
       .sort((a, b) => a.title.localeCompare(b.title, language === "th" ? "th" : "en"))
       .map((child) => ({
         label: child.title,
+        href: child.path,
         path: child.path,
+        external: false,
         children: [],
       })),
   }));

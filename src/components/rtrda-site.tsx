@@ -2,27 +2,13 @@ import Link from "next/link";
 import Image from "next/image";
 import type { WpContentRecord, WpImportManifest, WpLanguage } from "@/lib/wp/types";
 import { findContentByPath, getNavigationTree } from "@/lib/wp/content-store";
-
-const primaryNav = {
-  th: [
-    { label: "หน้าแรก", path: "/" },
-    { label: "เกี่ยวกับ สทร.", path: "/เกี่ยวกับ-สทร" },
-    { label: "ผลงานและโครงการเด่น", path: "/ผลงานและโครงการเด่น" },
-    { label: "ข่าวสาร - กิจกรรม", path: "/ข่าวสาร-กิจกรรม" },
-    { label: "เอกสารเผยแพร่", path: "/เอกสารเผยแพร่" },
-    { label: "จัดซื้อจัดจ้าง", path: "/จัดซื้อจัดจ้าง" },
-    { label: "ติดต่อเรา", path: "/ติดต่อเรา" },
-  ],
-  en: [
-    { label: "Home", path: "/en" },
-    { label: "About RTRDA", path: "/en/เกี่ยวกับ-สทร" },
-    { label: "Our Projects", path: "/en/ผลงานและโครงการเด่น" },
-    { label: "News & Activities", path: "/en/ข่าวสาร-กิจกรรม" },
-    { label: "Publications", path: "/en/เอกสารเผยแพร่" },
-    { label: "Procurement", path: "/en/จัดซื้อจัดจ้าง" },
-    { label: "Contact", path: "/en/ติดต่อเรา" },
-  ],
-};
+import {
+  buildPrimaryNavigation,
+  getSidebarItems,
+  resolveCardImagePath,
+  type PresentationSidebarItem,
+} from "@/lib/wp/presentation";
+import { RtrdaNavigation } from "./rtrda-navigation";
 
 function formatDate(value: string, language: WpLanguage): string {
   const date = new Date(value);
@@ -67,6 +53,74 @@ function relatedChildren(
     .sort((a, b) => a.title.localeCompare(b.title, record.language === "th" ? "th" : "en"));
 }
 
+function parentTitle(manifest: WpImportManifest, record: WpContentRecord): string {
+  if (!record.parentPath) {
+    return record.title;
+  }
+
+  return findContentByPath(manifest.records, record.parentPath)?.title ?? record.title;
+}
+
+function hasImportedLatestPosts(record: WpContentRecord): boolean {
+  return record.contentHtml.includes("wp-block-latest-posts");
+}
+
+function ArticleCard({
+  manifest,
+  record,
+}: {
+  manifest: WpImportManifest;
+  record: WpContentRecord;
+}) {
+  const imagePath = resolveCardImagePath(record, manifest.media);
+  const dateText = formatDate(record.date, record.language);
+
+  return (
+    <Link href={record.path} className="article-card">
+      <span className="article-image">
+        <Image
+          src={imagePath}
+          alt=""
+          fill
+          sizes="(max-width: 680px) 100vw, (max-width: 980px) 50vw, 33vw"
+        />
+      </span>
+      <span className="article-content">
+        {dateText ? <time dateTime={record.date}>{dateText}</time> : null}
+        <strong>{record.title}</strong>
+        {record.excerpt ? <span className="article-excerpt">{record.excerpt}</span> : null}
+        <span className="read-link">{record.language === "th" ? "อ่านเพิ่มเติม" : "Continue Reading"}</span>
+      </span>
+    </Link>
+  );
+}
+
+function SideNavigation({
+  items,
+  title,
+}: {
+  items: PresentationSidebarItem[];
+  title: string;
+}) {
+  if (items.length === 0) {
+    return null;
+  }
+
+  return (
+    <aside className="page-sidebar" aria-label={title}>
+      <h2>{title}</h2>
+      <nav>
+        {items.map((item) => (
+          <Link key={item.path} href={item.path} className={item.active ? "active" : undefined}>
+            <span>{item.label}</span>
+            <span aria-hidden="true" className="sidebar-arrow" />
+          </Link>
+        ))}
+      </nav>
+    </aside>
+  );
+}
+
 export function SiteShell({
   children,
   manifest,
@@ -80,65 +134,34 @@ export function SiteShell({
   const generatedDate = formatDate(manifest.generatedAt, language);
   const alternate = counterpartPath(manifest, path, language);
   const navigationTree = getNavigationTree(manifest.records, language).slice(0, 8);
+  const navItems = buildPrimaryNavigation(
+    manifest.records,
+    language,
+    path,
+    manifest.navigation?.[language],
+  );
 
   return (
     <div className="site-shell">
-      <div className="utility-bar">
-        <div className="site-container utility-inner">
-          <span>
-            {language === "th"
-              ? "สถาบันวิจัยและพัฒนาเทคโนโลยีระบบราง (องค์การมหาชน)"
-              : "Rail Technology Research and Development Agency"}
-          </span>
-          <nav aria-label="Utility navigation">
-            <Link href="/แผนที่เว็บไซต์">{language === "th" ? "แผนที่เว็บไซต์" : "Sitemap"}</Link>
-            <Link href={alternate}>{language === "th" ? "EN" : "TH"}</Link>
-          </nav>
-        </div>
-      </div>
-
-      <header className="site-header">
-        <div className="site-container header-inner">
-          <Link href={language === "th" ? "/" : "/en"} className="brand-link">
-            <Image
-              src="/wp-content/uploads/2023/02/Logo_RTRDA_full-1.png"
-              alt="RTRDA"
-              width={260}
-              height={72}
-              priority
-            />
-          </Link>
-          <form action="/search" className="site-search">
-            <input
-              name="q"
-              type="search"
-              placeholder={language === "th" ? "ค้นหา" : "Search"}
-              aria-label={language === "th" ? "ค้นหา" : "Search"}
-            />
-            <button type="submit">{language === "th" ? "ค้นหา" : "Search"}</button>
-          </form>
-        </div>
-        <nav className="primary-nav" aria-label="Primary navigation">
-          <div className="site-container nav-scroll">
-            {primaryNav[language].map((item) => (
-              <Link
-                key={item.path}
-                href={item.path}
-                className={path === item.path ? "active" : undefined}
-              >
-                {item.label}
-              </Link>
-            ))}
-          </div>
-        </nav>
-      </header>
+      <RtrdaNavigation alternatePath={alternate} language={language} navItems={navItems} />
 
       <main>{children}</main>
 
       <footer className="site-footer">
+        <div className="footer-topline" />
         <div className="site-container footer-grid">
-          <section>
-            <h2>{language === "th" ? "สทร." : "RTRDA"}</h2>
+          <section className="footer-brand">
+            <Image
+              src="/wp-content/uploads/2023/02/Logo_RTRDA_full-1.png"
+              alt="RTRDA"
+              width={220}
+              height={62}
+            />
+            <h2>
+              {language === "th"
+                ? "สถาบันวิจัยและพัฒนาเทคโนโลยีระบบราง"
+                : "Rail Technology Research and Development Agency"}
+            </h2>
             <p>
               {language === "th"
                 ? "หน่วยงานวิจัยและพัฒนาเทคโนโลยีระบบราง เพื่อยกระดับระบบรางไทยอย่างยั่งยืน"
@@ -149,24 +172,50 @@ export function SiteShell({
             </p>
           </section>
           <section>
-            <h2>{language === "th" ? "เมนูหลัก" : "Main links"}</h2>
+            <h2>{language === "th" ? "หน่วยงานภาครัฐ" : "Government Agencies"}</h2>
+            <ul>
+              <li>
+                <a href="https://www.mot.go.th" rel="noreferrer">
+                  {language === "th" ? "กระทรวงคมนาคม" : "Ministry of Transport"}
+                </a>
+              </li>
+              <li>
+                <a href="https://www.drt.go.th" rel="noreferrer">
+                  {language === "th" ? "กรมการขนส่งทางราง" : "Department of Rail Transport"}
+                </a>
+              </li>
+              <li>
+                <a href="https://www.railway.co.th" rel="noreferrer">
+                  {language === "th" ? "การรถไฟแห่งประเทศไทย" : "State Railway of Thailand"}
+                </a>
+              </li>
+            </ul>
+          </section>
+          <section>
+            <h2>{language === "th" ? "เมนูหลัก" : "Quick Links"}</h2>
             <ul>
               {navigationTree.map((item) => (
-                <li key={item.path}>
-                  <Link href={item.path}>{item.label}</Link>
+                <li key={item.href}>
+                  <Link href={item.href}>{item.label}</Link>
                 </li>
               ))}
             </ul>
           </section>
           <section>
-            <h2>{language === "th" ? "ติดต่อ" : "Contact"}</h2>
-            <p>เลขที่ 99 กระทรวงคมนาคม ถนนราชดำเนินนอก แขวงวัดโสมนัส เขตป้อมปราบศัตรูพ่าย กรุงเทพฯ</p>
+            <h2>{language === "th" ? "ติดต่อ" : "Contact Us"}</h2>
+            <p>99 กระทรวงคมนาคม ถนนราชดำเนินนอก แขวงวัดโสมนัส เขตป้อมปราบศัตรูพ่าย กรุงเทพฯ</p>
             <p>
-              <a href="https://www.rtrda.or.th" rel="noreferrer">
-                www.rtrda.or.th
-              </a>
+              <a href="mailto:info@rtrda.or.th">info@rtrda.or.th</a>
+            </p>
+            <p>
+              <a href="tel:0822042998">082 204 2998</a>
             </p>
           </section>
+        </div>
+        <div className="footer-bottom">
+          <div className="site-container">
+            © 2024 Rail Technology Research and Development Agency (RTRDA). All Rights Reserved.
+          </div>
         </div>
       </footer>
     </div>
@@ -181,60 +230,74 @@ export function ContentPage({
   record: WpContentRecord;
 }) {
   const children = relatedChildren(manifest, record);
-  const latest = record.path === "/" || record.path === "/en" ? latestPosts(manifest, record.language) : [];
+  const isHome = record.path === "/" || record.path === "/en";
+  const latest = isHome && !hasImportedLatestPosts(record) ? latestPosts(manifest, record.language) : [];
   const dateText = formatDate(record.date, record.language);
+  const sidebarItems = record.kind === "page" ? getSidebarItems(manifest.records, record) : [];
+  const sidebarTitle = parentTitle(manifest, record);
 
   return (
     <SiteShell manifest={manifest} path={record.path}>
-      <article className={`content-page content-${record.kind}`}>
-        <div className="page-hero">
-          <div className="site-container">
+      <article className={`content-page content-${record.kind} ${isHome ? "content-home" : ""}`}>
+        <section className={`page-hero ${isHome ? "home-hero" : ""}`}>
+          <div className="site-container hero-inner">
             <p className="breadcrumb">
               <Link href={record.language === "th" ? "/" : "/en"}>
                 {record.language === "th" ? "หน้าแรก" : "Home"}
               </Link>
-              {record.path !== "/" && record.path !== "/en" ? <span> / {record.title}</span> : null}
+              {!isHome ? <span> / {record.title}</span> : null}
             </p>
             <h1>{record.title}</h1>
             {record.kind === "post" && dateText ? <time dateTime={record.date}>{dateText}</time> : null}
             {record.excerpt ? <p className="hero-excerpt">{record.excerpt}</p> : null}
+            {isHome ? (
+              <a className="hero-button" href="#main-content">
+                {record.language === "th" ? "ดูข้อมูลล่าสุด" : "Explore Content"}
+                <span aria-hidden="true" />
+              </a>
+            ) : null}
           </div>
-        </div>
+        </section>
 
-        <div className="site-container content-layout">
-          <div className="wp-content" dangerouslySetInnerHTML={{ __html: record.contentHtml }} />
+        <div
+          className={`site-container content-layout ${sidebarItems.length > 0 ? "with-sidebar" : ""}`}
+          id="main-content"
+        >
+          <SideNavigation items={sidebarItems} title={sidebarTitle} />
 
-          {children.length > 0 ? (
-            <section className="related-section" aria-labelledby="related-pages-title">
-              <h2 id="related-pages-title">
-                {record.language === "th" ? "เนื้อหาที่เกี่ยวข้อง" : "Related pages"}
-              </h2>
-              <div className="related-grid">
-                {children.map((child) => (
-                  <Link key={child.id} href={child.path} className="related-card">
-                    <span>{child.title}</span>
-                  </Link>
-                ))}
-              </div>
-            </section>
-          ) : null}
+          <div className="content-main">
+            <div className="wp-content" dangerouslySetInnerHTML={{ __html: record.contentHtml }} />
 
-          {latest.length > 0 ? (
-            <section className="latest-section" aria-labelledby="latest-posts-title">
-              <h2 id="latest-posts-title">
-                {record.language === "th" ? "ข่าวล่าสุด" : "Latest news"}
-              </h2>
-              <div className="news-list">
-                {latest.map((post) => (
-                  <Link key={post.id} href={post.path} className="news-card">
-                    <time dateTime={post.date}>{formatDate(post.date, post.language)}</time>
-                    <span>{post.title}</span>
-                    {post.excerpt ? <p>{post.excerpt}</p> : null}
-                  </Link>
-                ))}
-              </div>
-            </section>
-          ) : null}
+            {children.length > 0 ? (
+              <section className="related-section" aria-labelledby="related-pages-title">
+                <div className="section-heading-row">
+                  <h2 id="related-pages-title">
+                    {record.language === "th" ? "เนื้อหาที่เกี่ยวข้อง" : "Related pages"}
+                  </h2>
+                </div>
+                <div className="related-grid">
+                  {children.map((child) => (
+                    <ArticleCard key={child.id} manifest={manifest} record={child} />
+                  ))}
+                </div>
+              </section>
+            ) : null}
+
+            {latest.length > 0 ? (
+              <section className="latest-section" aria-labelledby="latest-posts-title">
+                <div className="section-heading-row">
+                  <h2 id="latest-posts-title">
+                    {record.language === "th" ? "ข่าวล่าสุด" : "Latest news"}
+                  </h2>
+                </div>
+                <div className="related-grid">
+                  {latest.map((post) => (
+                    <ArticleCard key={post.id} manifest={manifest} record={post} />
+                  ))}
+                </div>
+              </section>
+            ) : null}
+          </div>
         </div>
       </article>
     </SiteShell>
@@ -261,7 +324,7 @@ export function SearchResults({
   return (
     <SiteShell manifest={manifest} path="/search">
       <section className="page-hero">
-        <div className="site-container">
+        <div className="site-container hero-inner">
           <p className="breadcrumb">
             <Link href="/">หน้าแรก</Link> / Search
           </p>
@@ -274,12 +337,9 @@ export function SearchResults({
           <input name="q" defaultValue={query} type="search" aria-label="Search" />
           <button type="submit">Search</button>
         </form>
-        <div className="news-list">
+        <div className="search-grid">
           {results.map((record) => (
-            <Link key={record.id} href={record.path} className="news-card">
-              <span>{record.title}</span>
-              <p>{record.path}</p>
-            </Link>
+            <ArticleCard key={record.id} manifest={manifest} record={record} />
           ))}
         </div>
         {normalizedQuery && results.length === 0 ? <p>No results found.</p> : null}

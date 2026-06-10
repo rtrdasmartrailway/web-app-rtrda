@@ -1,4 +1,5 @@
 import Image from "next/image";
+import Link from "next/link";
 import { NAV, ICON_ROWS } from "@/data/intranet";
 import type { IconItem } from "@/data/intranet";
 import { IntranetSidebar } from "@/components/intranet-sidebar";
@@ -80,7 +81,7 @@ export function IntranetShell({ children }: { children: React.ReactNode }) {
     <div className="intranet-shell">
       <header className="intranet-header">
         <div className="intranet-header-inner">
-          <a href="/rtrdaintranet" className="intranet-logo-link">
+          <Link href="/rtrdaintranet" className="intranet-logo-link">
             <Image
               src="/intranet/icons/White-logo-02.png"
               alt="RTRDA INTRANET"
@@ -89,7 +90,7 @@ export function IntranetShell({ children }: { children: React.ReactNode }) {
               priority
               className="intranet-logo"
             />
-          </a>
+          </Link>
           <NavMenu />
           <IntranetSidebar />
         </div>

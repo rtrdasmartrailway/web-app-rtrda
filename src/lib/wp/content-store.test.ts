@@ -59,7 +59,9 @@ describe("content store helpers", () => {
     expect(nav).toEqual([
       {
         label: "About RTRDA",
+        href: "/en/เกี่ยวกับ-สทร",
         path: "/en/เกี่ยวกับ-สทร",
+        external: false,
         children: [],
       },
     ]);

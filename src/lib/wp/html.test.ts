@@ -38,6 +38,17 @@ describe("WordPress HTML processing", () => {
     expect(result).toContain('type="submit"');
   });
 
+  it("preserves WordPress accordion details and summary markup", () => {
+    const result = sanitizeAndRewriteHtml(
+      '<div class="lightweight-accordion"><details open><summary class="lightweight-accordion-title"><span><strong>รายงานประจำปี</strong></span></summary><div class="lightweight-accordion-body">รายการเอกสาร</div></details></div>',
+    );
+
+    expect(result).toContain('<details open>');
+    expect(result).toContain('<summary class="lightweight-accordion-title">');
+    expect(result).toContain("รายงานประจำปี");
+    expect(result).toContain("รายการเอกสาร");
+  });
+
   it("extracts upload assets and internal links from rendered HTML", () => {
     const html =
       '<a href="https://www.rtrda.or.th/ข่าว/">ข่าว</a><img src="https://www.rtrda.or.th/wp-content/uploads/2026/01/a.jpg"><a href="/en/about">About</a>';
