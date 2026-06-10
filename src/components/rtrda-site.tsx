@@ -1,7 +1,8 @@
 import Link from "next/link";
 import Image from "next/image";
 import type { WpContentRecord, WpImportManifest, WpLanguage } from "@/lib/wp/types";
-import { findContentByPath, getNavigationTree } from "@/lib/wp/content-store";
+import { findContentByPath } from "@/lib/wp/content-store";
+import { SiteFooter } from "./SiteFooter";
 import {
   buildPrimaryNavigation,
   getSidebarItems,
@@ -131,7 +132,6 @@ export function SiteShell({
   path: string;
 }) {
   const language = currentLanguage(path);
-  const generatedDate = formatDate(manifest.generatedAt, language);
   const alternate = counterpartPath(manifest, path, language);
   const navigationTree = getNavigationTree(manifest.records, language).slice(0, 8);
   const navItems = buildPrimaryNavigation(
