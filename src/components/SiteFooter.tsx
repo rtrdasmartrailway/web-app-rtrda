@@ -35,8 +35,21 @@ const stateEnterprises = [
   { th: "บริษัท เอสอาร์ที แอสเสท จำกัด (อทส.)", en: "SRT Asset Company Limited", url: "https://srtasset.com/" },
 ];
 
-export function SiteFooter({ language }: { language: WpLanguage }) {
+function formatDate(value: string, language: WpLanguage): string {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  return new Intl.DateTimeFormat(language === "th" ? "th-TH" : "en-US", { dateStyle: "medium" }).format(date);
+}
+
+export function SiteFooter({
+  language,
+  generatedAt,
+}: {
+  language: WpLanguage;
+  generatedAt?: string;
+}) {
   const th = language === "th";
+  const generatedDate = generatedAt ? formatDate(generatedAt, language) : null;
 
   return (
     <footer className="site-footer">
@@ -67,6 +80,11 @@ export function SiteFooter({ language }: { language: WpLanguage }) {
               <a href="tel:022482988">02 248 2988</a>
             </span>
           </div>
+          {generatedDate ? (
+            <p className="freshness">
+              {th ? "ข้อมูลนำเข้าล่าสุด" : "Imported"}: {generatedDate}
+            </p>
+          ) : null}
           <div className="footer-visitor">
             <p className="footer-visitor-title">
               {th ? "จำนวนผู้เข้าชมเว็บไซต์" : "Website Visitors"}

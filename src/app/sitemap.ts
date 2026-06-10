@@ -1,11 +1,11 @@
 import type { MetadataRoute } from "next";
-import { loadManifest } from "@/lib/wp/content-store";
+import { getAllContentPaths } from "@/db/queries";
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const manifest = await loadManifest();
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "https://www.rtrda.or.th";
+  const paths = await getAllContentPaths();
 
-  return manifest.records.slice(0, 50000).map((record) => ({
-    url: `https://test.rtrda.or.th${record.path === "/" ? "" : record.path}`,
-    lastModified: record.modified,
+  return paths.slice(0, 50000).map(({ path }) => ({
+    url: `${siteUrl}${path === "/" ? "" : path}`,
   }));
 }

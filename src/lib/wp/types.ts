@@ -16,7 +16,8 @@ export interface WpContentRecord {
   date: string;
   parentPath: string | null;
   categoryIds: number[];
-  featuredMediaId: number | null;
+  featuredMediaId: number | string | null;
+  featuredMediaPath?: string | null;
 }
 
 export interface WpCategory {
