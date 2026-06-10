@@ -4,6 +4,10 @@ import { fileURLToPath } from "node:url";
 import * as cheerio from "cheerio";
 import sanitizeHtml from "sanitize-html";
 import {
+  createFetchTools,
+  describeFetchError,
+} from "./import-wordpress-fetch.mjs";
+import {
   createDownloadAssetRecord,
   decodeSegment,
   extractDownloadLinks,
@@ -26,7 +30,22 @@ const downloadRoot = path.join(publicRoot, "sdc-downloads");
 
 const TH_REST = `${SOURCE_ORIGIN}/wp-json/wp/v2`;
 const EN_REST = `${SOURCE_ORIGIN}/en/wp-json/wp/v2`;
-const USER_AGENT = "web-app-rtrda-importer/1.0";
+
+const {
+  fetchWithRetry,
+  fetchJson,
+  fetchJsonWithResponse,
+  fetchText,
+  fetchBufferWithRetry,
+} = createFetchTools({
+  onRetry: ({ url, attempt, attempts, error }) => {
+    console.warn(
+      `Retrying ${url} after fetch failure (${attempt + 1}/${attempts}): ${describeFetchError(
+        error,
+      )}`,
+    );
+  },
+});
 
 const EXPECTED_MINIMUMS = {
   pages: 56,
@@ -173,62 +192,17 @@ function mediaUrlsFromItem(item) {
   return Array.from(urls);
 }
 
-async function fetchWithRetry(url, init = {}, attempts = 3) {
-  let lastError;
-
-  for (let attempt = 1; attempt <= attempts; attempt += 1) {
-    try {
-      const response = await fetch(url, {
-        ...init,
-        headers: {
-          "user-agent": USER_AGENT,
-          accept: init.accept ?? "*/*",
-          ...(init.headers ?? {}),
-        },
-      });
-
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status} for ${url}`);
-      }
-
-      return response;
-    } catch (error) {
-      lastError = error;
-      if (attempt < attempts) {
-        await new Promise((resolve) => setTimeout(resolve, attempt * 500));
-      }
-    }
-  }
-
-  throw lastError;
-}
-
-async function fetchJson(url) {
-  const response = await fetchWithRetry(url, {
-    headers: { accept: "application/json" },
-  });
-  return response.json();
-}
-
-async function fetchText(url) {
-  const response = await fetchWithRetry(url, {
-    headers: { accept: "text/html,application/xhtml+xml,application/xml" },
-  });
-  return response.text();
-}
-
 async function fetchRestCollection(restRoot, resource, fields) {
   const firstUrl = new URL(`${restRoot}/${resource}`);
   firstUrl.searchParams.set("per_page", "100");
   firstUrl.searchParams.set("page", "1");
   firstUrl.searchParams.set("_fields", fields);
 
-  const firstResponse = await fetchWithRetry(firstUrl.toString(), {
+  const { response: firstResponse, body: items } = await fetchJsonWithResponse(firstUrl.toString(), {
     headers: { accept: "application/json" },
   });
   const total = Number(firstResponse.headers.get("x-wp-total") ?? "0");
   const pages = Number(firstResponse.headers.get("x-wp-totalpages") ?? "1");
-  const items = await firstResponse.json();
 
   for (let page = 2; page <= pages; page += 1) {
     const pageUrl = new URL(firstUrl);
@@ -585,8 +559,7 @@ async function mirrorAsset(url) {
     // Continue and download missing assets.
   }
 
-  const response = await fetchWithRetry(url);
-  const bytes = Buffer.from(await response.arrayBuffer());
+  const { body: bytes } = await fetchBufferWithRetry(url);
   await mkdir(path.dirname(destination), { recursive: true });
   await writeFile(destination, bytes);
   return routePath;
@@ -665,8 +638,7 @@ async function mirrorDownloadAsset(link) {
     // Continue and download missing assets.
   }
 
-  const response = await fetchWithRetry(link.sourceUrl);
-  const bytes = Buffer.from(await response.arrayBuffer());
+  const { response, body: bytes } = await fetchBufferWithRetry(link.sourceUrl);
 
   metadata = {
     fileName: safeDownloadFileName(
@@ -893,7 +865,7 @@ async function main() {
 
   if (sourceMissingReferencedUploads.length > 0) {
     console.warn(
-      `Source WordPress did not serve ${sourceMissingReferencedUploads.length} referenced upload assets: ${sourceMissingReferencedUploads
+      `Warning: source WordPress did not serve ${sourceMissingReferencedUploads.length} referenced upload assets; skipped because the source URL failed: ${sourceMissingReferencedUploads
         .slice(0, 20)
         .join(", ")}`,
     );
