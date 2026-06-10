@@ -26,7 +26,7 @@ const defaultHeadersTimeoutMs = positiveIntegerFromEnv(
 );
 const defaultBodyTimeoutMs = positiveIntegerFromEnv(
   "WP_IMPORT_FETCH_BODY_TIMEOUT_MS",
-  900_000,
+  120_000,
 );
 
 const defaultDispatcher = new Agent({

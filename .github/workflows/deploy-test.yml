@@ -8,7 +8,7 @@ on:
 
 concurrency:
   group: web-app-rtrda-test
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
   deploy:
