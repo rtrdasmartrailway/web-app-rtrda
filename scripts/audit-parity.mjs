@@ -271,6 +271,30 @@ async function auditUrl(urlKey, options, assetCache) {
   const newSignals = extractPageSignals(newRes.body, "new");
   const bothOk = oldRes.status === 200 && newRes.status === 200;
 
+  // The intranet is a deliberately redesigned internal app (see
+  // RTRDA_PAGES.md); only URL availability is required, not content parity.
+  if (urlKey.startsWith("/rtrdaintranet")) {
+    const oldSideBroken = oldRes.status < 200 || oldRes.status >= 400;
+    return {
+      urlKey,
+      oldStatus: oldRes.status,
+      newStatus: newRes.status,
+      similarity: null,
+      titleSimilarity: null,
+      oldTitle: oldSignals.title,
+      newTitle: newSignals.title,
+      missingAssets: [],
+      category: oldSideBroken
+        ? CATEGORY.OLD_SIDE_ERROR
+        : newRes.status === 404
+          ? CATEGORY.MISSING_ROUTE
+          : bothOk || newRes.status < 400
+            ? CATEGORY.PASS
+            : CATEGORY.STATUS_MISMATCH,
+      level: oldSideBroken ? "warn" : newRes.status < 400 ? "pass" : "fail",
+    };
+  }
+
   // Old flip-book pages render a JS viewer with no extractable text; parity
   // means the new page gives access to the same source PDF.
   if (/^\/(?:en\/)?3d-flip-book\//.test(urlKey)) {

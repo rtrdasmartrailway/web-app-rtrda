@@ -27,6 +27,12 @@ const nextConfig: NextConfig = {
         destination: "/rtrdaintranet",
         permanent: false,
       },
+      // "teluro" (the intranet theme's front-page slug) is the intranet home.
+      {
+        source: "/rtrdaintranet/index.php/teluro",
+        destination: "/rtrdaintranet",
+        permanent: false,
+      },
       {
         source: "/rtrdaintranet/index.php/:path*",
         destination: "/rtrdaintranet/:path*",

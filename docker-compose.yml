@@ -20,6 +20,10 @@ services:
       # from re-downloading gigabytes from the source site.
       - ./public/wp-content/uploads:/app/public/wp-content/uploads:ro
       - ./public/sdc-downloads:/app/public/sdc-downloads:ro
+    # Host gid of the `workspace` group that owns the mounted asset dirs
+    # (mode 2770), so the in-container user can read them.
+    group_add:
+      - "1009"
     healthcheck:
       test:
         [
