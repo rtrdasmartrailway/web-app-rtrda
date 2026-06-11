@@ -17,6 +17,7 @@ import {
   type PresentationSidebarItem,
 } from "@/lib/wp/presentation";
 import { RtrdaNavigation } from "./rtrda-navigation";
+import { WpContent } from "./wp/WpContent";
 
 function formatDate(value: string, language: WpLanguage): string {
   const date = new Date(value);
@@ -177,7 +178,7 @@ export async function ContentPage({ record }: { record: WpContentRecord }) {
           <SideNavigation items={sidebarItems} title={sidebarTitle} />
 
           <div className="content-main">
-            <div className="wp-content" dangerouslySetInnerHTML={{ __html: record.contentHtml }} />
+            <WpContent html={record.contentHtml} />
 
             {children.length > 0 ? (
               <section className="related-section" aria-labelledby="related-pages-title">

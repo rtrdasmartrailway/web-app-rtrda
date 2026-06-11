@@ -130,6 +130,40 @@ export async function getDownloadById(id: string): Promise<WpDownloadAsset | nul
   };
 }
 
+export async function getAllDownloads(group?: string): Promise<WpDownloadAsset[]> {
+  const rows = await db.select().from(wpDownloads).orderBy(asc(wpDownloads.title));
+  const filtered = group ? rows.filter((r) => r.group === group) : rows;
+  return filtered.map((row) => ({
+    id: row.id,
+    sourceUrl: row.sourceUrl,
+    localPath: row.localPath,
+    fileName: row.fileName,
+    mimeType: row.mimeType,
+    sizeBytes: row.sizeBytes,
+    title: row.title,
+    group: row.group,
+    sourcePages: [],
+  }));
+}
+
+export async function listContent(opts: {
+  language?: WpLanguage;
+  kind?: string;
+  limit?: number;
+  offset?: number;
+}): Promise<WpContentRecord[]> {
+  const { language, kind, limit = 50, offset = 0 } = opts;
+  const rows = await db
+    .select()
+    .from(wpContent)
+    .orderBy(desc(wpContent.date))
+    .limit(Math.min(limit, 200))
+    .offset(offset);
+  return rows
+    .filter((r) => (!language || r.language === language) && (!kind || r.kind === kind))
+    .map(rowToRecord);
+}
+
 export async function getGeneratedAt(): Promise<string> {
   const rows = await db
     .select()
