@@ -6,9 +6,12 @@ RUN npm ci
 FROM deps AS builder
 WORKDIR /app
 COPY . .
-RUN npm run import:wordpress
+# Content is imported before the image build (npm run import:wordpress);
+# uploads/downloads stay on the host and are bind-mounted at runtime.
+RUN test -f src/data/wp-content.json || { echo "src/data/wp-content.json missing — run 'npm run import:wordpress' before building"; exit 1; }
 RUN npm test
 RUN npm run lint
+RUN npm run typecheck
 RUN npm run build
 
 FROM node:22-bookworm-slim AS runner

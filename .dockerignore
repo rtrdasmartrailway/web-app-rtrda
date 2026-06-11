@@ -8,5 +8,7 @@ npm-debug.log*
 .DS_Store
 coverage
 public/wp-content/uploads
+public/sdc-downloads
+reports
 .worktrees
 worktrees
