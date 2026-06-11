@@ -1,8 +1,9 @@
 import type { Metadata } from "next";
+import { SITE_ORIGIN } from "@/lib/site-config";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  metadataBase: new URL("https://test.rtrda.or.th"),
+  metadataBase: new URL(SITE_ORIGIN),
   title: {
     default: "RTRDA",
     template: "%s",

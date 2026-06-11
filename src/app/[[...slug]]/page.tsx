@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { ContentPage } from "@/components/rtrda-site";
+import { ContentPage } from "@/components/content-page";
 import { findContentByPath, loadManifest } from "@/lib/wp/content-store";
 import { normalizeRoutePath } from "@/lib/wp/url";
 

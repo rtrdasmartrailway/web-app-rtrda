@@ -2,25 +2,28 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import * as cheerio from "cheerio";
-import sanitizeHtml from "sanitize-html";
-import {
-  createFetchTools,
-  describeFetchError,
-} from "./import-wordpress-fetch.mjs";
+import { createFetchTools, describeFetchError } from "./import-wordpress-fetch.mjs";
 import {
   createDownloadAssetRecord,
-  decodeSegment,
   extractDownloadLinks,
   extractFlipbookPdfPath,
   extractLinksFromRecords,
   getPathFromUrl,
   getReferencedUploadPaths,
   normalizeRoutePath,
-  rewriteSrcSet,
-  rewriteUrl,
   shouldIgnoreRoute,
   SOURCE_ORIGIN,
 } from "./import-wordpress-helpers.mjs";
+import {
+  createAuthorRecords,
+  createCategories,
+  createCategoryRecords,
+  createMediaAssets,
+  createPageRecords,
+  createPostRecords,
+  mediaUrlsFromItem,
+} from "./import-wordpress-records.mjs";
+import { htmlToText, sanitizeAndRewrite } from "./import-wordpress-sanitize.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const projectRoot = path.resolve(__dirname, "..");
@@ -65,144 +68,18 @@ const REST_FIELDS = {
   media: "id,source_url,title,alt_text,media_type,mime_type,media_details",
 };
 
-const allowedTags = [
-  ...sanitizeHtml.defaults.allowedTags,
-  "article",
-  "aside",
-  "audio",
-  "button",
-  "details",
-  "div",
-  "figure",
-  "figcaption",
-  "h1",
-  "h2",
-  "iframe",
-  "img",
-  "nav",
-  "section",
-  "source",
-  "span",
-  "summary",
-  "table",
-  "tbody",
-  "td",
-  "tfoot",
-  "th",
-  "thead",
-  "tr",
-  "video",
-];
-
-const allowedAttributes = {
-  ...sanitizeHtml.defaults.allowedAttributes,
-  "*": [
-    "aria-*",
-    "class",
-    "colspan",
-    "data-*",
-    "height",
-    "id",
-    "open",
-    "rowspan",
-    "style",
-    "title",
-    "width",
-  ],
-  a: ["aria-*", "class", "href", "name", "rel", "target", "title"],
-  img: [
-    "alt",
-    "class",
-    "decoding",
-    "height",
-    "loading",
-    "sizes",
-    "src",
-    "srcset",
-    "title",
-    "width",
-  ],
-  iframe: [
-    "allow",
-    "allowfullscreen",
-    "class",
-    "height",
-    "loading",
-    "referrerpolicy",
-    "src",
-    "title",
-    "width",
-  ],
-};
-
-function sanitizeAndRewrite(html) {
-  return sanitizeHtml(html ?? "", {
-    allowedTags,
-    allowedAttributes,
-    allowedSchemes: ["http", "https", "mailto", "tel"],
-    allowProtocolRelative: false,
-    transformTags: {
-      a: (_tagName, attribs) => ({
-        tagName: "a",
-        attribs: {
-          ...attribs,
-          href: attribs.href ? rewriteUrl(attribs.href) : undefined,
-        },
-      }),
-      img: (_tagName, attribs) => ({
-        tagName: "img",
-        attribs: {
-          ...attribs,
-          src: attribs.src ? rewriteUrl(attribs.src) : undefined,
-          srcset: attribs.srcset ? rewriteSrcSet(attribs.srcset) : undefined,
-        },
-      }),
-      iframe: (_tagName, attribs) => ({
-        tagName: "iframe",
-        attribs: {
-          ...attribs,
-          src: attribs.src ? rewriteUrl(attribs.src) : undefined,
-        },
-      }),
-    },
-  });
-}
-
-function htmlToText(value) {
-  return cheerio.load(`<body>${value ?? ""}</body>`)("body").text().trim();
-}
-
-function stripHtml(value) {
-  return cheerio.load(`<body>${value ?? ""}</body>`)("body").text().trim();
-}
-
-function mediaUrlsFromItem(item) {
-  const urls = new Set();
-  if (item.source_url) {
-    urls.add(item.source_url);
-  }
-
-  const sizes = item.media_details?.sizes;
-  if (sizes && typeof sizes === "object") {
-    for (const size of Object.values(sizes)) {
-      if (size?.source_url) {
-        urls.add(size.source_url);
-      }
-    }
-  }
-
-  return Array.from(urls);
-}
-
 async function fetchRestCollection(restRoot, resource, fields) {
   const firstUrl = new URL(`${restRoot}/${resource}`);
   firstUrl.searchParams.set("per_page", "100");
   firstUrl.searchParams.set("page", "1");
   firstUrl.searchParams.set("_fields", fields);
 
-  const { response: firstResponse, body: items } = await fetchJsonWithResponse(firstUrl.toString(), {
-    headers: { accept: "application/json" },
-  });
+  const { response: firstResponse, body: items } = await fetchJsonWithResponse(
+    firstUrl.toString(),
+    {
+      headers: { accept: "application/json" },
+    },
+  );
   const total = Number(firstResponse.headers.get("x-wp-total") ?? "0");
   const pages = Number(firstResponse.headers.get("x-wp-totalpages") ?? "1");
 
@@ -312,216 +189,8 @@ function collectNavigationInternalPaths(items) {
   return Array.from(paths);
 }
 
-function createPageRecords(items, language) {
-  const pathById = new Map(
-    items.map((item) => [item.id, getPathFromUrl(item.link) ?? "/"]),
-  );
-  const records = [];
-  const downloadLinks = [];
-
-  for (const item of items) {
-    const routePath = getPathFromUrl(item.link) ?? "/";
-    const rawContent = item.content?.rendered ?? "";
-
-    downloadLinks.push(...extractDownloadLinks(rawContent, routePath));
-    records.push({
-      id: `${language}-page-${item.id}`,
-      wpId: item.id,
-      language,
-      kind: "page",
-      path: routePath,
-      sourceUrl: item.link,
-      title: htmlToText(item.title?.rendered),
-      excerpt: stripHtml(item.excerpt?.rendered),
-      contentHtml: sanitizeAndRewrite(rawContent),
-      modified: item.modified,
-      date: item.date,
-      parentPath: item.parent ? pathById.get(item.parent) ?? null : null,
-      categoryIds: [],
-      featuredMediaId: item.featured_media || null,
-    });
-  }
-
-  return { records, downloadLinks };
-}
-
-function createPostRecords(items, language) {
-  const records = [];
-  const downloadLinks = [];
-
-  for (const item of items) {
-    const routePath = getPathFromUrl(item.link) ?? `/${item.slug}`;
-    const rawContent = item.content?.rendered ?? "";
-
-    downloadLinks.push(...extractDownloadLinks(rawContent, routePath));
-    records.push({
-      id: `${language}-post-${item.id}`,
-      wpId: item.id,
-      language,
-      kind: "post",
-      path: routePath,
-      sourceUrl: item.link,
-      title: htmlToText(item.title?.rendered),
-      excerpt: stripHtml(item.excerpt?.rendered),
-      contentHtml: sanitizeAndRewrite(rawContent),
-      modified: item.modified,
-      date: item.date,
-      parentPath: null,
-      categoryIds: item.categories ?? [],
-      featuredMediaId: item.featured_media || null,
-      authorId: item.author ?? null,
-    });
-  }
-
-  return { records, downloadLinks };
-}
-
-function createCategories(items, language) {
-  return items.map((item) => ({
-    id: item.id,
-    language,
-    path: getPathFromUrl(item.link) ?? `/category/${item.slug}`,
-    slug: decodeSegment(item.slug),
-    name: htmlToText(item.name),
-    count: item.count,
-    parent: item.parent,
-  }));
-}
-
-const POSTS_PER_ARCHIVE_PAGE = 10;
-
-/**
- * Build one record per archive page (10 posts each, matching WordPress),
- * so `/category/<slug>/page/2` style URLs keep working. Page 1 lives at
- * `basePath` itself.
- */
-function createArchivePageRecords({ kind, wpId, language, basePath, title, posts }) {
-  const sorted = [...posts].sort(
-    (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime(),
-  );
-  const pageCount = Math.max(1, Math.ceil(sorted.length / POSTS_PER_ARCHIVE_PAGE));
-  const pageLabel = language === "th" ? "หน้า" : "Page";
-  const records = [];
-
-  for (let page = 1; page <= pageCount; page += 1) {
-    const pagePosts = sorted.slice(
-      (page - 1) * POSTS_PER_ARCHIVE_PAGE,
-      page * POSTS_PER_ARCHIVE_PAGE,
-    );
-    const listHtml = pagePosts
-      .map((post) => {
-        const dateText = new Intl.DateTimeFormat(
-          language === "th" ? "th-TH" : "en-US",
-          { dateStyle: "medium" },
-        ).format(new Date(post.date));
-        const excerptHtml = post.excerpt ? `<p>${post.excerpt}</p>` : "";
-        return `<li><a href="${post.path}">${post.title}</a><time datetime="${post.date}">${dateText}</time>${excerptHtml}</li>`;
-      })
-      .join("");
-
-    const pagerLinks = [];
-    if (page > 1) {
-      const previousPath = page === 2 ? basePath : `${basePath}/page/${page - 1}`;
-      pagerLinks.push(
-        `<a href="${previousPath}" rel="prev">${language === "th" ? "← หน้าก่อนหน้า" : "← Previous page"}</a>`,
-      );
-    }
-    if (page < pageCount) {
-      pagerLinks.push(
-        `<a href="${basePath}/page/${page + 1}" rel="next">${language === "th" ? "หน้าถัดไป →" : "Next page →"}</a>`,
-      );
-    }
-    const pagerHtml =
-      pagerLinks.length > 0
-        ? `<nav class="wp-import-pagination">${pagerLinks.join(" ")}</nav>`
-        : "";
-
-    const pagePath = page === 1 ? basePath : `${basePath}/page/${page}`;
-    records.push({
-      id: `${language}-${kind}-${wpId}${page === 1 ? "" : `-page-${page}`}`,
-      wpId,
-      language,
-      kind,
-      path: pagePath,
-      sourceUrl: `${SOURCE_ORIGIN}${pagePath}`,
-      title: page === 1 ? title : `${title} – ${pageLabel} ${page}`,
-      excerpt: "",
-      contentHtml: `<ul class="wp-import-list">${listHtml}</ul>${pagerHtml}`,
-      modified: new Date().toISOString(),
-      date: new Date().toISOString(),
-      parentPath: page === 1 ? null : basePath,
-      categoryIds: [],
-      featuredMediaId: null,
-    });
-  }
-
-  return records;
-}
-
-function createCategoryRecords(categories, records, language) {
-  return categories
-    .filter((category) => category.language === language)
-    .flatMap((category) => {
-      const posts = records.filter(
-        (record) =>
-          record.language === language &&
-          record.kind === "post" &&
-          record.categoryIds.includes(category.id),
-      );
-
-      return createArchivePageRecords({
-        kind: "category",
-        wpId: category.id,
-        language,
-        basePath: category.path,
-        title: category.name,
-        posts,
-      }).map((record) => ({ ...record, categoryIds: [category.id] }));
-    });
-}
-
-function createAuthorRecords(users, records, language) {
-  return users.flatMap((user) => {
-    const posts = records.filter(
-      (record) =>
-        record.language === language &&
-        record.kind === "post" &&
-        record.authorId === user.id,
-    );
-
-    const basePath = `${language === "en" ? "/en" : ""}/author/${decodeSegment(user.slug)}`;
-    return createArchivePageRecords({
-      kind: "author",
-      wpId: user.id,
-      language,
-      basePath,
-      title: user.name,
-      posts,
-    });
-  });
-}
-
-function createMediaAssets(items) {
-  return items.map((item) => {
-    const sourceUrl = item.source_url ?? "";
-    return {
-      id: item.id,
-      sourceUrl,
-      localPath: getPathFromUrl(sourceUrl) ?? sourceUrl,
-      title: htmlToText(item.title?.rendered),
-      alt: item.alt_text ?? "",
-      width: item.media_details?.width ?? null,
-      height: item.media_details?.height ?? null,
-      mimeType: item.mime_type ?? "",
-    };
-  });
-}
-
 async function fetchFlipbookRecord(url, index, language) {
-  const sourceUrl =
-    language === "en"
-      ? `${SOURCE_ORIGIN}/en${getPathFromUrl(url)}`
-      : url;
+  const sourceUrl = language === "en" ? `${SOURCE_ORIGIN}/en${getPathFromUrl(url)}` : url;
   let html;
 
   try {
@@ -542,13 +211,18 @@ async function fetchFlipbookRecord(url, index, language) {
   const pathFromSource = getPathFromUrl(url) ?? `/3d-flip-book/${index + 1}`;
   const routePath = language === "en" ? `/en${pathFromSource}` : pathFromSource;
   const pdfPath = extractFlipbookPdfPath(html);
-  const escapedTitle = title.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;");
+  const escapedTitle = title
+    .replace(/&/g, "&amp;")
+    .replace(/"/g, "&quot;")
+    .replace(/</g, "&lt;");
   const mainHtml = pdfPath
     ? `<div class="wp-flipbook"><iframe src="${pdfPath}" title="${escapedTitle}" width="100%" height="800" loading="lazy"></iframe><p><a href="${pdfPath}" target="_blank" rel="noreferrer">${
         language === "en" ? "Download document (PDF)" : "ดาวน์โหลดเอกสาร (PDF)"
       }</a></p></div>`
     : `<div class="wp-flipbook-fallback"><p>${title}</p><p><a href="${sourceUrl}">${
-        language === "en" ? "Open original digital publication" : "เปิดเอกสารเผยแพร่ต้นฉบับ"
+        language === "en"
+          ? "Open original digital publication"
+          : "เปิดเอกสารเผยแพร่ต้นฉบับ"
       }</a></p></div>`;
 
   return {
@@ -683,7 +357,10 @@ function safeDownloadFileName(value, id) {
 }
 
 function contentTypeFromResponse(response) {
-  return response.headers.get("content-type")?.split(";")[0]?.trim() || "application/octet-stream";
+  return (
+    response.headers.get("content-type")?.split(";")[0]?.trim() ||
+    "application/octet-stream"
+  );
 }
 
 async function fetchDownloadMetadata(link) {
@@ -854,11 +531,15 @@ async function main() {
   records.push(...createAuthorRecords(users.items, records, "en"));
 
   console.log("Fetching 3D flip-book HTML...");
-  const flipbookRecords = await withConcurrency(sitemap.flipbookUrls, 4, async (url, index) => {
-    const thRecord = await fetchFlipbookRecord(url, index, "th");
-    const enRecord = await fetchFlipbookRecord(url, index, "en");
-    return [thRecord, enRecord];
-  });
+  const flipbookRecords = await withConcurrency(
+    sitemap.flipbookUrls,
+    4,
+    async (url, index) => {
+      const thRecord = await fetchFlipbookRecord(url, index, "th");
+      const enRecord = await fetchFlipbookRecord(url, index, "en");
+      return [thRecord, enRecord];
+    },
+  );
   records.push(...flipbookRecords.flat());
 
   const routePaths = new Set(records.map((record) => normalizeRoutePath(record.path)));
@@ -881,9 +562,9 @@ async function main() {
     ...collectNavigationInternalPaths(navigation.th),
     ...collectNavigationInternalPaths(navigation.en),
   ];
-  const fallbackCandidates = Array.from(new Set([...discovered.paths, ...navigationPaths])).filter(
-    (pathname) => !routePaths.has(normalizeRoutePath(pathname)),
-  );
+  const fallbackCandidates = Array.from(
+    new Set([...discovered.paths, ...navigationPaths]),
+  ).filter((pathname) => !routePaths.has(normalizeRoutePath(pathname)));
   const fallbackRecords = await withConcurrency(
     fallbackCandidates.slice(0, 80),
     4,
@@ -902,7 +583,9 @@ async function main() {
     downloadLinks.push(...fallback.downloadLinks);
   }
 
-  const finalRoutePaths = new Set(records.map((record) => normalizeRoutePath(record.path)));
+  const finalRoutePaths = new Set(
+    records.map((record) => normalizeRoutePath(record.path)),
+  );
   const missingNavigationRoutes = navigationPaths.filter(
     (pathname) => !finalRoutePaths.has(normalizeRoutePath(pathname)),
   );
@@ -939,8 +622,8 @@ async function main() {
   });
 
   const missingReferencedUploadPaths = await findMissingReferencedUploadPaths(records);
-  const sourceMissingReferencedUploads = missingReferencedUploadPaths.filter((routePath) =>
-    failedMirrorPaths.has(routePath),
+  const sourceMissingReferencedUploads = missingReferencedUploadPaths.filter(
+    (routePath) => failedMirrorPaths.has(routePath),
   );
   const missingReferencedUploads = missingReferencedUploadPaths.filter(
     (routePath) => !failedMirrorPaths.has(routePath),
