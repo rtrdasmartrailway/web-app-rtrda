@@ -6,6 +6,25 @@ const nextConfig: NextConfig = {
   experimental: {
     cpus: 4,
   },
+  async headers() {
+    // Cap CDN caching for mirrored assets. Next's default 1-year s-maxage
+    // also applies to 404 responses, which let Cloudflare cache a "missing"
+    // asset for a year if it was requested before the importer mirrored it.
+    return [
+      {
+        source: "/wp-content/uploads/:path*",
+        headers: [
+          { key: "Cache-Control", value: "public, max-age=14400, s-maxage=86400" },
+        ],
+      },
+      {
+        source: "/sdc-downloads/:path*",
+        headers: [
+          { key: "Cache-Control", value: "public, max-age=14400, s-maxage=86400" },
+        ],
+      },
+    ];
+  },
   async redirects() {
     // WordPress served search at /?s=<term>; keep those URLs working.
     return [
