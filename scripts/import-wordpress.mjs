@@ -11,6 +11,7 @@ import {
   createDownloadAssetRecord,
   decodeSegment,
   extractDownloadLinks,
+  extractFlipbookPdfPath,
   extractLinksFromRecords,
   getPathFromUrl,
   getReferencedUploadPaths,
@@ -58,8 +59,9 @@ const REST_FIELDS = {
   pages:
     "id,date,modified,slug,link,title,excerpt,content,parent,featured_media,template",
   posts:
-    "id,date,modified,slug,link,title,excerpt,content,categories,featured_media",
+    "id,date,modified,slug,link,title,excerpt,content,categories,featured_media,author",
   categories: "id,count,slug,name,parent,link",
+  users: "id,slug,name,link",
   media: "id,source_url,title,alt_text,media_type,mime_type,media_details",
 };
 
@@ -367,6 +369,7 @@ function createPostRecords(items, language) {
       parentPath: null,
       categoryIds: item.categories ?? [],
       featuredMediaId: item.featured_media || null,
+      authorId: item.author ?? null,
     });
   }
 
@@ -385,46 +388,117 @@ function createCategories(items, language) {
   }));
 }
 
+const POSTS_PER_ARCHIVE_PAGE = 10;
+
+/**
+ * Build one record per archive page (10 posts each, matching WordPress),
+ * so `/category/<slug>/page/2` style URLs keep working. Page 1 lives at
+ * `basePath` itself.
+ */
+function createArchivePageRecords({ kind, wpId, language, basePath, title, posts }) {
+  const sorted = [...posts].sort(
+    (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime(),
+  );
+  const pageCount = Math.max(1, Math.ceil(sorted.length / POSTS_PER_ARCHIVE_PAGE));
+  const pageLabel = language === "th" ? "หน้า" : "Page";
+  const records = [];
+
+  for (let page = 1; page <= pageCount; page += 1) {
+    const pagePosts = sorted.slice(
+      (page - 1) * POSTS_PER_ARCHIVE_PAGE,
+      page * POSTS_PER_ARCHIVE_PAGE,
+    );
+    const listHtml = pagePosts
+      .map((post) => {
+        const dateText = new Intl.DateTimeFormat(
+          language === "th" ? "th-TH" : "en-US",
+          { dateStyle: "medium" },
+        ).format(new Date(post.date));
+        const excerptHtml = post.excerpt ? `<p>${post.excerpt}</p>` : "";
+        return `<li><a href="${post.path}">${post.title}</a><time datetime="${post.date}">${dateText}</time>${excerptHtml}</li>`;
+      })
+      .join("");
+
+    const pagerLinks = [];
+    if (page > 1) {
+      const previousPath = page === 2 ? basePath : `${basePath}/page/${page - 1}`;
+      pagerLinks.push(
+        `<a href="${previousPath}" rel="prev">${language === "th" ? "← หน้าก่อนหน้า" : "← Previous page"}</a>`,
+      );
+    }
+    if (page < pageCount) {
+      pagerLinks.push(
+        `<a href="${basePath}/page/${page + 1}" rel="next">${language === "th" ? "หน้าถัดไป →" : "Next page →"}</a>`,
+      );
+    }
+    const pagerHtml =
+      pagerLinks.length > 0
+        ? `<nav class="wp-import-pagination">${pagerLinks.join(" ")}</nav>`
+        : "";
+
+    const pagePath = page === 1 ? basePath : `${basePath}/page/${page}`;
+    records.push({
+      id: `${language}-${kind}-${wpId}${page === 1 ? "" : `-page-${page}`}`,
+      wpId,
+      language,
+      kind,
+      path: pagePath,
+      sourceUrl: `${SOURCE_ORIGIN}${pagePath}`,
+      title: page === 1 ? title : `${title} – ${pageLabel} ${page}`,
+      excerpt: "",
+      contentHtml: `<ul class="wp-import-list">${listHtml}</ul>${pagerHtml}`,
+      modified: new Date().toISOString(),
+      date: new Date().toISOString(),
+      parentPath: page === 1 ? null : basePath,
+      categoryIds: [],
+      featuredMediaId: null,
+    });
+  }
+
+  return records;
+}
+
 function createCategoryRecords(categories, records, language) {
   return categories
     .filter((category) => category.language === language)
-    .map((category) => {
-    const posts = records
-      .filter(
+    .flatMap((category) => {
+      const posts = records.filter(
         (record) =>
           record.language === language &&
           record.kind === "post" &&
           record.categoryIds.includes(category.id),
-      )
-      .slice(0, 60);
+      );
 
-    const listHtml = posts
-      .map(
-        (post) =>
-          `<li><a href="${post.path}">${post.title}</a><time datetime="${post.date}">${new Intl.DateTimeFormat(
-            language === "th" ? "th-TH" : "en-US",
-            { dateStyle: "medium" },
-          ).format(new Date(post.date))}</time></li>`,
-      )
-      .join("");
-
-      return {
-        id: `${language}-category-${category.id}`,
+      return createArchivePageRecords({
+        kind: "category",
         wpId: category.id,
         language,
-        kind: "category",
-        path: category.path,
-        sourceUrl: `${SOURCE_ORIGIN}${category.path}`,
+        basePath: category.path,
         title: category.name,
-        excerpt: "",
-        contentHtml: `<ul class="wp-import-list">${listHtml}</ul>`,
-        modified: new Date().toISOString(),
-        date: new Date().toISOString(),
-        parentPath: null,
-        categoryIds: [category.id],
-        featuredMediaId: null,
-      };
+        posts,
+      }).map((record) => ({ ...record, categoryIds: [category.id] }));
     });
+}
+
+function createAuthorRecords(users, records, language) {
+  return users.flatMap((user) => {
+    const posts = records.filter(
+      (record) =>
+        record.language === language &&
+        record.kind === "post" &&
+        record.authorId === user.id,
+    );
+
+    const basePath = `${language === "en" ? "/en" : ""}/author/${decodeSegment(user.slug)}`;
+    return createArchivePageRecords({
+      kind: "author",
+      wpId: user.id,
+      language,
+      basePath,
+      title: user.name,
+      posts,
+    });
+  });
 }
 
 function createMediaAssets(items) {
@@ -467,9 +541,15 @@ async function fetchFlipbookRecord(url, index, language) {
   );
   const pathFromSource = getPathFromUrl(url) ?? `/3d-flip-book/${index + 1}`;
   const routePath = language === "en" ? `/en${pathFromSource}` : pathFromSource;
-  const mainHtml = `<div class="wp-flipbook-fallback"><p>${title}</p><p><a href="${sourceUrl}">${
-    language === "en" ? "Open original digital publication" : "เปิดเอกสารเผยแพร่ต้นฉบับ"
-  }</a></p></div>`;
+  const pdfPath = extractFlipbookPdfPath(html);
+  const escapedTitle = title.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;");
+  const mainHtml = pdfPath
+    ? `<div class="wp-flipbook"><iframe src="${pdfPath}" title="${escapedTitle}" width="100%" height="800" loading="lazy"></iframe><p><a href="${pdfPath}" target="_blank" rel="noreferrer">${
+        language === "en" ? "Download document (PDF)" : "ดาวน์โหลดเอกสาร (PDF)"
+      }</a></p></div>`
+    : `<div class="wp-flipbook-fallback"><p>${title}</p><p><a href="${sourceUrl}">${
+        language === "en" ? "Open original digital publication" : "เปิดเอกสารเผยแพร่ต้นฉบับ"
+      }</a></p></div>`;
 
   return {
     id: `${language}-flipbook-${index}`,
@@ -722,7 +802,7 @@ async function main() {
   await mkdir(downloadRoot, { recursive: true });
 
   console.log("Fetching WordPress REST collections...");
-  const [thPages, enPages, thPosts, enPosts, thCategories, enCategories, media] =
+  const [thPages, enPages, thPosts, enPosts, thCategories, enCategories, media, users] =
     await Promise.all([
       fetchRestCollection(TH_REST, "pages", REST_FIELDS.pages),
       fetchRestCollection(EN_REST, "pages", REST_FIELDS.pages),
@@ -731,6 +811,7 @@ async function main() {
       fetchRestCollection(TH_REST, "categories", REST_FIELDS.categories),
       fetchRestCollection(EN_REST, "categories", REST_FIELDS.categories),
       fetchRestCollection(TH_REST, "media", REST_FIELDS.media),
+      fetchRestCollection(TH_REST, "users", REST_FIELDS.users),
     ]);
 
   assertMinimum("pages", thPages.total, EXPECTED_MINIMUMS.pages);
@@ -769,6 +850,8 @@ async function main() {
   ];
   records.push(...createCategoryRecords(categories, records, "th"));
   records.push(...createCategoryRecords(categories, records, "en"));
+  records.push(...createAuthorRecords(users.items, records, "th"));
+  records.push(...createAuthorRecords(users.items, records, "en"));
 
   console.log("Fetching 3D flip-book HTML...");
   const flipbookRecords = await withConcurrency(sitemap.flipbookUrls, 4, async (url, index) => {
@@ -885,6 +968,10 @@ async function main() {
     const asset = await mirrorDownloadAsset(link);
     return asset;
   });
+
+  for (const record of records) {
+    record.searchText = htmlToText(record.contentHtml).slice(0, 4000);
+  }
 
   const manifest = {
     generatedAt: new Date().toISOString(),

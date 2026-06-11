@@ -135,6 +135,33 @@ export function downloadRoutePathFromValue(value) {
   return id ? `/sdc_download/${id}` : null;
 }
 
+/**
+ * Extract the source PDF of a 3D flip-book page. The viewer plugin embeds
+ * `window.FB3D_CLIENT_DATA.push('<base64 JSON>')` whose `posts[id].data.guid`
+ * is the PDF URL.
+ */
+export function extractFlipbookPdfPath(html) {
+  const match = String(html ?? "").match(
+    /FB3D_CLIENT_DATA\.push\('([A-Za-z0-9+/=]+)'\)/,
+  );
+  if (!match) {
+    return null;
+  }
+  try {
+    const payload = JSON.parse(Buffer.from(match[1], "base64").toString("utf8"));
+    for (const post of Object.values(payload.posts ?? {})) {
+      const guid = post?.data?.guid;
+      const routePath = guid ? getPathFromUrl(guid) : null;
+      if (routePath?.startsWith("/wp-content/uploads/")) {
+        return routePath;
+      }
+    }
+  } catch {
+    return null;
+  }
+  return null;
+}
+
 function textFrom($, element) {
   return $(element).text().replace(/\s+/g, " ").trim();
 }

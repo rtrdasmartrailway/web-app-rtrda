@@ -9,10 +9,16 @@ export const metadata: Metadata = {
 export default async function SearchPage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string }>;
+  searchParams: Promise<{ q?: string; lang?: string }>;
 }) {
   const manifest = await loadManifest();
-  const { q = "" } = await searchParams;
+  const { q = "", lang } = await searchParams;
 
-  return <SearchResults manifest={manifest} query={q} />;
+  return (
+    <SearchResults
+      manifest={manifest}
+      query={q}
+      language={lang === "en" ? "en" : "th"}
+    />
+  );
 }

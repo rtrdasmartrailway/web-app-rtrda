@@ -1,6 +1,12 @@
 export type WpLanguage = "th" | "en";
 
-export type WpRouteKind = "page" | "post" | "category" | "flipbook" | "fallback";
+export type WpRouteKind =
+  | "page"
+  | "post"
+  | "category"
+  | "author"
+  | "flipbook"
+  | "fallback";
 
 export interface WpContentRecord {
   id: string;
@@ -17,6 +23,10 @@ export interface WpContentRecord {
   parentPath: string | null;
   categoryIds: number[];
   featuredMediaId: number | null;
+  /** Plain-text body used by site search; populated by the importer. */
+  searchText?: string;
+  /** WordPress author id, set on posts; used to build author archives. */
+  authorId?: number | null;
 }
 
 export interface WpCategory {
