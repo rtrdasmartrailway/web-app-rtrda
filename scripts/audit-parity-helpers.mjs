@@ -255,8 +255,7 @@ export function summarizeResults(results) {
   const summary = { pass: 0, warn: 0, fail: 0, byCategory: {} };
   for (const result of results) {
     summary[result.level] += 1;
-    summary.byCategory[result.category] =
-      (summary.byCategory[result.category] ?? 0) + 1;
+    summary.byCategory[result.category] = (summary.byCategory[result.category] ?? 0) + 1;
   }
   return summary;
 }

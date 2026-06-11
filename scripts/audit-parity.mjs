@@ -276,7 +276,10 @@ async function auditUrl(urlKey, options, assetCache) {
   if (/^\/(?:en\/)?3d-flip-book\//.test(urlKey)) {
     const pdfPath = extractFlipbookPdfPath(oldRes.body);
     const titleSimilarity = bothOk
-      ? trigramSimilarity(normalizeTitle(oldSignals.title), normalizeTitle(newSignals.title))
+      ? trigramSimilarity(
+          normalizeTitle(oldSignals.title),
+          normalizeTitle(newSignals.title),
+        )
       : null;
     let flipbookOk = bothOk;
     const missingAssets = [];
@@ -319,14 +322,18 @@ async function auditUrl(urlKey, options, assetCache) {
 
   // When the old page has no recognizable content container, text and asset
   // signals come from the whole <body> (nav, footer, widgets) and are noise.
-  const oldSignalsReliable = oldSignals.selector !== null && oldSignals.selector !== "body";
+  const oldSignalsReliable =
+    oldSignals.selector !== null && oldSignals.selector !== "body";
 
   const similarity =
     bothOk && oldSignalsReliable
       ? trigramSimilarity(oldSignals.text, newSignals.text)
       : null;
   const titleSimilarity = bothOk
-    ? trigramSimilarity(normalizeTitle(oldSignals.title), normalizeTitle(newSignals.title))
+    ? trigramSimilarity(
+        normalizeTitle(oldSignals.title),
+        normalizeTitle(newSignals.title),
+      )
     : null;
 
   const missingAssets = [];
@@ -400,14 +407,18 @@ async function main() {
 
   const assetCache = new Map();
   let completed = 0;
-  const results = await withConcurrency(urlKeys, options.oldConcurrency, async (urlKey) => {
-    const result = await auditUrl(urlKey, options, assetCache);
-    completed += 1;
-    if (completed % 25 === 0 || completed === urlKeys.length) {
-      console.log(`  ${completed}/${urlKeys.length}`);
-    }
-    return result;
-  });
+  const results = await withConcurrency(
+    urlKeys,
+    options.oldConcurrency,
+    async (urlKey) => {
+      const result = await auditUrl(urlKey, options, assetCache);
+      completed += 1;
+      if (completed % 25 === 0 || completed === urlKeys.length) {
+        console.log(`  ${completed}/${urlKeys.length}`);
+      }
+      return result;
+    },
+  );
 
   const report = {
     generatedAt: new Date().toISOString(),

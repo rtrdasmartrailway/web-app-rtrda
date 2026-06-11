@@ -16,7 +16,9 @@ import {
 describe("normalizeUrlKey", () => {
   it("decodes Thai segments and strips trailing slashes", () => {
     expect(
-      normalizeUrlKey("https://www.rtrda.or.th/%E0%B9%80%E0%B8%81%E0%B8%B5%E0%B9%88%E0%B8%A2%E0%B8%A7%E0%B8%81%E0%B8%B1%E0%B8%9A-%E0%B8%AA%E0%B8%97%E0%B8%A3/"),
+      normalizeUrlKey(
+        "https://www.rtrda.or.th/%E0%B9%80%E0%B8%81%E0%B8%B5%E0%B9%88%E0%B8%A2%E0%B8%A7%E0%B8%81%E0%B8%B1%E0%B8%9A-%E0%B8%AA%E0%B8%97%E0%B8%A3/",
+      ),
     ).toBe("/เกี่ยวกับ-สทร");
   });
 
@@ -71,8 +73,7 @@ describe("extractSitemapLocs", () => {
 
 describe("extractRtrdaUrls", () => {
   it("finds TH and EN urls in markdown", () => {
-    const md =
-      "├── หน้าแรก [https://www.rtrda.or.th/] [EN: https://www.rtrda.or.th/en/]";
+    const md = "├── หน้าแรก [https://www.rtrda.or.th/] [EN: https://www.rtrda.or.th/en/]";
     expect(extractRtrdaUrls(md)).toEqual([
       "https://www.rtrda.or.th/",
       "https://www.rtrda.or.th/en/",
@@ -156,14 +157,20 @@ describe("trigramSimilarity", () => {
   });
 
   it("returns high similarity for content with extra chrome", () => {
-    const body = "สถาบันวิจัยและพัฒนาเทคโนโลยีระบบราง ก่อตั้งขึ้นเพื่อพัฒนาระบบขนส่งทางราง".repeat(5);
+    const body =
+      "สถาบันวิจัยและพัฒนาเทคโนโลยีระบบราง ก่อตั้งขึ้นเพื่อพัฒนาระบบขนส่งทางราง".repeat(
+        5,
+      );
     const withChrome = `หน้าแรก ข่าวสาร ${body} บทความที่เกี่ยวข้อง`;
     expect(trigramSimilarity(body, withChrome)).toBeGreaterThan(0.7);
   });
 
   it("returns low similarity for unrelated text", () => {
     expect(
-      trigramSimilarity("สถาบันวิจัยและพัฒนาเทคโนโลยีระบบราง", "Page not found error 404"),
+      trigramSimilarity(
+        "สถาบันวิจัยและพัฒนาเทคโนโลยีระบบราง",
+        "Page not found error 404",
+      ),
     ).toBeLessThan(0.1);
   });
 
