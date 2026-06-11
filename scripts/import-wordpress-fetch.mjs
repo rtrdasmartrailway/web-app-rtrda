@@ -160,12 +160,7 @@ export function createFetchTools({
   }
 
   function fetchJsonWithResponse(url, init = {}, requestAttempts = attempts) {
-    return fetchBodyWithRetry(
-      url,
-      init,
-      (response) => response.json(),
-      requestAttempts,
-    );
+    return fetchBodyWithRetry(url, init, (response) => response.json(), requestAttempts);
   }
 
   async function fetchText(url, init = {}, requestAttempts = attempts) {

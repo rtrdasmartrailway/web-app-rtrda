@@ -13,20 +13,11 @@ const extensionByMimeType = new Map([
   ["application/zip", ".zip"],
   ["application/x-zip-compressed", ".zip"],
   ["application/msword", ".doc"],
-  [
-    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-    ".docx",
-  ],
+  ["application/vnd.openxmlformats-officedocument.wordprocessingml.document", ".docx"],
   ["application/vnd.ms-excel", ".xls"],
-  [
-    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-    ".xlsx",
-  ],
+  ["application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", ".xlsx"],
   ["application/vnd.ms-powerpoint", ".ppt"],
-  [
-    "application/vnd.openxmlformats-officedocument.presentationml.presentation",
-    ".pptx",
-  ],
+  ["application/vnd.openxmlformats-officedocument.presentationml.presentation", ".pptx"],
 ]);
 
 export function decodeSegment(segment) {
@@ -44,10 +35,7 @@ export function normalizeRoutePath(value) {
   const withLeadingSlash = withoutSearch.startsWith("/")
     ? withoutSearch
     : `/${withoutSearch}`;
-  const segments = withLeadingSlash
-    .split("/")
-    .filter(Boolean)
-    .map(decodeSegment);
+  const segments = withLeadingSlash.split("/").filter(Boolean).map(decodeSegment);
   return segments.length === 0 ? "/" : `/${segments.join("/")}`;
 }
 
@@ -108,9 +96,10 @@ export function downloadSourceUrlFromValue(value) {
 
   let parsed;
   try {
-    parsed = value.startsWith("/") && !value.startsWith("//")
-      ? new URL(value, SOURCE_ORIGIN)
-      : new URL(value);
+    parsed =
+      value.startsWith("/") && !value.startsWith("//")
+        ? new URL(value, SOURCE_ORIGIN)
+        : new URL(value);
   } catch {
     return null;
   }
@@ -141,9 +130,7 @@ export function downloadRoutePathFromValue(value) {
  * is the PDF URL.
  */
 export function extractFlipbookPdfPath(html) {
-  const match = String(html ?? "").match(
-    /FB3D_CLIENT_DATA\.push\('([A-Za-z0-9+/=]+)'\)/,
-  );
+  const match = String(html ?? "").match(/FB3D_CLIENT_DATA\.push\('([A-Za-z0-9+/=]+)'\)/);
   if (!match) {
     return null;
   }

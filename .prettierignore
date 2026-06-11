@@ -1,0 +1,8 @@
+node_modules
+.next
+public/wp-content
+public/sdc-downloads
+src/data/wp-content.json
+reports
+package-lock.json
+*.md

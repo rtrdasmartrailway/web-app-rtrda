@@ -1,6 +1,6 @@
-export type NavItem = { label: string; href: string }
-export type NavGroup = { label: string; href: string; children: NavItem[] }
-export type IconItem = { img: string; href: string; caption: string }
+export type NavItem = { label: string; href: string };
+export type NavGroup = { label: string; href: string; children: NavItem[] };
+export type IconItem = { img: string; href: string; caption: string };
 
 export const NAV: NavGroup[] = [
   {
@@ -72,7 +72,7 @@ export const NAV: NavGroup[] = [
       },
     ],
   },
-]
+];
 
 export const ICON_ROWS: IconItem[][] = [
   // Section 1 — quick-access (no captions)
@@ -142,4 +142,4 @@ export const ICON_ROWS: IconItem[][] = [
       caption: "Executive Report",
     },
   ],
-]
+];

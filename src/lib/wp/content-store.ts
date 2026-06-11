@@ -2,7 +2,12 @@ import { readFile } from "node:fs/promises";
 import path from "node:path";
 
 import { normalizeRoutePath } from "./url";
-import type { WpContentRecord, WpImportManifest, WpLanguage, WpNavigationItem } from "./types";
+import type {
+  WpContentRecord,
+  WpImportManifest,
+  WpLanguage,
+  WpNavigationItem,
+} from "./types";
 
 const manifestPath = path.join(process.cwd(), "src/data/wp-content.json");
 

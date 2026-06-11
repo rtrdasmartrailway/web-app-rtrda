@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { SearchResults } from "@/components/rtrda-site";
+import { SearchResults } from "@/components/search-results";
 import { loadManifest } from "@/lib/wp/content-store";
 
 export const metadata: Metadata = {
@@ -15,10 +15,6 @@ export default async function SearchPage({
   const { q = "", lang } = await searchParams;
 
   return (
-    <SearchResults
-      manifest={manifest}
-      query={q}
-      language={lang === "en" ? "en" : "th"}
-    />
+    <SearchResults manifest={manifest} query={q} language={lang === "en" ? "en" : "th"} />
   );
 }

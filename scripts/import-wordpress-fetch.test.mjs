@@ -1,9 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import {
-  createFetchTools,
-  describeFetchError,
-} from "./import-wordpress-fetch.mjs";
+import { createFetchTools, describeFetchError } from "./import-wordpress-fetch.mjs";
 
 function okResponse(overrides = {}) {
   return {

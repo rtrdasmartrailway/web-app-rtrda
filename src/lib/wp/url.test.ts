@@ -22,13 +22,9 @@ describe("RTRDA URL helpers", () => {
   });
 
   it("keeps external URLs external and rewrites internal RTRDA URLs to relative paths", () => {
-    expect(isRtrdaInternalUrl("https://www.rtrda.or.th/wp-content/a.pdf")).toBe(
-      true,
-    );
+    expect(isRtrdaInternalUrl("https://www.rtrda.or.th/wp-content/a.pdf")).toBe(true);
     expect(isRtrdaInternalUrl("https://forms.gle/example")).toBe(false);
-    expect(rewriteRtrdaUrl("https://www.rtrda.or.th/en/contact/")).toBe(
-      "/en/contact",
-    );
+    expect(rewriteRtrdaUrl("https://www.rtrda.or.th/en/contact/")).toBe("/en/contact");
     expect(rewriteRtrdaUrl("https://forms.gle/example")).toBe(
       "https://forms.gle/example",
     );

@@ -65,9 +65,7 @@ function IconGrid({ items, eager }: { items: IconItem[]; eager?: boolean }) {
               priority={eager && idx === 0}
             />
             {item.caption && (
-              <figcaption className="intranet-icon-caption">
-                {item.caption}
-              </figcaption>
+              <figcaption className="intranet-icon-caption">{item.caption}</figcaption>
             )}
           </figure>
         </a>

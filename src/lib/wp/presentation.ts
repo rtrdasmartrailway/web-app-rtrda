@@ -1,5 +1,10 @@
 import { normalizeRoutePath } from "./url";
-import type { WpContentRecord, WpLanguage, WpMediaAsset, WpNavigationItem } from "./types";
+import type {
+  WpContentRecord,
+  WpLanguage,
+  WpMediaAsset,
+  WpNavigationItem,
+} from "./types";
 
 export interface PresentationNavItem {
   label: string;
@@ -95,7 +100,8 @@ export function buildPrimaryNavigation(
       href: item.path,
       path: item.path,
       external: false,
-      active: isPathActive(item.path, currentPath) || children.some((child) => child.active),
+      active:
+        isPathActive(item.path, currentPath) || children.some((child) => child.active),
       children,
     };
   });
@@ -111,7 +117,8 @@ function mapNavigationItem(
     mapNavigationItem(child, language, currentPath, false),
   );
   const activationPath =
-    item.path ?? (topLevel ? PRIMARY_NAV_PATH_BY_LABEL[language].get(item.label) : undefined);
+    item.path ??
+    (topLevel ? PRIMARY_NAV_PATH_BY_LABEL[language].get(item.label) : undefined);
   const active =
     (activationPath ? isPathActive(activationPath, currentPath) : false) ||
     children.some((child) => child.active);
@@ -151,14 +158,15 @@ export function getSidebarItems(
     .filter((candidate) => candidate.parentPath === record.path)
     .sort(sortByTitle(record.language));
 
-  const source = children.length > 0
-    ? children
-    : record.parentPath
-      ? records
-          .filter((candidate) => candidate.language === record.language)
-          .filter((candidate) => candidate.parentPath === record.parentPath)
-          .sort(sortByTitle(record.language))
-      : [];
+  const source =
+    children.length > 0
+      ? children
+      : record.parentPath
+        ? records
+            .filter((candidate) => candidate.language === record.language)
+            .filter((candidate) => candidate.parentPath === record.parentPath)
+            .sort(sortByTitle(record.language))
+        : [];
 
   return source.map((item) => ({
     label: item.title,

@@ -39,9 +39,7 @@ const records: WpContentRecord[] = [
 
 describe("content store helpers", () => {
   it("finds records by decoded or encoded route paths", () => {
-    expect(findContentByPath(records, "/เกี่ยวกับ-สทร")?.title).toBe(
-      "เกี่ยวกับ สทร.",
-    );
+    expect(findContentByPath(records, "/เกี่ยวกับ-สทร")?.title).toBe("เกี่ยวกับ สทร.");
     expect(
       findContentByPath(records, "/%e0%b9%80%e0%b8%81%e0%b8%b5%e0%b9%88")?.title,
     ).toBeUndefined();

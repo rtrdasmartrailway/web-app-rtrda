@@ -39,10 +39,12 @@ describe("WordPress importer helpers", () => {
       },
     ];
 
-    expect(getReferencedUploadPaths(records).sort()).toEqual([
-      "/wp-content/uploads/2026/05/903_12  21.05.69.pdf",
-      "/wp-content/uploads/2026/05/photo.jpg",
-    ].sort());
+    expect(getReferencedUploadPaths(records).sort()).toEqual(
+      [
+        "/wp-content/uploads/2026/05/903_12  21.05.69.pdf",
+        "/wp-content/uploads/2026/05/photo.jpg",
+      ].sort(),
+    );
   });
 
   it("collects keyed download plugin links with document context", () => {
@@ -90,15 +92,13 @@ describe("WordPress importer helpers", () => {
   });
 
   it("rewrites Thai and English download plugin links to the same local route", () => {
-    expect(
-      rewriteUrl("https://www.rtrda.or.th/sdc_download/5540/?key=abc123"),
-    ).toBe("/sdc_download/5540");
-    expect(
-      rewriteUrl("https://www.rtrda.or.th/en/sdc_download/5540/?key=abc123"),
-    ).toBe("/sdc_download/5540");
-    expect(rewriteUrl("/en/sdc_download/5540?key=abc123")).toBe(
+    expect(rewriteUrl("https://www.rtrda.or.th/sdc_download/5540/?key=abc123")).toBe(
       "/sdc_download/5540",
     );
+    expect(rewriteUrl("https://www.rtrda.or.th/en/sdc_download/5540/?key=abc123")).toBe(
+      "/sdc_download/5540",
+    );
+    expect(rewriteUrl("/en/sdc_download/5540?key=abc123")).toBe("/sdc_download/5540");
   });
 
   it("builds download asset records with deterministic local paths", () => {

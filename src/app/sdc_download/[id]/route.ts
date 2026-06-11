@@ -43,10 +43,7 @@ async function findDownload(id: string): Promise<WpDownloadAsset | null> {
   return manifest.downloads.find((download) => download.id === id) ?? null;
 }
 
-async function responseForDownload(
-  id: string,
-  includeBody: boolean,
-): Promise<Response> {
+async function responseForDownload(id: string, includeBody: boolean): Promise<Response> {
   const download = await findDownload(id);
   if (!download) {
     return new Response("Not found", { status: 404 });

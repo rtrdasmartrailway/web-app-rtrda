@@ -59,7 +59,10 @@ function DesktopDropdown({ items }: { items: PresentationNavItem[] }) {
       {items.map((child) =>
         child.children.length > 0 ? (
           <div className="nav-dropdown-group" key={`${child.href}-${child.label}`}>
-            <NavigationLink item={child} className={child.active ? "active" : undefined} />
+            <NavigationLink
+              item={child}
+              className={child.active ? "active" : undefined}
+            />
             <div className="nav-dropdown-nested">
               {child.children.map((grandchild) => (
                 <NavigationLink
@@ -93,9 +96,16 @@ function MobileNavItem({ item }: { item: PresentationNavItem }) {
         <div>
           {item.children.map((child) =>
             child.children.length > 0 ? (
-              <details className="mobile-subdetails" key={`${child.href}-${child.label}`} open={child.active}>
+              <details
+                className="mobile-subdetails"
+                key={`${child.href}-${child.label}`}
+                open={child.active}
+              >
                 <summary>
-                  <NavigationLink item={child} className={child.active ? "active" : undefined} />
+                  <NavigationLink
+                    item={child}
+                    className={child.active ? "active" : undefined}
+                  />
                   <span aria-hidden="true" className="nav-caret" />
                 </summary>
                 <div>
@@ -121,12 +131,7 @@ function MobileNavItem({ item }: { item: PresentationNavItem }) {
     );
   }
 
-  return (
-    <NavigationLink
-      item={item}
-      className={item.active ? "active" : undefined}
-    />
-  );
+  return <NavigationLink item={item} className={item.active ? "active" : undefined} />;
 }
 
 export function RtrdaNavigation({
@@ -151,7 +156,10 @@ export function RtrdaNavigation({
     <>
       <div className="utility-bar">
         <div className="site-container utility-inner">
-          <div className="reader-controls" aria-label={language === "th" ? "ขนาดตัวอักษร" : "Font size"}>
+          <div
+            className="reader-controls"
+            aria-label={language === "th" ? "ขนาดตัวอักษร" : "Font size"}
+          >
             <span>{language === "th" ? "ขนาดตัวอักษร" : "Font Size"}</span>
             {[1, 1.08, 1.16].map((scale, index) => (
               <button
@@ -191,11 +199,18 @@ export function RtrdaNavigation({
                 className={`nav-item ${item.active ? "active" : ""} ${item.children.length > 0 ? "has-dropdown" : ""}`}
                 key={`${item.href}-${item.label}`}
               >
-                <NavigationLink item={item} className={`nav-link ${isHashOnly(item) ? "is-placeholder" : ""}`}>
+                <NavigationLink
+                  item={item}
+                  className={`nav-link ${isHashOnly(item) ? "is-placeholder" : ""}`}
+                >
                   <span>{item.label}</span>
-                  {item.children.length > 0 ? <span aria-hidden="true" className="nav-caret" /> : null}
+                  {item.children.length > 0 ? (
+                    <span aria-hidden="true" className="nav-caret" />
+                  ) : null}
                 </NavigationLink>
-                {item.children.length > 0 ? <DesktopDropdown items={item.children} /> : null}
+                {item.children.length > 0 ? (
+                  <DesktopDropdown items={item.children} />
+                ) : null}
               </div>
             ))}
           </nav>
@@ -224,7 +239,10 @@ export function RtrdaNavigation({
           </div>
         </div>
 
-        <div className={`search-panel ${searchOpen ? "open" : ""}`} id="site-search-panel">
+        <div
+          className={`search-panel ${searchOpen ? "open" : ""}`}
+          id="site-search-panel"
+        >
           <form action="/search" className="site-search">
             <input
               name="q"
@@ -236,7 +254,11 @@ export function RtrdaNavigation({
           </form>
         </div>
 
-        <nav className={`mobile-nav ${mobileOpen ? "open" : ""}`} id="mobile-navigation" aria-label="Mobile navigation">
+        <nav
+          className={`mobile-nav ${mobileOpen ? "open" : ""}`}
+          id="mobile-navigation"
+          aria-label="Mobile navigation"
+        >
           <form action="/search" className="mobile-search">
             <input
               name="q"

@@ -37,7 +37,11 @@ describe("presentation helpers", () => {
       }),
     ];
 
-    const nav = buildPrimaryNavigation(records, "th", "/เกี่ยวกับ-สทร/กฏหมาย-ระเบียบ-ข้อบังคับ");
+    const nav = buildPrimaryNavigation(
+      records,
+      "th",
+      "/เกี่ยวกับ-สทร/กฏหมาย-ระเบียบ-ข้อบังคับ",
+    );
 
     const about = nav.find((item) => item.path === "/เกี่ยวกับ-สทร");
     expect(about?.active).toBe(true);
@@ -135,12 +139,7 @@ describe("presentation helpers", () => {
       },
     ];
 
-    const nav = buildPrimaryNavigation(
-      [],
-      "th",
-      "/พัฒนาระบบราชการ",
-      wordpressMenu,
-    );
+    const nav = buildPrimaryNavigation([], "th", "/พัฒนาระบบราชการ", wordpressMenu);
 
     const about = nav.find((item) => item.label === "เกี่ยวกับ สทร.");
     expect(about?.active).toBe(true);
@@ -201,7 +200,12 @@ describe("presentation helpers", () => {
       wordpressMenu,
     );
 
-    expect(nav[0]).toMatchObject({ href: "#", path: null, external: false, active: true });
+    expect(nav[0]).toMatchObject({
+      href: "#",
+      path: null,
+      external: false,
+      active: true,
+    });
     expect(nav[0].children[0]).toMatchObject({
       href: "https://infocenter.oic.go.th/rtrda/index.php",
       path: null,
@@ -241,7 +245,9 @@ describe("presentation helpers", () => {
     expect(resolveFeaturedMediaPath(record({ featuredMediaId: 99 }), media)).toBe(
       "/wp-content/uploads/post.jpg",
     );
-    expect(resolveFeaturedMediaPath(record({ featuredMediaId: 100 }), media)).toBeUndefined();
+    expect(
+      resolveFeaturedMediaPath(record({ featuredMediaId: 100 }), media),
+    ).toBeUndefined();
   });
 
   it("uses children for parent sidebars and siblings for child page sidebars", () => {
@@ -273,11 +279,11 @@ describe("presentation helpers", () => {
     expect(selectFallbackAsset(record({ kind: "post", path: "/a" }))).toBe(
       "/stitch-assets/rail-lab.png",
     );
-    expect(selectFallbackAsset(record({ kind: "category", path: "/category/news" }))).toBe(
-      "/stitch-assets/rail-network.png",
-    );
-    expect(selectFallbackAsset(record({ kind: "flipbook", path: "/3d-flip-book/6267" }))).toBe(
-      "/stitch-assets/rail-strategy-map.png",
-    );
+    expect(
+      selectFallbackAsset(record({ kind: "category", path: "/category/news" })),
+    ).toBe("/stitch-assets/rail-network.png");
+    expect(
+      selectFallbackAsset(record({ kind: "flipbook", path: "/3d-flip-book/6267" })),
+    ).toBe("/stitch-assets/rail-strategy-map.png");
   });
 });

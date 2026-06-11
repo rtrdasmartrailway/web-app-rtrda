@@ -19,10 +19,7 @@ export function normalizeRoutePath(value: string): string {
   const rawPath = stripHashAndSearch(value.trim());
   const pathOnly = rawPath === "" ? "/" : rawPath;
   const withLeadingSlash = pathOnly.startsWith("/") ? pathOnly : `/${pathOnly}`;
-  const segments = withLeadingSlash
-    .split("/")
-    .filter(Boolean)
-    .map(decodeSegment);
+  const segments = withLeadingSlash.split("/").filter(Boolean).map(decodeSegment);
   const normalized = `/${segments.join("/")}`;
 
   return normalized === "" ? "/" : normalized;
