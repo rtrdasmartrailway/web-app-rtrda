@@ -4,6 +4,7 @@ import { db } from "./index";
 import { wpContent, wpDownloads, wpMeta, wpNavigation } from "./schema";
 import type { WpContentRecord, WpDownloadAsset, WpLanguage, WpNavigationItem } from "@/lib/wp/types";
 import { normalizeRoutePath } from "@/lib/wp/url";
+import { MOCK_RECORDS, MOCK_DOWNLOADS, MOCK_NAV, MOCK_NAV_EN } from "./mock";
 
 function rowToRecord(row: typeof wpContent.$inferSelect): WpContentRecord {
   return {
@@ -27,6 +28,7 @@ function rowToRecord(row: typeof wpContent.$inferSelect): WpContentRecord {
 
 export const getContentByPath = cache(async (path: string): Promise<WpContentRecord | null> => {
   const normalized = normalizeRoutePath(path);
+  if (!db) return MOCK_RECORDS.find((r) => r.path === normalized) ?? null;
   const rows = await db
     .select()
     .from(wpContent)
@@ -36,10 +38,12 @@ export const getContentByPath = cache(async (path: string): Promise<WpContentRec
 });
 
 export async function getAllContentPaths(): Promise<{ path: string }[]> {
+  if (!db) return MOCK_RECORDS.map((r) => ({ path: r.path }));
   return db.select({ path: wpContent.path }).from(wpContent);
 }
 
 export async function getChildPages(parentPath: string): Promise<WpContentRecord[]> {
+  if (!db) return MOCK_RECORDS.filter((r) => r.parentPath === parentPath);
   const rows = await db
     .select()
     .from(wpContent)
@@ -53,6 +57,9 @@ export async function getSiblingPages(parentPath: string): Promise<WpContentReco
 }
 
 export async function getLatestPosts(language: WpLanguage, limit = 6): Promise<WpContentRecord[]> {
+  if (!db) {
+    return MOCK_RECORDS.filter((r) => r.kind === "post" && r.language === language).slice(0, limit);
+  }
   const rows = await db
     .select()
     .from(wpContent)
@@ -63,6 +70,9 @@ export async function getLatestPosts(language: WpLanguage, limit = 6): Promise<W
 }
 
 export async function getTopLevelPages(language: WpLanguage): Promise<WpContentRecord[]> {
+  if (!db) {
+    return MOCK_RECORDS.filter((r) => r.kind === "page" && r.parentPath === null && r.language === language);
+  }
   const rows = await db
     .select()
     .from(wpContent)
@@ -74,13 +84,13 @@ export async function getTopLevelPages(language: WpLanguage): Promise<WpContentR
 }
 
 export async function getNavItems(language: WpLanguage): Promise<WpNavigationItem[]> {
+  if (!db) return language === "en" ? MOCK_NAV_EN : MOCK_NAV;
   const rows = await db
     .select()
     .from(wpNavigation)
     .where(eq(wpNavigation.language, language))
     .orderBy(asc(wpNavigation.sortOrder));
 
-  // Rebuild tree from flat rows (top-level only for now — navigation is shallow)
   const topLevel = rows.filter((r) => r.parentId === null);
   return topLevel.map((item) => ({
     label: item.label,
@@ -100,6 +110,15 @@ export async function getNavItems(language: WpLanguage): Promise<WpNavigationIte
 }
 
 export async function searchContent(query: string, limit = 80): Promise<WpContentRecord[]> {
+  if (!db) {
+    const q = query.toLowerCase();
+    return MOCK_RECORDS.filter(
+      (r) =>
+        r.title.toLowerCase().includes(q) ||
+        r.excerpt.toLowerCase().includes(q) ||
+        r.path.toLowerCase().includes(q)
+    ).slice(0, limit);
+  }
   const term = `%${query}%`;
   const rows = await db
     .select()
@@ -110,6 +129,7 @@ export async function searchContent(query: string, limit = 80): Promise<WpConten
 }
 
 export async function getDownloadById(id: string): Promise<WpDownloadAsset | null> {
+  if (!db) return MOCK_DOWNLOADS.find((d) => d.id === id) ?? null;
   const rows = await db
     .select()
     .from(wpDownloads)
@@ -131,6 +151,9 @@ export async function getDownloadById(id: string): Promise<WpDownloadAsset | nul
 }
 
 export async function getAllDownloads(group?: string): Promise<WpDownloadAsset[]> {
+  if (!db) {
+    return group ? MOCK_DOWNLOADS.filter((d) => d.group === group) : MOCK_DOWNLOADS;
+  }
   const rows = await db.select().from(wpDownloads).orderBy(asc(wpDownloads.title));
   const filtered = group ? rows.filter((r) => r.group === group) : rows;
   return filtered.map((row) => ({
@@ -153,6 +176,11 @@ export async function listContent(opts: {
   offset?: number;
 }): Promise<WpContentRecord[]> {
   const { language, kind, limit = 50, offset = 0 } = opts;
+  if (!db) {
+    return MOCK_RECORDS.filter(
+      (r) => (!language || r.language === language) && (!kind || r.kind === kind)
+    ).slice(offset, offset + limit);
+  }
   const rows = await db
     .select()
     .from(wpContent)
@@ -165,6 +193,7 @@ export async function listContent(opts: {
 }
 
 export async function getGeneratedAt(): Promise<string> {
+  if (!db) return new Date().toISOString();
   const rows = await db
     .select()
     .from(wpMeta)
