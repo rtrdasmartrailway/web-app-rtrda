@@ -22,3 +22,24 @@ services:
       timeout: 10s
       retries: 5
       start_period: 30s
+
+  db:
+    image: postgres:16-alpine
+    container_name: rtrda-db
+    environment:
+      POSTGRES_DB: rtrda
+      POSTGRES_USER: rtrda
+      POSTGRES_PASSWORD: rtrda
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    ports:
+      - "127.0.0.1:5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U rtrda"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+volumes:
+  db-data:

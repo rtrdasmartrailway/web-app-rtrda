@@ -189,9 +189,13 @@ if (downloads.length > 0) {
 // ---------------------------------------------------------------------------
 // Seed wp_content
 // ---------------------------------------------------------------------------
-console.log(`Seeding ${records.length} content records…`);
-for (let i = 0; i < records.length; i += BATCH) {
-  const chunk = records.slice(i, i + BATCH);
+// Deduplicate by path — keep last occurrence (most recent wins)
+const recordsByPath = new Map();
+for (const r of records) recordsByPath.set(r.path, r);
+const uniqueRecords = [...recordsByPath.values()];
+console.log(`Seeding ${uniqueRecords.length} content records (${records.length - uniqueRecords.length} duplicates removed)…`);
+for (let i = 0; i < uniqueRecords.length; i += BATCH) {
+  const chunk = uniqueRecords.slice(i, i + BATCH);
   await sql`
     INSERT INTO wp_content ${sql(chunk.map((r) => ({
       wp_id:                String(r.id ?? r.wpId ?? ""),
