@@ -6,6 +6,8 @@
     "dev": "next dev",
     "import:wordpress": "node scripts/import-wordpress.mjs",
     "db:seed": "node scripts/seed-postgres.mjs",
+    "db:seed:featured-projects": "node scripts/seed-featured-projects.mjs",
+    "db:seed:news": "node scripts/seed-news.mjs",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "build": "next build",

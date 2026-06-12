@@ -1,35 +1,15 @@
 import Link from "next/link";
 import Image from "next/image";
 import type { WpContentRecord } from "@/lib/wp/types";
-import { getLatestPosts } from "@/db/queries";
+import {
+  listNews,
+  listHeroSlides,
+  listEvents,
+  listPartners,
+  type EventRow,
+} from "@/db/queries";
 import { SiteShell, formatDate } from "@/components/rtrda-shared";
 import { HeroSlider } from "./HeroSlider";
-
-// ─── Mock data (replaced by DB tables later) ─────────────────────────────────
-
-const MOCK_EVENTS = [
-  { date: 7, label: "งาน Asia Pacific Rail 2026", color: "#0055c7" },
-  { date: 14, label: 'สัมมนา "ยาง+ราง"', color: "#8b0000" },
-];
-
-const MOCK_PARTNERS = [
-  { name: "กระทรวงคมนาคม", icon: "directions_railway" },
-  { name: "กรมทางหลวง", icon: "route" },
-  { name: "กรมการขนส่งทางราง", icon: "train" },
-  { name: "การรถไฟแห่งประเทศไทย", icon: "tram" },
-  { name: "สนข.", icon: "account_balance" },
-];
-
-// ─── Helpers ─────────────────────────────────────────────────────────────────
-
-function getCategoryBadge(record: WpContentRecord): string {
-  const path = record.parentPath ?? record.path;
-  if (path.includes("งานวิจัย")) return "งานวิจัย";
-  if (path.includes("โครงการ")) return "โครงการ";
-  if (path.includes("ความร่วมมือ")) return "ความร่วมมือ";
-  if (path.includes("อบรม") || path.includes("สัมมนา")) return "อบรม/สัมมนา";
-  return "ข่าวสาร";
-}
 
 const THAI_MONTHS = [
   "มกราคม", "กุมภาพันธ์", "มีนาคม", "เมษายน", "พฤษภาคม", "มิถุนายน",
@@ -39,7 +19,7 @@ const THAI_MONTHS = [
 function buildCalendarCells(year: number, month: number): (number | null)[] {
   const firstDay = new Date(year, month, 1).getDay();
   const daysInMonth = new Date(year, month + 1, 0).getDate();
-  const thaiFirstDay = firstDay === 0 ? 6 : firstDay - 1; // Thai week starts Mon
+  const thaiFirstDay = firstDay === 0 ? 6 : firstDay - 1;
   const cells: (number | null)[] = [];
   for (let i = 0; i < thaiFirstDay; i++) cells.push(null);
   for (let d = 1; d <= daysInMonth; d++) cells.push(d);
@@ -49,13 +29,15 @@ function buildCalendarCells(year: number, month: number): (number | null)[] {
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
-function CalendarWidget() {
+function CalendarWidget({ events }: { events: EventRow[] }) {
   const now = new Date();
   const year = now.getFullYear();
   const month = now.getMonth();
   const today = now.getDate();
   const cells = buildCalendarCells(year, month);
-  const eventMap = new Map(MOCK_EVENTS.map((e) => [e.date, e]));
+  const eventMap = new Map(
+    events.map((e) => [new Date(e.eventDate + "T00:00:00").getDate(), e]),
+  );
 
   return (
     <div className="bg-white border border-[#c3c6d2] p-5">
@@ -100,8 +82,8 @@ function CalendarWidget() {
             <div
               key={i}
               className={cls}
-              style={event && !isToday ? { backgroundColor: event.color } : undefined}
-              title={event?.label}
+              style={event && !isToday ? { backgroundColor: event.colorHex } : undefined}
+              title={event?.title}
             >
               {day}
             </div>
@@ -109,17 +91,19 @@ function CalendarWidget() {
         })}
       </div>
 
-      <div className="mt-4 space-y-1.5">
-        {MOCK_EVENTS.map((event, i) => (
-          <div key={i} className="flex items-center gap-2 text-[12px] text-[#44474f]">
-            <span
-              className="w-3 h-3 flex-shrink-0 rounded-sm inline-block"
-              style={{ backgroundColor: event.color }}
-            />
-            {event.label}
-          </div>
-        ))}
-      </div>
+      {events.length > 0 && (
+        <div className="mt-4 space-y-1.5">
+          {events.map((e) => (
+            <div key={e.id} className="flex items-center gap-2 text-[12px] text-[#44474f]">
+              <span
+                className="w-3 h-3 flex-shrink-0 rounded-sm inline-block"
+                style={{ backgroundColor: e.colorHex }}
+              />
+              {e.title}
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -128,9 +112,23 @@ function CalendarWidget() {
 
 export async function HomePage({ record }: { record: WpContentRecord }) {
   const { language } = record;
-  const posts = await getLatestPosts(language, 5);
-  const newsPosts = posts.slice(0, 3);
-  const articlePosts = posts.slice(3, 5);
+
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = now.getMonth();
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const monthFrom = `${year}-${String(month + 1).padStart(2, "0")}-01`;
+  const monthTo = `${year}-${String(month + 1).padStart(2, "0")}-${String(daysInMonth).padStart(2, "0")}`;
+
+  const [newsItems, slides, monthEvents, partnerList] = await Promise.all([
+    listNews({ language, limit: 5 }),
+    listHeroSlides({ language, activeOnly: true }),
+    listEvents({ language, from: monthFrom, to: monthTo }),
+    listPartners(),
+  ]);
+
+  const newsPosts = newsItems.slice(0, 3);
+  const articlePosts = newsItems.slice(3, 5);
 
   const newsHref = language === "th" ? "/ข่าวสาร-กิจกรรม" : "/en/ข่าวสาร-กิจกรรม";
   const contactHref = language === "th" ? "/ติดต่อเรา" : "/en/ติดต่อเรา";
@@ -138,7 +136,10 @@ export async function HomePage({ record }: { record: WpContentRecord }) {
   return (
     <SiteShell path={record.path}>
       {/* Hero Slider */}
-      <HeroSlider />
+      <HeroSlider slides={slides.map((s) => ({
+        imageUrl: s.imagePath ?? "/stitch-assets/home-hero.png",
+        alt: s.altText,
+      }))} />
 
       {/* ข่าวสารและกิจกรรม */}
       <section className="py-16 bg-white" style={{ fontFamily: "'Hanken Grotesk', 'Noto Sans Thai', sans-serif" }}>
@@ -160,42 +161,43 @@ export async function HomePage({ record }: { record: WpContentRecord }) {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {newsPosts.map((post) => {
-              const badge = getCategoryBadge(post);
-              const dateText = formatDate(post.date, language);
-              const imageSrc = post.featuredMediaPath ?? "/stitch-assets/page-hero.png";
+            {newsPosts.map((item) => {
+              const dateStr = item.publishedAt?.toISOString() ?? "";
+              const dateText = formatDate(dateStr, language);
 
               return (
-                <article key={post.id} className="bg-white border border-[#c3c6d2] overflow-hidden group">
+                <article key={item.id} className="bg-white border border-[#c3c6d2] overflow-hidden group">
                   <div className="relative h-52 overflow-hidden">
                     <Image
-                      src={imageSrc}
+                      src="/stitch-assets/page-hero.png"
                       alt=""
                       fill
                       className="object-cover group-hover:scale-105 transition-transform duration-500"
                       sizes="(max-width: 768px) 100vw, 33vw"
                     />
-                    <span className="absolute top-3 left-3 bg-[#0055c7] text-white text-[11px] font-bold px-2 py-1 uppercase tracking-wide">
-                      {badge}
-                    </span>
+                    {item.category && (
+                      <span className="absolute top-3 left-3 bg-[#0055c7] text-white text-[11px] font-bold px-2 py-1 uppercase tracking-wide">
+                        {item.category}
+                      </span>
+                    )}
                   </div>
                   <div className="p-4">
                     {dateText && (
                       <div className="flex items-center gap-1.5 text-xs text-[#44474f] mb-2">
                         <span className="material-symbols-outlined" style={{ fontSize: 14 }}>calendar_today</span>
-                        <time dateTime={post.date}>{dateText}</time>
+                        <time dateTime={dateStr}>{dateText}</time>
                       </div>
                     )}
                     <h3 className="text-[15px] font-bold text-[#001f49] mb-2 line-clamp-2 leading-snug">
-                      {post.title}
+                      {item.title}
                     </h3>
-                    {post.excerpt && (
+                    {item.excerpt && (
                       <p className="text-sm text-[#44474f] line-clamp-3 mb-3 leading-relaxed">
-                        {post.excerpt}
+                        {item.excerpt}
                       </p>
                     )}
                     <Link
-                      href={post.path}
+                      href={`/${item.slug}`}
                       className="flex items-center gap-1 text-sm font-bold text-[#0055c7] hover:underline"
                     >
                       {language === "th" ? "อ่านต่อ" : "Read more"}
@@ -221,15 +223,15 @@ export async function HomePage({ record }: { record: WpContentRecord }) {
               <div className="w-16 h-1 bg-[#0055c7] mb-6" />
 
               <div className="space-y-4">
-                {articlePosts.map((post) => {
-                  const dateText = formatDate(post.date, language);
-                  const imageSrc = post.featuredMediaPath ?? "/stitch-assets/page-hero.png";
+                {articlePosts.map((item) => {
+                  const dateStr = item.publishedAt?.toISOString() ?? "";
+                  const dateText = formatDate(dateStr, language);
 
                   return (
-                    <article key={post.id} className="bg-white border border-[#c3c6d2] p-4 flex gap-4 group">
+                    <article key={item.id} className="bg-white border border-[#c3c6d2] p-4 flex gap-4 group">
                       <div className="flex-shrink-0 w-32 h-24 relative overflow-hidden">
                         <Image
-                          src={imageSrc}
+                          src="/stitch-assets/page-hero.png"
                           alt=""
                           fill
                           className="object-cover group-hover:scale-105 transition-transform duration-300"
@@ -242,16 +244,16 @@ export async function HomePage({ record }: { record: WpContentRecord }) {
                             <p className="text-xs text-[#0055c7] font-bold mb-1">{dateText}</p>
                           )}
                           <h3 className="text-sm font-bold text-[#001f49] line-clamp-2 leading-snug mb-1">
-                            {post.title}
+                            {item.title}
                           </h3>
-                          {post.excerpt && (
+                          {item.excerpt && (
                             <p className="text-xs text-[#44474f] line-clamp-2 leading-relaxed">
-                              {post.excerpt}
+                              {item.excerpt}
                             </p>
                           )}
                         </div>
                         <Link
-                          href={post.path}
+                          href={`/${item.slug}`}
                           className="mt-2 inline-flex items-center text-xs font-bold text-[#001f49] border border-[#001f49] px-3 py-1.5 hover:bg-[#001f49] hover:text-white transition-colors self-start"
                         >
                           {language === "th" ? "อ่านต่อ" : "Read more"}
@@ -271,39 +273,51 @@ export async function HomePage({ record }: { record: WpContentRecord }) {
 
             {/* ปฏิทินกิจกรรม */}
             <div className="w-full lg:w-72 flex-shrink-0">
-              <CalendarWidget />
+              <CalendarWidget events={monthEvents} />
             </div>
           </div>
         </div>
       </section>
 
       {/* พันธมิตรทางยุทธศาสตร์ */}
-      <section
-        className="py-16 bg-white border-t border-[#c3c6d2]"
-        style={{ fontFamily: "'Hanken Grotesk', 'Noto Sans Thai', sans-serif" }}
-      >
-        <div className="mx-auto max-w-[1280px] px-10 text-center">
-          <h2 className="text-xl font-bold text-[#001f49] mb-8">
-            {language === "th" ? "พันธมิตรทางยุทธศาสตร์ของเรา" : "Our Strategic Partners"}
-          </h2>
-          <div className="flex items-center justify-center gap-10 flex-wrap">
-            {MOCK_PARTNERS.map((partner) => (
-              <div
-                key={partner.name}
-                className="flex flex-col items-center gap-2 text-[#44474f]"
-                title={partner.name}
-              >
-                <div className="w-16 h-16 bg-[#eeeeee] flex items-center justify-center">
-                  <span className="material-symbols-outlined text-[#44474f]" style={{ fontSize: 32 }}>
-                    {partner.icon}
-                  </span>
-                </div>
-              </div>
-            ))}
-            <div className="text-xs font-bold text-[#44474f] uppercase tracking-widest">MINISTRY</div>
+      {partnerList.length > 0 && (
+        <section
+          className="py-16 bg-white border-t border-[#c3c6d2]"
+          style={{ fontFamily: "'Hanken Grotesk', 'Noto Sans Thai', sans-serif" }}
+        >
+          <div className="mx-auto max-w-[1280px] px-10 text-center">
+            <h2 className="text-xl font-bold text-[#001f49] mb-8">
+              {language === "th" ? "พันธมิตรทางยุทธศาสตร์ของเรา" : "Our Strategic Partners"}
+            </h2>
+            <div className="flex items-center justify-center gap-10 flex-wrap">
+              {partnerList.map((partner) => (
+                <a
+                  key={partner.id}
+                  href={partner.websiteUrl || "#"}
+                  title={partner.name}
+                  className="flex flex-col items-center gap-2 text-[#44474f] hover:opacity-80 transition-opacity"
+                >
+                  {partner.logoPath ? (
+                    <Image
+                      src={partner.logoPath}
+                      alt={partner.name}
+                      width={64}
+                      height={64}
+                      className="object-contain"
+                    />
+                  ) : (
+                    <div className="w-16 h-16 bg-[#eeeeee] flex items-center justify-center">
+                      <span className="material-symbols-outlined text-[#44474f]" style={{ fontSize: 32 }}>
+                        business
+                      </span>
+                    </div>
+                  )}
+                </a>
+              ))}
+            </div>
           </div>
-        </div>
-      </section>
+        </section>
+      )}
 
       {/* Floating chat button */}
       <Link
