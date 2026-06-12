@@ -9,6 +9,20 @@ import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import postgres from "postgres";
+import sanitizeHtml from "sanitize-html";
+
+function toPlainText(html) {
+  if (!html) return "";
+  const withBreaks = html
+    .replace(/<\/p>/gi, "\n\n")
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<\/div>/gi, "\n")
+    .replace(/<\/li>/gi, "\n")
+    .replace(/<\/(h[1-6])>/gi, "\n\n");
+  return sanitizeHtml(withBreaks, { allowedTags: [], allowedAttributes: {} })
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(__dirname, "..");
@@ -61,8 +75,8 @@ for (const r of posts) {
       ${r.language},
       ${slug},
       ${r.title},
-      ${r.excerpt ?? ""},
-      ${r.contentHtml ?? ""},
+      ${toPlainText(r.excerpt)},
+      ${toPlainText(r.contentHtml)},
       ${category},
       ${null},
       ${"[]"},

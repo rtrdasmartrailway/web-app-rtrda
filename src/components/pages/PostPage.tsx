@@ -29,10 +29,7 @@ export async function PostPage({ record }: { record: WpContentRecord }) {
         <div className="site-container content-layout" id="main-content">
           <div className="content-main">
             {newsItem?.body ? (
-              <div
-                className="prose max-w-none"
-                dangerouslySetInnerHTML={{ __html: newsItem.body }}
-              />
+              <div className="prose max-w-none whitespace-pre-wrap">{newsItem.body}</div>
             ) : record.excerpt ? (
               <p className="post-excerpt">{record.excerpt}</p>
             ) : null}
