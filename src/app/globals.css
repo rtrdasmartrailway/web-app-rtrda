@@ -21,6 +21,36 @@
   --color-foreground: var(--foreground);
 }
 
+/* Stitch design system tokens — used by Tailwind utilities (bg-primary, text-secondary, etc.) */
+@theme {
+  --color-primary: #001f49;
+  --color-primary-container: #001f49;
+  --color-on-primary: #ffffff;
+  --color-on-primary-container: #7088b7;
+  --color-secondary: #0055c7;
+  --color-secondary-container: #336fe2;
+  --color-on-secondary: #ffffff;
+  --color-on-surface: #1a1c1c;
+  --color-on-surface-variant: #44474f;
+  --color-outline: #747780;
+  --color-outline-variant: #c3c6d2;
+  --color-surface-bright: #f9f9f9;
+  --color-surface-container: #eeeeee;
+  --color-surface-container-high: #e8e8e8;
+  --color-surface-container-highest: #e2e2e2;
+  --color-surface-container-low: #f3f3f3;
+  --color-surface-container-lowest: #ffffff;
+}
+
+.material-symbols-outlined {
+  font-family: "Material Symbols Outlined";
+  font-variation-settings: "FILL" 0, "wght" 400, "GRAD" 0, "opsz" 24;
+  font-size: inherit;
+  line-height: 1;
+  vertical-align: middle;
+  user-select: none;
+}
+
 * {
   box-sizing: border-box;
 }

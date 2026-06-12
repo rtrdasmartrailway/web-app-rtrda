@@ -1,10 +1,47 @@
 import { cache } from "react";
-import { asc, desc, eq, ilike, or } from "drizzle-orm";
+import { and, asc, desc, eq, gte, ilike, isNull, lte, or } from "drizzle-orm";
 import { db } from "./index";
-import { wpContent, wpDownloads, wpMeta, wpNavigation } from "./schema";
+import {
+  wpContent,
+  wpDownloads,
+  wpMeta,
+  wpNavigation,
+  news,
+  procurement,
+  publications,
+  featuredProjects,
+  flipbooks,
+  pages,
+  jobs,
+  faq,
+  events,
+  partners,
+  heroSlides,
+  navigation,
+  media,
+  siteMeta,
+} from "./schema";
 import type { WpContentRecord, WpDownloadAsset, WpLanguage, WpNavigationItem } from "@/lib/wp/types";
 import { normalizeRoutePath } from "@/lib/wp/url";
 import { MOCK_RECORDS, MOCK_DOWNLOADS, MOCK_NAV, MOCK_NAV_EN } from "./mock";
+
+// ─── Exported row types (for new tables) ─────────────────────────────────────
+
+export type NewsRow = typeof news.$inferSelect;
+export type ProcurementRow = typeof procurement.$inferSelect;
+export type PublicationRow = typeof publications.$inferSelect;
+export type FeaturedProjectRow = typeof featuredProjects.$inferSelect;
+export type FlipbookRow = typeof flipbooks.$inferSelect;
+export type PageRow = typeof pages.$inferSelect;
+export type JobRow = typeof jobs.$inferSelect;
+export type FaqRow = typeof faq.$inferSelect;
+export type EventRow = typeof events.$inferSelect;
+export type PartnerRow = typeof partners.$inferSelect;
+export type HeroSlideRow = typeof heroSlides.$inferSelect;
+export type NavigationRow = typeof navigation.$inferSelect;
+export type MediaRow = typeof media.$inferSelect;
+
+// ─── Legacy wp_content queries (unchanged) ────────────────────────────────────
 
 function rowToRecord(row: typeof wpContent.$inferSelect): WpContentRecord {
   return {
@@ -200,4 +237,298 @@ export async function getGeneratedAt(): Promise<string> {
     .where(eq(wpMeta.key, "generatedAt"))
     .limit(1);
   return rows[0]?.value ?? "";
+}
+
+// ─── News ─────────────────────────────────────────────────────────────────────
+
+export async function listNews(opts: {
+  language?: string;
+  category?: string;
+  limit?: number;
+  offset?: number;
+} = {}): Promise<NewsRow[]> {
+  const { language, category, limit = 20, offset = 0 } = opts;
+  if (!db) return [];
+  return db
+    .select()
+    .from(news)
+    .where(and(
+      language ? eq(news.language, language) : undefined,
+      category ? eq(news.category, category) : undefined,
+    ))
+    .orderBy(desc(news.publishedAt))
+    .limit(Math.min(limit, 200))
+    .offset(offset);
+}
+
+export const getNewsBySlug = cache(async (slug: string): Promise<NewsRow | null> => {
+  if (!db) return null;
+  const rows = await db.select().from(news).where(eq(news.slug, slug)).limit(1);
+  return rows[0] ?? null;
+});
+
+// ─── Procurement ─────────────────────────────────────────────────────────────
+
+export async function listProcurement(opts: {
+  language?: string;
+  category?: string;
+  limit?: number;
+  offset?: number;
+} = {}): Promise<ProcurementRow[]> {
+  const { language, category, limit = 20, offset = 0 } = opts;
+  if (!db) return [];
+  return db
+    .select()
+    .from(procurement)
+    .where(and(
+      language ? eq(procurement.language, language) : undefined,
+      category ? eq(procurement.category, category) : undefined,
+    ))
+    .orderBy(desc(procurement.publishedAt))
+    .limit(Math.min(limit, 200))
+    .offset(offset);
+}
+
+export const getProcurementBySlug = cache(async (slug: string): Promise<ProcurementRow | null> => {
+  if (!db) return null;
+  const rows = await db.select().from(procurement).where(eq(procurement.slug, slug)).limit(1);
+  return rows[0] ?? null;
+});
+
+// ─── Publications ─────────────────────────────────────────────────────────────
+
+export async function listPublications(opts: {
+  language?: string;
+  category?: string;
+  limit?: number;
+  offset?: number;
+} = {}): Promise<PublicationRow[]> {
+  const { language, category, limit = 20, offset = 0 } = opts;
+  if (!db) return [];
+  return db
+    .select()
+    .from(publications)
+    .where(and(
+      language ? eq(publications.language, language) : undefined,
+      category ? eq(publications.category, category) : undefined,
+    ))
+    .orderBy(desc(publications.publishedAt))
+    .limit(Math.min(limit, 200))
+    .offset(offset);
+}
+
+export const getPublicationBySlug = cache(async (slug: string): Promise<PublicationRow | null> => {
+  if (!db) return null;
+  const rows = await db.select().from(publications).where(eq(publications.slug, slug)).limit(1);
+  return rows[0] ?? null;
+});
+
+// ─── Featured Projects ────────────────────────────────────────────────────────
+
+export async function listFeaturedProjects(opts: {
+  language?: string;
+  category?: string;
+  limit?: number;
+  offset?: number;
+} = {}): Promise<FeaturedProjectRow[]> {
+  const { language, category, limit = 20, offset = 0 } = opts;
+  if (!db) return [];
+  return db
+    .select()
+    .from(featuredProjects)
+    .where(and(
+      language ? eq(featuredProjects.language, language) : undefined,
+      category ? eq(featuredProjects.category, category) : undefined,
+    ))
+    .orderBy(desc(featuredProjects.publishedAt))
+    .limit(Math.min(limit, 200))
+    .offset(offset);
+}
+
+export const getFeaturedProjectBySlug = cache(async (slug: string): Promise<FeaturedProjectRow | null> => {
+  if (!db) return null;
+  const rows = await db.select().from(featuredProjects).where(eq(featuredProjects.slug, slug)).limit(1);
+  return rows[0] ?? null;
+});
+
+// ─── Flipbooks ────────────────────────────────────────────────────────────────
+
+export async function listFlipbooks(opts: {
+  language?: string;
+  limit?: number;
+  offset?: number;
+} = {}): Promise<FlipbookRow[]> {
+  const { language, limit = 20, offset = 0 } = opts;
+  if (!db) return [];
+  return db
+    .select()
+    .from(flipbooks)
+    .where(language ? eq(flipbooks.language, language) : undefined)
+    .orderBy(desc(flipbooks.publishedAt))
+    .limit(Math.min(limit, 200))
+    .offset(offset);
+}
+
+export const getFlipbookBySlug = cache(async (slug: string): Promise<FlipbookRow | null> => {
+  if (!db) return null;
+  const rows = await db.select().from(flipbooks).where(eq(flipbooks.slug, slug)).limit(1);
+  return rows[0] ?? null;
+});
+
+// ─── Pages ────────────────────────────────────────────────────────────────────
+
+export async function listPages(opts: {
+  language?: string;
+  parentSlug?: string | null;
+  limit?: number;
+} = {}): Promise<PageRow[]> {
+  const { language, parentSlug, limit = 100 } = opts;
+  if (!db) return [];
+  return db
+    .select()
+    .from(pages)
+    .where(and(
+      language ? eq(pages.language, language) : undefined,
+      parentSlug === null
+        ? isNull(pages.parentSlug)
+        : parentSlug
+          ? eq(pages.parentSlug, parentSlug)
+          : undefined,
+    ))
+    .orderBy(asc(pages.sortOrder), asc(pages.title))
+    .limit(Math.min(limit, 500));
+}
+
+export const getPageBySlug = cache(async (slug: string): Promise<PageRow | null> => {
+  if (!db) return null;
+  const rows = await db.select().from(pages).where(eq(pages.slug, slug)).limit(1);
+  return rows[0] ?? null;
+});
+
+// ─── Jobs ─────────────────────────────────────────────────────────────────────
+
+export async function listJobs(opts: {
+  language?: string;
+  isOpen?: boolean;
+  limit?: number;
+  offset?: number;
+} = {}): Promise<JobRow[]> {
+  const { language, isOpen, limit = 20, offset = 0 } = opts;
+  if (!db) return [];
+  return db
+    .select()
+    .from(jobs)
+    .where(and(
+      language ? eq(jobs.language, language) : undefined,
+      isOpen !== undefined ? eq(jobs.isOpen, isOpen) : undefined,
+    ))
+    .orderBy(desc(jobs.publishedAt))
+    .limit(Math.min(limit, 200))
+    .offset(offset);
+}
+
+export const getJobBySlug = cache(async (slug: string): Promise<JobRow | null> => {
+  if (!db) return null;
+  const rows = await db.select().from(jobs).where(eq(jobs.slug, slug)).limit(1);
+  return rows[0] ?? null;
+});
+
+// ─── FAQ ──────────────────────────────────────────────────────────────────────
+
+export async function listFaq(opts: {
+  language?: string;
+  category?: string;
+} = {}): Promise<FaqRow[]> {
+  const { language, category } = opts;
+  if (!db) return [];
+  return db
+    .select()
+    .from(faq)
+    .where(and(
+      language ? eq(faq.language, language) : undefined,
+      category ? eq(faq.category, category) : undefined,
+    ))
+    .orderBy(asc(faq.sortOrder));
+}
+
+// ─── Events ───────────────────────────────────────────────────────────────────
+
+export async function listEvents(opts: {
+  language?: string;
+  from?: string;
+  to?: string;
+  limit?: number;
+} = {}): Promise<EventRow[]> {
+  const { language, from, to, limit = 50 } = opts;
+  if (!db) return [];
+  return db
+    .select()
+    .from(events)
+    .where(and(
+      language ? eq(events.language, language) : undefined,
+      from ? gte(events.eventDate, from) : undefined,
+      to ? lte(events.eventDate, to) : undefined,
+    ))
+    .orderBy(asc(events.eventDate))
+    .limit(Math.min(limit, 200));
+}
+
+// ─── Partners ─────────────────────────────────────────────────────────────────
+
+export async function listPartners(): Promise<PartnerRow[]> {
+  if (!db) return [];
+  return db.select().from(partners).orderBy(asc(partners.sortOrder));
+}
+
+// ─── Hero Slides ──────────────────────────────────────────────────────────────
+
+export async function listHeroSlides(opts: {
+  language?: string;
+  activeOnly?: boolean;
+} = {}): Promise<HeroSlideRow[]> {
+  const { language, activeOnly = true } = opts;
+  if (!db) return [];
+  return db
+    .select()
+    .from(heroSlides)
+    .where(and(
+      language ? eq(heroSlides.language, language) : undefined,
+      activeOnly ? eq(heroSlides.isActive, true) : undefined,
+    ))
+    .orderBy(asc(heroSlides.sortOrder));
+}
+
+// ─── Navigation (new table) ───────────────────────────────────────────────────
+
+export async function getNavigationItems(language: string): Promise<NavigationRow[]> {
+  if (!db) return [];
+  return db
+    .select()
+    .from(navigation)
+    .where(eq(navigation.language, language))
+    .orderBy(asc(navigation.sortOrder));
+}
+
+// ─── Media ────────────────────────────────────────────────────────────────────
+
+export const getMediaById = cache(async (id: number): Promise<MediaRow | null> => {
+  if (!db) return null;
+  const rows = await db.select().from(media).where(eq(media.id, id)).limit(1);
+  return rows[0] ?? null;
+});
+
+// ─── Site Meta ────────────────────────────────────────────────────────────────
+
+export async function getSiteMeta(key: string): Promise<string | null> {
+  if (!db) return null;
+  const rows = await db.select().from(siteMeta).where(eq(siteMeta.key, key)).limit(1);
+  return rows[0]?.value ?? null;
+}
+
+export async function setSiteMeta(key: string, value: string): Promise<void> {
+  if (!db) return;
+  await db
+    .insert(siteMeta)
+    .values({ key, value })
+    .onConflictDoUpdate({ target: siteMeta.key, set: { value } });
 }
