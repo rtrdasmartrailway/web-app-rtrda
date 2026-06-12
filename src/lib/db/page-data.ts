@@ -131,7 +131,9 @@ export const getPageData = cache(async (path: string): Promise<PageData | null> 
   const isHome = record.path === "/" || record.path === "/en";
   const [childRecords, siblingRecords, latestRecords, stats, shell] = await Promise.all([
     getChildren(record.path, record.language),
-    record.parentPath ? getChildren(record.parentPath, record.language) : Promise.resolve([]),
+    record.parentPath
+      ? getChildren(record.parentPath, record.language)
+      : Promise.resolve([]),
     isHome && !hasImportedLatestPosts(record)
       ? getLatestPosts(record.language)
       : Promise.resolve([]),
@@ -139,7 +141,9 @@ export const getPageData = cache(async (path: string): Promise<PageData | null> 
     buildShellData(path),
   ]);
 
-  const parentRecord = record.parentPath ? await getRecordByPath(record.parentPath) : null;
+  const parentRecord = record.parentPath
+    ? await getRecordByPath(record.parentPath)
+    : null;
   const [children, latest] = await Promise.all([
     fetchCards(childRecords),
     fetchCards(latestRecords),
@@ -151,7 +155,9 @@ export const getPageData = cache(async (path: string): Promise<PageData | null> 
     latest,
     stats,
     sidebarItems:
-      record.kind === "page" ? buildSidebarItems(record, childRecords, siblingRecords) : [],
+      record.kind === "page"
+        ? buildSidebarItems(record, childRecords, siblingRecords)
+        : [],
     parentTitle: parentRecord?.title ?? record.title,
     shell,
   };

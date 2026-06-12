@@ -1,47 +1,25 @@
 import Link from "next/link";
-import type { WpImportManifest, WpLanguage } from "@/lib/wp/types";
+import type { Card, ShellData } from "@/lib/db/page-data";
+import type { WpLanguage } from "@/lib/wp/types";
 import { ArticleCard } from "./article-card";
 import { SiteShell } from "./site-shell";
 
 export function SearchResults({
-  manifest,
+  results,
   query,
-  language = "th",
+  language,
+  shell,
 }: {
-  manifest: WpImportManifest;
+  results: Card[];
   query: string;
-  language?: WpLanguage;
+  language: WpLanguage;
+  shell: ShellData;
 }) {
-  const normalizedQuery = query.trim().toLowerCase();
-  const results = normalizedQuery
-    ? manifest.records
-        .filter((record) => record.language === language)
-        .map((record) => {
-          const titleHaystack = `${record.title} ${record.excerpt}`.toLowerCase();
-          const bodyHaystack = (record.searchText ?? "").toLowerCase();
-          if (titleHaystack.includes(normalizedQuery)) {
-            return { record, rank: 0 };
-          }
-          if (bodyHaystack.includes(normalizedQuery)) {
-            return { record, rank: 1 };
-          }
-          return null;
-        })
-        .filter((entry) => entry !== null)
-        .sort(
-          (a, b) =>
-            a.rank - b.rank ||
-            new Date(b.record.date).getTime() - new Date(a.record.date).getTime(),
-        )
-        .slice(0, 80)
-        .map((entry) => entry.record)
-    : [];
-
   const searchTitle = language === "th" ? "ผลการค้นหา" : "Search results";
   const homePath = language === "th" ? "/" : "/en";
 
   return (
-    <SiteShell manifest={manifest} path="/search">
+    <SiteShell shell={shell}>
       <section className="page-hero">
         <div className="site-container hero-inner">
           <p className="breadcrumb">
@@ -59,11 +37,11 @@ export function SearchResults({
           <button type="submit">{language === "th" ? "ค้นหา" : "Search"}</button>
         </form>
         <div className="search-grid">
-          {results.map((record) => (
-            <ArticleCard key={record.id} manifest={manifest} record={record} />
+          {results.map((card) => (
+            <ArticleCard key={card.record.id} card={card} />
           ))}
         </div>
-        {normalizedQuery && results.length === 0 ? (
+        {query.trim() && results.length === 0 ? (
           <p>{language === "th" ? "ไม่พบผลการค้นหา" : "No results found."}</p>
         ) : null}
       </section>

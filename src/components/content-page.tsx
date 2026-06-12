@@ -1,15 +1,9 @@
 import Link from "next/link";
-import type { WpContentRecord, WpImportManifest } from "@/lib/wp/types";
-import { getSidebarItems, type PresentationSidebarItem } from "@/lib/wp/presentation";
+import type { PageData } from "@/lib/db/page-data";
+import type { PresentationSidebarItem } from "@/lib/wp/presentation";
 import { ArticleCard } from "./article-card";
 import { SiteShell } from "./site-shell";
-import {
-  formatDate,
-  hasImportedLatestPosts,
-  latestPosts,
-  parentTitle,
-  relatedChildren,
-} from "./site-helpers";
+import { formatDate } from "./site-helpers";
 
 function SideNavigation({
   items,
@@ -41,26 +35,13 @@ function SideNavigation({
   );
 }
 
-export function ContentPage({
-  manifest,
-  record,
-}: {
-  manifest: WpImportManifest;
-  record: WpContentRecord;
-}) {
-  const children = relatedChildren(manifest, record);
+export function ContentPage({ data }: { data: PageData }) {
+  const { record, children, latest, sidebarItems, parentTitle } = data;
   const isHome = record.path === "/" || record.path === "/en";
-  const latest =
-    isHome && !hasImportedLatestPosts(record)
-      ? latestPosts(manifest, record.language)
-      : [];
   const dateText = formatDate(record.date, record.language);
-  const sidebarItems =
-    record.kind === "page" ? getSidebarItems(manifest.records, record) : [];
-  const sidebarTitle = parentTitle(manifest, record);
 
   return (
-    <SiteShell manifest={manifest} path={record.path}>
+    <SiteShell shell={data.shell}>
       <article
         className={`content-page content-${record.kind} ${isHome ? "content-home" : ""}`}
       >
@@ -90,7 +71,7 @@ export function ContentPage({
           className={`site-container content-layout ${sidebarItems.length > 0 ? "with-sidebar" : ""}`}
           id="main-content"
         >
-          <SideNavigation items={sidebarItems} title={sidebarTitle} />
+          <SideNavigation items={sidebarItems} title={parentTitle} />
 
           <div className="content-main">
             <div
@@ -107,7 +88,7 @@ export function ContentPage({
                 </div>
                 <div className="related-grid">
                   {children.map((child) => (
-                    <ArticleCard key={child.id} manifest={manifest} record={child} />
+                    <ArticleCard key={child.record.id} card={child} />
                   ))}
                 </div>
               </section>
@@ -122,7 +103,7 @@ export function ContentPage({
                 </div>
                 <div className="related-grid">
                   {latest.map((post) => (
-                    <ArticleCard key={post.id} manifest={manifest} record={post} />
+                    <ArticleCard key={post.record.id} card={post} />
                   ))}
                 </div>
               </section>

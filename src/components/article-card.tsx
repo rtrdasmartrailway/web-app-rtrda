@@ -1,18 +1,17 @@
 import Link from "next/link";
 import Image from "next/image";
-import type { WpContentRecord, WpImportManifest } from "@/lib/wp/types";
-import { resolveCardImagePath } from "@/lib/wp/presentation";
+import type { Card } from "@/lib/db/page-data";
 import { formatDate } from "./site-helpers";
 
-export function ArticleCard({
-  manifest,
-  record,
-}: {
-  manifest: WpImportManifest;
-  record: WpContentRecord;
-}) {
-  const imagePath = resolveCardImagePath(record, manifest.media);
+const KIND_BADGE: Record<string, { th: string; en: string } | undefined> = {
+  flipbook: { th: "เอกสาร PDF", en: "PDF" },
+  post: { th: "ข่าวสาร", en: "News" },
+};
+
+export function ArticleCard({ card }: { card: Card }) {
+  const { record, imagePath } = card;
   const dateText = formatDate(record.date, record.language);
+  const badge = KIND_BADGE[record.kind];
 
   return (
     <Link href={record.path} className="article-card">
@@ -23,6 +22,7 @@ export function ArticleCard({
           fill
           sizes="(max-width: 680px) 100vw, (max-width: 980px) 50vw, 33vw"
         />
+        {badge ? <span className="article-badge">{badge[record.language]}</span> : null}
       </span>
       <span className="article-content">
         {dateText ? <time dateTime={record.date}>{dateText}</time> : null}

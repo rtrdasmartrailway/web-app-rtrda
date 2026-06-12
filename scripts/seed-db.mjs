@@ -109,7 +109,15 @@ async function main() {
       "Category",
       ["id", "language", "path", "slug", "name", "count", "parent"],
       rows.categories,
-      (row) => [row.id, row.language, row.path, row.slug, row.name, row.count, row.parent],
+      (row) => [
+        row.id,
+        row.language,
+        row.path,
+        row.slug,
+        row.name,
+        row.count,
+        row.parent,
+      ],
     );
 
     await insertRows(

@@ -1,37 +1,25 @@
 import Link from "next/link";
 import Image from "next/image";
-import type { WpImportManifest } from "@/lib/wp/types";
-import { getNavigationTree } from "@/lib/wp/content-store";
-import { buildPrimaryNavigation } from "@/lib/wp/presentation";
+import type { ShellData } from "@/lib/db/page-data";
 import { RtrdaNavigation } from "./rtrda-navigation";
-import { counterpartPath, currentLanguage, formatDate } from "./site-helpers";
+import { formatDate } from "./site-helpers";
 
 export function SiteShell({
   children,
-  manifest,
-  path,
+  shell,
 }: {
   children: React.ReactNode;
-  manifest: WpImportManifest;
-  path: string;
+  shell: ShellData;
 }) {
-  const language = currentLanguage(path);
-  const generatedDate = formatDate(manifest.generatedAt, language);
-  const alternate = counterpartPath(manifest, path, language);
-  const navigationTree = getNavigationTree(manifest.records, language).slice(0, 8);
-  const navItems = buildPrimaryNavigation(
-    manifest.records,
-    language,
-    path,
-    manifest.navigation?.[language],
-  );
+  const { language } = shell;
+  const generatedDate = formatDate(shell.generatedAt, language);
 
   return (
     <div className="site-shell">
       <RtrdaNavigation
-        alternatePath={alternate}
+        alternatePath={shell.alternatePath}
         language={language}
-        navItems={navItems}
+        navItems={shell.navItems}
       />
 
       <main>{children}</main>
@@ -57,7 +45,8 @@ export function SiteShell({
                 : "Research and development for Thailand rail technology and sustainable rail systems."}
             </p>
             <p className="freshness">
-              {language === "th" ? "ข้อมูลนำเข้าล่าสุด" : "Imported"}: {generatedDate}
+              {language === "th" ? "ข้อมูลปรับปรุงล่าสุด" : "Last updated"}:{" "}
+              {generatedDate}
             </p>
           </section>
           <section>
@@ -87,7 +76,7 @@ export function SiteShell({
           <section>
             <h2>{language === "th" ? "เมนูหลัก" : "Quick Links"}</h2>
             <ul>
-              {navigationTree.map((item) => (
+              {shell.footerNav.map((item) => (
                 <li key={item.href}>
                   <Link href={item.href}>{item.label}</Link>
                 </li>

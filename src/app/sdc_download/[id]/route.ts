@@ -1,7 +1,7 @@
 import { readFile, stat } from "node:fs/promises";
 import path from "node:path";
 
-import { loadManifest } from "@/lib/wp/content-store";
+import { getDownloadById } from "@/lib/db/queries";
 import type { WpDownloadAsset } from "@/lib/wp/types";
 
 export const dynamic = "force-dynamic";
@@ -39,8 +39,7 @@ function contentDisposition(download: WpDownloadAsset): string {
 }
 
 async function findDownload(id: string): Promise<WpDownloadAsset | null> {
-  const manifest = await loadManifest();
-  return manifest.downloads.find((download) => download.id === id) ?? null;
+  return getDownloadById(id);
 }
 
 async function responseForDownload(id: string, includeBody: boolean): Promise<Response> {

@@ -1,5 +1,6 @@
 import type {
   WpContentRecord,
+  WpDownloadAsset,
   WpLanguage,
   WpMediaAsset,
   WpNavigationItem,
@@ -46,7 +47,9 @@ function lookupPath(path: string): string {
 }
 
 export async function getRecordByPath(path: string): Promise<WpContentRecord | null> {
-  const row = await prisma.contentRecord.findUnique({ where: { path: lookupPath(path) } });
+  const row = await prisma.contentRecord.findUnique({
+    where: { path: lookupPath(path) },
+  });
   return row ? toRecord(row) : null;
 }
 
@@ -91,7 +94,9 @@ export async function getTopLevelPages(language: WpLanguage): Promise<WpContentR
 
 export async function getNavigation(): Promise<Record<WpLanguage, WpNavigationItem[]>> {
   const row = await prisma.siteMeta.findUnique({ where: { key: "navigation" } });
-  return (row?.value as Record<WpLanguage, WpNavigationItem[]> | null) ?? { th: [], en: [] };
+  return (
+    (row?.value as Record<WpLanguage, WpNavigationItem[]> | null) ?? { th: [], en: [] }
+  );
 }
 
 export async function getGeneratedAt(): Promise<string> {
@@ -115,6 +120,10 @@ export async function getAllForSitemap(): Promise<
     select: { path: true, modified: true },
     orderBy: { path: "asc" },
   });
+}
+
+export async function getDownloadById(id: string): Promise<WpDownloadAsset | null> {
+  return prisma.download.findUnique({ where: { id } });
 }
 
 export interface SiteStats {

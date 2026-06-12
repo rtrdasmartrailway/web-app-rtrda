@@ -36,8 +36,18 @@ describe("deriveCounterpartCandidate", () => {
 
 describe("buildSidebarItems", () => {
   const current = record({ path: "/parent/me", parentPath: "/parent" });
-  const sibling = record({ id: "s", path: "/parent/อื่น", title: "อื่น", parentPath: "/parent" });
-  const child = record({ id: "c", path: "/parent/me/ลูก", title: "ลูก", parentPath: "/parent/me" });
+  const sibling = record({
+    id: "s",
+    path: "/parent/อื่น",
+    title: "อื่น",
+    parentPath: "/parent",
+  });
+  const child = record({
+    id: "c",
+    path: "/parent/me/ลูก",
+    title: "ลูก",
+    parentPath: "/parent/me",
+  });
 
   it("prefers children when present", () => {
     const items = buildSidebarItems(current, [child], [sibling, current]);

@@ -60,7 +60,15 @@ const manifest = {
     },
   ],
   categories: [
-    { id: 3, language: "th", path: "/category/ข่าว", slug: "ข่าว", name: "ข่าว", count: 1, parent: 0 },
+    {
+      id: 3,
+      language: "th",
+      path: "/category/ข่าว",
+      slug: "ข่าว",
+      name: "ข่าว",
+      count: 1,
+      parent: 0,
+    },
   ],
   media: [
     {
@@ -87,7 +95,10 @@ const manifest = {
       sourcePages: ["/เอกสาร"],
     },
   ],
-  navigation: { th: [{ label: "หน้าแรก", href: "/", path: "/", external: false, children: [] }], en: [] },
+  navigation: {
+    th: [{ label: "หน้าแรก", href: "/", path: "/", external: false, children: [] }],
+    en: [],
+  },
 };
 
 describe("manifestToRows", () => {
@@ -115,7 +126,9 @@ describe("manifestToRows", () => {
   it("keeps the first record when paths collide (matches records.find semantics)", () => {
     const winner = rows.records.find((row) => row.path === "/หน้า");
     expect(winner.id).toBe("th-page-1");
-    expect(rows.skippedDuplicates).toEqual([{ path: "/หน้า", keptId: "th-page-1", droppedId: "th-post-3" }]);
+    expect(rows.skippedDuplicates).toEqual([
+      { path: "/หน้า", keptId: "th-page-1", droppedId: "th-post-3" },
+    ]);
   });
 
   it("coerces media ids to string", () => {
