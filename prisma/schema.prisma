@@ -37,13 +37,16 @@ model ContentRecord {
 }
 
 model Category {
-  id       Int    @id
+  /// WordPress term id — only unique per language, hence the composite id.
+  id       Int
   language String
   path     String
   slug     String
   name     String
   count    Int
   parent   Int
+
+  @@id([id, language])
 }
 
 model MediaAsset {
