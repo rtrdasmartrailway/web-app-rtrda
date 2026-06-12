@@ -15,6 +15,9 @@
 /reports/
 .playwright-mcp/
 
+# generated prisma client (npx prisma generate)
+src/generated/
+
 # next.js
 /.next/
 /out/

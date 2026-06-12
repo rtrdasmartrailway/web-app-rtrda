@@ -12,6 +12,10 @@ services:
       PORT: 3000
       # Public origin for canonical URLs/sitemap; also defaulted in code.
       SITE_ORIGIN: https://test.rtrda.or.th
+      DATABASE_URL: postgresql://rtrda:${POSTGRES_PASSWORD}@db:5432/rtrda
+    depends_on:
+      db:
+        condition: service_healthy
     ports:
       - "127.0.0.1:3020:3000"
     volumes:
@@ -34,3 +38,27 @@ services:
       timeout: 10s
       retries: 5
       start_period: 30s
+
+  db:
+    image: postgres:17-alpine
+    container_name: web-app-rtrda-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: rtrda
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: rtrda
+    ports:
+      # Host access for prisma migrate / db:seed / ad-hoc content edits.
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - rtrda-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U rtrda -d rtrda"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  rtrda-db-data:
+    # Fixed name so every compose checkout (local + CI runner) shares the data.
+    name: rtrda-db-data

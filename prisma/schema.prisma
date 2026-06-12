@@ -1,0 +1,76 @@
+// Content database — the source of truth for everything the site serves.
+// Models mirror the legacy import manifest types (src/lib/wp/types.ts) 1:1;
+// `src/data/wp-content.json` is the frozen import artifact that seeded it
+// (scripts/seed-db.mjs).
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model ContentRecord {
+  id              String  @id
+  wpId            String
+  language        String
+  kind            String
+  path            String  @unique
+  sourceUrl       String
+  title           String
+  excerpt         String
+  contentHtml     String
+  /// Plain-text body used by site search (trigram-indexed; see migration SQL).
+  searchText      String  @default("")
+  /// ISO-8601 strings, kept as text: they sort correctly and the UI formats them.
+  date            String
+  modified        String
+  parentPath      String?
+  categoryIds     Int[]
+  featuredMediaId Int?
+  authorId        Int?
+
+  @@index([language, kind, date])
+  @@index([parentPath])
+}
+
+model Category {
+  id       Int    @id
+  language String
+  path     String
+  slug     String
+  name     String
+  count    Int
+  parent   Int
+}
+
+model MediaAsset {
+  id        String @id
+  sourceUrl String
+  localPath String
+  title     String
+  alt       String
+  width     Int?
+  height    Int?
+  mimeType  String
+}
+
+model Download {
+  id          String   @id
+  sourceUrl   String
+  localPath   String
+  fileName    String
+  mimeType    String
+  sizeBytes   Int
+  title       String
+  group       String
+  sourcePages String[]
+}
+
+/// Small key/JSON store: navigation trees, generatedAt, source.
+model SiteMeta {
+  key   String @id
+  value Json
+}

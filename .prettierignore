@@ -3,6 +3,8 @@ node_modules
 public/wp-content
 public/sdc-downloads
 src/data/wp-content.json
+src/generated
+prisma/migrations
 reports
 package-lock.json
 *.md
