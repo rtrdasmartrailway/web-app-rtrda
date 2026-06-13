@@ -6,6 +6,11 @@ const nextConfig: NextConfig = {
   experimental: {
     cpus: 4,
   },
+  // The generated Prisma client and its native query engine live outside
+  // node_modules; make sure the standalone bundle traces them in.
+  outputFileTracingIncludes: {
+    "/**": ["./src/generated/prisma/**"],
+  },
   async headers() {
     // Cap CDN caching for mirrored assets. Next's default 1-year s-maxage
     // also applies to 404 responses, which let Cloudflare cache a "missing"

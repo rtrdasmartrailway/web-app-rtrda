@@ -2,13 +2,16 @@ FROM node:22-bookworm-slim AS deps
 WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci
+# Generate the Prisma client (reads prisma/schema.prisma); needed for typecheck/build.
+COPY prisma ./prisma
+COPY prisma.config.ts ./
+RUN npx prisma generate
 
 FROM deps AS builder
 WORKDIR /app
 COPY . .
-# Content is imported before the image build (npm run import:wordpress);
-# uploads/downloads stay on the host and are bind-mounted at runtime.
-RUN test -f src/data/wp-content.json || { echo "src/data/wp-content.json missing — run 'npm run import:wordpress' before building"; exit 1; }
+# Content is served from Postgres at runtime; the build must not need the
+# database. Generated client is already present from the deps stage.
 RUN npm test
 RUN npm run lint
 RUN npm run typecheck
@@ -20,13 +23,17 @@ ENV NODE_ENV=production
 ENV HOSTNAME=0.0.0.0
 ENV PORT=3000
 
+# Prisma's query engine needs OpenSSL at runtime.
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends openssl \
+  && rm -rf /var/lib/apt/lists/*
+
 RUN groupadd --system --gid 1001 nodejs \
   && useradd --system --uid 1001 --gid nodejs nextjs
 
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 COPY --from=builder --chown=nextjs:nodejs /app/public ./public
-COPY --from=builder --chown=nextjs:nodejs /app/src/data ./src/data
 
 USER nextjs
 EXPOSE 3000

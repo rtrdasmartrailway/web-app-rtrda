@@ -36,8 +36,20 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Import WordPress content
-        run: npm run import:wordpress
+      - name: Start database and apply migrations
+        run: |
+          docker compose up -d db
+          # Wait for Postgres to accept connections before migrating.
+          for attempt in $(seq 1 30); do
+            if docker compose exec -T db pg_isready -U rtrda -d rtrda >/dev/null 2>&1; then
+              break
+            fi
+            sleep 2
+          done
+          npm run db:migrate
+
+      - name: Seed database from content manifest
+        run: npm run db:seed
 
       - name: Run unit tests
         run: npm test
