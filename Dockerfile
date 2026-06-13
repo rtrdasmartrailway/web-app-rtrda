@@ -3,9 +3,11 @@ WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci
 # Generate the Prisma client (reads prisma/schema.prisma); needed for typecheck/build.
+# `prisma generate` doesn't connect, but the config resolves DATABASE_URL — pass
+# a throwaway value so it loads. The real URL is injected at runtime by compose.
 COPY prisma ./prisma
 COPY prisma.config.ts ./
-RUN npx prisma generate
+RUN DATABASE_URL="postgresql://build:build@localhost:5432/build" npx prisma generate
 
 FROM deps AS builder
 WORKDIR /app
