@@ -1338,6 +1338,244 @@ button {
 }
 
 /* ============================================================
+   Home page custom sections (news, articles, calendar, partners)
+   ============================================================ */
+.home-sections {
+  display: grid;
+  gap: 56px;
+}
+
+.home-section {
+  min-width: 0;
+}
+
+.section-all-link {
+  align-items: center;
+  color: var(--accent-strong);
+  display: inline-flex;
+  font-size: 14px;
+  font-weight: 700;
+  gap: 8px;
+  white-space: nowrap;
+}
+
+.section-all-link:hover {
+  color: var(--accent-deep);
+}
+
+.section-all-arrow {
+  border-right: 2px solid currentColor;
+  border-top: 2px solid currentColor;
+  height: 7px;
+  transform: rotate(45deg);
+  width: 7px;
+}
+
+.section-heading-center {
+  justify-content: center;
+}
+
+.section-heading-center h2::after {
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+/* Articles + calendar sit side by side on wide screens. */
+.home-split {
+  align-items: start;
+  display: grid;
+  gap: 40px;
+  grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr);
+}
+
+.article-list {
+  display: grid;
+  gap: 20px;
+}
+
+/* Events calendar */
+.events-calendar {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-card);
+  padding: 22px;
+}
+
+.calendar-head {
+  align-items: center;
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 18px;
+}
+
+.calendar-head strong {
+  color: var(--navy-900);
+  font-size: 18px;
+  font-weight: 800;
+}
+
+.calendar-head button {
+  align-items: center;
+  background: var(--surface-muted);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: var(--navy-900);
+  display: inline-flex;
+  height: 38px;
+  justify-content: center;
+  transition:
+    background 150ms ease,
+    color 150ms ease;
+  width: 38px;
+}
+
+.calendar-head button:hover {
+  background: var(--accent-strong);
+  color: #fff;
+}
+
+.cal-arrow {
+  border-right: 2px solid currentColor;
+  border-top: 2px solid currentColor;
+  height: 9px;
+  width: 9px;
+}
+
+.cal-arrow-left {
+  transform: rotate(-135deg);
+  margin-left: 3px;
+}
+
+.cal-arrow-right {
+  transform: rotate(45deg);
+  margin-right: 3px;
+}
+
+.calendar-grid {
+  display: grid;
+  gap: 6px;
+  grid-template-columns: repeat(7, 1fr);
+}
+
+.calendar-weekdays {
+  margin-bottom: 6px;
+}
+
+.calendar-weekday {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+  padding: 4px 0;
+  text-align: center;
+}
+
+.calendar-cell {
+  align-items: center;
+  aspect-ratio: 1;
+  border-radius: var(--radius-sm);
+  color: var(--foreground);
+  display: flex;
+  font-size: 14px;
+  font-weight: 600;
+  justify-content: center;
+  position: relative;
+}
+
+.calendar-cell.is-empty {
+  visibility: hidden;
+}
+
+.calendar-cell.is-today {
+  box-shadow: inset 0 0 0 2px var(--accent);
+}
+
+a.calendar-cell.has-posts {
+  background: var(--rail-gradient);
+  color: #fff;
+  font-weight: 800;
+  transition: transform 150ms ease;
+}
+
+a.calendar-cell.has-posts:hover {
+  transform: translateY(-2px);
+}
+
+.calendar-count {
+  align-items: center;
+  background: var(--accent-deep);
+  border-radius: 999px;
+  color: #fff;
+  display: flex;
+  font-size: 10px;
+  font-weight: 800;
+  height: 16px;
+  justify-content: center;
+  min-width: 16px;
+  position: absolute;
+  right: -4px;
+  top: -4px;
+}
+
+/* Partner logo strip */
+.partners-strip {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+}
+
+.partner-logo {
+  align-items: center;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  display: flex;
+  height: 96px;
+  justify-content: center;
+  padding: 16px;
+  transition:
+    border-color 150ms ease,
+    box-shadow 150ms ease;
+}
+
+.partner-logo:hover {
+  border-color: rgba(37, 99, 235, 0.4);
+  box-shadow: var(--shadow-card);
+}
+
+.partner-logo img {
+  height: 100%;
+  object-fit: contain;
+  width: 100%;
+}
+
+@media (max-width: 900px) {
+  .home-split {
+    grid-template-columns: 1fr;
+    gap: 48px;
+  }
+
+  .partners-strip {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 560px) {
+  .home-sections {
+    gap: 44px;
+  }
+
+  .partners-strip {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .partner-logo {
+    height: 78px;
+    padding: 12px;
+  }
+}
+
+/* ============================================================
    Footer — dark with rail-gradient topline
    ============================================================ */
 .footer-topline {

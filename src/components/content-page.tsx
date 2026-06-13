@@ -2,6 +2,7 @@ import Link from "next/link";
 import type { PageData } from "@/lib/db/page-data";
 import type { PresentationSidebarItem } from "@/lib/wp/presentation";
 import { ArticleCard } from "./article-card";
+import { HomeSections } from "./home/home-sections";
 import { SiteShell } from "./site-shell";
 import { formatDate } from "./site-helpers";
 
@@ -147,10 +148,14 @@ export function ContentPage({ data }: { data: PageData }) {
           <SideNavigation items={sidebarItems} title={parentTitle} />
 
           <div className="content-main">
-            <div
-              className="wp-content"
-              dangerouslySetInnerHTML={{ __html: record.contentHtml }}
-            />
+            {isHome && data.home ? (
+              <HomeSections home={data.home} language={record.language} />
+            ) : (
+              <div
+                className="wp-content"
+                dangerouslySetInnerHTML={{ __html: record.contentHtml }}
+              />
+            )}
 
             {children.length > 0 ? (
               <section className="related-section" aria-labelledby="related-pages-title">

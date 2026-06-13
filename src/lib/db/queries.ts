@@ -84,6 +84,55 @@ export async function getLatestPosts(
   return rows.map(toRecord);
 }
 
+// Stable WordPress term ids from the import: the home's two post lists.
+export const CATEGORY_NEWS = 7; // ข่าวและกิจกรรม / News and Activities
+export const CATEGORY_ARTICLES = 6; // บทความ / Recent Articles
+
+export async function getPostsByCategory(
+  categoryId: number,
+  language: WpLanguage,
+  limit = 6,
+): Promise<WpContentRecord[]> {
+  const rows = await prisma.contentRecord.findMany({
+    where: { language, kind: "post", categoryIds: { has: categoryId } },
+    orderBy: { date: "desc" },
+    take: limit,
+  });
+  return rows.map(toRecord);
+}
+
+export interface CalendarDay {
+  /** YYYY-MM-DD */
+  day: string;
+  /** Path of the most recent post that day; where the calendar cell links. */
+  path: string;
+  count: number;
+}
+
+/**
+ * All days that have at least one post, for the interactive calendar. The
+ * client highlights these days and links each to its most recent post.
+ */
+export async function getPostCalendar(language: WpLanguage): Promise<CalendarDay[]> {
+  const rows = await prisma.contentRecord.findMany({
+    where: { language, kind: "post" },
+    select: { path: true, date: true },
+    orderBy: { date: "desc" },
+  });
+  const byDay = new Map<string, CalendarDay>();
+  for (const row of rows) {
+    const day = row.date.slice(0, 10);
+    const existing = byDay.get(day);
+    if (existing) {
+      existing.count += 1;
+    } else {
+      // rows are date-desc, so the first seen per day is the most recent.
+      byDay.set(day, { day, path: row.path, count: 1 });
+    }
+  }
+  return Array.from(byDay.values());
+}
+
 /** Top-level pages, used as footer quick links. */
 export async function getTopLevelPages(language: WpLanguage): Promise<WpContentRecord[]> {
   const rows = await prisma.contentRecord.findMany({

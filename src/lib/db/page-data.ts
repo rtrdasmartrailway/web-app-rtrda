@@ -12,22 +12,35 @@ import {
   type PresentationSidebarItem,
 } from "@/lib/wp/presentation";
 import { normalizeRoutePath } from "@/lib/wp/url";
+import { extractPartnerLogos } from "@/lib/wp/home";
 import {
+  CATEGORY_ARTICLES,
+  CATEGORY_NEWS,
   getChildren,
   getGeneratedAt,
   getLatestPosts,
   getMediaByIds,
   getNavigation,
+  getPostCalendar,
+  getPostsByCategory,
   getRecordByPath,
   getStats,
   getTopLevelPages,
   recordExists,
+  type CalendarDay,
   type SiteStats,
 } from "./queries";
 
 export interface Card {
   record: WpContentRecord;
   imagePath: string;
+}
+
+export interface HomeData {
+  news: Card[];
+  articles: Card[];
+  partners: string[];
+  calendarDays: CalendarDay[];
 }
 
 export interface ShellData {
@@ -44,6 +57,8 @@ export interface PageData {
   children: Card[];
   latest: Card[];
   stats: SiteStats | null;
+  /** Custom home-page sections; null for non-home pages. */
+  home: HomeData | null;
   sidebarItems: PresentationSidebarItem[];
   parentTitle: string;
   shell: ShellData;
@@ -129,17 +144,19 @@ export const getPageData = cache(async (path: string): Promise<PageData | null> 
   }
 
   const isHome = record.path === "/" || record.path === "/en";
-  const [childRecords, siblingRecords, latestRecords, stats, shell] = await Promise.all([
-    getChildren(record.path, record.language),
-    record.parentPath
-      ? getChildren(record.parentPath, record.language)
-      : Promise.resolve([]),
-    isHome && !hasImportedLatestPosts(record)
-      ? getLatestPosts(record.language)
-      : Promise.resolve([]),
-    isHome ? getStats() : Promise.resolve(null),
-    buildShellData(path),
-  ]);
+  const [childRecords, siblingRecords, latestRecords, stats, shell, home] =
+    await Promise.all([
+      getChildren(record.path, record.language),
+      record.parentPath
+        ? getChildren(record.parentPath, record.language)
+        : Promise.resolve([]),
+      isHome && !hasImportedLatestPosts(record)
+        ? getLatestPosts(record.language)
+        : Promise.resolve([]),
+      isHome ? getStats() : Promise.resolve(null),
+      buildShellData(path),
+      isHome ? buildHomeData(record) : Promise.resolve(null),
+    ]);
 
   const parentRecord = record.parentPath
     ? await getRecordByPath(record.parentPath)
@@ -154,6 +171,7 @@ export const getPageData = cache(async (path: string): Promise<PageData | null> 
     children,
     latest,
     stats,
+    home,
     sidebarItems:
       record.kind === "page"
         ? buildSidebarItems(record, childRecords, siblingRecords)
@@ -162,3 +180,21 @@ export const getPageData = cache(async (path: string): Promise<PageData | null> 
     shell,
   };
 });
+
+async function buildHomeData(record: WpContentRecord): Promise<HomeData> {
+  const [newsRecords, articleRecords, calendarDays] = await Promise.all([
+    getPostsByCategory(CATEGORY_NEWS, record.language, 6),
+    getPostsByCategory(CATEGORY_ARTICLES, record.language, 3),
+    getPostCalendar(record.language),
+  ]);
+  const [news, articles] = await Promise.all([
+    fetchCards(newsRecords),
+    fetchCards(articleRecords),
+  ]);
+  return {
+    news,
+    articles,
+    partners: extractPartnerLogos(record.contentHtml),
+    calendarDays,
+  };
+}
