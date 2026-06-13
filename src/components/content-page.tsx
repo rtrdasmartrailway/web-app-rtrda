@@ -35,6 +35,15 @@ function SideNavigation({
   );
 }
 
+function StatCard({ value, label }: { value: number; label: string }) {
+  return (
+    <div className="stat-card">
+      <span className="stat-number">{value.toLocaleString()}+</span>
+      <span className="stat-label">{label}</span>
+    </div>
+  );
+}
+
 export function ContentPage({ data }: { data: PageData }) {
   const { record, children, latest, sidebarItems, parentTitle } = data;
   const isHome = record.path === "/" || record.path === "/en";
@@ -59,12 +68,76 @@ export function ContentPage({ data }: { data: PageData }) {
             ) : null}
             {record.excerpt ? <p className="hero-excerpt">{record.excerpt}</p> : null}
             {isHome ? (
-              <a className="hero-button" href="#main-content">
-                {record.language === "th" ? "ดูข้อมูลล่าสุด" : "Explore Content"}
-                <span aria-hidden="true" />
-              </a>
+              <>
+                <form
+                  action="/search"
+                  className="home-search"
+                  role="search"
+                  aria-label={
+                    record.language === "th" ? "ค้นหางานวิจัย" : "Search research"
+                  }
+                >
+                  <input
+                    name="q"
+                    type="search"
+                    placeholder={
+                      record.language === "th"
+                        ? "ค้นหางานวิจัย เอกสาร และข่าวสาร…"
+                        : "Search research, documents and news…"
+                    }
+                    aria-label={record.language === "th" ? "ค้นหา" : "Search"}
+                  />
+                  {record.language === "en" ? (
+                    <input type="hidden" name="lang" value="en" />
+                  ) : null}
+                  <button type="submit">
+                    {record.language === "th" ? "ค้นหา" : "Search"}
+                  </button>
+                </form>
+                <div className="hero-cta-row">
+                  <a className="hero-button" href="#main-content">
+                    {record.language === "th" ? "ดูข้อมูลล่าสุด" : "Explore Content"}
+                    <span aria-hidden="true" />
+                  </a>
+                  <Link
+                    className="hero-button secondary"
+                    href={
+                      record.language === "th" ? "/เอกสารเผยแพร่" : "/en/เอกสารเผยแพร่"
+                    }
+                  >
+                    {record.language === "th" ? "เอกสารเผยแพร่" : "Publications"}
+                    <span aria-hidden="true" />
+                  </Link>
+                </div>
+              </>
             ) : null}
           </div>
+          {isHome && data.stats ? (
+            <div className="stats-band">
+              <div className="site-container stats-grid">
+                <StatCard
+                  value={data.stats.posts}
+                  label={
+                    record.language === "th" ? "ข่าวสารและบทความ" : "News & articles"
+                  }
+                />
+                <StatCard
+                  value={data.stats.pages}
+                  label={record.language === "th" ? "หน้าข้อมูล" : "Information pages"}
+                />
+                <StatCard
+                  value={data.stats.flipbooks}
+                  label={record.language === "th" ? "สิ่งพิมพ์/เอกสาร" : "Publications"}
+                />
+                <StatCard
+                  value={data.stats.downloads}
+                  label={
+                    record.language === "th" ? "ไฟล์ดาวน์โหลด" : "Downloadable files"
+                  }
+                />
+              </div>
+            </div>
+          ) : null}
         </section>
 
         <div
