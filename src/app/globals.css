@@ -1110,6 +1110,52 @@ button {
   margin-top: 12px;
 }
 
+/* The agency's real social accounts (WordPress social-links block). The block
+   ships only screen-reader text labels and relies on the theme for icons, so
+   without styling it renders as stray plain text — present them as a row of
+   labelled pills with working links instead. */
+.wp-content .wp-block-social-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  list-style: none;
+  margin: 22px 0;
+  padding: 0;
+}
+
+.wp-content .wp-block-social-links .wp-social-link {
+  margin: 0;
+}
+
+.wp-content .wp-block-social-link-anchor {
+  align-items: center;
+  background: var(--navy-900);
+  border-radius: 999px;
+  color: #fff;
+  display: inline-flex;
+  font-size: 14px;
+  font-weight: 700;
+  gap: 8px;
+  padding: 9px 18px;
+  text-decoration: none;
+  transition: background 150ms ease;
+}
+
+.wp-content .wp-block-social-link-anchor:hover {
+  background: var(--accent-strong);
+}
+
+/* Reveal the otherwise screen-reader-only labels so the pills have text. */
+.wp-content .wp-block-social-links .wp-block-social-link-label {
+  clip: auto;
+  height: auto;
+  margin: 0;
+  overflow: visible;
+  position: static;
+  white-space: normal;
+  width: auto;
+}
+
 .wp-content .read-more-link {
   display: inline-block;
   font-weight: 700;

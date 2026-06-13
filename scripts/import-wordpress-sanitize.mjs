@@ -72,12 +72,39 @@ const allowedAttributes = {
   ],
 };
 
+// Non-content theme/plugin chrome embedded in WordPress-rendered HTML. These
+// are the Lightning/VK ExUnit social share + follow boxes (sb_facebook,
+// Hatena, Pocket, "Copy" …) and post meta — JS-driven widgets with no working
+// links once migrated, so they render as stray plain text. Removed from
+// content; the parity audit strips the same selectors from the old side.
+const IMPORTED_CHROME_SELECTORS = [
+  ".veu_socialSet",
+  ".veu_followSet",
+  ".veu_contentAddSection",
+  ".followSet",
+  ".followSet_body",
+  ".vk_post",
+];
+
+/**
+ * Drop non-content theme chrome (social share/follow boxes, post meta) from a
+ * fragment of WordPress HTML. Safe to run on already-imported content.
+ */
+export function stripImportedChrome(html) {
+  if (!html) {
+    return html ?? "";
+  }
+  const $ = cheerio.load(html, null, false);
+  $(IMPORTED_CHROME_SELECTORS.join(",")).remove();
+  return $.html();
+}
+
 /**
  * Sanitize WordPress-rendered HTML and rewrite rtrda.or.th URLs to local
  * route paths (uploads, downloads, internal links).
  */
 export function sanitizeAndRewrite(html) {
-  return sanitizeHtml(html ?? "", {
+  return sanitizeHtml(stripImportedChrome(html ?? ""), {
     allowedTags,
     allowedAttributes,
     allowedSchemes: ["http", "https", "mailto", "tel"],

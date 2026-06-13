@@ -10,6 +10,7 @@ import path from "node:path";
 import process from "node:process";
 import pg from "pg";
 import { manifestToRows } from "./seed-db-helpers.mjs";
+import { stripImportedChrome } from "./import-wordpress-sanitize.mjs";
 
 process.loadEnvFile();
 
@@ -46,6 +47,12 @@ async function insertRows(client, table, columns, rows, toValues) {
 
 async function main() {
   const manifest = JSON.parse(await readFile(MANIFEST_PATH, "utf8"));
+  // The frozen manifest predates the chrome stripper in the importer, so clean
+  // each record's HTML here too (idempotent — a no-op once re-imported).
+  manifest.records = manifest.records.map((record) => ({
+    ...record,
+    contentHtml: stripImportedChrome(record.contentHtml),
+  }));
   const rows = manifestToRows(manifest);
 
   for (const duplicate of rows.skippedDuplicates) {

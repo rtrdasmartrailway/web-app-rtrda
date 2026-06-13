@@ -85,7 +85,7 @@ const STRIP_SELECTORS = "script,style,noscript,nav,header,footer,form,iframe";
 // Old Lightning-theme widgets rendered inside .siteContent that are chrome,
 // not page content: social follow box, prev/next post links, category badges.
 const OLD_CHROME_SELECTORS =
-  ".followSet, .followSet_body, .veu_followSet, .vk_post, .entry-meta, .entry-meta-dataList, .sideSection";
+  ".followSet, .followSet_body, .veu_followSet, .veu_socialSet, .veu_contentAddSection, .vk_post, .entry-meta, .entry-meta-dataList, .sideSection";
 
 const OLD_CONTENT_SELECTORS = [".siteContent", ".mainSection", "main", "article", "body"];
 const NEW_CONTENT_SELECTORS = [".content-main", "main", "body"];
