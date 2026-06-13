@@ -1,13 +1,11 @@
 import Link from "next/link";
 import type { WpContentRecord } from "@/lib/wp/types";
-import { SiteShell } from "@/components/rtrda-shared";
 
 export async function FallbackPage({ record }: { record: WpContentRecord }) {
   const { language } = record;
 
   return (
-    <SiteShell path={record.path}>
-      <article className="content-page content-fallback">
+    <article className="content-page content-fallback">
         <section className="page-hero">
           <div className="site-container hero-inner">
             <p className="breadcrumb">
@@ -25,7 +23,6 @@ export async function FallbackPage({ record }: { record: WpContentRecord }) {
             {record.excerpt ? <p className="page-excerpt">{record.excerpt}</p> : null}
           </div>
         </div>
-      </article>
-    </SiteShell>
+    </article>
   );
 }

@@ -1,6 +1,9 @@
+import { Suspense } from "react";
 import Link from "next/link";
 import type { WpContentRecord } from "@/lib/wp/types";
+import { searchContent } from "@/db/queries";
 import { ArticleCard, SiteShell } from "./rtrda-shared";
+import { SearchResultsSkeleton } from "./skeletons";
 import { HomePage } from "./pages/HomePage";
 import { StandardPage } from "./pages/StandardPage";
 import { PostPage } from "./pages/PostPage";
@@ -21,13 +24,21 @@ export async function ContentPage({ record }: { record: WpContentRecord }) {
   return <StandardPage record={record} />;
 }
 
-export function SearchResults({
-  records,
-  query,
-}: {
-  records: WpContentRecord[];
-  query: string;
-}) {
+async function SearchResultsList({ query }: { query: string }) {
+  const records = query.trim() ? await searchContent(query.trim(), 80) : [];
+  return (
+    <>
+      <div className="search-grid">
+        {records.map((record) => (
+          <ArticleCard key={record.id} record={record} />
+        ))}
+      </div>
+      {query.trim() && records.length === 0 ? <p>No results found.</p> : null}
+    </>
+  );
+}
+
+export function SearchResults({ query }: { query: string }) {
   return (
     <SiteShell path="/search">
       <section className="page-hero">
@@ -44,12 +55,9 @@ export function SearchResults({
           <input name="q" defaultValue={query} type="search" aria-label="Search" />
           <button type="submit">Search</button>
         </form>
-        <div className="search-grid">
-          {records.map((record) => (
-            <ArticleCard key={record.id} record={record} />
-          ))}
-        </div>
-        {query.trim() && records.length === 0 ? <p>No results found.</p> : null}
+        <Suspense key={query} fallback={<SearchResultsSkeleton />}>
+          <SearchResultsList query={query} />
+        </Suspense>
       </section>
     </SiteShell>
   );

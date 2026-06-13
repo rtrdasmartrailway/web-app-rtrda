@@ -1,8 +1,10 @@
+import { Suspense } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import type { WpContentRecord } from "@/lib/wp/types";
 import { getChildPages, listNews, type NewsRow } from "@/db/queries";
-import { ArticleCard, SiteShell, formatDate } from "@/components/rtrda-shared";
+import { ArticleCard, formatDate } from "@/components/rtrda-shared";
+import { CategoryGridSkeleton } from "@/components/skeletons";
 
 const NEWS_CATEGORY_MAP: Record<string, string> = {
   "ข่าวและกิจกรรม": "ข่าวและกิจกรรม",
@@ -58,54 +60,44 @@ function NewsCard({ item, language }: { item: NewsRow; language: string }) {
   );
 }
 
-export async function CategoryPage({ record }: { record: WpContentRecord }) {
+/** Data region — news category grid, or the child-pages fallback grid. */
+async function CategoryGrid({ record }: { record: WpContentRecord }) {
   const { language } = record;
-
   const lastSegment = record.path.split("/").filter(Boolean).pop() ?? "";
   const newsCategory = NEWS_CATEGORY_MAP[lastSegment];
 
   if (newsCategory) {
     const newsItems = await listNews({ language, category: newsCategory, limit: 20 });
-
+    if (newsItems.length === 0) {
+      return <p>{language === "th" ? "ยังไม่มีเนื้อหาในหมวดหมู่นี้" : "No content in this category yet."}</p>;
+    }
     return (
-      <SiteShell path={record.path}>
-        <article className="content-page content-category">
-          <section className="page-hero">
-            <div className="site-container hero-inner">
-              <p className="breadcrumb">
-                <Link href={language === "th" ? "/" : "/en"}>
-                  {language === "th" ? "หน้าแรก" : "Home"}
-                </Link>
-                <span> / {record.title}</span>
-              </p>
-              <h1>{record.title}</h1>
-              {record.excerpt ? <p className="hero-excerpt">{record.excerpt}</p> : null}
-            </div>
-          </section>
-
-          <div className="site-container content-layout" id="main-content">
-            <div className="content-main">
-              {newsItems.length > 0 ? (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {newsItems.map((item) => (
-                    <NewsCard key={item.id} item={item} language={language} />
-                  ))}
-                </div>
-              ) : (
-                <p>{language === "th" ? "ยังไม่มีเนื้อหาในหมวดหมู่นี้" : "No content in this category yet."}</p>
-              )}
-            </div>
-          </div>
-        </article>
-      </SiteShell>
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {newsItems.map((item) => (
+          <NewsCard key={item.id} item={item} language={language} />
+        ))}
+      </div>
     );
   }
 
   const posts = await getChildPages(record.path);
+  if (posts.length === 0) {
+    return <p>{language === "th" ? "ยังไม่มีเนื้อหาในหมวดหมู่นี้" : "No content in this category yet."}</p>;
+  }
+  return (
+    <div className="related-grid">
+      {posts.map((post) => (
+        <ArticleCard key={post.id} record={post} />
+      ))}
+    </div>
+  );
+}
+
+export function CategoryPage({ record }: { record: WpContentRecord }) {
+  const { language } = record;
 
   return (
-    <SiteShell path={record.path}>
-      <article className="content-page content-category">
+    <article className="content-page content-category">
         <section className="page-hero">
           <div className="site-container hero-inner">
             <p className="breadcrumb">
@@ -121,18 +113,11 @@ export async function CategoryPage({ record }: { record: WpContentRecord }) {
 
         <div className="site-container content-layout" id="main-content">
           <div className="content-main">
-            {posts.length > 0 ? (
-              <div className="related-grid">
-                {posts.map((post) => (
-                  <ArticleCard key={post.id} record={post} />
-                ))}
-              </div>
-            ) : (
-              <p>{language === "th" ? "ยังไม่มีเนื้อหาในหมวดหมู่นี้" : "No content in this category yet."}</p>
-            )}
+            <Suspense fallback={<CategoryGridSkeleton />}>
+              <CategoryGrid record={record} />
+            </Suspense>
           </div>
         </div>
-      </article>
-    </SiteShell>
+    </article>
   );
 }

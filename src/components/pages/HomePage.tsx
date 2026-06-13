@@ -1,6 +1,7 @@
+import { Suspense } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import type { WpContentRecord } from "@/lib/wp/types";
+import type { WpContentRecord, WpLanguage } from "@/lib/wp/types";
 import {
   listNews,
   listHeroSlides,
@@ -8,8 +9,15 @@ import {
   listPartners,
   type EventRow,
 } from "@/db/queries";
-import { SiteShell, formatDate } from "@/components/rtrda-shared";
+import { formatDate } from "@/components/rtrda-shared";
+import {
+  HeroSkeleton,
+  NewsHomeSkeleton,
+  PartnersSkeleton,
+} from "@/components/skeletons";
 import { HeroSlider } from "./HeroSlider";
+
+const FONT = { fontFamily: "'Hanken Grotesk', 'Noto Sans Thai', sans-serif" };
 
 const THAI_MONTHS = [
   "มกราคม", "กุมภาพันธ์", "มีนาคม", "เมษายน", "พฤษภาคม", "มิถุนายน",
@@ -108,11 +116,21 @@ function CalendarWidget({ events }: { events: EventRow[] }) {
   );
 }
 
-// ─── Page ─────────────────────────────────────────────────────────────────────
+/** Hero banner — fetches active slides. */
+async function HeroSection({ language }: { language: WpLanguage }) {
+  const slides = await listHeroSlides({ language, activeOnly: true });
+  return (
+    <HeroSlider
+      slides={slides.map((s) => ({
+        imageUrl: s.imagePath ?? "/stitch-assets/home-hero.png",
+        alt: s.altText,
+      }))}
+    />
+  );
+}
 
-export async function HomePage({ record }: { record: WpContentRecord }) {
-  const { language } = record;
-
+/** News grid + latest articles + event calendar (one listNews fetch). */
+async function NewsSection({ language }: { language: WpLanguage }) {
   const now = new Date();
   const year = now.getFullYear();
   const month = now.getMonth();
@@ -120,29 +138,19 @@ export async function HomePage({ record }: { record: WpContentRecord }) {
   const monthFrom = `${year}-${String(month + 1).padStart(2, "0")}-01`;
   const monthTo = `${year}-${String(month + 1).padStart(2, "0")}-${String(daysInMonth).padStart(2, "0")}`;
 
-  const [newsItems, slides, monthEvents, partnerList] = await Promise.all([
+  const [newsItems, monthEvents] = await Promise.all([
     listNews({ language, limit: 5 }),
-    listHeroSlides({ language, activeOnly: true }),
     listEvents({ language, from: monthFrom, to: monthTo }),
-    listPartners(),
   ]);
 
   const newsPosts = newsItems.slice(0, 3);
   const articlePosts = newsItems.slice(3, 5);
-
   const newsHref = language === "th" ? "/ข่าวสาร-กิจกรรม" : "/en/ข่าวสาร-กิจกรรม";
-  const contactHref = language === "th" ? "/ติดต่อเรา" : "/en/ติดต่อเรา";
 
   return (
-    <SiteShell path={record.path}>
-      {/* Hero Slider */}
-      <HeroSlider slides={slides.map((s) => ({
-        imageUrl: s.imagePath ?? "/stitch-assets/home-hero.png",
-        alt: s.altText,
-      }))} />
-
+    <>
       {/* ข่าวสารและกิจกรรม */}
-      <section className="py-16 bg-white" style={{ fontFamily: "'Hanken Grotesk', 'Noto Sans Thai', sans-serif" }}>
+      <section className="py-16 bg-white" style={FONT}>
         <div className="mx-auto max-w-[1280px] px-10">
           <div className="flex items-end justify-between mb-8">
             <div>
@@ -212,7 +220,7 @@ export async function HomePage({ record }: { record: WpContentRecord }) {
       </section>
 
       {/* บทความล่าสุด + ปฏิทิน */}
-      <section className="py-16 bg-[#f3f3f3]" style={{ fontFamily: "'Hanken Grotesk', 'Noto Sans Thai', sans-serif" }}>
+      <section className="py-16 bg-[#f3f3f3]" style={FONT}>
         <div className="mx-auto max-w-[1280px] px-10">
           <div className="flex gap-8 items-start flex-col lg:flex-row">
             {/* บทความล่าสุด */}
@@ -278,46 +286,71 @@ export async function HomePage({ record }: { record: WpContentRecord }) {
           </div>
         </div>
       </section>
+    </>
+  );
+}
 
-      {/* พันธมิตรทางยุทธศาสตร์ */}
-      {partnerList.length > 0 && (
-        <section
-          className="py-16 bg-white border-t border-[#c3c6d2]"
-          style={{ fontFamily: "'Hanken Grotesk', 'Noto Sans Thai', sans-serif" }}
-        >
-          <div className="mx-auto max-w-[1280px] px-10 text-center">
-            <h2 className="text-xl font-bold text-[#001f49] mb-8">
-              {language === "th" ? "พันธมิตรทางยุทธศาสตร์ของเรา" : "Our Strategic Partners"}
-            </h2>
-            <div className="flex items-center justify-center gap-10 flex-wrap">
-              {partnerList.map((partner) => (
-                <a
-                  key={partner.id}
-                  href={partner.websiteUrl || "#"}
-                  title={partner.name}
-                  className="flex flex-col items-center gap-2 text-[#44474f] hover:opacity-80 transition-opacity"
-                >
-                  {partner.logoPath ? (
-                    <Image
-                      src={partner.logoPath}
-                      alt={partner.name}
-                      width={64}
-                      height={64}
-                      className="object-contain"
-                    />
-                  ) : (
-                    <div className="w-16 h-16 bg-[#eeeeee] flex items-center justify-center">
-                      <span className="material-symbols-outlined text-[#44474f]" style={{ fontSize: 32 }}>
-                        business
-                      </span>
-                    </div>
-                  )}
-                </a>
-              ))}
-            </div>
-          </div>
-        </section>
-      )}
+/** Strategic partners logo row. */
+async function PartnersSection({ language }: { language: WpLanguage }) {
+  const partnerList = await listPartners();
+  if (partnerList.length === 0) return null;
+
+  return (
+    <section className="py-16 bg-white border-t border-[#c3c6d2]" style={FONT}>
+      <div className="mx-auto max-w-[1280px] px-10 text-center">
+        <h2 className="text-xl font-bold text-[#001f49] mb-8">
+          {language === "th" ? "พันธมิตรทางยุทธศาสตร์ของเรา" : "Our Strategic Partners"}
+        </h2>
+        <div className="flex items-center justify-center gap-10 flex-wrap">
+          {partnerList.map((partner) => (
+            <a
+              key={partner.id}
+              href={partner.websiteUrl || "#"}
+              title={partner.name}
+              className="flex flex-col items-center gap-2 text-[#44474f] hover:opacity-80 transition-opacity"
+            >
+              {partner.logoPath ? (
+                <Image
+                  src={partner.logoPath}
+                  alt={partner.name}
+                  width={64}
+                  height={64}
+                  className="object-contain"
+                />
+              ) : (
+                <div className="w-16 h-16 bg-[#eeeeee] flex items-center justify-center">
+                  <span className="material-symbols-outlined text-[#44474f]" style={{ fontSize: 32 }}>
+                    business
+                  </span>
+                </div>
+              )}
+            </a>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+// ─── Page ─────────────────────────────────────────────────────────────────────
+
+export function HomePage({ record }: { record: WpContentRecord }) {
+  const { language } = record;
+  const contactHref = language === "th" ? "/ติดต่อเรา" : "/en/ติดต่อเรา";
+
+  return (
+    <>
+      <Suspense fallback={<HeroSkeleton />}>
+        <HeroSection language={language} />
+      </Suspense>
+
+      <Suspense fallback={<NewsHomeSkeleton />}>
+        <NewsSection language={language} />
+      </Suspense>
+
+      <Suspense fallback={<PartnersSkeleton />}>
+        <PartnersSection language={language} />
+      </Suspense>
 
       {/* Floating chat button */}
       <Link
@@ -327,6 +360,6 @@ export async function HomePage({ record }: { record: WpContentRecord }) {
       >
         <span className="material-symbols-outlined" style={{ fontSize: 24 }}>chat</span>
       </Link>
-    </SiteShell>
+    </>
   );
 }
