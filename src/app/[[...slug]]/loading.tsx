@@ -6,7 +6,7 @@ export default function Loading() {
   return (
     <div aria-busy="true">
       <HeroSkeleton />
-      <div className="mx-auto max-w-[1280px] px-10 py-16 space-y-3">
+      <div className="site-container py-16 space-y-3">
         <SkeletonBox className="h-7 w-1/2" />
         <SkeletonBox className="h-4 w-full" />
         <SkeletonBox className="h-4 w-11/12" />
