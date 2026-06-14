@@ -3,7 +3,7 @@ name: Deploy test.rtrda.or.th
 on:
   push:
     branches:
-      - main
+      - test
   workflow_dispatch:
 
 concurrency:

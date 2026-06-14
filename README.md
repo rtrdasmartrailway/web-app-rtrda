@@ -86,7 +86,7 @@ npm run audit:parity -- --only /category --max-urls 50
 
 ## Deployment (test.rtrda.or.th)
 
-Push to `main` of `rtrdasmartrailway/web-app-rtrda` → self-hosted GitHub
+Push to `test` of `rtrdasmartrailway/web-app-rtrda` → self-hosted GitHub
 Actions runner on this machine (`.github/workflows/deploy-test.yml`):
 install deps → start Postgres + `db:migrate` → `db:seed` →
 test/lint/typecheck/format → `docker compose up -d --build
