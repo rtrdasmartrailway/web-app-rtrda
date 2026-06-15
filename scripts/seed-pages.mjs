@@ -1,11 +1,12 @@
 #!/usr/bin/env node
 /**
- * Seed the `news` table from post records in wp-content.json.
- * Thai + English posts are merged into ONE row (paired by canonical path:
- * en path = "/en" + th path), with title/excerpt/body stored per language in
- * *_th / *_en columns. Truncates first for a clean bilingual state.
+ * Seed the `pages` table from `kind === "page"` records.
+ * Thai + English pages are merged into ONE row (paired by canonical path:
+ * en path = "/en" + th path), with title/body per language in *_th / *_en
+ * columns. Pages are addressed by the canonical (Thai) `path`. Run after
+ * seed-media.mjs. Truncates first for a clean bilingual state.
  *
- * Run with: node scripts/seed-news.mjs   (requires DATABASE_URL or .env.local)
+ * Run with: node scripts/seed-pages.mjs   (requires DATABASE_URL or .env.local)
  */
 
 import { readFile } from "node:fs/promises";
@@ -27,6 +28,8 @@ function toPlainText(html) {
     .trim();
 }
 
+const lastSegment = (p) => p.split("/").filter(Boolean).pop() ?? null;
+
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(__dirname, "..");
 
@@ -47,50 +50,55 @@ if (!process.env.DATABASE_URL) {
 
 const sql = postgres(process.env.DATABASE_URL);
 
-const CATEGORY_MAP = { 7: "ข่าวและกิจกรรม", 150: "ประกาศ", 6: "บทความ", 20: "ความร่วมมือ" };
-
 const manifestPath = path.join(root, "src/data/wp-content.json");
 console.log("Reading wp-content.json…");
 const { records } = JSON.parse(await readFile(manifestPath, "utf8"));
 
-const posts = records.filter((r) => r.kind === "post");
-// English twin keyed by canonical (Thai) path.
+const mediaIds = new Set((await sql`SELECT id FROM media`).map((r) => r.id));
+
+const pages = records.filter((r) => r.kind === "page");
 const enByCanonical = new Map();
-for (const r of posts) {
+for (const r of pages) {
   if (r.language === "en") {
     const canonical = r.path.replace(/^\/en/, "") || "/";
     enByCanonical.set(canonical, r);
   }
 }
 
-const thPosts = posts.filter((r) => r.language === "th");
-console.log(`Found ${thPosts.length} Thai post(s); merging English twins.`);
+// Deduplicate Thai pages by path (last wins).
+const thByPath = new Map();
+for (const r of pages) {
+  if (r.language === "th") thByPath.set(r.path, r);
+}
+const thPages = [...thByPath.values()];
+console.log(`Found ${thPages.length} Thai page(s); merging English twins.`);
 
-const rows = thPosts.map((th) => {
+const rows = thPages.map((th) => {
   const en = enByCanonical.get(th.path) ?? {};
-  const catId = th.categoryIds?.[0] ?? null;
+  const fid = Number(th.featuredMediaId);
+  const featured = Number.isInteger(fid) && mediaIds.has(fid) ? fid : null;
   return {
-    slug: th.path.slice(1),
+    slug: lastSegment(th.path) ?? "home",
+    path: th.path,
     title_th: th.title ?? "",
     title_en: en.title ?? "",
-    excerpt_th: toPlainText(th.excerpt),
-    excerpt_en: toPlainText(en.excerpt),
     body_th: toPlainText(th.contentHtml),
     body_en: toPlainText(en.contentHtml),
-    category: CATEGORY_MAP[catId] ?? "",
-    featured_image_id: null,
+    parent_slug: th.parentPath ? lastSegment(th.parentPath) : null,
+    parent_path: th.parentPath ?? null,
+    featured_image_id: featured,
     attachments: sql.json([]),
-    published_at: th.date ? new Date(th.date) : null,
+    sort_order: 0,
     updated_at: th.modified ? new Date(th.modified) : new Date(),
   };
 });
 
-await sql`DELETE FROM news`;
+await sql`DELETE FROM pages`;
 const BATCH = 200;
 for (let i = 0; i < rows.length; i += BATCH) {
-  await sql`INSERT INTO news ${sql(rows.slice(i, i + BATCH))}`;
+  await sql`INSERT INTO pages ${sql(rows.slice(i, i + BATCH))}`;
   process.stdout.write(`  ${Math.min(i + BATCH, rows.length)}/${rows.length}\r`);
 }
 
-console.log(`\nDone — ${rows.length} bilingual news row(s) inserted.`);
+console.log(`\nDone — ${rows.length} bilingual page(s) inserted.`);
 await sql.end();

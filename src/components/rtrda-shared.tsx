@@ -1,6 +1,7 @@
 import Link from "next/link";
 import Image from "next/image";
-import type { WpContentRecord, WpLanguage } from "@/lib/wp/types";
+import type { WpLanguage } from "@/lib/wp/types";
+import type { ContentView } from "@/lib/content/types";
 import {
   getContentByPath,
   getGeneratedAt,
@@ -41,15 +42,11 @@ export async function resolveCounterpartPath(
   return found ? thaiPath : "/";
 }
 
-export function resolveCardImagePath(record: WpContentRecord): string {
-  return record.featuredMediaPath ?? selectFallbackAsset(record);
+export function resolveCardImagePath(record: ContentView): string {
+  return record.featuredImagePath ?? selectFallbackAsset(record);
 }
 
-export function hasImportedLatestPosts(record: WpContentRecord): boolean {
-  return record.contentHtml.includes("wp-block-latest-posts");
-}
-
-export function ArticleCard({ record }: { record: WpContentRecord }) {
+export function ArticleCard({ record }: { record: ContentView }) {
   const imagePath = resolveCardImagePath(record);
   const dateText = formatDate(record.date, record.language);
 

@@ -1,21 +1,20 @@
 import { Suspense } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import type { WpContentRecord } from "@/lib/wp/types";
+import type { ContentView } from "@/lib/content/types";
 import { getChildPages, listNews, type NewsRow } from "@/db/queries";
+import { getCategoryByPath } from "@/lib/content/categories";
+import { pickLang, displayPath } from "@/lib/content/i18n";
+import type { WpLanguage } from "@/lib/wp/types";
 import { ArticleCard, formatDate } from "@/components/rtrda-shared";
 import { CategoryGridSkeleton } from "@/components/skeletons";
 
-const NEWS_CATEGORY_MAP: Record<string, string> = {
-  "ข่าวและกิจกรรม": "ข่าวและกิจกรรม",
-  "ประกาศ": "ประกาศ",
-  "บทความ": "บทความ",
-  "ความร่วมมือทั้งในและต่างประเทศ": "ความร่วมมือ",
-};
-
-function NewsCard({ item, language }: { item: NewsRow; language: string }) {
+function NewsCard({ item, language }: { item: NewsRow; language: WpLanguage }) {
   const dateStr = item.publishedAt?.toISOString() ?? "";
-  const dateText = formatDate(dateStr, language === "th" ? "th" : "en");
+  const dateText = formatDate(dateStr, language);
+  const title = pickLang(item.titleTh, item.titleEn, language);
+  const excerpt = pickLang(item.excerptTh, item.excerptEn, language);
+  const href = displayPath(`/${item.slug}`, language);
 
   return (
     <article className="bg-white border border-[#c3c6d2] overflow-hidden group">
@@ -41,15 +40,15 @@ function NewsCard({ item, language }: { item: NewsRow; language: string }) {
           </div>
         )}
         <h3 className="text-[15px] font-bold text-[#001f49] mb-2 line-clamp-2 leading-snug">
-          {item.title}
+          {title}
         </h3>
-        {item.excerpt && (
+        {excerpt && (
           <p className="text-sm text-[#44474f] line-clamp-3 mb-3 leading-relaxed">
-            {item.excerpt}
+            {excerpt}
           </p>
         )}
         <Link
-          href={`/${item.slug}`}
+          href={href}
           className="flex items-center gap-1 text-sm font-bold text-[#0055c7] hover:underline"
         >
           {language === "th" ? "อ่านต่อ" : "Read more"}
@@ -61,13 +60,12 @@ function NewsCard({ item, language }: { item: NewsRow; language: string }) {
 }
 
 /** Data region — news category grid, or the child-pages fallback grid. */
-async function CategoryGrid({ record }: { record: WpContentRecord }) {
+async function CategoryGrid({ record }: { record: ContentView }) {
   const { language } = record;
-  const lastSegment = record.path.split("/").filter(Boolean).pop() ?? "";
-  const newsCategory = NEWS_CATEGORY_MAP[lastSegment];
+  const newsCategory = getCategoryByPath(record.path)?.newsCategory ?? null;
 
   if (newsCategory) {
-    const newsItems = await listNews({ language, category: newsCategory, limit: 20 });
+    const newsItems = await listNews({ category: newsCategory, limit: 20 });
     if (newsItems.length === 0) {
       return <p>{language === "th" ? "ยังไม่มีเนื้อหาในหมวดหมู่นี้" : "No content in this category yet."}</p>;
     }
@@ -93,7 +91,7 @@ async function CategoryGrid({ record }: { record: WpContentRecord }) {
   );
 }
 
-export function CategoryPage({ record }: { record: WpContentRecord }) {
+export function CategoryPage({ record }: { record: ContentView }) {
   const { language } = record;
 
   return (

@@ -1,5 +1,6 @@
 import { normalizeRoutePath } from "./url";
-import type { WpContentRecord, WpLanguage, WpMediaAsset, WpNavigationItem } from "./types";
+import type { WpLanguage, WpNavigationItem } from "./types";
+import type { ContentView } from "@/lib/content/types";
 
 export interface PresentationNavItem {
   label: string;
@@ -51,7 +52,7 @@ const PRIMARY_NAV_PATH_BY_LABEL: Record<WpLanguage, Map<string, string>> = {
 };
 
 function sortByTitle(language: WpLanguage) {
-  return (a: WpContentRecord, b: WpContentRecord) =>
+  return (a: ContentView, b: ContentView) =>
     a.title.localeCompare(b.title, language === "th" ? "th" : "en");
 }
 
@@ -67,7 +68,7 @@ function isPathActive(itemPath: string, currentPath: string): boolean {
 }
 
 export function buildPrimaryNavigation(
-  records: WpContentRecord[],
+  records: ContentView[],
   language: WpLanguage,
   currentPath: string,
   navigation?: WpNavigationItem[],
@@ -131,25 +132,9 @@ function mapNavigationItem(
   };
 }
 
-export function resolveFeaturedMediaPath(
-  record: WpContentRecord,
-  media: WpMediaAsset[],
-): string | undefined {
-  if (!record.featuredMediaId) {
-    return undefined;
-  }
-
-  const asset = media.find((item) => String(item.id) === String(record.featuredMediaId));
-  if (!asset?.mimeType.startsWith("image/")) {
-    return undefined;
-  }
-
-  return asset.localPath;
-}
-
 export function getSidebarItems(
-  records: WpContentRecord[],
-  record: WpContentRecord,
+  records: ContentView[],
+  record: ContentView,
 ): PresentationSidebarItem[] {
   const children = records
     .filter((candidate) => candidate.language === record.language)
@@ -172,7 +157,7 @@ export function getSidebarItems(
   }));
 }
 
-export function selectFallbackAsset(record: WpContentRecord): string {
+export function selectFallbackAsset(record: ContentView): string {
   if (record.kind === "category") {
     return STITCH_ASSETS.railNetwork;
   }
@@ -186,11 +171,4 @@ export function selectFallbackAsset(record: WpContentRecord): string {
   }
 
   return STITCH_ASSETS.railLab;
-}
-
-export function resolveCardImagePath(
-  record: WpContentRecord,
-  media: WpMediaAsset[],
-): string {
-  return resolveFeaturedMediaPath(record, media) ?? selectFallbackAsset(record);
 }

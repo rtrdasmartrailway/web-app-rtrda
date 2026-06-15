@@ -1,7 +1,7 @@
 import Link from "next/link";
-import type { WpContentRecord } from "@/lib/wp/types";
+import type { ContentView } from "@/lib/content/types";
 
-export async function FallbackPage({ record }: { record: WpContentRecord }) {
+export async function FallbackPage({ record }: { record: ContentView }) {
   const { language } = record;
 
   return (

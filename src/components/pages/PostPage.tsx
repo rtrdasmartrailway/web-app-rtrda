@@ -1,16 +1,11 @@
-import { Suspense } from "react";
 import Link from "next/link";
-import type { WpContentRecord } from "@/lib/wp/types";
-import { getNewsBySlug } from "@/db/queries";
+import type { ContentView } from "@/lib/content/types";
 import { formatDate } from "@/components/rtrda-shared";
-import { PostSkeleton } from "@/components/skeletons";
 
-/** Article body — fetched by slug. */
-async function PostBody({ record }: { record: WpContentRecord }) {
-  const newsItem = await getNewsBySlug(record.path.slice(1));
-
-  if (newsItem?.body) {
-    return <div className="prose max-w-none whitespace-pre-wrap">{newsItem.body}</div>;
+/** Article body — carried on the resolved view. */
+function PostBody({ record }: { record: ContentView }) {
+  if (record.body) {
+    return <div className="prose max-w-none whitespace-pre-wrap">{record.body}</div>;
   }
   if (record.excerpt) {
     return <p className="post-excerpt">{record.excerpt}</p>;
@@ -18,7 +13,7 @@ async function PostBody({ record }: { record: WpContentRecord }) {
   return null;
 }
 
-export function PostPage({ record }: { record: WpContentRecord }) {
+export function PostPage({ record }: { record: ContentView }) {
   const { language } = record;
   const dateText = formatDate(record.date, language);
 
@@ -40,9 +35,7 @@ export function PostPage({ record }: { record: WpContentRecord }) {
 
         <div className="site-container content-layout" id="main-content">
           <div className="content-main">
-            <Suspense fallback={<PostSkeleton />}>
-              <PostBody record={record} />
-            </Suspense>
+            <PostBody record={record} />
           </div>
         </div>
     </article>

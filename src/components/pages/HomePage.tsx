@@ -1,7 +1,8 @@
 import { Suspense } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import type { WpContentRecord, WpLanguage } from "@/lib/wp/types";
+import type { WpLanguage } from "@/lib/wp/types";
+import type { ContentView } from "@/lib/content/types";
 import {
   listNews,
   listHeroSlides,
@@ -10,6 +11,7 @@ import {
   type EventRow,
 } from "@/db/queries";
 import { formatDate } from "@/components/rtrda-shared";
+import { pickLang, displayPath } from "@/lib/content/i18n";
 import {
   HeroSkeleton,
   NewsHomeSkeleton,
@@ -139,7 +141,7 @@ async function NewsSection({ language }: { language: WpLanguage }) {
   const monthTo = `${year}-${String(month + 1).padStart(2, "0")}-${String(daysInMonth).padStart(2, "0")}`;
 
   const [newsItems, monthEvents] = await Promise.all([
-    listNews({ language, limit: 5 }),
+    listNews({ limit: 5 }),
     listEvents({ language, from: monthFrom, to: monthTo }),
   ]);
 
@@ -172,6 +174,9 @@ async function NewsSection({ language }: { language: WpLanguage }) {
             {newsPosts.map((item) => {
               const dateStr = item.publishedAt?.toISOString() ?? "";
               const dateText = formatDate(dateStr, language);
+              const title = pickLang(item.titleTh, item.titleEn, language);
+              const excerpt = pickLang(item.excerptTh, item.excerptEn, language);
+              const href = displayPath(`/${item.slug}`, language);
 
               return (
                 <article key={item.id} className="bg-white border border-[#c3c6d2] overflow-hidden group">
@@ -197,15 +202,15 @@ async function NewsSection({ language }: { language: WpLanguage }) {
                       </div>
                     )}
                     <h3 className="text-[15px] font-bold text-[#001f49] mb-2 line-clamp-2 leading-snug">
-                      {item.title}
+                      {title}
                     </h3>
-                    {item.excerpt && (
+                    {excerpt && (
                       <p className="text-sm text-[#44474f] line-clamp-3 mb-3 leading-relaxed">
-                        {item.excerpt}
+                        {excerpt}
                       </p>
                     )}
                     <Link
-                      href={`/${item.slug}`}
+                      href={href}
                       className="flex items-center gap-1 text-sm font-bold text-[#0055c7] hover:underline"
                     >
                       {language === "th" ? "อ่านต่อ" : "Read more"}
@@ -234,6 +239,9 @@ async function NewsSection({ language }: { language: WpLanguage }) {
                 {articlePosts.map((item) => {
                   const dateStr = item.publishedAt?.toISOString() ?? "";
                   const dateText = formatDate(dateStr, language);
+                  const title = pickLang(item.titleTh, item.titleEn, language);
+                  const excerpt = pickLang(item.excerptTh, item.excerptEn, language);
+                  const href = displayPath(`/${item.slug}`, language);
 
                   return (
                     <article key={item.id} className="bg-white border border-[#c3c6d2] p-4 flex gap-4 group">
@@ -252,16 +260,16 @@ async function NewsSection({ language }: { language: WpLanguage }) {
                             <p className="text-xs text-[#0055c7] font-bold mb-1">{dateText}</p>
                           )}
                           <h3 className="text-sm font-bold text-[#001f49] line-clamp-2 leading-snug mb-1">
-                            {item.title}
+                            {title}
                           </h3>
-                          {item.excerpt && (
+                          {excerpt && (
                             <p className="text-xs text-[#44474f] line-clamp-2 leading-relaxed">
-                              {item.excerpt}
+                              {excerpt}
                             </p>
                           )}
                         </div>
                         <Link
-                          href={`/${item.slug}`}
+                          href={href}
                           className="mt-2 inline-flex items-center text-xs font-bold text-[#001f49] border border-[#001f49] px-3 py-1.5 hover:bg-[#001f49] hover:text-white transition-colors self-start"
                         >
                           {language === "th" ? "อ่านต่อ" : "Read more"}
@@ -334,7 +342,7 @@ async function PartnersSection({ language }: { language: WpLanguage }) {
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
-export function HomePage({ record }: { record: WpContentRecord }) {
+export function HomePage({ record }: { record: ContentView }) {
   const { language } = record;
   const contactHref = language === "th" ? "/ติดต่อเรา" : "/en/ติดต่อเรา";
 

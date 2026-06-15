@@ -34,16 +34,15 @@ const spec = {
     { name: "Partners", description: "พันธมิตรทางยุทธศาสตร์" },
     { name: "Hero Slides", description: "Homepage banner" },
     { name: "Media", description: "Media file registry" },
-    { name: "Legacy", description: "Legacy wp_content endpoints (read-only)" },
+    { name: "Content", description: "Path-based content endpoints (pages, posts, flipbooks, categories)" },
   ],
   paths: {
     // ─── News ───────────────────────────────────────────────────────────────
     "/news": {
       get: {
         tags: ["News"],
-        summary: "List news items",
+        summary: "List news items (returns both languages per row)",
         parameters: [
-          { $ref: "#/components/parameters/language" },
           {
             name: "category",
             in: "query",
@@ -151,9 +150,8 @@ const spec = {
     "/featured-projects": {
       get: {
         tags: ["Featured Projects"],
-        summary: "List featured projects (ผลงานและโครงการเด่น)",
+        summary: "List featured projects (ผลงานและโครงการเด่น, both languages per row)",
         parameters: [
-          { $ref: "#/components/parameters/language" },
           {
             name: "category",
             in: "query",
@@ -222,9 +220,8 @@ const spec = {
     "/pages": {
       get: {
         tags: ["Pages"],
-        summary: "List static pages",
+        summary: "List static pages (returns both languages per row)",
         parameters: [
-          { $ref: "#/components/parameters/language" },
           {
             name: "parent_slug",
             in: "query",
@@ -401,8 +398,8 @@ const spec = {
     // ─── Legacy ──────────────────────────────────────────────────────────────
     "/content": {
       get: {
-        tags: ["Legacy"],
-        summary: "[Legacy] List wp_content records",
+        tags: ["Content"],
+        summary: "List content records (pages + posts)",
         parameters: [
           { $ref: "#/components/parameters/language" },
           { name: "kind", in: "query", schema: { type: "string", enum: ["page", "post", "flipbook", "category", "fallback"] } },
@@ -410,53 +407,53 @@ const spec = {
           { $ref: "#/components/parameters/offset" },
         ],
         responses: {
-          200: { description: "OK", content: { "application/json": { schema: { type: "array", items: { $ref: "#/components/schemas/WpContentRecord" } } } } },
+          200: { description: "OK", content: { "application/json": { schema: { type: "array", items: { $ref: "#/components/schemas/ContentView" } } } } },
         },
       },
     },
     "/content/{path}": {
       get: {
-        tags: ["Legacy"],
-        summary: "[Legacy] Get wp_content record by path",
+        tags: ["Content"],
+        summary: "Get content record by URL path",
         parameters: [
           { name: "path", in: "path", required: true, schema: { type: "string", example: "ข่าวสาร-กิจกรรม/my-post" } },
         ],
         responses: {
-          200: { description: "OK", content: { "application/json": { schema: { $ref: "#/components/schemas/WpContentRecord" } } } },
+          200: { description: "OK", content: { "application/json": { schema: { $ref: "#/components/schemas/ContentView" } } } },
           404: { $ref: "#/components/responses/NotFound" },
         },
       },
     },
     "/posts": {
       get: {
-        tags: ["Legacy"],
-        summary: "[Legacy] Get latest posts from wp_content",
+        tags: ["Content"],
+        summary: "Get latest posts",
         parameters: [
           { $ref: "#/components/parameters/language" },
           { name: "limit", in: "query", schema: { type: "integer", default: 20, maximum: 100 } },
         ],
         responses: {
-          200: { description: "OK", content: { "application/json": { schema: { type: "array", items: { $ref: "#/components/schemas/WpContentRecord" } } } } },
+          200: { description: "OK", content: { "application/json": { schema: { type: "array", items: { $ref: "#/components/schemas/ContentView" } } } } },
         },
       },
     },
     "/search": {
       get: {
-        tags: ["Legacy"],
-        summary: "[Legacy] Full-text search on wp_content",
+        tags: ["Content"],
+        summary: "Full-text search across pages and posts",
         parameters: [
           { name: "q", in: "query", required: true, schema: { type: "string" } },
           { name: "limit", in: "query", schema: { type: "integer", default: 80, maximum: 200 } },
         ],
         responses: {
-          200: { description: "OK", content: { "application/json": { schema: { type: "array", items: { $ref: "#/components/schemas/WpContentRecord" } } } } },
+          200: { description: "OK", content: { "application/json": { schema: { type: "array", items: { $ref: "#/components/schemas/ContentView" } } } } },
         },
       },
     },
     "/downloads": {
       get: {
-        tags: ["Legacy"],
-        summary: "[Legacy] List downloadable files",
+        tags: ["Content"],
+        summary: "List downloadable files",
         parameters: [
           { name: "group", in: "query", schema: { type: "string" } },
         ],
@@ -467,8 +464,8 @@ const spec = {
     },
     "/downloads/{id}": {
       get: {
-        tags: ["Legacy"],
-        summary: "[Legacy] Get download by ID",
+        tags: ["Content"],
+        summary: "Get download by ID",
         parameters: [
           { name: "id", in: "path", required: true, schema: { type: "string" } },
         ],
@@ -480,8 +477,8 @@ const spec = {
     },
     "/navigation/{language}": {
       get: {
-        tags: ["Legacy"],
-        summary: "[Legacy] Get site navigation tree",
+        tags: ["Content"],
+        summary: "Get site navigation tree",
         parameters: [
           { name: "language", in: "path", required: true, schema: { type: "string", enum: ["th", "en"] } },
         ],
@@ -492,8 +489,8 @@ const spec = {
     },
     "/meta": {
       get: {
-        tags: ["Legacy"],
-        summary: "[Legacy] Get content generation metadata",
+        tags: ["Content"],
+        summary: "Get content generation metadata",
         responses: {
           200: {
             description: "OK",
@@ -543,13 +540,16 @@ const spec = {
 
       NewsItem: {
         type: "object",
+        description: "Bilingual: title/excerpt/body stored per language in *_th / *_en columns.",
         properties: {
           id: { type: "integer" },
-          language: { type: "string", enum: ["th", "en"] },
           slug: { type: "string" },
-          title: { type: "string" },
-          excerpt: { type: "string" },
-          body: { type: "string" },
+          titleTh: { type: "string" },
+          titleEn: { type: "string" },
+          excerptTh: { type: "string" },
+          excerptEn: { type: "string" },
+          bodyTh: { type: "string" },
+          bodyEn: { type: "string" },
           category: { type: "string", example: "ข่าว-กิจกรรม" },
           featuredImageId: { type: "integer", nullable: true },
           attachments: { type: "array", items: { $ref: "#/components/schemas/Attachment" } },
@@ -591,13 +591,16 @@ const spec = {
 
       FeaturedProjectItem: {
         type: "object",
+        description: "Bilingual: title/excerpt/body stored per language in *_th / *_en columns.",
         properties: {
           id: { type: "integer" },
-          language: { type: "string", enum: ["th", "en"] },
           slug: { type: "string" },
-          title: { type: "string" },
-          excerpt: { type: "string" },
-          body: { type: "string" },
+          titleTh: { type: "string" },
+          titleEn: { type: "string" },
+          excerptTh: { type: "string" },
+          excerptEn: { type: "string" },
+          bodyTh: { type: "string" },
+          bodyEn: { type: "string" },
           category: { type: "string", example: "วิจัย-นวัตกรรม" },
           featuredImageId: { type: "integer", nullable: true },
           attachments: { type: "array", items: { $ref: "#/components/schemas/Attachment" } },
@@ -623,13 +626,17 @@ const spec = {
 
       PageItem: {
         type: "object",
+        description: "Bilingual: title/body stored per language in *_th / *_en columns. Keyed by canonical (Thai) path.",
         properties: {
           id: { type: "integer" },
-          language: { type: "string", enum: ["th", "en"] },
-          slug: { type: "string", example: "/เกี่ยวกับ-สทร" },
-          title: { type: "string" },
-          body: { type: "string" },
+          slug: { type: "string", example: "เกี่ยวกับ-สทร" },
+          path: { type: "string", example: "/เกี่ยวกับ-สทร" },
+          titleTh: { type: "string" },
+          titleEn: { type: "string" },
+          bodyTh: { type: "string" },
+          bodyEn: { type: "string" },
           parentSlug: { type: "string", nullable: true },
+          parentPath: { type: "string", nullable: true },
           featuredImageId: { type: "integer", nullable: true },
           attachments: { type: "array", items: { $ref: "#/components/schemas/Attachment" } },
           sortOrder: { type: "integer" },
@@ -726,20 +733,20 @@ const spec = {
         },
       },
 
-      WpContentRecord: {
+      ContentView: {
         type: "object",
         properties: {
           id: { type: "string" },
-          wpId: { type: "string" },
           language: { type: "string", enum: ["th", "en"] },
           kind: { type: "string", enum: ["page", "post", "flipbook", "category", "fallback"] },
           path: { type: "string" },
+          parentPath: { type: "string", nullable: true },
           title: { type: "string" },
           excerpt: { type: "string" },
+          body: { type: "string" },
           date: { type: "string" },
-          parentPath: { type: "string", nullable: true },
-          featuredMediaId: { type: "string", nullable: true },
-          featuredMediaPath: { type: "string", nullable: true },
+          featuredImagePath: { type: "string", nullable: true },
+          sourceUrl: { type: "string" },
         },
       },
 

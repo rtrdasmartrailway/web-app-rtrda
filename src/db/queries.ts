@@ -2,10 +2,6 @@ import { cache } from "react";
 import { and, asc, desc, eq, gte, ilike, isNull, lte, or } from "drizzle-orm";
 import { db } from "./index";
 import {
-  wpContent,
-  wpDownloads,
-  wpMeta,
-  wpNavigation,
   news,
   procurement,
   publications,
@@ -20,11 +16,15 @@ import {
   navigation,
   media,
   siteMeta,
+  downloads,
   user,
 } from "./schema";
 import type { ContentResource } from "@/lib/permissions";
 import type { UserRole } from "@/lib/permissions";
-import type { WpContentRecord, WpDownloadAsset, WpLanguage, WpNavigationItem } from "@/lib/wp/types";
+import type { WpDownloadAsset, WpLanguage, WpNavigationItem } from "@/lib/wp/types";
+import type { ContentView } from "@/lib/content/types";
+import { CATEGORIES, getCategoryByPath, type CategoryDef } from "@/lib/content/categories";
+import { splitLanguage, displayPath, pickLang } from "@/lib/content/i18n";
 import { normalizeRoutePath } from "@/lib/wp/url";
 import { MOCK_RECORDS, MOCK_DOWNLOADS, MOCK_NAV, MOCK_NAV_EN } from "./mock";
 
@@ -44,92 +44,230 @@ export type HeroSlideRow = typeof heroSlides.$inferSelect;
 export type NavigationRow = typeof navigation.$inferSelect;
 export type MediaRow = typeof media.$inferSelect;
 
-// ─── Legacy wp_content queries (unchanged) ────────────────────────────────────
+// ─── Content resolution (dedicated tables → ContentView) ──────────────────────
+//
+// Routable content lives across several dedicated tables. These helpers resolve a
+// URL path to a ContentView and feed the catch-all route / page components.
+// Nothing here reads wp_-prefixed tables.
 
-function rowToRecord(row: typeof wpContent.$inferSelect): WpContentRecord {
+type PageViewRow = {
+  id: number;
+  path: string;
+  parentPath: string | null;
+  titleTh: string;
+  titleEn: string;
+  bodyTh: string;
+  bodyEn: string;
+  updatedAt: Date | null;
+  mediaPath: string | null;
+};
+type NewsViewRow = {
+  id: number;
+  slug: string;
+  titleTh: string;
+  titleEn: string;
+  excerptTh: string;
+  excerptEn: string;
+  bodyTh: string;
+  bodyEn: string;
+  publishedAt: Date | null;
+  mediaPath: string | null;
+};
+
+const pageSelect = {
+  id: pages.id,
+  path: pages.path,
+  parentPath: pages.parentPath,
+  titleTh: pages.titleTh,
+  titleEn: pages.titleEn,
+  bodyTh: pages.bodyTh,
+  bodyEn: pages.bodyEn,
+  updatedAt: pages.updatedAt,
+  featuredImageId: pages.featuredImageId,
+  mediaPath: media.filePath,
+};
+
+const newsSelect = {
+  id: news.id,
+  slug: news.slug,
+  titleTh: news.titleTh,
+  titleEn: news.titleEn,
+  excerptTh: news.excerptTh,
+  excerptEn: news.excerptEn,
+  bodyTh: news.bodyTh,
+  bodyEn: news.bodyEn,
+  publishedAt: news.publishedAt,
+  featuredImageId: news.featuredImageId,
+  mediaPath: media.filePath,
+};
+
+// Mappers take the request `language`; the row stores the canonical (Thai) path
+// and both languages, so we localize and build the language-specific path here.
+function pageToView(row: PageViewRow, language: WpLanguage): ContentView {
   return {
-    id: String(row.wpId),
-    wpId: row.wpId,
-    language: row.language as WpLanguage,
-    kind: row.kind as WpContentRecord["kind"],
-    path: row.path,
-    sourceUrl: row.sourceUrl,
-    title: row.title,
-    excerpt: row.excerpt,
-    contentHtml: row.contentHtml,
-    modified: row.modified,
-    date: row.date,
-    parentPath: row.parentPath ?? null,
-    categoryIds: [],
-    featuredMediaId: row.featuredMediaId ?? null,
-    featuredMediaPath: row.featuredMediaPath ?? null,
+    id: `page-${row.id}`,
+    language,
+    kind: "page",
+    path: displayPath(row.path, language),
+    parentPath: row.parentPath ? displayPath(row.parentPath, language) : null,
+    title: pickLang(row.titleTh, row.titleEn, language),
+    excerpt: "",
+    body: pickLang(row.bodyTh, row.bodyEn, language),
+    date: row.updatedAt?.toISOString() ?? "",
+    featuredImagePath: row.mediaPath ?? null,
+    sourceUrl: "",
   };
 }
 
-export const getContentByPath = cache(async (path: string): Promise<WpContentRecord | null> => {
-  const normalized = normalizeRoutePath(path);
-  if (!db) return MOCK_RECORDS.find((r) => r.path === normalized) ?? null;
-  const rows = await db
-    .select()
-    .from(wpContent)
-    .where(eq(wpContent.path, normalized))
+function newsToView(row: NewsViewRow, language: WpLanguage): ContentView {
+  const canonical = `/${row.slug}`;
+  const parentCanonical = canonical.split("/").slice(0, -1).join("/") || null;
+  return {
+    id: `news-${row.id}`,
+    language,
+    kind: "post",
+    path: displayPath(canonical, language),
+    parentPath: parentCanonical ? displayPath(parentCanonical, language) : null,
+    title: pickLang(row.titleTh, row.titleEn, language),
+    excerpt: pickLang(row.excerptTh, row.excerptEn, language),
+    body: pickLang(row.bodyTh, row.bodyEn, language),
+    date: row.publishedAt?.toISOString() ?? "",
+    featuredImagePath: row.mediaPath ?? null,
+    sourceUrl: "",
+  };
+}
+
+function flipbookToView(row: typeof flipbooks.$inferSelect): ContentView {
+  return {
+    id: `flipbook-${row.id}`,
+    language: row.language as WpLanguage,
+    kind: "flipbook",
+    path: row.path ?? `/3d-flip-book/${row.slug}`,
+    parentPath: null,
+    title: row.title,
+    excerpt: row.description,
+    body: row.description,
+    date: row.publishedAt?.toISOString() ?? "",
+    featuredImagePath: null,
+    // pdfPath stores the upstream document URL — FlipbookPage opens it.
+    sourceUrl: row.pdfPath ?? "",
+  };
+}
+
+function categoryToView(cat: CategoryDef): ContentView {
+  return {
+    id: `category-${cat.path}`,
+    language: cat.language,
+    kind: "category",
+    path: cat.path,
+    parentPath: null,
+    title: cat.title,
+    excerpt: "",
+    body: "",
+    date: "",
+    featuredImagePath: null,
+    sourceUrl: "",
+  };
+}
+
+export const getContentByPath = cache(async (rawPath: string): Promise<ContentView | null> => {
+  const fullPath = normalizeRoutePath(rawPath);
+  if (!db) return MOCK_RECORDS.find((r) => r.path === fullPath) ?? null;
+
+  // Bilingual tables (pages, news) are keyed by the canonical Thai path; the
+  // /en prefix selects the English columns.
+  const { language, canonical } = splitLanguage(fullPath);
+
+  // 1. pages (takes precedence over posts on path collisions)
+  const pageRows = await db
+    .select(pageSelect)
+    .from(pages)
+    .leftJoin(media, eq(pages.featuredImageId, media.id))
+    .where(eq(pages.path, canonical))
     .limit(1);
-  return rows[0] ? rowToRecord(rows[0]) : null;
+  if (pageRows[0]) return pageToView(pageRows[0], language);
+
+  // 2. posts — news.slug is the canonical path without its leading slash
+  const newsRows = await db
+    .select(newsSelect)
+    .from(news)
+    .leftJoin(media, eq(news.featuredImageId, media.id))
+    .where(eq(news.slug, canonical.slice(1)))
+    .limit(1);
+  if (newsRows[0]) return newsToView(newsRows[0], language);
+
+  // 3. flipbooks (still per-language rows, keyed by full path)
+  const fbRows = await db.select().from(flipbooks).where(eq(flipbooks.path, fullPath)).limit(1);
+  if (fbRows[0]) return flipbookToView(fbRows[0]);
+
+  // 4. category landing pages (static config, per-language paths)
+  const cat = getCategoryByPath(fullPath);
+  if (cat) return categoryToView(cat);
+
+  return null;
 });
 
 export async function getAllContentPaths(): Promise<{ path: string }[]> {
   if (!db) return MOCK_RECORDS.map((r) => ({ path: r.path }));
-  return db.select({ path: wpContent.path }).from(wpContent);
+  const [pageRows, newsRows, fbRows] = await Promise.all([
+    db.select({ path: pages.path }).from(pages),
+    db.select({ slug: news.slug }).from(news),
+    db.select({ path: flipbooks.path }).from(flipbooks),
+  ]);
+  return [
+    // Each bilingual row yields both a Thai and an English URL.
+    ...pageRows.flatMap((r) => [{ path: r.path }, { path: displayPath(r.path, "en") }]),
+    ...newsRows.flatMap((r) => [{ path: `/${r.slug}` }, { path: `/en/${r.slug}` }]),
+    ...fbRows.filter((r): r is { path: string } => Boolean(r.path)).map((r) => ({ path: r.path })),
+    ...CATEGORIES.map((c) => ({ path: c.path })),
+  ];
 }
 
-export async function getChildPages(parentPath: string): Promise<WpContentRecord[]> {
+export async function getChildPages(parentPath: string): Promise<ContentView[]> {
   if (!db) return MOCK_RECORDS.filter((r) => r.parentPath === parentPath);
+  const { language, canonical } = splitLanguage(parentPath);
   const rows = await db
-    .select()
-    .from(wpContent)
-    .where(eq(wpContent.parentPath, parentPath))
-    .orderBy(asc(wpContent.title));
-  return rows.map(rowToRecord);
+    .select(pageSelect)
+    .from(pages)
+    .leftJoin(media, eq(pages.featuredImageId, media.id))
+    .where(eq(pages.parentPath, canonical))
+    .orderBy(asc(pages.sortOrder), asc(pages.titleTh));
+  return rows.map((r) => pageToView(r, language));
 }
 
-export async function getSiblingPages(parentPath: string): Promise<WpContentRecord[]> {
-  return getChildPages(parentPath);
-}
-
-export async function getLatestPosts(language: WpLanguage, limit = 6): Promise<WpContentRecord[]> {
+export async function getLatestPosts(language: WpLanguage, limit = 6): Promise<ContentView[]> {
   if (!db) {
     return MOCK_RECORDS.filter((r) => r.kind === "post" && r.language === language).slice(0, limit);
   }
   const rows = await db
-    .select()
-    .from(wpContent)
-    .where(eq(wpContent.language, language))
-    .orderBy(desc(wpContent.date))
+    .select(newsSelect)
+    .from(news)
+    .leftJoin(media, eq(news.featuredImageId, media.id))
+    .orderBy(desc(news.publishedAt))
     .limit(limit);
-  return rows.filter((r) => r.kind === "post").map(rowToRecord);
+  return rows.map((r) => newsToView(r, language));
 }
 
-export async function getTopLevelPages(language: WpLanguage): Promise<WpContentRecord[]> {
+export async function getTopLevelPages(language: WpLanguage): Promise<ContentView[]> {
   if (!db) {
     return MOCK_RECORDS.filter((r) => r.kind === "page" && r.parentPath === null && r.language === language);
   }
   const rows = await db
-    .select()
-    .from(wpContent)
-    .where(eq(wpContent.language, language))
-    .orderBy(asc(wpContent.title));
-  return rows
-    .filter((r) => r.kind === "page" && r.parentPath === null)
-    .map(rowToRecord);
+    .select(pageSelect)
+    .from(pages)
+    .leftJoin(media, eq(pages.featuredImageId, media.id))
+    .where(isNull(pages.parentPath))
+    .orderBy(asc(pages.sortOrder), asc(pages.titleTh));
+  return rows.map((r) => pageToView(r, language));
 }
 
 export async function getNavItems(language: WpLanguage): Promise<WpNavigationItem[]> {
   if (!db) return language === "en" ? MOCK_NAV_EN : MOCK_NAV;
   const rows = await db
     .select()
-    .from(wpNavigation)
-    .where(eq(wpNavigation.language, language))
-    .orderBy(asc(wpNavigation.sortOrder));
+    .from(navigation)
+    .where(eq(navigation.language, language))
+    .orderBy(asc(navigation.sortOrder));
 
   const topLevel = rows.filter((r) => r.parentId === null);
   return topLevel.map((item) => ({
@@ -149,7 +287,7 @@ export async function getNavItems(language: WpLanguage): Promise<WpNavigationIte
   }));
 }
 
-export async function searchContent(query: string, limit = 80): Promise<WpContentRecord[]> {
+export async function searchContent(query: string, limit = 80): Promise<ContentView[]> {
   if (!db) {
     const q = query.toLowerCase();
     return MOCK_RECORDS.filter(
@@ -160,23 +298,35 @@ export async function searchContent(query: string, limit = 80): Promise<WpConten
     ).slice(0, limit);
   }
   const term = `%${query}%`;
-  const rows = await db
-    .select()
-    .from(wpContent)
-    .where(or(ilike(wpContent.title, term), ilike(wpContent.excerpt, term), ilike(wpContent.path, term)))
-    .limit(limit);
-  return rows.map(rowToRecord);
+  const [pageRows, newsRows] = await Promise.all([
+    db
+      .select(pageSelect)
+      .from(pages)
+      .leftJoin(media, eq(pages.featuredImageId, media.id))
+      .where(or(
+        ilike(pages.titleTh, term), ilike(pages.titleEn, term),
+        ilike(pages.bodyTh, term), ilike(pages.bodyEn, term),
+      ))
+      .limit(limit),
+    db
+      .select(newsSelect)
+      .from(news)
+      .leftJoin(media, eq(news.featuredImageId, media.id))
+      .where(or(
+        ilike(news.titleTh, term), ilike(news.titleEn, term),
+        ilike(news.excerptTh, term), ilike(news.excerptEn, term),
+        ilike(news.bodyTh, term), ilike(news.bodyEn, term),
+      ))
+      .limit(limit),
+  ]);
+  // Search spans both languages; render matches in Thai (the /search page is th).
+  return [
+    ...pageRows.map((r) => pageToView(r, "th")),
+    ...newsRows.map((r) => newsToView(r, "th")),
+  ].slice(0, limit);
 }
 
-export async function getDownloadById(id: string): Promise<WpDownloadAsset | null> {
-  if (!db) return MOCK_DOWNLOADS.find((d) => d.id === id) ?? null;
-  const rows = await db
-    .select()
-    .from(wpDownloads)
-    .where(eq(wpDownloads.id, id))
-    .limit(1);
-  if (!rows[0]) return null;
-  const row = rows[0];
+function downloadRowToAsset(row: typeof downloads.$inferSelect): WpDownloadAsset {
   return {
     id: row.id,
     sourceUrl: row.sourceUrl,
@@ -185,28 +335,24 @@ export async function getDownloadById(id: string): Promise<WpDownloadAsset | nul
     mimeType: row.mimeType,
     sizeBytes: row.sizeBytes,
     title: row.title,
-    group: row.group,
-    sourcePages: [],
+    group: row.groupName,
+    sourcePages: row.sourcePages ?? [],
   };
+}
+
+export async function getDownloadById(id: string): Promise<WpDownloadAsset | null> {
+  if (!db) return MOCK_DOWNLOADS.find((d) => d.id === id) ?? null;
+  const rows = await db.select().from(downloads).where(eq(downloads.id, id)).limit(1);
+  return rows[0] ? downloadRowToAsset(rows[0]) : null;
 }
 
 export async function getAllDownloads(group?: string): Promise<WpDownloadAsset[]> {
   if (!db) {
     return group ? MOCK_DOWNLOADS.filter((d) => d.group === group) : MOCK_DOWNLOADS;
   }
-  const rows = await db.select().from(wpDownloads).orderBy(asc(wpDownloads.title));
-  const filtered = group ? rows.filter((r) => r.group === group) : rows;
-  return filtered.map((row) => ({
-    id: row.id,
-    sourceUrl: row.sourceUrl,
-    localPath: row.localPath,
-    fileName: row.fileName,
-    mimeType: row.mimeType,
-    sizeBytes: row.sizeBytes,
-    title: row.title,
-    group: row.group,
-    sourcePages: [],
-  }));
+  const rows = await db.select().from(downloads).orderBy(asc(downloads.title));
+  const filtered = group ? rows.filter((r) => r.groupName === group) : rows;
+  return filtered.map(downloadRowToAsset);
 }
 
 export async function listContent(opts: {
@@ -214,51 +360,48 @@ export async function listContent(opts: {
   kind?: string;
   limit?: number;
   offset?: number;
-}): Promise<WpContentRecord[]> {
-  const { language, kind, limit = 50, offset = 0 } = opts;
+}): Promise<ContentView[]> {
+  const { language = "th", kind, limit = 50, offset = 0 } = opts;
   if (!db) {
     return MOCK_RECORDS.filter(
-      (r) => (!language || r.language === language) && (!kind || r.kind === kind)
+      (r) => r.language === language && (!kind || r.kind === kind)
     ).slice(offset, offset + limit);
   }
-  const rows = await db
-    .select()
-    .from(wpContent)
-    .orderBy(desc(wpContent.date))
-    .limit(Math.min(limit, 200))
-    .offset(offset);
-  return rows
-    .filter((r) => (!language || r.language === language) && (!kind || r.kind === kind))
-    .map(rowToRecord);
+  const [pageRows, newsRows] = await Promise.all([
+    db
+      .select(pageSelect)
+      .from(pages)
+      .leftJoin(media, eq(pages.featuredImageId, media.id)),
+    db
+      .select(newsSelect)
+      .from(news)
+      .leftJoin(media, eq(news.featuredImageId, media.id)),
+  ]);
+  const all = [
+    ...pageRows.map((r) => pageToView(r, language)),
+    ...newsRows.map((r) => newsToView(r, language)),
+  ].filter((r) => !kind || r.kind === kind);
+  return all.slice(offset, offset + limit);
 }
 
 export async function getGeneratedAt(): Promise<string> {
   if (!db) return new Date().toISOString();
-  const rows = await db
-    .select()
-    .from(wpMeta)
-    .where(eq(wpMeta.key, "generatedAt"))
-    .limit(1);
-  return rows[0]?.value ?? "";
+  return (await getSiteMeta("generatedAt")) ?? "";
 }
 
 // ─── News ─────────────────────────────────────────────────────────────────────
 
 export async function listNews(opts: {
-  language?: string;
   category?: string;
   limit?: number;
   offset?: number;
 } = {}): Promise<NewsRow[]> {
-  const { language, category, limit = 20, offset = 0 } = opts;
+  const { category, limit = 20, offset = 0 } = opts;
   if (!db) return [];
   return db
     .select()
     .from(news)
-    .where(and(
-      language ? eq(news.language, language) : undefined,
-      category ? eq(news.category, category) : undefined,
-    ))
+    .where(category ? eq(news.category, category) : undefined)
     .orderBy(desc(news.publishedAt))
     .limit(Math.min(limit, 200))
     .offset(offset);
@@ -329,20 +472,16 @@ export const getPublicationBySlug = cache(async (slug: string): Promise<Publicat
 // ─── Featured Projects ────────────────────────────────────────────────────────
 
 export async function listFeaturedProjects(opts: {
-  language?: string;
   category?: string;
   limit?: number;
   offset?: number;
 } = {}): Promise<FeaturedProjectRow[]> {
-  const { language, category, limit = 20, offset = 0 } = opts;
+  const { category, limit = 20, offset = 0 } = opts;
   if (!db) return [];
   return db
     .select()
     .from(featuredProjects)
-    .where(and(
-      language ? eq(featuredProjects.language, language) : undefined,
-      category ? eq(featuredProjects.category, category) : undefined,
-    ))
+    .where(category ? eq(featuredProjects.category, category) : undefined)
     .orderBy(desc(featuredProjects.publishedAt))
     .limit(Math.min(limit, 200))
     .offset(offset);
@@ -381,30 +520,29 @@ export const getFlipbookBySlug = cache(async (slug: string): Promise<FlipbookRow
 // ─── Pages ────────────────────────────────────────────────────────────────────
 
 export async function listPages(opts: {
-  language?: string;
   parentSlug?: string | null;
   limit?: number;
 } = {}): Promise<PageRow[]> {
-  const { language, parentSlug, limit = 100 } = opts;
+  const { parentSlug, limit = 100 } = opts;
   if (!db) return [];
   return db
     .select()
     .from(pages)
-    .where(and(
-      language ? eq(pages.language, language) : undefined,
+    .where(
       parentSlug === null
         ? isNull(pages.parentSlug)
         : parentSlug
           ? eq(pages.parentSlug, parentSlug)
           : undefined,
-    ))
-    .orderBy(asc(pages.sortOrder), asc(pages.title))
+    )
+    .orderBy(asc(pages.sortOrder), asc(pages.titleTh))
     .limit(Math.min(limit, 500));
 }
 
-export const getPageBySlug = cache(async (slug: string): Promise<PageRow | null> => {
+export const getPageByPath = cache(async (path: string): Promise<PageRow | null> => {
   if (!db) return null;
-  const rows = await db.select().from(pages).where(eq(pages.slug, slug)).limit(1);
+  const { canonical } = splitLanguage(path);
+  const rows = await db.select().from(pages).where(eq(pages.path, canonical)).limit(1);
   return rows[0] ?? null;
 });
 
