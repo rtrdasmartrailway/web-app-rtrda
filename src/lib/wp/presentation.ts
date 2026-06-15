@@ -110,16 +110,21 @@ function mapNavigationItem(
   const children = item.children.map((child) =>
     mapNavigationItem(child, language, currentPath, false),
   );
-  const activationPath =
-    item.path ?? (topLevel ? PRIMARY_NAV_PATH_BY_LABEL[language].get(item.label) : undefined);
+  // Top-level WordPress menu items often arrive as placeholders (path null, href "#")
+  // that only open a dropdown. Resolve them to a real, client-routable path so the parent
+  // label itself navigates: own path → canonical PRIMARY_NAV path → first child's path.
+  const resolvedPath = topLevel
+    ? item.path ?? PRIMARY_NAV_PATH_BY_LABEL[language].get(item.label) ?? children[0]?.path ?? null
+    : item.path;
+  const activationPath = resolvedPath ?? undefined;
   const active =
     (activationPath ? isPathActive(activationPath, currentPath) : false) ||
     children.some((child) => child.active);
 
   return {
     label: item.label,
-    href: item.href,
-    path: item.path,
+    href: resolvedPath ?? item.href,
+    path: resolvedPath,
     external: item.external,
     active,
     children,

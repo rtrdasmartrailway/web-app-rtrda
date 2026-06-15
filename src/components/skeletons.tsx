@@ -72,7 +72,7 @@ export function NewsHomeSkeleton() {
   return (
     <>
       <section className="py-16 bg-white" style={FONT}>
-        <div className="mx-auto max-w-[1280px] px-10">
+        <div className="site-container">
           <div className="mb-8 space-y-2">
             <SkeletonBox className="h-7 w-56" />
             <SkeletonBox className="h-1 w-16 rounded-none" />
@@ -86,7 +86,7 @@ export function NewsHomeSkeleton() {
       </section>
 
       <section className="py-16 bg-[#f3f3f3]" style={FONT}>
-        <div className="mx-auto max-w-[1280px] px-10">
+        <div className="site-container">
           <div className="flex gap-8 items-start flex-col lg:flex-row">
             <div className="flex-1 min-w-0">
               <div className="mb-6 space-y-2">
@@ -113,7 +113,7 @@ export function NewsHomeSkeleton() {
 export function PartnersSkeleton() {
   return (
     <section className="py-16 bg-white border-t border-[#c3c6d2]" style={FONT}>
-      <div className="mx-auto max-w-[1280px] px-10 text-center">
+      <div className="site-container text-center">
         <SkeletonBox className="h-6 w-64 mx-auto mb-8" />
         <div className="flex items-center justify-center gap-10 flex-wrap">
           {Array.from({ length: 5 }).map((_, i) => (

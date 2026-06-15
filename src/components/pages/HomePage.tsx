@@ -151,7 +151,7 @@ async function NewsSection({ language }: { language: WpLanguage }) {
     <>
       {/* ข่าวสารและกิจกรรม */}
       <section className="py-16 bg-white" style={FONT}>
-        <div className="mx-auto max-w-[1280px] px-10">
+        <div className="site-container">
           <div className="flex items-end justify-between mb-8">
             <div>
               <h2 className="text-2xl font-bold text-[#001f49] mb-2">
@@ -221,7 +221,7 @@ async function NewsSection({ language }: { language: WpLanguage }) {
 
       {/* บทความล่าสุด + ปฏิทิน */}
       <section className="py-16 bg-[#f3f3f3]" style={FONT}>
-        <div className="mx-auto max-w-[1280px] px-10">
+        <div className="site-container">
           <div className="flex gap-8 items-start flex-col lg:flex-row">
             {/* บทความล่าสุด */}
             <div className="flex-1 min-w-0">
@@ -297,7 +297,7 @@ async function PartnersSection({ language }: { language: WpLanguage }) {
 
   return (
     <section className="py-16 bg-white border-t border-[#c3c6d2]" style={FONT}>
-      <div className="mx-auto max-w-[1280px] px-10 text-center">
+      <div className="site-container text-center">
         <h2 className="text-xl font-bold text-[#001f49] mb-8">
           {language === "th" ? "พันธมิตรทางยุทธศาสตร์ของเรา" : "Our Strategic Partners"}
         </h2>
