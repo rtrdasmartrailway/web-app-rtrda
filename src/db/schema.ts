@@ -96,11 +96,14 @@ export const news = pgTable(
   "news",
   {
     id: serial("id").primaryKey(),
-    language: text("language").notNull().default("th"),
+    // One row per item; Thai + English live side by side in *_th / *_en columns.
     slug: text("slug").notNull().unique(),
-    title: text("title").notNull(),
-    excerpt: text("excerpt").notNull().default(""),
-    body: text("body").notNull().default(""),
+    titleTh: text("title_th").notNull().default(""),
+    titleEn: text("title_en").notNull().default(""),
+    excerptTh: text("excerpt_th").notNull().default(""),
+    excerptEn: text("excerpt_en").notNull().default(""),
+    bodyTh: text("body_th").notNull().default(""),
+    bodyEn: text("body_en").notNull().default(""),
     // ข่าว-กิจกรรม / ความร่วมมือ / ทันข่าวเทคโนโลยี / อบรม-สัมมนา
     category: text("category").notNull().default(""),
     featuredImageId: integer("featured_image_id").references(() => media.id),
@@ -108,10 +111,7 @@ export const news = pgTable(
     publishedAt: timestamp("published_at", { withTimezone: true }),
     updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
   },
-  (t) => [
-    index("news_language_idx").on(t.language),
-    index("news_category_idx").on(t.category),
-  ],
+  (t) => [index("news_category_idx").on(t.category)],
 );
 
 // ─── Procurement — จัดซื้อจัดจ้าง ────────────────────────────────────────────
@@ -163,11 +163,13 @@ export const featuredProjects = pgTable(
   "featured_projects",
   {
     id: serial("id").primaryKey(),
-    language: text("language").notNull().default("th"),
     slug: text("slug").notNull().unique(),
-    title: text("title").notNull(),
-    excerpt: text("excerpt").notNull().default(""),
-    body: text("body").notNull().default(""),
+    titleTh: text("title_th").notNull().default(""),
+    titleEn: text("title_en").notNull().default(""),
+    excerptTh: text("excerpt_th").notNull().default(""),
+    excerptEn: text("excerpt_en").notNull().default(""),
+    bodyTh: text("body_th").notNull().default(""),
+    bodyEn: text("body_en").notNull().default(""),
     // วิจัย-นวัตกรรม / มาตรฐาน-ระบบทดสอบ / การถ่ายทอดเทคโนโลยี /
     // ฐานข้อมูลเทคโนโลยี / ยุทธศาสตร์-เทคโนโลยี / พัฒนา-บุคลากร
     category: text("category").notNull().default(""),
@@ -176,10 +178,7 @@ export const featuredProjects = pgTable(
     publishedAt: timestamp("published_at", { withTimezone: true }),
     updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
   },
-  (t) => [
-    index("featured_projects_language_idx").on(t.language),
-    index("featured_projects_category_idx").on(t.category),
-  ],
+  (t) => [index("featured_projects_category_idx").on(t.category)],
 );
 
 // ─── Flipbooks — คลังความรู้ / interactive PDF publications ──────────────────
@@ -190,6 +189,8 @@ export const flipbooks = pgTable(
     id: serial("id").primaryKey(),
     language: text("language").notNull().default("th"),
     slug: text("slug").notNull().unique(),
+    // Full URL path, e.g. /3d-flip-book/6267 — how the catch-all route resolves it.
+    path: text("path").unique(),
     title: text("title").notNull(),
     description: text("description").notNull().default(""),
     coverImageId: integer("cover_image_id").references(() => media.id),
@@ -197,7 +198,10 @@ export const flipbooks = pgTable(
     publishedAt: timestamp("published_at", { withTimezone: true }),
     updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
   },
-  (t) => [index("flipbooks_language_idx").on(t.language)],
+  (t) => [
+    index("flipbooks_language_idx").on(t.language),
+    index("flipbooks_path_idx").on(t.path),
+  ],
 );
 
 // ─── Pages — static content pages (เกี่ยวกับ-สทร, ติดต่อเรา, etc.) ───────────
@@ -206,19 +210,26 @@ export const pages = pgTable(
   "pages",
   {
     id: serial("id").primaryKey(),
-    language: text("language").notNull().default("th"),
-    slug: text("slug").notNull().unique(),
-    title: text("title").notNull(),
-    body: text("body").notNull().default(""),
+    // slug is the last URL segment. The canonical (Thai) `path` is the unique
+    // routing key; the `/en` URL prefix selects the English columns at read time.
+    slug: text("slug").notNull(),
+    // Canonical (Thai) URL path, e.g. /เกี่ยวกับ-สทร/วิสัยทัศน์
+    path: text("path").notNull().unique(),
+    titleTh: text("title_th").notNull().default(""),
+    titleEn: text("title_en").notNull().default(""),
+    bodyTh: text("body_th").notNull().default(""),
+    bodyEn: text("body_en").notNull().default(""),
     parentSlug: text("parent_slug"),
+    // Canonical parent URL path, used for child/sibling lookups (equality match).
+    parentPath: text("parent_path"),
     featuredImageId: integer("featured_image_id").references(() => media.id),
     attachments: jsonb("attachments").$type<Attachment[]>().notNull().default([]),
     sortOrder: integer("sort_order").notNull().default(0),
     updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
   },
   (t) => [
-    index("pages_language_idx").on(t.language),
-    index("pages_parent_slug_idx").on(t.parentSlug),
+    index("pages_path_idx").on(t.path),
+    index("pages_parent_path_idx").on(t.parentPath),
   ],
 );
 
@@ -317,4 +328,21 @@ export const navigation = pgTable(
 export const siteMeta = pgTable("site_meta", {
   key: text("key").primaryKey(),
   value: text("value").notNull(),
+});
+
+// ─── Downloads — file assets (replaces wp_downloads) ──────────────────────────
+
+export const downloads = pgTable("downloads", {
+  // Keep the WordPress download id — the /sdc_download/[id] route and localPath
+  // (e.g. /sdc-downloads/5540.pdf) depend on it.
+  id: text("id").primaryKey(),
+  sourceUrl: text("source_url").notNull().default(""),
+  localPath: text("local_path").notNull(),
+  fileName: text("file_name").notNull().default(""),
+  mimeType: text("mime_type").notNull().default(""),
+  sizeBytes: integer("size_bytes").notNull().default(0),
+  title: text("title").notNull().default(""),
+  // `group` is a reserved word — store under group_name.
+  groupName: text("group_name").notNull().default(""),
+  sourcePages: jsonb("source_pages").$type<string[]>().notNull().default([]),
 });

@@ -1,28 +1,25 @@
 import { describe, expect, it } from "vitest";
-import type { WpContentRecord, WpMediaAsset, WpNavigationItem } from "./types";
+import type { WpNavigationItem } from "./types";
+import type { ContentView } from "@/lib/content/types";
 import {
   buildPrimaryNavigation,
   getSidebarItems,
-  resolveFeaturedMediaPath,
   selectFallbackAsset,
 } from "./presentation";
 
-function record(overrides: Partial<WpContentRecord>): WpContentRecord {
+function record(overrides: Partial<ContentView>): ContentView {
   return {
-    id: overrides.id ?? String(overrides.wpId ?? overrides.path),
-    wpId: overrides.wpId ?? overrides.path ?? 0,
+    id: overrides.id ?? String(overrides.path ?? "0"),
     language: overrides.language ?? "th",
     kind: overrides.kind ?? "page",
     path: overrides.path ?? "/",
-    sourceUrl: overrides.sourceUrl ?? "https://www.rtrda.or.th/",
+    parentPath: overrides.parentPath ?? null,
     title: overrides.title ?? "Untitled",
     excerpt: overrides.excerpt ?? "",
-    contentHtml: overrides.contentHtml ?? "",
-    modified: overrides.modified ?? "",
+    body: overrides.body ?? "",
     date: overrides.date ?? "",
-    parentPath: overrides.parentPath ?? null,
-    categoryIds: overrides.categoryIds ?? [],
-    featuredMediaId: overrides.featuredMediaId ?? null,
+    featuredImagePath: overrides.featuredImagePath ?? null,
+    sourceUrl: overrides.sourceUrl ?? "",
   };
 }
 
@@ -212,36 +209,6 @@ describe("presentation helpers", () => {
       href: "/ข่าวสาร-กิจกรรม/ร่วมงานกับ-สทร/สมัครงาน",
       active: true,
     });
-  });
-
-  it("returns an imported image media path for records with valid featured media", () => {
-    const media: WpMediaAsset[] = [
-      {
-        id: 99,
-        sourceUrl: "https://www.rtrda.or.th/wp-content/uploads/post.jpg",
-        localPath: "/wp-content/uploads/post.jpg",
-        title: "Post image",
-        alt: "",
-        width: 1200,
-        height: 800,
-        mimeType: "image/jpeg",
-      },
-      {
-        id: 100,
-        sourceUrl: "https://www.rtrda.or.th/wp-content/uploads/file.pdf",
-        localPath: "/wp-content/uploads/file.pdf",
-        title: "PDF",
-        alt: "",
-        width: null,
-        height: null,
-        mimeType: "application/pdf",
-      },
-    ];
-
-    expect(resolveFeaturedMediaPath(record({ featuredMediaId: 99 }), media)).toBe(
-      "/wp-content/uploads/post.jpg",
-    );
-    expect(resolveFeaturedMediaPath(record({ featuredMediaId: 100 }), media)).toBeUndefined();
   });
 
   it("uses children for parent sidebars and siblings for child page sidebars", () => {

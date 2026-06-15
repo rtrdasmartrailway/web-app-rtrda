@@ -8,6 +8,27 @@
       "when": 1781247083770,
       "tag": "0000_curvy_the_phantom",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1781491271712,
+      "tag": "0001_fluffy_kat_farrell",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1781504421276,
+      "tag": "0002_furry_morph",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1781504490149,
+      "tag": "0003_friendly_hedge_knight",
+      "breakpoints": true
     }
   ]
 }

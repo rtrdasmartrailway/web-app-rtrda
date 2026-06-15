@@ -1,13 +1,13 @@
 import { Suspense } from "react";
 import Link from "next/link";
-import type { WpContentRecord } from "@/lib/wp/types";
+import type { ContentView } from "@/lib/content/types";
 import { getChildPages, getContentByPath } from "@/db/queries";
 import { getSidebarItems } from "@/lib/wp/presentation";
 import { ArticleCard, SideNavigation } from "@/components/rtrda-shared";
 import { StandardSkeleton } from "@/components/skeletons";
 
 /** Sidebar + related-pages grid, derived from the same set of queries. */
-async function StandardBody({ record }: { record: WpContentRecord }) {
+async function StandardBody({ record }: { record: ContentView }) {
   const { language } = record;
 
   const [children, siblingCandidates, parentRecord] = await Promise.all([
@@ -45,7 +45,7 @@ async function StandardBody({ record }: { record: WpContentRecord }) {
   );
 }
 
-export function StandardPage({ record }: { record: WpContentRecord }) {
+export function StandardPage({ record }: { record: ContentView }) {
   const { language } = record;
 
   return (

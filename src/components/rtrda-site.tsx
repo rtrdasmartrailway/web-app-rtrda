@@ -1,6 +1,6 @@
 import { Suspense } from "react";
 import Link from "next/link";
-import type { WpContentRecord } from "@/lib/wp/types";
+import type { ContentView } from "@/lib/content/types";
 import { searchContent } from "@/db/queries";
 import { ArticleCard, SiteShell } from "./rtrda-shared";
 import { SearchResultsSkeleton } from "./skeletons";
@@ -13,7 +13,7 @@ import { FallbackPage } from "./pages/FallbackPage";
 
 export { SiteShell } from "./rtrda-shared";
 
-export async function ContentPage({ record }: { record: WpContentRecord }) {
+export async function ContentPage({ record }: { record: ContentView }) {
   const { path, kind } = record;
 
   if (path === "/" || path === "/en") return <HomePage record={record} />;
