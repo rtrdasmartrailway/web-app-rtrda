@@ -990,7 +990,32 @@ button {
 
 .wp-content .lightweight-accordion-body {
   background: linear-gradient(180deg, #f8fbff 0%, #fff 100%);
-  padding: 24px;
+  padding: 28px 28px 32px;
+}
+
+.wp-content .lightweight-accordion-body > .wp-block-column > * {
+  margin: 0;
+  width: 100%;
+}
+
+.wp-content .lightweight-accordion-body table {
+  table-layout: fixed;
+  width: 100%;
+}
+
+.wp-content .lightweight-accordion-body table td {
+  overflow-wrap: anywhere;
+  padding: 14px 16px;
+}
+
+.wp-content .lightweight-accordion-body table td:last-child {
+  text-align: center;
+  white-space: nowrap;
+  width: 180px;
+}
+
+.wp-content .lightweight-accordion-body a {
+  display: inline-block;
 }
 
 .wp-content .lightweight-accordion-body > .wp-block-spacer,
