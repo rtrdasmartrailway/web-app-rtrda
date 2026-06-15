@@ -14,6 +14,11 @@ function fmtDate(value: unknown): string {
   return Number.isNaN(d.getTime()) ? "—" : d.toLocaleDateString("th-TH");
 }
 
+// All content rows are bilingual; show the Thai title, falling back to English.
+function rowTitle(row: { titleTh?: string; titleEn?: string }): string {
+  return row.titleTh || row.titleEn || "—";
+}
+
 export default async function ResourceListPage({
   params,
 }: {
@@ -59,7 +64,7 @@ export default async function ResourceListPage({
             {rows.map((row) => (
               <tr key={row.id}>
                 <td>
-                  <span className="manage-row-title">{row.title}</span>
+                  <span className="manage-row-title">{rowTitle(row)}</span>
                   <span className="manage-row-slug">/{row.slug}</span>
                 </td>
                 <td>{row.category || "—"}</td>
@@ -73,7 +78,7 @@ export default async function ResourceListPage({
                     แก้ไข
                   </Link>
                   <DeleteButton
-                    label={row.title}
+                    label={rowTitle(row)}
                     action={deleteContentAction.bind(null, resource, row.id)}
                   />
                 </td>

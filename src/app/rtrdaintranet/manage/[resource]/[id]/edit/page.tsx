@@ -35,14 +35,18 @@ export default async function EditContentPage({
   const row = (await getContentById(resource, numId)) as Record<string, unknown> | null;
   if (!row) notFound();
 
-  // Build string initial values for the generic form fields.
+  // Build string initial values for the generic form fields. Localized fields map
+  // to a pair of columns (`${name}Th` / `${name}En`).
   const initialValues: Record<string, string> = {};
+  const str = (v: unknown) => (v == null ? "" : String(v));
   for (const field of config.fields) {
     if (field.type === "datetime") {
       initialValues[field.name] = toDateTimeLocal(row[field.name]);
+    } else if (field.localized) {
+      initialValues[`${field.name}Th`] = str(row[`${field.name}Th`]);
+      initialValues[`${field.name}En`] = str(row[`${field.name}En`]);
     } else {
-      const v = row[field.name];
-      initialValues[field.name] = v == null ? "" : String(v);
+      initialValues[field.name] = str(row[field.name]);
     }
   }
 

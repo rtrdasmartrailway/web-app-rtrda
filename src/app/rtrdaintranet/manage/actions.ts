@@ -2,7 +2,11 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { getContentForm, parseContentForm } from "@/lib/content-config";
+import {
+  getContentForm,
+  parseContentForm,
+  type ContentFormConfig,
+} from "@/lib/content-config";
 import { isUserRole, type ContentResource } from "@/lib/permissions";
 import {
   requireAdmin,
@@ -37,6 +41,20 @@ const SLUG_TAKEN: ActionState = {
   fieldErrors: { slug: "slug ซ้ำ" },
 };
 
+/**
+ * Purge the caches a content write affects: the resource's listing/landing pages
+ * plus the item's own article page (`/{slug}` and the `/en/` twin), so the change
+ * is visible immediately on the public site.
+ */
+function revalidateContent(config: ContentFormConfig, data: Record<string, unknown>) {
+  for (const p of config.revalidatePaths) revalidatePath(p);
+  const slug = data.slug;
+  if (typeof slug === "string" && slug) {
+    revalidatePath(`/${slug}`);
+    revalidatePath(`/en/${slug}`);
+  }
+}
+
 // ─── Content CRUD ───────────────────────────────────────────────────────────
 
 export async function createContentAction(
@@ -57,7 +75,7 @@ export async function createContentAction(
     throw e;
   }
 
-  for (const p of config.revalidatePaths) revalidatePath(p);
+  revalidateContent(config, parsed.data);
   redirect(`/rtrdaintranet/manage/${resource}`);
 }
 
@@ -80,7 +98,7 @@ export async function updateContentAction(
     throw e;
   }
 
-  for (const p of config.revalidatePaths) revalidatePath(p);
+  revalidateContent(config, parsed.data);
   redirect(`/rtrdaintranet/manage/${resource}`);
 }
 

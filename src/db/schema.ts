@@ -120,10 +120,12 @@ export const procurement = pgTable(
   "procurement",
   {
     id: serial("id").primaryKey(),
-    language: text("language").notNull().default("th"),
+    // Bilingual: one row holds both Thai and English (see news/featuredProjects).
     slug: text("slug").notNull().unique(),
-    title: text("title").notNull(),
-    excerpt: text("excerpt").notNull().default(""),
+    titleTh: text("title_th").notNull().default(""),
+    titleEn: text("title_en").notNull().default(""),
+    excerptTh: text("excerpt_th").notNull().default(""),
+    excerptEn: text("excerpt_en").notNull().default(""),
     // ประกาศเชิญชวน / ประกาศราคากลาง / ประกาศผลผู้เสนอราคา /
     // ประกาศผลผู้ชนะ / ร่างTOR / ยกเลิก / แผนการจัดซื้อ / สขร.
     category: text("category").notNull().default(""),
@@ -131,10 +133,7 @@ export const procurement = pgTable(
     publishedAt: timestamp("published_at", { withTimezone: true }),
     updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
   },
-  (t) => [
-    index("procurement_language_idx").on(t.language),
-    index("procurement_category_idx").on(t.category),
-  ],
+  (t) => [index("procurement_category_idx").on(t.category)],
 );
 
 // ─── Publications — เอกสารเผยแพร่ ────────────────────────────────────────────
@@ -143,10 +142,12 @@ export const publications = pgTable(
   "publications",
   {
     id: serial("id").primaryKey(),
-    language: text("language").notNull().default("th"),
+    // Bilingual: one row holds both Thai and English.
     slug: text("slug").notNull().unique(),
-    title: text("title").notNull(),
-    description: text("description").notNull().default(""),
+    titleTh: text("title_th").notNull().default(""),
+    titleEn: text("title_en").notNull().default(""),
+    descriptionTh: text("description_th").notNull().default(""),
+    descriptionEn: text("description_en").notNull().default(""),
     // หลักธรรมาภิบาล / รายงานผล
     category: text("category").notNull().default(""),
     featuredImageId: integer("featured_image_id").references(() => media.id),
@@ -154,7 +155,7 @@ export const publications = pgTable(
     publishedAt: timestamp("published_at", { withTimezone: true }),
     updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
   },
-  (t) => [index("publications_language_idx").on(t.language)],
+  (t) => [index("publications_category_idx").on(t.category)],
 );
 
 // ─── Featured Projects — ผลงานและโครงการเด่น ─────────────────────────────────

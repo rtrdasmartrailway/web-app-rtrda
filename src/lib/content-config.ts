@@ -4,6 +4,7 @@ import {
   RESOURCE_LABELS,
   type ContentResource,
 } from "@/lib/permissions";
+import { CATEGORIES } from "@/lib/content/categories";
 
 // ─── Reusable content registry ────────────────────────────────────────────────
 //
@@ -13,13 +14,19 @@ import {
 // (procurement has no body/featured image; publications uses "description")
 // are encoded here as data so there is a single form + single action codepath.
 
-export type FieldType = "text" | "textarea" | "datetime" | "language";
+export type FieldType = "text" | "textarea" | "datetime";
 
 export interface FieldDef {
   name: string;
   label: string;
   type: FieldType;
   required?: boolean;
+  /**
+   * Bilingual field: rendered inside the Thai/English tabs and stored in a pair
+   * of columns `${name}Th` / `${name}En`. Non-localized fields (slug, category,
+   * publishedAt) are language-neutral and rendered once, outside the tabs.
+   */
+  localized?: boolean;
   /** Optional datalist suggestions for free-text fields (e.g. category). */
   suggestions?: string[];
   rows?: number;
@@ -40,12 +47,10 @@ export interface ContentFormConfig {
 // ─── Shared zod fragments ──────────────────────────────────────────────────────
 
 const zText = z.string().trim();
-const zTitle = zText.min(1, "กรุณากรอกหัวข้อ (title is required)");
 // Slugs may contain Thai characters and hyphens; just forbid whitespace.
 const zSlug = zText
   .min(1, "กรุณากรอก slug")
   .regex(/^[^\s/]+$/, "slug ต้องไม่มีช่องว่างหรือเครื่องหมาย / (no spaces or slashes)");
-const zLanguage = z.enum(["th", "en"]).default("th");
 const zOptionalText = z.string().default("");
 
 const zPublishedAt = z.preprocess(
@@ -78,83 +83,128 @@ const zAttachments = z.preprocess(
     .default([]),
 );
 
-const common = {
-  title: zTitle,
-  slug: zSlug,
-  language: zLanguage,
-  category: zOptionalText,
-  publishedAt: zPublishedAt,
-  attachments: zAttachments,
-};
-
-const LANGUAGE_FIELD: FieldDef = { name: "language", label: "ภาษา (Language)", type: "language" };
 const PUBLISHED_FIELD: FieldDef = { name: "publishedAt", label: "วันที่เผยแพร่ (Published at)", type: "datetime" };
+const TITLE_FIELD: FieldDef = { name: "title", label: "หัวข้อ (Title)", type: "text", required: true, localized: true };
+const SLUG_FIELD: FieldDef = { name: "slug", label: "Slug (URL)", type: "text", required: true };
 
-function titleSlugFields(categorySuggestions: string[]): FieldDef[] {
-  return [
-    { name: "title", label: "หัวข้อ (Title)", type: "text", required: true },
-    { name: "slug", label: "Slug (URL)", type: "text", required: true },
-    { name: "category", label: "หมวดหมู่ (Category)", type: "text", suggestions: categorySuggestions },
-    LANGUAGE_FIELD,
-  ];
+function categoryField(suggestions: string[]): FieldDef {
+  return { name: "category", label: "หมวดหมู่ (Category)", type: "text", suggestions };
 }
 
-const NEWS_CATEGORIES = ["ข่าว-กิจกรรม", "ความร่วมมือ", "ทันข่าวเทคโนโลยีระบบราง", "อบรม-สัมมนา", "ประกาศ", "บทความ"];
+/** Submitted form keys for a field — localized fields expand to `${name}Th`/`${name}En`. */
+export function fieldNames(field: FieldDef): string[] {
+  return field.localized ? [`${field.name}Th`, `${field.name}En`] : [field.name];
+}
+
+/**
+ * Build a resource's zod schema from its field defs so the form fields and the
+ * validation can never drift. Localized + required fields demand BOTH languages.
+ */
+function buildSchema(fields: FieldDef[], hasFeaturedImage: boolean): z.ZodType {
+  const shape: Record<string, z.ZodTypeAny> = { attachments: zAttachments };
+  if (hasFeaturedImage) shape.featuredImageId = zFeaturedImageId;
+
+  for (const field of fields) {
+    if (field.type === "datetime") {
+      shape[field.name] = zPublishedAt;
+    } else if (field.name === "slug") {
+      shape.slug = zSlug;
+    } else if (field.localized) {
+      shape[`${field.name}Th`] = field.required
+        ? zText.min(1, `กรุณากรอก${field.label} ภาษาไทย`)
+        : zOptionalText;
+      shape[`${field.name}En`] = field.required
+        ? zText.min(1, `กรุณากรอก${field.label} ภาษาอังกฤษ (English required)`)
+        : zOptionalText;
+    } else {
+      shape[field.name] = field.required
+        ? zText.min(1, `กรุณากรอก${field.label}`)
+        : zOptionalText;
+    }
+  }
+  return z.object(shape);
+}
+
+function makeForm(cfg: {
+  resource: ContentResource;
+  hasFeaturedImage: boolean;
+  fields: FieldDef[];
+  revalidatePaths: string[];
+}): ContentFormConfig {
+  return {
+    resource: cfg.resource,
+    label: RESOURCE_LABELS[cfg.resource],
+    hasFeaturedImage: cfg.hasFeaturedImage,
+    fields: cfg.fields,
+    revalidatePaths: cfg.revalidatePaths,
+    schema: buildSchema(cfg.fields, cfg.hasFeaturedImage),
+  };
+}
+
+// News categories are derived from CATEGORIES (the single source of truth for
+// the /category landing pages) so a value chosen in the CMS always matches a
+// real listing page — and a saved item shows up there.
+const NEWS_CATEGORIES = [
+  ...new Set(CATEGORIES.map((c) => c.newsCategory).filter((c): c is string => Boolean(c))),
+];
+// Landing-page paths (Thai + English) whose listings include news; revalidated
+// after every news write so the new/edited item appears immediately.
+const NEWS_CATEGORY_PATHS = CATEGORIES.filter((c) => c.newsCategory).map((c) => c.path);
 const PROCUREMENT_CATEGORIES = ["ประกาศเชิญชวน", "ประกาศราคากลาง", "ประกาศผลผู้เสนอราคา", "ประกาศผลผู้ชนะ", "ร่างTOR", "ยกเลิก", "แผนการจัดซื้อ", "สขร."];
 const PUBLICATION_CATEGORIES = ["หลักธรรมาภิบาล", "รายงานผล"];
 const PROJECT_CATEGORIES = ["วิจัย-นวัตกรรม", "มาตรฐาน-ระบบทดสอบ", "การถ่ายทอดเทคโนโลยี", "ฐานข้อมูลเทคโนโลยี", "ยุทธศาสตร์-เทคโนโลยี", "พัฒนา-บุคลากร"];
 
 export const CONTENT_FORMS: Record<ContentResource, ContentFormConfig> = {
-  news: {
+  news: makeForm({
     resource: "news",
-    label: RESOURCE_LABELS.news,
     hasFeaturedImage: true,
     fields: [
-      ...titleSlugFields(NEWS_CATEGORIES),
-      { name: "excerpt", label: "เกริ่นนำ (Excerpt)", type: "textarea", rows: 3 },
-      { name: "body", label: "เนื้อหา (Body)", type: "textarea", rows: 12 },
+      TITLE_FIELD,
+      { name: "excerpt", label: "เกริ่นนำ (Excerpt)", type: "textarea", rows: 3, localized: true },
+      { name: "body", label: "เนื้อหา (Body)", type: "textarea", rows: 12, required: true, localized: true },
+      SLUG_FIELD,
+      categoryField(NEWS_CATEGORIES),
       PUBLISHED_FIELD,
     ],
-    revalidatePaths: ["/ข่าวสาร-กิจกรรม", "/"],
-    schema: z.object({ ...common, excerpt: zOptionalText, body: zOptionalText, featuredImageId: zFeaturedImageId }),
-  },
-  procurement: {
+    revalidatePaths: ["/", ...NEWS_CATEGORY_PATHS],
+  }),
+  procurement: makeForm({
     resource: "procurement",
-    label: RESOURCE_LABELS.procurement,
     hasFeaturedImage: false,
     fields: [
-      ...titleSlugFields(PROCUREMENT_CATEGORIES),
-      { name: "excerpt", label: "รายละเอียด (Excerpt)", type: "textarea", rows: 4 },
+      TITLE_FIELD,
+      { name: "excerpt", label: "รายละเอียด (Excerpt)", type: "textarea", rows: 4, localized: true },
+      SLUG_FIELD,
+      categoryField(PROCUREMENT_CATEGORIES),
       PUBLISHED_FIELD,
     ],
     revalidatePaths: ["/จัดซื้อจัดจ้าง"],
-    schema: z.object({ ...common, excerpt: zOptionalText }),
-  },
-  publications: {
+  }),
+  publications: makeForm({
     resource: "publications",
-    label: RESOURCE_LABELS.publications,
     hasFeaturedImage: true,
     fields: [
-      ...titleSlugFields(PUBLICATION_CATEGORIES),
-      { name: "description", label: "คำอธิบาย (Description)", type: "textarea", rows: 6 },
+      TITLE_FIELD,
+      { name: "description", label: "คำอธิบาย (Description)", type: "textarea", rows: 6, localized: true },
+      SLUG_FIELD,
+      categoryField(PUBLICATION_CATEGORIES),
       PUBLISHED_FIELD,
     ],
     revalidatePaths: ["/เอกสารเผยแพร่"],
-    schema: z.object({ ...common, description: zOptionalText, featuredImageId: zFeaturedImageId }),
-  },
-  featuredProjects: {
+  }),
+  featuredProjects: makeForm({
     resource: "featuredProjects",
-    label: RESOURCE_LABELS.featuredProjects,
     hasFeaturedImage: true,
     fields: [
-      ...titleSlugFields(PROJECT_CATEGORIES),
-      { name: "excerpt", label: "เกริ่นนำ (Excerpt)", type: "textarea", rows: 3 },
-      { name: "body", label: "เนื้อหา (Body)", type: "textarea", rows: 12 },
+      TITLE_FIELD,
+      { name: "excerpt", label: "เกริ่นนำ (Excerpt)", type: "textarea", rows: 3, localized: true },
+      { name: "body", label: "เนื้อหา (Body)", type: "textarea", rows: 12, required: true, localized: true },
+      SLUG_FIELD,
+      categoryField(PROJECT_CATEGORIES),
       PUBLISHED_FIELD,
     ],
     revalidatePaths: ["/ผลงานและโครงการเด่น"],
-    schema: z.object({ ...common, excerpt: zOptionalText, body: zOptionalText, featuredImageId: zFeaturedImageId }),
-  },
+  }),
 };
 
 export function getContentForm(resource: ContentResource): ContentFormConfig {
@@ -171,21 +221,15 @@ export function parseContentForm(
   formData: FormData,
 ): ParseResult {
   const config = CONTENT_FORMS[resource];
-  const raw: Record<string, FormDataEntryValue | null> = {};
-  // Pull every field the form may submit; the schema picks what it needs.
-  for (const key of [
-    "title",
-    "slug",
-    "language",
-    "category",
-    "excerpt",
-    "body",
-    "description",
-    "publishedAt",
-    "featuredImageId",
-    "attachments",
-  ]) {
-    raw[key] = formData.get(key);
+  const raw: Record<string, FormDataEntryValue | null> = {
+    attachments: formData.get("attachments"),
+  };
+  if (config.hasFeaturedImage) raw.featuredImageId = formData.get("featuredImageId");
+  // Pull every field the form submits (localized fields → `${name}Th`/`${name}En`).
+  for (const field of config.fields) {
+    for (const key of fieldNames(field)) {
+      raw[key] = formData.get(key);
+    }
   }
 
   const parsed = config.schema.safeParse(raw);

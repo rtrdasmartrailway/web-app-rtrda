@@ -2139,6 +2139,58 @@ button {
   margin-top: 1.25rem;
 }
 
+/* Bilingual Thai / English tabs. The whole block is a tinted card so the
+   per-language fields read as a unit, set apart from the shared fields
+   (slug, category, date, image, attachments) that follow on the white form. */
+.manage-lang {
+  border: 1px solid #d7dee8;
+  border-radius: 10px;
+  background: #f4f7fb;
+  overflow: hidden;
+}
+
+.manage-lang-tabs {
+  display: flex;
+  gap: 0.25rem;
+  padding: 0.4rem 0.4rem 0;
+  background: #e8eef6;
+  border-bottom: 1px solid #d7dee8;
+}
+
+.manage-tab {
+  appearance: none;
+  border: none;
+  background: none;
+  padding: 0.55rem 1.1rem;
+  font: inherit;
+  font-weight: 600;
+  color: #667085;
+  cursor: pointer;
+  border-radius: 8px 8px 0 0;
+}
+
+.manage-tab:hover {
+  color: #06142b;
+}
+
+/* Active tab blends into the panel below to look like a connected folder tab. */
+.manage-tab.is-active {
+  color: #005bd3;
+  background: #f4f7fb;
+}
+
+.manage-tab-dot {
+  color: #d61f3c;
+}
+
+/* `display` must beat the UA `[hidden] { display: none }`, so scope to :not([hidden]). */
+.manage-lang-panel:not([hidden]) {
+  display: flex;
+  flex-direction: column;
+  gap: 1.1rem;
+  padding: 1.25rem;
+}
+
 .manage-field {
   display: flex;
   flex-direction: column;

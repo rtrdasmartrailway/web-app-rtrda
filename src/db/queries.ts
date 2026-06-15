@@ -416,20 +416,17 @@ export const getNewsBySlug = cache(async (slug: string): Promise<NewsRow | null>
 // ─── Procurement ─────────────────────────────────────────────────────────────
 
 export async function listProcurement(opts: {
-  language?: string;
   category?: string;
   limit?: number;
   offset?: number;
 } = {}): Promise<ProcurementRow[]> {
-  const { language, category, limit = 20, offset = 0 } = opts;
+  const { category, limit = 20, offset = 0 } = opts;
   if (!db) return [];
+  // Rows are bilingual (title_th/title_en/…); the caller picks the language.
   return db
     .select()
     .from(procurement)
-    .where(and(
-      language ? eq(procurement.language, language) : undefined,
-      category ? eq(procurement.category, category) : undefined,
-    ))
+    .where(category ? eq(procurement.category, category) : undefined)
     .orderBy(desc(procurement.publishedAt))
     .limit(Math.min(limit, 200))
     .offset(offset);
@@ -444,20 +441,17 @@ export const getProcurementBySlug = cache(async (slug: string): Promise<Procurem
 // ─── Publications ─────────────────────────────────────────────────────────────
 
 export async function listPublications(opts: {
-  language?: string;
   category?: string;
   limit?: number;
   offset?: number;
 } = {}): Promise<PublicationRow[]> {
-  const { language, category, limit = 20, offset = 0 } = opts;
+  const { category, limit = 20, offset = 0 } = opts;
   if (!db) return [];
+  // Rows are bilingual (title_th/title_en/…); the caller picks the language.
   return db
     .select()
     .from(publications)
-    .where(and(
-      language ? eq(publications.language, language) : undefined,
-      category ? eq(publications.category, category) : undefined,
-    ))
+    .where(category ? eq(publications.category, category) : undefined)
     .orderBy(desc(publications.publishedAt))
     .limit(Math.min(limit, 200))
     .offset(offset);

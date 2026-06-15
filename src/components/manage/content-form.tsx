@@ -144,6 +144,70 @@ function AttachmentUploader({ initial }: { initial?: Attachment[] }) {
   );
 }
 
+const LANGS = [
+  { code: "th", suffix: "Th", label: "ไทย (Thai)" },
+  { code: "en", suffix: "En", label: "English" },
+] as const;
+
+/** Render one form field. `name` is the submitted input name (may carry a Th/En suffix). */
+function Field({
+  field,
+  name,
+  value,
+  error,
+}: {
+  field: FieldDef;
+  name: string;
+  value: string;
+  error?: string;
+}) {
+  return (
+    <div className="manage-field">
+      <label className="manage-label" htmlFor={name}>
+        {field.label}
+        {field.required && <span className="manage-req"> *</span>}
+      </label>
+
+      {field.type === "textarea" ? (
+        <textarea
+          id={name}
+          name={name}
+          rows={field.rows ?? 4}
+          defaultValue={value}
+          className="manage-input"
+        />
+      ) : field.type === "datetime" ? (
+        <input
+          id={name}
+          name={name}
+          type="datetime-local"
+          defaultValue={value}
+          className="manage-input"
+        />
+      ) : (
+        <>
+          <input
+            id={name}
+            name={name}
+            type="text"
+            defaultValue={value}
+            list={field.suggestions ? `${name}-suggestions` : undefined}
+            className="manage-input"
+          />
+          {field.suggestions && (
+            <datalist id={`${name}-suggestions`}>
+              {field.suggestions.map((s) => (
+                <option key={s} value={s} />
+              ))}
+            </datalist>
+          )}
+        </>
+      )}
+      {error && <p className="manage-error">{error}</p>}
+    </div>
+  );
+}
+
 export function ContentForm({
   resource,
   fields,
@@ -156,65 +220,66 @@ export function ContentForm({
   submitLabel,
 }: Props) {
   const [state, formAction, pending] = useActionState(action, {} as ActionState);
+  const [lang, setLang] = useState<"th" | "en">("th");
+
+  const localized = fields.filter((f) => f.localized);
+  const shared = fields.filter((f) => !f.localized);
+
+  // Surface which language tab still has validation errors after a failed save.
+  const tabHasError = (suffix: string) =>
+    localized.some((f) => state.fieldErrors?.[`${f.name}${suffix}`]);
 
   return (
     <form action={formAction} className="manage-form">
       {state.error && <p className="manage-error manage-error-banner">{state.error}</p>}
 
-      {fields.map((field) => {
-        const error = state.fieldErrors?.[field.name];
-        const value = initialValues[field.name] ?? "";
-        return (
-          <div className="manage-field" key={field.name}>
-            <label className="manage-label" htmlFor={field.name}>
-              {field.label}
-              {field.required && <span className="manage-req"> *</span>}
-            </label>
-
-            {field.type === "textarea" ? (
-              <textarea
-                id={field.name}
-                name={field.name}
-                rows={field.rows ?? 4}
-                defaultValue={value}
-                className="manage-input"
-              />
-            ) : field.type === "language" ? (
-              <select id={field.name} name={field.name} defaultValue={value || "th"} className="manage-input">
-                <option value="th">ไทย (th)</option>
-                <option value="en">English (en)</option>
-              </select>
-            ) : field.type === "datetime" ? (
-              <input
-                id={field.name}
-                name={field.name}
-                type="datetime-local"
-                defaultValue={value}
-                className="manage-input"
-              />
-            ) : (
-              <>
-                <input
-                  id={field.name}
-                  name={field.name}
-                  type="text"
-                  defaultValue={value}
-                  list={field.suggestions ? `${field.name}-suggestions` : undefined}
-                  className="manage-input"
-                />
-                {field.suggestions && (
-                  <datalist id={`${field.name}-suggestions`}>
-                    {field.suggestions.map((s) => (
-                      <option key={s} value={s} />
-                    ))}
-                  </datalist>
-                )}
-              </>
-            )}
-            {error && <p className="manage-error">{error}</p>}
+      {localized.length > 0 && (
+        <div className="manage-lang">
+          <div className="manage-lang-tabs" role="tablist">
+            {LANGS.map((l) => (
+              <button
+                key={l.code}
+                type="button"
+                role="tab"
+                aria-selected={lang === l.code}
+                className={`manage-tab${lang === l.code ? " is-active" : ""}`}
+                onClick={() => setLang(l.code)}
+              >
+                {l.label}
+                {tabHasError(l.suffix) && <span className="manage-tab-dot" aria-hidden> ●</span>}
+              </button>
+            ))}
           </div>
-        );
-      })}
+
+          {LANGS.map((l) => (
+            // Both panels stay mounted so every language submits; inactive one is hidden.
+            <div key={l.code} role="tabpanel" hidden={lang !== l.code} className="manage-lang-panel">
+              {localized.map((field) => {
+                const name = `${field.name}${l.suffix}`;
+                return (
+                  <Field
+                    key={name}
+                    field={field}
+                    name={name}
+                    value={initialValues[name] ?? ""}
+                    error={state.fieldErrors?.[name]}
+                  />
+                );
+              })}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {shared.map((field) => (
+        <Field
+          key={field.name}
+          field={field}
+          name={field.name}
+          value={initialValues[field.name] ?? ""}
+          error={state.fieldErrors?.[field.name]}
+        />
+      ))}
 
       {hasFeaturedImage && (
         <MediaUploader
