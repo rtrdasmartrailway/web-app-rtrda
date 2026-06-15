@@ -20,7 +20,10 @@ import {
   navigation,
   media,
   siteMeta,
+  user,
 } from "./schema";
+import type { ContentResource } from "@/lib/permissions";
+import type { UserRole } from "@/lib/permissions";
 import type { WpContentRecord, WpDownloadAsset, WpLanguage, WpNavigationItem } from "@/lib/wp/types";
 import { normalizeRoutePath } from "@/lib/wp/url";
 import { MOCK_RECORDS, MOCK_DOWNLOADS, MOCK_NAV, MOCK_NAV_EN } from "./mock";
@@ -531,4 +534,135 @@ export async function setSiteMeta(key: string, value: string): Promise<void> {
     .insert(siteMeta)
     .values({ key, value })
     .onConflictDoUpdate({ target: siteMeta.key, set: { value } });
+}
+
+// ─── Content write helpers (intranet CMS) ─────────────────────────────────────
+//
+// Generic create/update/delete/read used by the admin server actions for all
+// four manageable content resources. Drizzle tables are resolved from a single
+// map so one implementation serves every resource. Values are validated by zod
+// (see src/lib/content-config.ts) before reaching these functions.
+
+const CONTENT_TABLES = {
+  news,
+  procurement,
+  publications,
+  featuredProjects,
+} as const;
+
+type ContentTable = (typeof CONTENT_TABLES)[ContentResource];
+export type ContentRow = ContentTable["$inferSelect"];
+export type ContentInsert = ContentTable["$inferInsert"];
+
+function tableFor(resource: ContentResource) {
+  return CONTENT_TABLES[resource];
+}
+
+class DbUnavailableError extends Error {
+  constructor() {
+    super("Database is not configured (DATABASE_URL missing).");
+    this.name = "DbUnavailableError";
+  }
+}
+
+export async function listContentForAdmin(
+  resource: ContentResource,
+  opts: { limit?: number; offset?: number } = {},
+): Promise<ContentRow[]> {
+  if (!db) return [];
+  const { limit = 100, offset = 0 } = opts;
+  const table = tableFor(resource);
+  // No publishedAt filter — admins must see drafts/unpublished items too.
+  return db
+    .select()
+    .from(table)
+    .orderBy(desc(table.updatedAt))
+    .limit(Math.min(limit, 500))
+    .offset(offset) as Promise<ContentRow[]>;
+}
+
+export async function getContentById(
+  resource: ContentResource,
+  id: number,
+): Promise<ContentRow | null> {
+  if (!db) return null;
+  const table = tableFor(resource);
+  const rows = await db.select().from(table).where(eq(table.id, id)).limit(1);
+  return (rows[0] as ContentRow) ?? null;
+}
+
+export async function insertContent(
+  resource: ContentResource,
+  values: Record<string, unknown>,
+): Promise<ContentRow> {
+  if (!db) throw new DbUnavailableError();
+  const table = tableFor(resource);
+  const rows = await db
+    .insert(table)
+    .values(values as ContentInsert)
+    .returning();
+  return rows[0] as ContentRow;
+}
+
+export async function updateContent(
+  resource: ContentResource,
+  id: number,
+  values: Record<string, unknown>,
+): Promise<ContentRow | null> {
+  if (!db) throw new DbUnavailableError();
+  const table = tableFor(resource);
+  const rows = await db
+    .update(table)
+    .set({ ...values, updatedAt: new Date() } as Partial<ContentInsert>)
+    .where(eq(table.id, id))
+    .returning();
+  return (rows[0] as ContentRow) ?? null;
+}
+
+export async function deleteContent(
+  resource: ContentResource,
+  id: number,
+): Promise<void> {
+  if (!db) throw new DbUnavailableError();
+  const table = tableFor(resource);
+  await db.delete(table).where(eq(table.id, id));
+}
+
+// ─── Media write helper ───────────────────────────────────────────────────────
+
+export async function insertMedia(values: {
+  filename: string;
+  filePath: string;
+  mimeType?: string;
+  sizeBytes?: number | null;
+  width?: number | null;
+  height?: number | null;
+  altText?: string;
+}): Promise<MediaRow> {
+  if (!db) throw new DbUnavailableError();
+  const rows = await db.insert(media).values(values).returning();
+  return rows[0];
+}
+
+// ─── User / role administration ───────────────────────────────────────────────
+
+export type UserRow = typeof user.$inferSelect;
+
+export async function listUsers(): Promise<UserRow[]> {
+  if (!db) return [];
+  return db.select().from(user).orderBy(asc(user.email));
+}
+
+export async function countAdmins(): Promise<number> {
+  if (!db) return 0;
+  const rows = await db.select({ id: user.id }).from(user).where(eq(user.role, "admin"));
+  return rows.length;
+}
+
+export async function setUserRole(userId: string, role: UserRole): Promise<void> {
+  if (!db) throw new DbUnavailableError();
+  await db
+    .update(user)
+    .set({ role, updatedAt: new Date() })
+    .where(eq(user.id, userId));
 }

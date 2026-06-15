@@ -3,6 +3,7 @@ import Link from "next/link";
 import { NAV, ICON_ROWS } from "@/data/intranet";
 import type { IconItem } from "@/data/intranet";
 import { IntranetSidebar } from "@/components/intranet-sidebar";
+import { IntranetAuthNav } from "@/components/manage/intranet-auth-nav";
 
 function NavMenu() {
   return (
@@ -92,6 +93,7 @@ export function IntranetShell({ children }: { children: React.ReactNode }) {
             />
           </Link>
           <NavMenu />
+          <IntranetAuthNav />
           <IntranetSidebar />
         </div>
       </header>
