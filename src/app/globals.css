@@ -1522,10 +1522,10 @@ button {
   border-collapse: collapse;
   display: table;
   font-size: calc(13px * var(--reader-scale));
+  table-layout: auto;
+  width: 100%;
   line-height: 1.7;
   margin: 1.5em 0;
-  table-layout: fixed;
-  width: 100%;
 }
 
 .wp-content th,
@@ -1771,10 +1771,26 @@ button {
   display: inline-block;
 }
 
-/* Allow shrink for compact download cells */
-.wp-content table td:has(a:only-child) {
+/* Allow shrink for compact download cells. The previous `:has(a:only-child)`
+   rule alone left the icon-cell and description-cell to split the row
+   width, which then crushed the download cell on Elementor tables
+   (e.g. /ตราสัญลักษณ์-สทร). Force an explicit width on the icon cell
+   and let the description wrap, so the download column keeps its
+   natural width. */
+.wp-content table td:has(a:only-child),
+.wp-content table td:has(> a),
+.wp-content table td:last-child:has(a) {
   width: 1%;
   white-space: nowrap;
+}
+
+/* Icon cell (typically a small <img> like pdf/png/ai) — keep it
+   from expanding to half the row by giving it an explicit narrow
+   width. */
+.wp-content table td > img:only-child,
+.wp-content table td:has(> img:only-child) {
+  width: 60px;
+  max-width: 60px;
 }
 .wp-content table th,
 .wp-content table td {
