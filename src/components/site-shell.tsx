@@ -1,5 +1,4 @@
 import Link from "next/link";
-import Image from "next/image";
 import type { ShellData } from "@/lib/db/page-data";
 import { RtrdaNavigation } from "./rtrda-navigation";
 import { formatDate } from "./site-helpers";
@@ -28,11 +27,19 @@ export function SiteShell({
         <div className="footer-topline" />
         <div className="site-container footer-grid">
           <section className="footer-brand">
-            <Image
-              src="/wp-content/uploads/2023/02/Logo_RTRDA_full-1.png"
+            {/* Use a plain <img> with the legacy absolute URL — the
+                Next.js image optimizer can't proxy www.rtrda.or.th
+                (no `images.domains` configured) and the file isn't
+                in the Docker image (public/wp-content/uploads is
+                gitignored), so any `/_next/image?...` request 400s.
+                The legacy host serves it fine. */}
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="https://www.rtrda.or.th/wp-content/uploads/2023/02/Logo_RTRDA_full-1.png"
               alt="RTRDA"
               width={220}
               height={62}
+              loading="lazy"
             />
             <h2>
               {language === "th"
