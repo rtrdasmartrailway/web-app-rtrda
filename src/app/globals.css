@@ -869,30 +869,61 @@ button {
 
 .wp-content h2 {
   border-bottom: 1px solid var(--border);
-  font-size: clamp(26px, 2.4vw, 34px);
-  padding-bottom: 12px;
+  font-size: clamp(28px, 2.6vw, 36px);
+  margin-top: 1.6em;
+  padding-bottom: 14px;
   position: relative;
 }
 
 .wp-content h2::after {
   background: var(--rail-gradient);
+  border-radius: 2px;
   bottom: -1px;
   content: "";
-  height: 3px;
+  height: 4px;
   left: 0;
+  position: absolute;
+  width: 96px;
+}
+
+/* WP "vk-heading-plain" variant — restore the rail-gradient accent
+   and add a small navy block on the left so the heading has real weight
+   (without it the heading renders as plain underlined text and looks weak). */
+.wp-content h2.is-style-vk-heading-plain {
+  border-bottom: 1px solid var(--border);
+  padding-left: 18px;
+  position: relative;
+}
+.wp-content h2.is-style-vk-heading-plain::before {
+  background: var(--accent-strong);
+  border-radius: 2px;
+  content: "";
+  height: 70%;
+  left: 0;
+  position: absolute;
+  top: 18%;
+  width: 5px;
+}
+.wp-content h2.is-style-vk-heading-plain::after {
+  background: var(--rail-gradient);
+  border-radius: 2px;
+  bottom: -1px;
+  content: "";
+  height: 4px;
+  left: 18px;
   position: absolute;
   width: 72px;
 }
 
 /* H3 as section header in wp-content (ยุทธศาสตร์, เป้าหมาย, etc.) */
 .wp-content h3 {
-  background: linear-gradient(135deg, #f0f5fc 0%, #e6eef9 100%);
+  background: linear-gradient(180deg, #f0f5fc 0%, #e6eef9 100%);
   border-left: 4px solid var(--accent);
-  border-radius: 6px;
+  border-radius: 4px;
   color: var(--navy-900);
   font-size: clamp(20px, 1.8vw, 24px);
   margin: 2em 0 1em;
-  padding: 14px 18px;
+  padding: 8px 14px;
   position: relative;
 }
 .wp-content h3:first-of-type,
@@ -955,7 +986,11 @@ button {
 }
 
 /* ============================================================
-   Vision stack (พันธกิจ/ยุทธศาสตร์) — vertical zigzag layout
+   Vision / พันธกิจ cards — mockup-style
+   Per card: figure (icon + SVG number) on one side, content
+   (title + large blue number badge + MISSION label + body)
+   on the other. Odd cards = figure left / content right.
+   Even cards = figure right / content left (flipped via order).
    ============================================================ */
 .wp-content .vision-stack {
   display: flex;
@@ -972,9 +1007,9 @@ button {
   box-shadow: 0 4px 20px rgba(0, 52, 113, 0.06);
   display: grid;
   gap: clamp(20px, 3vw, 36px);
-  grid-template-columns: minmax(0, 220px) minmax(0, 1fr);
-  overflow: hidden;
-  padding: clamp(20px, 2.5vw, 32px);
+  grid-template-columns: minmax(0, 180px) minmax(0, 1fr);
+  overflow: visible;
+  padding: clamp(24px, 3vw, 36px) clamp(24px, 3vw, 40px);
   position: relative;
   transition:
     box-shadow 200ms ease,
@@ -985,20 +1020,22 @@ button {
   transform: translateY(-2px);
 }
 
+/* Decorative top accent bar — short blue gradient line */
 .wp-content .vision-row::before {
   background: var(--rail-gradient);
   border-radius: 4px;
   content: "";
   height: 4px;
-  left: clamp(20px, 2.5vw, 32px);
+  left: 50%;
   position: absolute;
-  top: 0;
-  width: 56px;
+  top: -2px;
+  transform: translateX(-50%);
+  width: 80px;
 }
 
-/* Even rows: image RIGHT, text LEFT (zigzag) */
+/* Even rows: figure right, content left (mirrored) */
 .wp-content .vision-row-even {
-  grid-template-columns: minmax(0, 1fr) minmax(0, 220px);
+  grid-template-columns: minmax(0, 1fr) minmax(0, 180px);
 }
 .wp-content .vision-row-even .vision-figure {
   order: 2;
@@ -1007,104 +1044,185 @@ button {
   order: 1;
   text-align: right;
 }
-.wp-content .vision-row-even .vision-number {
-  margin-left: auto;
-}
 
+/* Figure column — vertical stack of icon + SVG number badge */
 .wp-content .vision-figure {
   align-items: center;
   display: flex;
   justify-content: center;
   min-width: 0;
 }
-.wp-content .vision-figure img {
-  background: #fff;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  box-shadow: 0 6px 18px rgba(0, 52, 113, 0.1);
-  display: block;
-  height: auto;
-  margin: 0;
-  max-height: 220px;
-  max-width: 100%;
-  object-fit: contain;
-  padding: 10px;
-  width: auto;
-}
-
-.wp-content .vision-content {
+.wp-content .vision-figure-stack {
+  align-items: center;
   display: flex;
   flex-direction: column;
   gap: 10px;
-  min-width: 0;
+  width: 100%;
 }
 
-.wp-content .vision-number {
+/* Icon image — small circle/square container */
+.wp-content .vision-icon {
   align-items: center;
-  background: transparent;
-  border: 2px solid var(--accent);
-  border-radius: 8px;
-  color: var(--accent-strong);
-  display: inline-flex;
-  font-family: var(--font-sans);
-  font-size: clamp(28px, 3.6vw, 44px);
-  font-weight: 800;
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  box-shadow: 0 4px 14px rgba(0, 52, 113, 0.08);
+  display: flex;
   justify-content: center;
-  letter-spacing: -0.02em;
-  line-height: 1;
+  padding: 12px;
+  width: clamp(110px, 12vw, 140px);
+}
+.wp-content .vision-icon img {
+  display: block;
+  height: auto;
   margin: 0;
-  padding: 4px 16px;
-  width: fit-content;
-  -webkit-text-stroke: 0.5px currentColor;
-  text-stroke: 0.5px currentColor;
+  max-height: 110px;
+  max-width: 100%;
+  object-fit: contain;
+  width: auto;
+}
+.wp-content .vision-icon img.error,
+.wp-content .vision-icon img:not([src]),
+.wp-content .vision-icon img[src=""] {
+  background: linear-gradient(135deg, #eef4fc 0%, #dce8f7 100%);
+  border: 1px dashed var(--accent);
+  min-height: 100px;
+  min-width: 100px;
+  opacity: 0.4;
+}
+
+/* Number image (SVG 01-06) */
+.wp-content .vision-number-image {
+  align-items: center;
+  display: flex;
+  justify-content: center;
+  width: clamp(70px, 8vw, 88px);
+}
+.wp-content .vision-number-image img {
+  display: block;
+  height: auto;
+  margin: 0;
+  width: 100%;
+}
+.wp-content .vision-number-image img.error,
+.wp-content .vision-number-image img:not([src]),
+.wp-content .vision-number-image img[src=""] {
+  background: linear-gradient(135deg, #eef4fc 0%, #dce8f7 100%);
+  border: 1px dashed var(--accent);
+  min-height: 40px;
+  opacity: 0.4;
+}
+
+/* Content column — title, number badge, MISSION label, body text */
+.wp-content .vision-content {
+  align-items: center;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+  text-align: center;
 }
 
 .wp-content .vision-title {
+  background: linear-gradient(180deg, #e0e9f5 0%, #d3e0f0 100%);
   border: 0 !important;
+  border-radius: 6px;
   color: var(--navy-900);
-  font-size: clamp(22px, 2.4vw, 30px);
+  font-size: clamp(18px, 2vw, 24px);
   font-weight: 800;
-  letter-spacing: -0.01em;
+  letter-spacing: -0.005em;
   line-height: 1.2;
   margin: 0 !important;
-  padding: 0 !important;
+  padding: 8px 18px !important;
   position: relative;
+  width: fit-content;
 }
 .wp-content .vision-title::after {
   display: none !important;
 }
 
-.wp-content .vision-text {
-  color: #374151;
-  font-size: clamp(15px, 1.2vw, 17px);
-  line-height: 1.75;
-  margin: 0 !important;
-  padding: 0 !important;
+/* Number badge (blue block) — below title */
+.wp-content .vision-number-badge {
+  background: linear-gradient(180deg, #5ea8f5 0%, #2563eb 100%);
+  border-radius: 10px;
+  box-shadow: 0 4px 14px rgba(37, 99, 235, 0.3);
+  color: #ffffff;
+  font-family: var(--font-sans);
+  font-size: clamp(28px, 3.4vw, 40px);
+  font-weight: 900;
+  letter-spacing: 0.02em;
+  line-height: 1;
+  margin-top: 4px;
+  padding: 8px 18px;
+  text-align: center;
+  width: fit-content;
 }
 
-/* Responsive: stack vertically with image on top */
+/* MISSION label — tiny uppercase letter-spaced */
+.wp-content .vision-mission-label {
+  color: #94a3b8;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.3em;
+  margin-top: -2px;
+  text-transform: uppercase;
+}
+
+.wp-content .vision-text {
+  color: #4b5563;
+  font-size: clamp(14px, 1.05vw, 16px);
+  line-height: 1.7;
+  margin: 8px auto 0 !important;
+  max-width: 580px;
+  padding: 0 !important;
+  text-align: center;
+}
+.wp-content .vision-row-even .vision-text {
+  margin-left: auto !important;
+  margin-right: auto !important;
+}
+
+/* Decorative circle in bottom-right of some cards (mockup accent) */
+.wp-content .vision-row::after {
+  background: radial-gradient(
+    circle,
+    rgba(56, 189, 248, 0.18) 0%,
+    rgba(56, 189, 248, 0) 70%
+  );
+  border-radius: 50%;
+  content: "";
+  height: 90px;
+  pointer-events: none;
+  position: absolute;
+  right: 20px;
+  bottom: 20px;
+  width: 90px;
+}
+.wp-content .vision-row-even::after {
+  left: 20px;
+  right: auto;
+}
+
+/* Responsive: stack vertically */
 @media (max-width: 720px) {
   .wp-content .vision-row,
   .wp-content .vision-row-even {
     grid-template-columns: minmax(0, 1fr);
+    text-align: center;
   }
   .wp-content .vision-row .vision-figure,
   .wp-content .vision-row-even .vision-figure {
     margin: 0 auto;
-    max-width: 180px;
     order: 0;
   }
   .wp-content .vision-row .vision-content,
   .wp-content .vision-row-even .vision-content {
-    text-align: center !important;
     order: 1;
+    text-align: center !important;
   }
-  .wp-content .vision-row-even .vision-number,
-  .wp-content .vision-number {
-    margin: 0 auto;
-  }
-  .wp-content .vision-figure img {
-    max-height: 160px;
+  .wp-content .vision-row::after,
+  .wp-content .vision-row-even::after {
+    display: none;
   }
 }
 
@@ -1121,6 +1239,35 @@ button {
   margin: 20px 0;
   overflow: hidden;
   padding: 24px;
+}
+
+/* If a wp-block-columns only contains a blockquote (vision/mission
+   pages), drop the card chrome — the blockquote gets its own hero
+   style and the wrapper should be invisible. */
+.wp-content
+  .wp-block-columns:has(> .wp-block-column:only-child > .wp-block-quote:only-child),
+.wp-content
+  .wp-block-columns.is-layout-flex:has(
+    > .wp-block-column:only-child > .wp-block-quote:only-child
+  ) {
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  gap: 0;
+  margin: 8px 0 28px;
+  padding: 0;
+}
+.wp-content
+  .wp-block-columns:has(> .wp-block-column:only-child > .wp-block-quote:only-child)
+  > .wp-block-column,
+.wp-content
+  .wp-block-columns.is-layout-flex:has(
+    > .wp-block-column:only-child > .wp-block-quote:only-child
+  )
+  > .wp-block-column {
+  flex-basis: 100% !important;
+  max-width: 100% !important;
 }
 .wp-content .wp-block-columns img {
   border: none;
@@ -1142,6 +1289,210 @@ button {
 }
 .wp-content .wp-block-columns figure {
   margin: 0;
+}
+
+/* ============================================================
+   Vision / mission page — blockquote hero card
+   ============================================================ */
+.wp-content .wp-block-quote {
+  background: linear-gradient(135deg, #f0f5fc 0%, #e6eef9 60%, #dce8f7 100%);
+  border: 0;
+  border-left: 5px solid var(--accent-strong);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 6px 24px rgba(0, 52, 113, 0.08);
+  color: var(--navy-900);
+  font-size: clamp(17px, 1.4vw, 20px);
+  font-weight: 500;
+  line-height: 1.8;
+  margin: 0;
+  padding: clamp(24px, 3vw, 36px) clamp(28px, 4vw, 48px);
+  position: relative;
+}
+.wp-content .wp-block-quote::before {
+  color: var(--accent);
+  content: "\201C";
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: clamp(56px, 6vw, 84px);
+  font-weight: 700;
+  left: clamp(16px, 2vw, 24px);
+  line-height: 1;
+  opacity: 0.45;
+  position: absolute;
+  top: clamp(6px, 1vw, 14px);
+}
+.wp-content .wp-block-quote::after {
+  color: var(--accent);
+  bottom: -8px;
+  content: "\201D";
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: clamp(56px, 6vw, 84px);
+  font-weight: 700;
+  line-height: 1;
+  opacity: 0.45;
+  position: absolute;
+  right: clamp(20px, 2.4vw, 32px);
+}
+.wp-content .wp-block-quote p {
+  font-size: inherit;
+  line-height: inherit;
+  margin: 0 !important;
+  padding: 0 !important;
+  /* leave room for the big quote marks on both sides */
+  padding-left: clamp(36px, 4vw, 56px) !important;
+  padding-right: clamp(36px, 4vw, 56px) !important;
+}
+
+/* ============================================================
+   ยุทธศาสตร์เทคโนโลยีระบบราง — section headings + ผลงานปัจจุบัน
+   ============================================================ */
+
+/* Numbered section heading (01, 02, 03, 04) — square number badge
+   on the left of the heading text. */
+.wp-content .yutth-section-heading {
+  align-items: center;
+  display: flex !important;
+  gap: 14px;
+  margin: 2em 0 1em;
+  padding: 10px 16px !important;
+}
+.wp-content .yutth-section-num {
+  align-items: center;
+  background: linear-gradient(180deg, #5ea8f5 0%, #2563eb 100%);
+  border-radius: 8px;
+  box-shadow: 0 3px 10px rgba(37, 99, 235, 0.3);
+  color: #ffffff;
+  display: inline-flex;
+  flex-shrink: 0;
+  font-family: var(--font-sans);
+  font-size: clamp(16px, 1.6vw, 20px);
+  font-weight: 800;
+  justify-content: center;
+  letter-spacing: 0.02em;
+  line-height: 1;
+  min-width: 44px;
+  padding: 8px 12px;
+  text-align: center;
+}
+
+/* ผลงานปัจจุบัน (yutth-current) — content list on top, then
+   feature image (strategy.png), then 2x2 gallery. */
+.wp-content .yutth-current {
+  margin: 16px 0 32px;
+}
+
+.wp-content .yutth-feature-img {
+  margin: 0 0 24px !important;
+}
+.wp-content .yutth-feature-img img {
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  box-shadow: 0 6px 20px rgba(0, 52, 113, 0.1);
+  display: block;
+  height: auto;
+  margin: 0 auto;
+  max-height: 480px;
+  max-width: 100%;
+  object-fit: contain;
+  padding: 12px;
+  width: auto;
+}
+.wp-content .yutth-feature-img img.error,
+.wp-content .yutth-feature-img img:not([src]),
+.wp-content .yutth-feature-img img[src=""] {
+  background: linear-gradient(135deg, #eef4fc 0%, #dce8f7 100%);
+  border: 1px dashed var(--accent);
+  min-height: 220px;
+  opacity: 0.4;
+}
+.wp-content .yutth-feature-caption {
+  color: #4b5563;
+  font-size: 14px;
+  font-style: italic;
+  margin: 10px auto 0;
+  max-width: 720px;
+  text-align: center;
+}
+
+.wp-content .yutth-gallery-grid {
+  display: grid;
+  gap: clamp(10px, 1.5vw, 18px);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin: 0 0 24px;
+}
+.wp-content .yutth-gallery-cell {
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  box-shadow: 0 4px 14px rgba(0, 52, 113, 0.08);
+  margin: 0 !important;
+  overflow: hidden;
+  padding: 10px;
+  transition:
+    box-shadow 200ms ease,
+    transform 200ms ease;
+}
+.wp-content .yutth-gallery-cell:hover {
+  box-shadow: 0 8px 22px rgba(0, 52, 113, 0.14);
+  transform: translateY(-2px);
+}
+.wp-content .yutth-gallery-cell img {
+  display: block;
+  height: 100%;
+  margin: 0;
+  max-height: 320px;
+  max-width: 100%;
+  object-fit: cover;
+  width: 100%;
+}
+.wp-content .yutth-gallery-cell img.error,
+.wp-content .yutth-gallery-cell img:not([src]),
+.wp-content .yutth-gallery-cell img[src=""] {
+  background: linear-gradient(135deg, #eef4fc 0%, #dce8f7 100%);
+  border: 1px dashed var(--accent);
+  min-height: 200px;
+  opacity: 0.4;
+}
+
+.wp-content .yutth-list {
+  background: linear-gradient(180deg, #ffffff 0%, #f7faff 100%);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  box-shadow: 0 2px 10px rgba(0, 52, 113, 0.05);
+  list-style: decimal;
+  margin: 0 0 24px;
+  padding: 18px 18px 18px 40px;
+}
+.wp-content .yutth-list li {
+  color: #374151;
+  font-size: 15.5px;
+  line-height: 1.7;
+  margin-bottom: 8px;
+  padding-left: 6px;
+}
+.wp-content .yutth-list li:last-child {
+  margin-bottom: 0;
+}
+.wp-content .yutth-list li::marker {
+  color: var(--accent-strong);
+  font-weight: 700;
+}
+
+@media (max-width: 720px) {
+  .wp-content .yutth-section-heading {
+    gap: 10px;
+    padding: 8px 12px !important;
+  }
+  .wp-content .yutth-section-num {
+    min-width: 38px;
+    padding: 6px 10px;
+  }
+  .wp-content .yutth-gallery-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .wp-content .yutth-gallery-cell img {
+    max-height: 280px;
+  }
 }
 
 /* Better list styling */
@@ -1427,6 +1778,119 @@ button {
 .wp-content table th,
 .wp-content table td {
   padding: 10px 12px;
+}
+
+/* ============================================================
+   ตราสัญลักษณ์ สทร. (tralat) — hero image + download table
+   ============================================================ */
+.wp-content .tralat-hero {
+  align-items: center;
+  display: flex;
+  justify-content: center;
+  margin: 8px auto 28px;
+  max-width: 480px;
+}
+.wp-content .tralat-hero img {
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  box-shadow: 0 8px 24px rgba(0, 52, 113, 0.1);
+  display: block;
+  height: auto;
+  margin: 0 auto;
+  max-height: 360px;
+  max-width: 100%;
+  object-fit: contain;
+  padding: 18px;
+  width: auto;
+}
+.wp-content .tralat-hero img.error,
+.wp-content .tralat-hero img:not([src]),
+.wp-content .tralat-hero img[src=""] {
+  background: linear-gradient(135deg, #eef4fc 0%, #dce8f7 100%);
+  border: 1px dashed var(--accent);
+  min-height: 200px;
+  min-width: 200px;
+  opacity: 0.4;
+}
+
+/* Download table — fixed layout with colgroup, no shrinking */
+.wp-content .tralat-download-table {
+  margin: 20px 0 32px;
+  table-layout: fixed;
+  width: 100%;
+}
+.wp-content .tralat-download-table colgroup col:first-child {
+  width: 90px;
+}
+.wp-content .tralat-download-table colgroup col:last-child {
+  width: 200px;
+}
+/* Override the generic td:has(a:only-child) width:1% inside this table —
+   the colgroup above is authoritative. */
+.wp-content .tralat-download-table td:has(a:only-child) {
+  white-space: nowrap;
+  width: auto;
+}
+.wp-content .tralat-download-table th,
+.wp-content .tralat-download-table td {
+  padding: 12px 14px;
+  vertical-align: middle;
+}
+.wp-content .tralat-download-table th {
+  background: linear-gradient(180deg, #f0f5fc 0%, #e6eef9 100%);
+  border-bottom: 2px solid var(--accent);
+  color: var(--navy-900);
+  font-size: 14px;
+  font-weight: 700;
+  text-align: left;
+}
+.wp-content .tralat-download-table th.tralat-download-th {
+  text-align: center;
+}
+.wp-content .tralat-download-table td:last-child {
+  text-align: center;
+}
+.wp-content .tralat-download-table tralat-icon,
+.wp-content .tralat-download-table img.tralat-icon {
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  display: block;
+  height: 50px;
+  margin: 0 auto;
+  object-fit: contain;
+  padding: 4px;
+  width: 50px;
+}
+.wp-content .tralat-download-table img.tralat-icon.error,
+.wp-content .tralat-download-table img.tralat-icon:not([src]),
+.wp-content .tralat-download-table img.tralat-icon[src=""] {
+  background: linear-gradient(135deg, #eef4fc 0%, #dce8f7 100%);
+  border: 1px dashed var(--accent);
+  opacity: 0.4;
+}
+.wp-content .tralat-download-link {
+  background: linear-gradient(180deg, #5ea8f5 0%, #2563eb 100%);
+  border-radius: 6px;
+  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.25);
+  color: #ffffff !important;
+  display: inline-block;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 7px 14px;
+  text-decoration: none !important;
+  transition:
+    box-shadow 200ms ease,
+    transform 200ms ease;
+  white-space: nowrap;
+}
+.wp-content .tralat-download-link:hover {
+  box-shadow: 0 4px 14px rgba(37, 99, 235, 0.35);
+  transform: translateY(-1px);
+}
+.wp-content .tralat-download-link .text-nowrap {
+  white-space: nowrap;
 }
 
 /* ผลงานปัจจุบัน — yutth-current (ยุทธศาสตร์เทคโนโลยีระบบราง) */
@@ -1780,7 +2244,7 @@ body:has(.yutth-lightbox) {
 .wp-content .lightweight-accordion-body > .wp-block-columns {
   display: grid;
   gap: 22px;
-  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
 }
 
 .wp-content .lightweight-accordion-body > .wp-block-columns > .wp-block-column {
@@ -3245,5 +3709,108 @@ a.calendar-cell.has-posts:hover {
     grid-template-columns: repeat(1, 1fr);
     max-width: 200px;
     margin: 0 auto;
+  }
+}
+
+/* ============================================================
+   วิจัยและพัฒนา (research 414) — yutth-event pattern
+   Per event: number + title + body text + 2x2 gallery.
+   ============================================================ */
+.wp-content .yutth-event {
+  background: linear-gradient(180deg, #ffffff 0%, #f7faff 100%);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 4px 20px rgba(0, 52, 113, 0.06);
+  margin: 0 0 28px;
+  padding: clamp(20px, 2.5vw, 28px);
+  position: relative;
+}
+.wp-content .yutth-event-header {
+  align-items: center;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  gap: 14px;
+  margin: 0 0 14px;
+  padding: 0 0 12px;
+}
+.wp-content .yutth-event-num {
+  align-items: center;
+  background: linear-gradient(180deg, #5ea8f5 0%, #2563eb 100%);
+  border-radius: 10px;
+  box-shadow: 0 4px 14px rgba(37, 99, 235, 0.3);
+  color: #ffffff;
+  display: inline-flex;
+  flex-shrink: 0;
+  font-family: var(--font-sans);
+  font-size: 22px;
+  font-weight: 900;
+  height: 44px;
+  justify-content: center;
+  line-height: 1;
+  width: 44px;
+}
+.wp-content .yutth-event-title {
+  border: 0 !important;
+  color: var(--navy-900);
+  font-size: clamp(17px, 1.6vw, 20px);
+  font-weight: 800;
+  margin: 0 !important;
+  padding: 0 !important;
+}
+.wp-content .yutth-event-title::after {
+  display: none !important;
+}
+.wp-content .yutth-event-text {
+  color: #374151;
+  font-size: 15.5px;
+  line-height: 1.75;
+  margin: 0 0 18px !important;
+  padding: 0 !important;
+}
+.wp-content .yutth-event-gallery {
+  display: grid;
+  gap: clamp(10px, 1.5vw, 18px);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.wp-content .yutth-event-cell {
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  box-shadow: 0 4px 14px rgba(0, 52, 113, 0.08);
+  margin: 0 !important;
+  overflow: hidden;
+  padding: 8px;
+  transition:
+    box-shadow 200ms ease,
+    transform 200ms ease;
+}
+.wp-content .yutth-event-cell:hover {
+  box-shadow: 0 8px 22px rgba(0, 52, 113, 0.14);
+  transform: translateY(-2px);
+}
+.wp-content .yutth-event-cell img {
+  display: block;
+  height: 100%;
+  margin: 0;
+  max-height: 360px;
+  max-width: 100%;
+  min-height: 180px;
+  object-fit: cover;
+  width: 100%;
+}
+.wp-content .yutth-event-cell img.error,
+.wp-content .yutth-event-cell img:not([src]),
+.wp-content .yutth-event-cell img[src=""] {
+  background: linear-gradient(135deg, #eef4fc 0%, #dce8f7 100%);
+  border: 1px dashed var(--accent);
+  min-height: 200px;
+  opacity: 0.4;
+}
+@media (max-width: 720px) {
+  .wp-content .yutth-event-gallery {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .wp-content .yutth-event-cell img {
+    max-height: 280px;
   }
 }
