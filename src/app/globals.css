@@ -924,6 +924,188 @@ button {
   padding: 8px;
 }
 
+.wp-content > .wp-block-image.is-style-vk-image-shadow:first-child {
+  background:
+    radial-gradient(circle at 12% 8%, rgba(56, 189, 248, 0.2), transparent 34%),
+    linear-gradient(135deg, #f8fbff 0%, #eef5ff 52%, #e5f8ff 100%);
+  border: 1px solid rgba(148, 163, 184, 0.28);
+  border-radius: 24px;
+  box-shadow: 0 24px 70px rgba(4, 18, 46, 0.12);
+  margin: 0 auto 28px;
+  max-width: 980px;
+  overflow: hidden;
+  padding: clamp(14px, 2.4vw, 26px);
+}
+
+.wp-content > .wp-block-image.is-style-vk-image-shadow:first-child figure {
+  margin: 0;
+}
+
+.wp-content > .wp-block-image.is-style-vk-image-shadow:first-child img {
+  background: transparent;
+  border: 0;
+  border-radius: 18px;
+  box-shadow: 0 18px 38px rgba(15, 23, 42, 0.14);
+  margin: 0 auto;
+  padding: 0;
+}
+
+.wp-content > .wp-block-image.is-style-vk-image-shadow:first-child + .wp-block-spacer {
+  height: 18px !important;
+}
+
+/* ============================================================
+   Vision stack (พันธกิจ/ยุทธศาสตร์) — vertical zigzag layout
+   ============================================================ */
+.wp-content .vision-stack {
+  display: flex;
+  flex-direction: column;
+  gap: clamp(28px, 4vw, 48px);
+  margin: 28px 0 40px;
+}
+
+.wp-content .vision-row {
+  align-items: center;
+  background: linear-gradient(180deg, #ffffff 0%, #f7faff 100%);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 4px 20px rgba(0, 52, 113, 0.06);
+  display: grid;
+  gap: clamp(20px, 3vw, 36px);
+  grid-template-columns: minmax(0, 220px) minmax(0, 1fr);
+  overflow: hidden;
+  padding: clamp(20px, 2.5vw, 32px);
+  position: relative;
+  transition:
+    box-shadow 200ms ease,
+    transform 200ms ease;
+}
+.wp-content .vision-row:hover {
+  box-shadow: 0 8px 32px rgba(0, 52, 113, 0.12);
+  transform: translateY(-2px);
+}
+
+.wp-content .vision-row::before {
+  background: var(--rail-gradient);
+  border-radius: 4px;
+  content: "";
+  height: 4px;
+  left: clamp(20px, 2.5vw, 32px);
+  position: absolute;
+  top: 0;
+  width: 56px;
+}
+
+/* Even rows: image RIGHT, text LEFT (zigzag) */
+.wp-content .vision-row-even {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 220px);
+}
+.wp-content .vision-row-even .vision-figure {
+  order: 2;
+}
+.wp-content .vision-row-even .vision-content {
+  order: 1;
+  text-align: right;
+}
+.wp-content .vision-row-even .vision-number {
+  margin-left: auto;
+}
+
+.wp-content .vision-figure {
+  align-items: center;
+  display: flex;
+  justify-content: center;
+  min-width: 0;
+}
+.wp-content .vision-figure img {
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  box-shadow: 0 6px 18px rgba(0, 52, 113, 0.1);
+  display: block;
+  height: auto;
+  margin: 0;
+  max-height: 220px;
+  max-width: 100%;
+  object-fit: contain;
+  padding: 10px;
+  width: auto;
+}
+
+.wp-content .vision-content {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
+
+.wp-content .vision-number {
+  background: linear-gradient(135deg, var(--accent) 0%, var(--accent-strong) 100%);
+  border-radius: 12px;
+  box-shadow: 0 6px 20px rgba(0, 90, 156, 0.25);
+  color: #fff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-sans);
+  font-size: clamp(34px, 4.5vw, 56px);
+  font-weight: 900;
+  letter-spacing: -0.04em;
+  line-height: 1;
+  margin: 0;
+  padding: 6px 18px;
+  width: fit-content;
+}
+
+.wp-content .vision-title {
+  border: 0 !important;
+  color: var(--navy-900);
+  font-size: clamp(22px, 2.4vw, 30px);
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  line-height: 1.2;
+  margin: 0 !important;
+  padding: 0 !important;
+  position: relative;
+}
+.wp-content .vision-title::after {
+  display: none !important;
+}
+
+.wp-content .vision-text {
+  color: #374151;
+  font-size: clamp(15px, 1.2vw, 17px);
+  line-height: 1.75;
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+/* Responsive: stack vertically with image on top */
+@media (max-width: 720px) {
+  .wp-content .vision-row,
+  .wp-content .vision-row-even {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .wp-content .vision-row .vision-figure,
+  .wp-content .vision-row-even .vision-figure {
+    margin: 0 auto;
+    max-width: 180px;
+    order: 0;
+  }
+  .wp-content .vision-row .vision-content,
+  .wp-content .vision-row-even .vision-content {
+    text-align: center !important;
+    order: 1;
+  }
+  .wp-content .vision-row-even .vision-number,
+  .wp-content .vision-number {
+    margin: 0 auto;
+  }
+  .wp-content .vision-figure img {
+    max-height: 160px;
+  }
+}
+
 /* Wrap each wp-block-columns section in nicer card */
 .wp-content .wp-block-columns {
   align-items: stretch;
@@ -1082,82 +1264,129 @@ button {
 /* Card layout for "story" columns block (used on ความเป็นมา page) */
 .wp-content .wp-block-columns.story {
   align-items: stretch;
-  gap: 24px;
-  margin: 24px 0 16px;
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+  counter-reset: story-card;
+  display: grid;
+  gap: 22px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin: 18px 0 18px;
+  overflow: visible;
+  padding: 0;
 }
 .wp-content .wp-block-columns.story > .wp-block-column {
   align-items: flex-start;
-  background: #ffffff;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-card);
+  background:
+    radial-gradient(circle at 18% 10%, rgba(56, 189, 248, 0.18), transparent 42%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(248, 251, 255, 0.98));
+  border: 1px solid rgba(148, 163, 184, 0.28);
+  border-radius: 22px;
+  box-shadow: 0 16px 44px rgba(4, 18, 46, 0.09);
+  counter-increment: story-card;
   display: flex;
-  flex: 1 1 280px;
   flex-direction: column;
-  gap: 14px;
-  padding: 28px 24px;
+  gap: 18px;
+  min-height: 100%;
+  overflow: hidden;
+  padding: 30px 26px 28px;
   position: relative;
   text-align: left;
   transition:
+    border-color 200ms ease,
     box-shadow 200ms ease,
     transform 200ms ease;
 }
 .wp-content .wp-block-columns.story > .wp-block-column:hover {
+  border-color: rgba(37, 99, 235, 0.32);
   box-shadow:
-    0 12px 32px rgba(0, 52, 113, 0.14),
-    0 4px 8px rgba(0, 52, 113, 0.06);
-  transform: translateY(-3px);
+    0 24px 62px rgba(4, 18, 46, 0.14),
+    0 8px 18px rgba(37, 99, 235, 0.08);
+  transform: translateY(-4px);
 }
 .wp-content .wp-block-columns.story > .wp-block-column::before {
   background: var(--rail-gradient);
-  border-radius: 2px;
+  border-radius: 999px;
   content: "";
-  height: 4px;
-  left: 24px;
+  height: 5px;
+  left: 26px;
   position: absolute;
-  top: 0;
-  width: 56px;
+  right: 26px;
+  top: 18px;
+}
+.wp-content .wp-block-columns.story > .wp-block-column::after {
+  color: rgba(37, 99, 235, 0.08);
+  content: counter(story-card, decimal-leading-zero);
+  font-size: 58px;
+  font-weight: 800;
+  line-height: 1;
+  position: absolute;
+  right: 18px;
+  top: 28px;
 }
 .wp-content .wp-block-columns.story > .wp-block-column > figure.wp-block-image {
   align-items: center;
-  background: linear-gradient(135deg, #eef4fb 0%, #dbeafe 100%);
-  border-radius: 50%;
+  background:
+    linear-gradient(#ffffff, #ffffff) padding-box,
+    var(--rail-gradient) border-box;
+  border: 1px solid transparent;
+  border-radius: 22px;
+  box-shadow: 0 12px 26px rgba(37, 99, 235, 0.14);
   display: flex;
-  height: 72px;
+  height: 82px;
   justify-content: center;
-  margin: 0 0 4px;
+  margin: 16px 0 2px;
   padding: 0;
-  width: 72px;
+  position: relative;
+  width: 82px;
+  z-index: 1;
 }
 .wp-content .wp-block-columns.story > .wp-block-column > figure.wp-block-image img {
   filter: brightness(0) saturate(100%) invert(15%) sepia(38%) saturate(2456%)
     hue-rotate(202deg) brightness(95%) contrast(95%);
-  height: 38px;
+  height: 42px;
   margin: 0;
   object-fit: contain;
-  width: 38px;
+  width: 42px;
 }
 .wp-content .wp-block-columns.story > .wp-block-column > p {
-  color: #374151;
-  font-size: 15px;
-  line-height: 1.7;
+  color: #2f3d52;
+  font-size: calc(15px * var(--reader-scale));
+  line-height: 1.78;
   margin: 0;
+  position: relative;
   text-align: left;
+  z-index: 1;
 }
 @media (max-width: 720px) {
+  .wp-content > .wp-block-image.is-style-vk-image-shadow:first-child {
+    border-radius: 18px;
+    margin-bottom: 20px;
+    padding: 10px;
+  }
+  .wp-content > .wp-block-image.is-style-vk-image-shadow:first-child img {
+    border-radius: 14px;
+  }
+  .wp-content > .wp-block-image.is-style-vk-image-shadow:first-child + .wp-block-spacer {
+    height: 8px !important;
+  }
+  .wp-content .wp-block-columns.story {
+    gap: 16px;
+    grid-template-columns: 1fr;
+  }
   .wp-content .wp-block-columns.story > .wp-block-column {
-    padding: 22px 18px;
+    padding: 26px 20px 24px;
   }
   .wp-content .wp-block-columns.story > .wp-block-column > figure.wp-block-image {
-    height: 60px;
-    width: 60px;
+    height: 66px;
+    width: 66px;
   }
   .wp-content .wp-block-columns.story > .wp-block-column > figure.wp-block-image img {
-    height: 32px;
-    width: 32px;
+    height: 34px;
+    width: 34px;
   }
   .wp-content .wp-block-columns.story > .wp-block-column > p {
-    font-size: 14px;
+    font-size: calc(14px * var(--reader-scale));
   }
 }
 
