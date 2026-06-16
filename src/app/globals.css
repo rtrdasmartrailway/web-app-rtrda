@@ -1092,13 +1092,24 @@ button {
   text-align: left;
 }
 
-/* Group title + number: first two children get tiny gap, rest get the 12px */
-.wp-content .vision-row .vision-content > .vision-title {
-  margin-bottom: -4px !important;
+/* Group title + number: small gap inside group, larger outside */
+.wp-content .vision-row .vision-title-group {
+  align-items: inherit;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  line-height: 1;
+  margin: 0 !important;
+  padding: 0 !important;
+  width: 100%;
 }
-.wp-content .vision-row .vision-content > .vision-number + .vision-text,
-.wp-content .vision-row .vision-content > .vision-text {
-  /* nothing extra */
+
+.wp-content .vision-row .vision-title,
+.wp-content .vision-row .vision-number {
+  display: block;
+  line-height: 1.05;
+  margin: 0 !important;
+  padding: 0 !important;
 }
 
 /* Title — bigger, navy */
