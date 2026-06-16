@@ -16,6 +16,8 @@ import { extractPartnerLogos } from "@/lib/wp/home";
 import {
   CATEGORY_ARTICLES,
   CATEGORY_NEWS,
+  countPostsByCategory,
+  getCategoryBySlug,
   getChildren,
   getGeneratedAt,
   getLatestPosts,
@@ -52,12 +54,27 @@ export interface ShellData {
   generatedAt: string;
 }
 
+export interface CategoryPagination {
+  /** 1-based current page. */
+  currentPage: number;
+  /** Total number of pages. */
+  totalPages: number;
+  /** Total posts in this category (across all pages). */
+  totalPosts: number;
+  /** Posts per page. */
+  pageSize: number;
+  /** Base path of the category (no /page/N suffix). */
+  basePath: string;
+}
+
 export interface PageData {
   record: WpContentRecord;
   children: Card[];
   latest: Card[];
   /** News items extracted from a category listing's <ul class="wp-import-list">. */
   newsCards: Card[];
+  /** Pagination state for category listing pages; null on non-category pages. */
+  categoryPagination: CategoryPagination | null;
   stats: SiteStats | null;
   /** Custom home-page sections; null for non-home pages. */
   home: HomeData | null;
@@ -164,10 +181,11 @@ export const getPageData = cache(async (path: string): Promise<PageData | null> 
   const parentRecord = record.parentPath
     ? await getRecordByPath(record.parentPath)
     : null;
-  const [children, latest, newsCards] = await Promise.all([
+  const [children, latest, newsCards, categoryPagination] = await Promise.all([
     fetchCards(childRecords),
     fetchCards(latestRecords),
     isCategory ? fetchCategoryNewsCards(record) : Promise.resolve([]),
+    isCategory ? fetchCategoryPagination(record) : Promise.resolve(null),
   ]);
 
   return {
@@ -175,6 +193,7 @@ export const getPageData = cache(async (path: string): Promise<PageData | null> 
     children,
     latest,
     newsCards,
+    categoryPagination,
     stats,
     home,
     sidebarItems:
@@ -207,6 +226,37 @@ async function fetchCategoryNewsCards(record: WpContentRecord): Promise<Card[]> 
   ).filter((r): r is WpContentRecord => r !== null);
 
   return fetchCards(newsRecords);
+}
+
+/**
+ * For a category listing page, compute pagination state: total pages,
+ * current page (parsed from /page/N suffix), and base path. Uses the
+ * authoritative post count from the DB so links stay correct even when
+ * the listing HTML is out of sync.
+ */
+async function fetchCategoryPagination(
+  record: WpContentRecord,
+): Promise<CategoryPagination | null> {
+  // record.path looks like /category/<slug> or /category/<slug>/page/<N>
+  const m = record.path.match(/^\/category\/([^/]+)(?:\/page\/(\d+))?$/);
+  if (!m) return null;
+  const slug = decodeURIComponent(m[1]);
+  const currentPage = m[2] ? parseInt(m[2], 10) : 1;
+
+  const category = await getCategoryBySlug(slug);
+  if (!category) return null;
+
+  const totalPosts = await countPostsByCategory(category.id, record.language);
+  const pageSize = 10;
+  const totalPages = Math.max(1, Math.ceil(totalPosts / pageSize));
+
+  return {
+    currentPage,
+    totalPages,
+    totalPosts,
+    pageSize,
+    basePath: `/category/${m[1]}`,
+  };
 }
 
 async function buildHomeData(record: WpContentRecord): Promise<HomeData> {

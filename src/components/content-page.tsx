@@ -3,6 +3,7 @@ import type { PageData } from "@/lib/db/page-data";
 import type { PresentationSidebarItem } from "@/lib/wp/presentation";
 import { ArticleCard } from "./article-card";
 import { CategoryNewsListing } from "./category-news-listing";
+import { CategoryPagination } from "./category-pagination";
 import { HomeSections } from "./home/home-sections";
 import { SiteShell } from "./site-shell";
 import { YutthLightbox } from "./yutth-lightbox";
@@ -48,7 +49,15 @@ function StatCard({ value, label }: { value: number; label: string }) {
 }
 
 export function ContentPage({ data }: { data: PageData }) {
-  const { record, children, latest, newsCards, sidebarItems, parentTitle } = data;
+  const {
+    record,
+    children,
+    latest,
+    newsCards,
+    categoryPagination,
+    sidebarItems,
+    parentTitle,
+  } = data;
   const isHome = record.path === "/" || record.path === "/en";
   const isCategory = record.kind === "category";
   const dateText = formatDate(record.date, record.language);
@@ -154,14 +163,9 @@ export function ContentPage({ data }: { data: PageData }) {
             {isCategory && newsCards.length > 0 ? (
               <>
                 <CategoryNewsListing cards={newsCards} />
-                <nav className="category-pagination">
-                  <Link
-                    href={`${record.path === "/" ? "" : record.path}/page/2`}
-                    rel="next"
-                  >
-                    {record.language === "th" ? "หน้าถัดไป →" : "Next page →"}
-                  </Link>
-                </nav>
+                {categoryPagination && categoryPagination.totalPages > 1 ? (
+                  <CategoryPagination pagination={categoryPagination} />
+                ) : null}
               </>
             ) : isHome && data.home ? (
               <HomeSections home={data.home} language={record.language} />

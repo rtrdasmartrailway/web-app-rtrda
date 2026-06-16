@@ -1829,29 +1829,57 @@ body:has(.yutth-lightbox) {
   -webkit-line-clamp: 3;
 }
 
-/* Category pagination — "Next page →" link under the news grid */
+/* Category pagination — numbered control under the news grid.
+   Layout: [1] [2] [...] [24] [»] — dark navy active, light pills for rest. */
 .category-pagination {
   display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
   justify-content: center;
-  margin: 16px 0 48px;
+  margin: 24px 0 48px;
 }
-.category-pagination a {
-  background: var(--surface);
+.category-pagination a,
+.category-pagination span {
+  align-items: center;
   border: 1px solid var(--border);
-  border-radius: 999px;
-  box-shadow: var(--shadow-card);
-  color: var(--accent-strong);
-  font-size: 15px;
+  border-radius: 10px;
+  color: var(--foreground);
+  display: inline-flex;
+  font-size: 16px;
   font-weight: 700;
-  padding: 12px 28px;
+  height: 44px;
+  justify-content: center;
+  min-width: 44px;
+  padding: 0 14px;
   text-decoration: none;
   transition:
     border-color 180ms ease,
-    transform 180ms ease;
+    background 180ms ease,
+    color 180ms ease;
 }
 .category-pagination a:hover {
-  border-color: rgba(37, 99, 235, 0.4);
-  transform: translateY(-2px);
+  border-color: rgba(37, 99, 235, 0.45);
+  color: var(--accent-strong);
+}
+.category-pagination .pagination-page.active,
+.category-pagination .pagination-page.active:hover {
+  background: var(--navy-900);
+  border-color: var(--navy-900);
+  color: #fff;
+  cursor: default;
+}
+.category-pagination .pagination-arrow {
+  font-size: 18px;
+  font-weight: 800;
+}
+.category-pagination .pagination-arrow.disabled {
+  color: var(--muted);
+  cursor: default;
+}
+.category-pagination .pagination-ellipsis {
+  border-color: transparent;
+  color: var(--muted);
+  font-weight: 700;
 }
 
 .read-link {

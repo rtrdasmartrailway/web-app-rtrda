@@ -101,6 +101,27 @@ export async function getPostsByCategory(
   return rows.map(toRecord);
 }
 
+export async function countPostsByCategory(
+  categoryId: number,
+  language: WpLanguage,
+): Promise<number> {
+  return prisma.contentRecord.count({
+    where: { language, kind: "post", categoryIds: { has: categoryId } },
+  });
+}
+
+export interface CategoryInfo {
+  id: number;
+  slug: string;
+  name: string;
+}
+
+export async function getCategoryBySlug(slug: string): Promise<CategoryInfo | null> {
+  const row = await prisma.category.findFirst({ where: { slug } });
+  if (!row) return null;
+  return { id: row.id, slug: row.slug, name: row.name };
+}
+
 export interface CalendarDay {
   /** YYYY-MM-DD */
   day: string;
