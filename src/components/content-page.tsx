@@ -7,6 +7,7 @@ import { CategoryPagination } from "./category-pagination";
 import { HomeSections } from "./home/home-sections";
 import { SiteShell } from "./site-shell";
 import { YutthLightbox } from "./yutth-lightbox";
+import { WpImageFallback } from "./wp-image-fallback";
 import { formatDate } from "./site-helpers";
 
 function SideNavigation({
@@ -175,6 +176,7 @@ export function ContentPage({ data }: { data: PageData }) {
               />
             )}
             <YutthLightbox />
+            <WpImageFallback />
 
             {/* Category listings already show their own news cards; skip related. */}
             {!isCategory && children.length > 0 ? (

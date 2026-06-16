@@ -102,19 +102,19 @@ export function WpImageFallback() {
     const scan = () => {
       for (const target of targets) {
         const nodes = root.querySelectorAll<HTMLElement>(
-          `[${target.attr}]:not([data-legacy-rewritten])`,
+          `[${target.attr}]:not([data-legacy-rewritten-${target.attr}])`,
         );
         nodes.forEach((node) => {
           const value = node.getAttribute(target.attr);
           if (!value) return;
           if (!target.match(value)) {
             // Mark as processed so we don't re-evaluate it on every scan.
-            node.setAttribute("data-legacy-rewritten", "skipped");
+            node.setAttribute(`data-legacy-rewritten-${target.attr}`, "skipped");
             return;
           }
           const next = target.rewrite(value);
           node.setAttribute(target.attr, next);
-          node.setAttribute("data-legacy-rewritten", "1");
+          node.setAttribute(`data-legacy-rewritten-${target.attr}`, "1");
         });
       }
       root.querySelectorAll<HTMLImageElement>("img").forEach(watchImage);
