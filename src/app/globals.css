@@ -1213,6 +1213,46 @@ button {
   grid-template-columns: repeat(2, minmax(0, 1fr));
   margin: 0;
 }
+
+/* wijai-current: sectioned layout (ผลงานปัจจุบัน on วิจัยและพัฒนา page) */
+.wp-content .wijai-current {
+  display: grid;
+  gap: 32px;
+  margin: 24px 0;
+}
+.wp-content .wijai-item {
+  background: #ffffff;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  box-shadow: 0 2px 10px rgba(0, 52, 113, 0.06);
+  display: grid;
+  gap: 16px;
+  margin: 0;
+  padding: 24px 26px;
+  transition:
+    box-shadow 200ms ease,
+    transform 200ms ease;
+}
+.wp-content .wijai-item:hover {
+  box-shadow: 0 8px 24px rgba(0, 52, 113, 0.12);
+  transform: translateY(-2px);
+}
+.wp-content .wijai-item > h4 {
+  border-bottom: 1px solid var(--border);
+  color: var(--navy-900);
+  font-size: 18px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  line-height: 1.45;
+  margin: 0 0 8px;
+  padding: 0 0 10px;
+}
+.wp-content .wijai-item > p {
+  color: #374151;
+  font-size: 15.5px;
+  line-height: 1.8;
+  margin: 0;
+}
 .wp-content .yutth-gallery > figure {
   background: #fff;
   border: 1px solid var(--border);
