@@ -1806,6 +1806,30 @@ button {
 .wp-content table th,
 .wp-content table td {
   padding: 10px 12px;
+  vertical-align: middle;
+}
+
+/* Make the table fill the full content-main width (961px) and
+   give the icon cell a slightly larger hit area while keeping
+   the icon at 32px. Previously the table was narrow because
+   table-layout: auto + no explicit 100% left whitespace on
+   both sides. */
+.wp-content table.is-style-vk-table-border-stripes {
+  width: 100%;
+}
+
+/* Description cell — wrap text comfortably, top-align not
+   needed since the icon column is fixed-height. */
+.wp-content table td:has(> img:only-child) {
+  text-align: center;
+}
+
+/* Download-cell — center the button both ways so it sits
+   prominently even though the column is narrow. */
+.wp-content table td:has(> a:only-child) {
+  text-align: center;
+  white-space: nowrap;
+  width: 1%;
 }
 
 /* ============================================================
