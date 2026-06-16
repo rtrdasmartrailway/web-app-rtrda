@@ -1797,11 +1797,13 @@ button {
 
 /* Icon cell (typically a small <img> like pdf/png/ai) — keep it
    from expanding to half the row by giving it an explicit narrow
-   width. */
+   width. The previous 60px was too tight for the 32×32 icons plus
+   padding, so 80px gives breathing room while leaving the
+   description column most of the row. */
 .wp-content table td > img:only-child,
 .wp-content table td:has(> img:only-child) {
-  width: 60px;
-  max-width: 60px;
+  width: 80px;
+  max-width: 80px;
 }
 .wp-content table th,
 .wp-content table td {
