@@ -1031,19 +1031,7 @@ button {
   align-items: flex-end;
 }
 
-/* Decorative top accent bar — short blue gradient line */
-.wp-content .vision-row::before {
-  background: var(--rail-gradient);
-  border-radius: 4px;
-  content: "";
-  height: 4px;
-  left: 50%;
-  position: absolute;
-  top: -18px;
-  transform: translateX(-50%);
-  width: 80px;
-}
-
+/* Decorative top accent bar — see new rule further down for the active one */
 /* Figure — NO card chrome (transparent bg, no border) */
 .wp-content .vision-row .vision-figure {
   align-items: center;
@@ -1082,22 +1070,22 @@ button {
   opacity: 0.4;
 }
 
-/* Content column — title+number grouped (small gap), body below (larger) */
+/* Content column — centered, number on top, title below, body last */
 .wp-content .vision-row .vision-content {
-  align-items: flex-start;
+  align-items: center;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 14px;
   min-width: 0;
-  text-align: left;
+  text-align: center;
 }
 
 /* Group title + number: small gap inside group, larger outside */
 .wp-content .vision-row .vision-title-group {
-  align-items: inherit;
+  align-items: center;
   display: flex;
   flex-direction: column;
-  gap: 0;
+  gap: 4px;
   line-height: 1;
   margin: 0 !important;
   padding: 0 !important;
@@ -1110,18 +1098,19 @@ button {
   line-height: 1.05;
   margin: 0 !important;
   padding: 0 !important;
+  text-align: center;
 }
 
-/* Title — bigger, navy */
+/* Title — biggest, navy, bold */
 .wp-content .vision-title {
   background: none !important;
   border: 0 !important;
   border-radius: 0;
   color: var(--navy-900);
-  font-size: clamp(22px, 2.2vw, 30px);
+  font-size: clamp(26px, 2.6vw, 36px);
   font-weight: 800;
   letter-spacing: 0;
-  line-height: 1.1;
+  line-height: 1.15;
   margin: 0 !important;
   padding: 0 !important;
   position: relative;
@@ -1131,35 +1120,49 @@ button {
   display: none !important;
 }
 
-/* Number — large light-gray "01"-"06", tight under title */
+/* Number — smaller than title, navy (not gray), top of group */
 .wp-content .vision-number {
-  color: #cbd5e1;
+  color: var(--navy-900);
   font-family: var(--font-sans);
-  font-size: clamp(36px, 4vw, 52px);
+  font-size: clamp(28px, 3vw, 42px);
   font-weight: 900;
   letter-spacing: 0;
   line-height: 1;
-  margin: -4px 0 0 0 !important;
-  text-align: left;
+  margin: 0 !important;
+  text-align: center;
 }
 .wp-content .vision-row-even .vision-number {
-  text-align: right;
-  width: 100%;
+  text-align: center;
+  width: auto;
 }
 
-/* Description text — bigger and readable */
+/* Body text */
 .wp-content .vision-text {
   color: #4b5563;
-  font-size: clamp(15px, 1.1vw, 18px);
+  font-size: clamp(14px, 1vw, 16px);
   line-height: 1.7;
   margin: 0 !important;
   max-width: 620px;
   padding: 0 !important;
-  text-align: left;
+  text-align: center;
 }
 .wp-content .vision-row-even .vision-text {
   margin-left: auto !important;
-  text-align: right;
+  margin-right: auto !important;
+  text-align: center;
+}
+
+/* Decorative top accent bar — short blue gradient line ABOVE card */
+.wp-content .vision-row::before {
+  background: var(--rail-gradient);
+  border-radius: 4px;
+  content: "";
+  height: 4px;
+  left: 50%;
+  position: absolute;
+  top: -18px;
+  transform: translateX(-50%);
+  width: 80px;
 }
 
 /* Responsive: stack vertically */
