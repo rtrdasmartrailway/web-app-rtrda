@@ -2181,6 +2181,19 @@ body:has(.yutth-lightbox) {
   position: relative;
 }
 
+/* WP-exported pages (e.g. /เอกสารเผยแพร่/.../รายงานการดำเนินงาน) inject
+   inline `style="color:#003471;background:#ffffff"` on the summary,
+   which sets background to white. The `color: #fff !important` above
+   already beats the inline color (text stays white), but the inline
+   background wins over the CSS background — leaving white-on-white
+   text. Force the navy background with !important so the export's
+   inline `background:#ffffff` is overridden too. */
+.wp-content
+  .lightweight-accordion
+  summary.lightweight-accordion-title[style*="background"] {
+  background: var(--navy-900) !important;
+}
+
 .wp-content
   .lightweight-accordion
   summary.lightweight-accordion-title::-webkit-details-marker {
