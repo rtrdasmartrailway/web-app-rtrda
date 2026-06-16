@@ -1018,7 +1018,8 @@ button {
   transform: translateY(-2px);
 }
 
-/* Even rows: image right, content left (zigzag flip) */
+/* Even rows: image right, content left (zigzag flip).
+   Text stays LTR (left) — only the block position changes. */
 .wp-content .vision-row-even {
   grid-template-columns: minmax(0, 1fr) minmax(0, 240px);
 }
@@ -1026,9 +1027,9 @@ button {
   order: 2;
 }
 .wp-content .vision-row-even .vision-content {
+  align-items: flex-start;
   order: 1;
-  text-align: right;
-  align-items: flex-end;
+  text-align: left;
 }
 
 /* Decorative top accent bar — see new rule further down for the active one */
@@ -1070,9 +1071,9 @@ button {
   opacity: 0.4;
 }
 
-/* Content column — hugs the figure: left for ODD, right for EVEN.
-   Internal flex column (number on top, title, body) stays — only
-   outer alignment changes per side. */
+/* Content column — block sits next to figure (hugs image) for both
+   ODD and EVEN rows. Text is ALWAYS left-to-right (LTR), only the
+   block position changes per side. */
 .wp-content .vision-row .vision-content {
   align-items: flex-start;
   display: flex;
@@ -1082,12 +1083,13 @@ button {
   text-align: left;
 }
 .wp-content .vision-row-even .vision-content {
-  align-items: flex-end;
-  text-align: right;
+  align-items: flex-start;
+  text-align: left;
 }
 
 /* Group title + number: small gap inside group, larger outside.
-   Group takes natural width (not 100%) so it hugs the figure side. */
+   Group takes natural width (not 100%) so it hugs the figure side.
+   Always LTR — both ODD and EVEN. */
 .wp-content .vision-row .vision-title-group {
   align-items: flex-start;
   display: flex;
@@ -1099,7 +1101,7 @@ button {
   width: auto;
 }
 .wp-content .vision-row-even .vision-title-group {
-  align-items: flex-end;
+  align-items: flex-start;
 }
 
 .wp-content .vision-row .vision-title,
@@ -1112,7 +1114,7 @@ button {
 }
 .wp-content .vision-row-even .vision-title,
 .wp-content .vision-row-even .vision-number {
-  text-align: right;
+  text-align: left;
 }
 
 /* Title — biggest, navy, bold */
@@ -1146,7 +1148,7 @@ button {
   text-align: left;
 }
 .wp-content .vision-row-even .vision-number {
-  text-align: right;
+  text-align: left;
   width: auto;
 }
 
@@ -1163,7 +1165,7 @@ button {
 .wp-content .vision-row-even .vision-text {
   margin-left: 0 !important;
   margin-right: 0 !important;
-  text-align: right;
+  text-align: left;
 }
 
 /* Decorative top accent bar — short blue gradient line ABOVE card */
