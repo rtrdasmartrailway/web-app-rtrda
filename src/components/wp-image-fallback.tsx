@@ -117,9 +117,7 @@ export function WpImageFallback() {
           node.setAttribute("data-legacy-rewritten", "1");
         });
       }
-      root
-        .querySelectorAll<HTMLImageElement>("img")
-        .forEach(watchImage);
+      root.querySelectorAll<HTMLImageElement>("img").forEach(watchImage);
     };
 
     scan();
