@@ -79,7 +79,6 @@ export function ContentPage({ data }: { data: PageData }) {
             {record.kind === "post" && dateText ? (
               <time dateTime={record.date}>{dateText}</time>
             ) : null}
-            {record.excerpt ? <p className="hero-excerpt">{record.excerpt}</p> : null}
             {isHome ? (
               <>
                 <form
