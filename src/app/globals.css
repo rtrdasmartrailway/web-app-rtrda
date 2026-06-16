@@ -984,12 +984,11 @@ button {
 
 .wp-content table {
   border-collapse: collapse;
-  display: block;
+  display: table;
   font-size: calc(13px * var(--reader-scale));
   line-height: 1.7;
   margin: 1.5em 0;
-  max-width: 100%;
-  overflow-x: auto;
+  table-layout: fixed;
   width: 100%;
 }
 
@@ -999,6 +998,28 @@ button {
   padding: 10px 12px;
   text-align: left;
   vertical-align: top;
+  word-wrap: break-word;
+}
+
+.wp-content th.col-align-center,
+.wp-content td.col-align-center {
+  text-align: center;
+}
+
+.wp-content th.col-align-left,
+.wp-content td.col-align-left {
+  text-align: left;
+}
+
+.wp-content th.col-align-right,
+.wp-content td.col-align-right {
+  text-align: right;
+}
+
+/* Column 4 (ลิ้งค์) - keep URL fully visible, break on slashes/dots */
+.wp-content td.col-4 {
+  font-size: calc(12px * var(--reader-scale));
+  word-break: break-all;
 }
 
 .wp-content thead th,
@@ -1024,6 +1045,14 @@ button {
 .wp-content table li {
   font-size: inherit;
   margin: 0;
+}
+
+.wp-content table a {
+  color: var(--accent-strong);
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  word-break: break-all;
 }
 
 .wp-content img {

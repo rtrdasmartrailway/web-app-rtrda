@@ -102,10 +102,15 @@ export function buildSidebarItems(
   siblings: WpContentRecord[],
 ): PresentationSidebarItem[] {
   const source = children.length > 0 ? children : record.parentPath ? siblings : [];
-  return source.map((item) => ({
+  // Filter out the current page itself (a "siblings = [self]" result is useless
+  // for navigation). When everything is filtered out, return [] so the layout
+  // collapses sidebar and gives content-main the full width.
+  const selfPath = normalizeRoutePath(record.path);
+  const filtered = source.filter((item) => normalizeRoutePath(item.path) !== selfPath);
+  return filtered.map((item) => ({
     label: item.title,
     path: item.path,
-    active: normalizeRoutePath(item.path) === normalizeRoutePath(record.path),
+    active: normalizeRoutePath(item.path) === selfPath,
   }));
 }
 

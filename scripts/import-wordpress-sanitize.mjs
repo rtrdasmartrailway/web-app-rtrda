@@ -8,6 +8,8 @@ const allowedTags = [
   "aside",
   "audio",
   "button",
+  "col",
+  "colgroup",
   "details",
   "div",
   "figure",
@@ -47,6 +49,8 @@ const allowedAttributes = {
     "width",
   ],
   a: ["aria-*", "class", "href", "name", "rel", "target", "title"],
+  col: ["span", "style", "width", "class"],
+  colgroup: ["span", "style", "class"],
   img: [
     "alt",
     "class",

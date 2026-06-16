@@ -54,10 +54,18 @@ describe("buildSidebarItems", () => {
     expect(items).toEqual([{ label: "ลูก", path: "/parent/me/ลูก", active: false }]);
   });
 
-  it("falls back to siblings and marks the current page active", () => {
+  it("falls back to siblings, filters self, and marks the current page active", () => {
+    // current is included in the siblings list (real DB query returns it
+    // when fetching by parentPath), so the filter must remove it.
     const items = buildSidebarItems(current, [], [sibling, current]);
-    expect(items).toHaveLength(2);
-    expect(items.find((item) => item.path === "/parent/me")?.active).toBe(true);
+    expect(items).toEqual([{ label: "อื่น", path: "/parent/อื่น", active: false }]);
+  });
+
+  it("filters the current page itself when it is the only sibling", () => {
+    // Real-world case: a page has no children, and its only sibling is itself.
+    // The sidebar would be a single self-link, which is useless. Filter it out.
+    const items = buildSidebarItems(current, [], [current]);
+    expect(items).toEqual([]);
   });
 
   it("is empty for top-level pages without children", () => {

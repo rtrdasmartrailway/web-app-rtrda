@@ -40,4 +40,15 @@ describe("sanitizeAndRewrite", () => {
     expect(out).toContain("ok");
     expect(out).not.toMatch(/Hatena/);
   });
+
+  it("preserves <colgroup> and <col> with style/width for table layout", () => {
+    const out = sanitizeAndRewrite(
+      '<table><colgroup><col style="width:60px"><col></colgroup><thead><tr><th>Header</th></tr></thead><tbody><tr><td>Cell</td></tr></tbody></table>',
+    );
+    expect(out).toContain("<colgroup>");
+    expect(out).toContain('<col style="width:60px"');
+    expect(out).toContain("<col>");
+    expect(out).toContain("<th>Header</th>");
+    expect(out).toContain("<td>Cell</td>");
+  });
 });
