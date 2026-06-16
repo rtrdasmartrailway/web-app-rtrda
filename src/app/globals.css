@@ -412,8 +412,8 @@ button {
 }
 
 .search-panel {
-  background: var(--navy-850);
-  border-top: 1px solid transparent;
+  background: transparent;
+  border-top: 0;
   max-height: 0;
   overflow: hidden;
   transition:
@@ -422,7 +422,7 @@ button {
 }
 
 .search-panel.open {
-  border-top-color: var(--glass-border);
+  border-top-color: transparent;
   max-height: 88px;
 }
 
