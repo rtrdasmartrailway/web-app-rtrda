@@ -1213,6 +1213,10 @@ button {
   grid-template-columns: repeat(2, minmax(0, 1fr));
   margin: 0;
 }
+/* 3-column variant — used on มาตรฐานและระบบทดสอบ (th-page-416) where each event has 2-7 figures */
+.wp-content .yutth-gallery.yutth-gallery-3col {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
 
 /* wijai-current: sectioned layout (ผลงานปัจจุบัน on วิจัยและพัฒนา page) */
 .wp-content .wijai-current {
@@ -1309,6 +1313,9 @@ button {
     font-size: 14.5px;
   }
   .wp-content .yutth-gallery {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .wp-content .yutth-gallery.yutth-gallery-3col {
     grid-template-columns: repeat(2, 1fr);
   }
   .wp-content .yutth-gallery > .yutth-feature img {
