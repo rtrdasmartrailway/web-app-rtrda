@@ -56,6 +56,8 @@ export interface PageData {
   record: WpContentRecord;
   children: Card[];
   latest: Card[];
+  /** News items extracted from a category listing's <ul class="wp-import-list">. */
+  newsCards: Card[];
   stats: SiteStats | null;
   /** Custom home-page sections; null for non-home pages. */
   home: HomeData | null;
@@ -144,6 +146,7 @@ export const getPageData = cache(async (path: string): Promise<PageData | null> 
   }
 
   const isHome = record.path === "/" || record.path === "/en";
+  const isCategory = record.kind === "category";
   const [childRecords, siblingRecords, latestRecords, stats, shell, home] =
     await Promise.all([
       getChildren(record.path, record.language),
@@ -161,15 +164,17 @@ export const getPageData = cache(async (path: string): Promise<PageData | null> 
   const parentRecord = record.parentPath
     ? await getRecordByPath(record.parentPath)
     : null;
-  const [children, latest] = await Promise.all([
+  const [children, latest, newsCards] = await Promise.all([
     fetchCards(childRecords),
     fetchCards(latestRecords),
+    isCategory ? fetchCategoryNewsCards(record) : Promise.resolve([]),
   ]);
 
   return {
     record,
     children,
     latest,
+    newsCards,
     stats,
     home,
     sidebarItems:
@@ -180,6 +185,29 @@ export const getPageData = cache(async (path: string): Promise<PageData | null> 
     shell,
   };
 });
+
+/**
+ * For a category listing page, extract the <li> entries from
+ * <ul class="wp-import-list"> and resolve each one's image via
+ * featuredMediaId. Each <li> is `<a href=path>title<time/><p>excerpt</p></a>`.
+ */
+async function fetchCategoryNewsCards(record: WpContentRecord): Promise<Card[]> {
+  const liMatches = [...record.contentHtml.matchAll(/<li>([\s\S]*?)<\/li>/g)];
+  if (liMatches.length === 0) return [];
+
+  const newsPaths: string[] = [];
+  for (const m of liMatches) {
+    const aMatch = m[1].match(/<a\s+href="([^"]+)"/);
+    if (aMatch) newsPaths.push(aMatch[1]);
+  }
+  if (newsPaths.length === 0) return [];
+
+  const newsRecords = (
+    await Promise.all(newsPaths.map((p) => getRecordByPath(normalizeRoutePath(p))))
+  ).filter((r): r is WpContentRecord => r !== null);
+
+  return fetchCards(newsRecords);
+}
 
 async function buildHomeData(record: WpContentRecord): Promise<HomeData> {
   const [newsRecords, articleRecords, calendarDays] = await Promise.all([

@@ -2,6 +2,7 @@ import Link from "next/link";
 import type { PageData } from "@/lib/db/page-data";
 import type { PresentationSidebarItem } from "@/lib/wp/presentation";
 import { ArticleCard } from "./article-card";
+import { CategoryNewsListing } from "./category-news-listing";
 import { HomeSections } from "./home/home-sections";
 import { SiteShell } from "./site-shell";
 import { YutthLightbox } from "./yutth-lightbox";
@@ -47,8 +48,9 @@ function StatCard({ value, label }: { value: number; label: string }) {
 }
 
 export function ContentPage({ data }: { data: PageData }) {
-  const { record, children, latest, sidebarItems, parentTitle } = data;
+  const { record, children, latest, newsCards, sidebarItems, parentTitle } = data;
   const isHome = record.path === "/" || record.path === "/en";
+  const isCategory = record.kind === "category";
   const dateText = formatDate(record.date, record.language);
 
   return (
@@ -149,7 +151,19 @@ export function ContentPage({ data }: { data: PageData }) {
           <SideNavigation items={sidebarItems} title={parentTitle} />
 
           <div className="content-main">
-            {isHome && data.home ? (
+            {isCategory && newsCards.length > 0 ? (
+              <>
+                <CategoryNewsListing cards={newsCards} />
+                <nav className="category-pagination">
+                  <Link
+                    href={`${record.path === "/" ? "" : record.path}/page/2`}
+                    rel="next"
+                  >
+                    {record.language === "th" ? "หน้าถัดไป →" : "Next page →"}
+                  </Link>
+                </nav>
+              </>
+            ) : isHome && data.home ? (
               <HomeSections home={data.home} language={record.language} />
             ) : (
               <div
@@ -159,7 +173,8 @@ export function ContentPage({ data }: { data: PageData }) {
             )}
             <YutthLightbox />
 
-            {children.length > 0 ? (
+            {/* Category listings already show their own news cards; skip related. */}
+            {!isCategory && children.length > 0 ? (
               <section className="related-section" aria-labelledby="related-pages-title">
                 <div className="section-heading-row">
                   <h2 id="related-pages-title">
@@ -174,7 +189,7 @@ export function ContentPage({ data }: { data: PageData }) {
               </section>
             ) : null}
 
-            {latest.length > 0 ? (
+            {!isCategory && latest.length > 0 ? (
               <section className="latest-section" aria-labelledby="latest-posts-title">
                 <div className="section-heading-row">
                   <h2 id="latest-posts-title">
