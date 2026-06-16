@@ -4,6 +4,7 @@ import type { PresentationSidebarItem } from "@/lib/wp/presentation";
 import { ArticleCard } from "./article-card";
 import { HomeSections } from "./home/home-sections";
 import { SiteShell } from "./site-shell";
+import { YutthLightbox } from "./yutth-lightbox";
 import { formatDate } from "./site-helpers";
 
 function SideNavigation({
@@ -156,6 +157,7 @@ export function ContentPage({ data }: { data: PageData }) {
                 dangerouslySetInnerHTML={{ __html: record.contentHtml }}
               />
             )}
+            <YutthLightbox />
 
             {children.length > 0 ? (
               <section className="related-section" aria-labelledby="related-pages-title">
