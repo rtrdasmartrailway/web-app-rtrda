@@ -1669,8 +1669,11 @@ button {
   top: 18px;
 }
 .wp-content .wp-block-columns.story > .wp-block-column::after {
-  color: rgba(37, 99, 235, 0.08);
-  content: counter(story-card, decimal-leading-zero);
+  /* Numbered "01/02/03" badges are intentionally disabled.
+     The mockup for /เกี่ยวกับ-สทร/ความเป็นมา shows plain 3-card
+     layout without the outline number. The counter still
+     increments so future rules can re-enable it. */
+  content: none;
   font-size: 58px;
   font-weight: 800;
   line-height: 1;
