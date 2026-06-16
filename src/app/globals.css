@@ -987,243 +987,178 @@ button {
 }
 
 /* ============================================================
-   Vision / พันธกิจ cards — mockup-style
-   Per card: figure (icon + SVG number) on one side, content
-   (title + large blue number badge + MISSION label + body)
-   on the other. Odd cards = figure left / content right.
-   Even cards = figure right / content left (flipped via order).
+   Vision / พันธกิจ — zigzag mockup layout
+   6 photo cards arranged horizontally in a sine-wave
+   (shorter at edges, tallest in the middle). Each card stacks
+   vertically: image + divider + title (navy) + big gray
+   number 01-06 + descriptive text. The "พันธกิจ" heading
+   sits centered above the row.
    ============================================================ */
 .wp-content .vision-stack {
+  align-items: flex-start;
   display: flex;
-  flex-direction: column;
-  gap: clamp(28px, 4vw, 48px);
-  margin: 28px 0 40px;
+  flex-direction: row;
+  flex-wrap: nowrap;
+  gap: clamp(8px, 1vw, 18px);
+  justify-content: space-between;
+  margin: 36px 0 48px;
+  padding: 0 8px;
+  position: relative;
 }
 
 .wp-content .vision-row {
   align-items: center;
-  background: linear-gradient(180deg, #ffffff 0%, #f7faff 100%);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
-  box-shadow: 0 4px 20px rgba(0, 52, 113, 0.06);
-  display: grid;
-  gap: clamp(20px, 3vw, 36px);
-  grid-template-columns: minmax(0, 180px) minmax(0, 1fr);
-  overflow: visible;
-  padding: clamp(24px, 3vw, 36px) clamp(24px, 3vw, 40px);
-  position: relative;
-  transition:
-    box-shadow 200ms ease,
-    transform 200ms ease;
-}
-.wp-content .vision-row:hover {
-  box-shadow: 0 8px 32px rgba(0, 52, 113, 0.12);
-  transform: translateY(-2px);
-}
-
-/* Decorative top accent bar — short blue gradient line */
-.wp-content .vision-row::before {
-  background: var(--rail-gradient);
-  border-radius: 4px;
-  content: "";
-  height: 4px;
-  left: 50%;
-  position: absolute;
-  top: -2px;
-  transform: translateX(-50%);
-  width: 80px;
-}
-
-/* Even rows: figure right, content left (mirrored) */
-.wp-content .vision-row-even {
-  grid-template-columns: minmax(0, 1fr) minmax(0, 180px);
-}
-.wp-content .vision-row-even .vision-figure {
-  order: 2;
-}
-.wp-content .vision-row-even .vision-content {
-  order: 1;
-  text-align: right;
-}
-
-/* Figure column — vertical stack of icon + SVG number badge */
-.wp-content .vision-figure {
-  align-items: center;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
   display: flex;
-  justify-content: center;
+  flex: 1 1 0;
+  flex-direction: column;
+  gap: 6px;
   min-width: 0;
-}
-.wp-content .vision-figure-stack {
-  align-items: center;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  width: 100%;
+  padding: 0;
+  position: relative;
+  text-align: center;
+  transform: translateY(var(--zigzag-shift, 0px));
+  transition: transform 300ms ease;
 }
 
-/* Icon image — small circle/square container */
-.wp-content .vision-icon {
+.wp-content .vision-row-even {
+  --zigzag-shift: 30px;
+}
+.wp-content .vision-row-odd {
+  --zigzag-shift: 0px;
+}
+/* Zigzag offsets — edges shortest, middle tallest.
+   6 cards: 1=low, 2=mid, 3=high, 4=high, 5=mid, 6=low */
+.wp-content .vision-stack > .vision-row:nth-child(1) {
+  --zigzag-shift: 50px;
+}
+.wp-content .vision-stack > .vision-row:nth-child(2) {
+  --zigzag-shift: 18px;
+}
+.wp-content .vision-stack > .vision-row:nth-child(3) {
+  --zigzag-shift: -22px;
+}
+.wp-content .vision-stack > .vision-row:nth-child(4) {
+  --zigzag-shift: -22px;
+}
+.wp-content .vision-stack > .vision-row:nth-child(5) {
+  --zigzag-shift: 18px;
+}
+.wp-content .vision-stack > .vision-row:nth-child(6) {
+  --zigzag-shift: 50px;
+}
+
+/* Figure — image card with white border + soft shadow */
+.wp-content .vision-row .vision-figure {
   align-items: center;
-  background: #fff;
+  background: #ffffff;
   border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  box-shadow: 0 4px 14px rgba(0, 52, 113, 0.08);
+  border-radius: 6px;
+  box-shadow: 0 6px 20px rgba(0, 52, 113, 0.10);
   display: flex;
+  height: clamp(120px, 14vw, 170px);
   justify-content: center;
-  padding: 12px;
-  width: clamp(110px, 12vw, 140px);
-}
-.wp-content .vision-icon img {
-  display: block;
-  height: auto;
-  margin: 0;
-  max-height: 110px;
-  max-width: 100%;
-  object-fit: contain;
-  width: auto;
-}
-.wp-content .vision-icon img.error,
-.wp-content .vision-icon img:not([src]),
-.wp-content .vision-icon img[src=""] {
-  background: linear-gradient(135deg, #eef4fc 0%, #dce8f7 100%);
-  border: 1px dashed var(--accent);
-  min-height: 100px;
-  min-width: 100px;
-  opacity: 0.4;
-}
-
-/* Number image (SVG 01-06) */
-.wp-content .vision-number-image {
-  align-items: center;
-  display: flex;
-  justify-content: center;
-  width: clamp(70px, 8vw, 88px);
-}
-.wp-content .vision-number-image img {
-  display: block;
-  height: auto;
-  margin: 0;
+  margin-bottom: 14px;
+  overflow: hidden;
+  padding: 6px;
   width: 100%;
 }
-.wp-content .vision-number-image img.error,
-.wp-content .vision-number-image img:not([src]),
-.wp-content .vision-number-image img[src=""] {
+.wp-content .vision-row .vision-figure img {
+  display: block;
+  height: 100%;
+  margin: 0;
+  max-height: 100%;
+  max-width: 100%;
+  object-fit: cover;
+  width: 100%;
+}
+.wp-content .vision-row .vision-figure img.error,
+.wp-content .vision-row .vision-figure img:not([src]),
+.wp-content .vision-row .vision-figure img[src=""] {
   background: linear-gradient(135deg, #eef4fc 0%, #dce8f7 100%);
   border: 1px dashed var(--accent);
-  min-height: 40px;
+  min-height: 110px;
   opacity: 0.4;
 }
 
-/* Content column — title, number badge, MISSION label, body text */
-.wp-content .vision-content {
+/* Content column — divider, title, big number, body */
+.wp-content .vision-row .vision-content {
   align-items: center;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 4px;
   min-width: 0;
   text-align: center;
+  width: 100%;
 }
 
+/* Short horizontal divider above the title */
+.wp-content .vision-row .vision-content::before {
+  background: #d1d5db;
+  content: "";
+  display: block;
+  height: 1.5px;
+  margin-bottom: 12px;
+  width: 50%;
+}
+
+/* Title — navy bold */
 .wp-content .vision-title {
-  background: linear-gradient(180deg, #e0e9f5 0%, #d3e0f0 100%);
+  background: none !important;
   border: 0 !important;
-  border-radius: 6px;
+  border-radius: 0;
   color: var(--navy-900);
-  font-size: clamp(18px, 2vw, 24px);
+  font-size: clamp(14px, 1.05vw, 17px);
   font-weight: 800;
-  letter-spacing: -0.005em;
-  line-height: 1.2;
-  margin: 0 !important;
-  padding: 8px 18px !important;
+  letter-spacing: 0;
+  line-height: 1.25;
+  margin: 0 0 2px !important;
+  padding: 0 !important;
   position: relative;
-  width: fit-content;
+  width: auto;
 }
 .wp-content .vision-title::after {
   display: none !important;
 }
 
-/* Number badge (blue block) — below title */
-.wp-content .vision-number-badge {
-  background: linear-gradient(180deg, #5ea8f5 0%, #2563eb 100%);
-  border-radius: 10px;
-  box-shadow: 0 4px 14px rgba(37, 99, 235, 0.3);
-  color: #ffffff;
+/* Number — very large light-gray "01"-"06" */
+.wp-content .vision-number {
+  color: #cbd5e1;
   font-family: var(--font-sans);
-  font-size: clamp(28px, 3.4vw, 40px);
+  font-size: clamp(40px, 4.4vw, 60px);
   font-weight: 900;
-  letter-spacing: 0.02em;
+  letter-spacing: 0;
   line-height: 1;
-  margin-top: 4px;
-  padding: 8px 18px;
+  margin: 0 0 6px !important;
   text-align: center;
-  width: fit-content;
 }
 
-/* MISSION label — tiny uppercase letter-spaced */
-.wp-content .vision-mission-label {
-  color: #94a3b8;
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.3em;
-  margin-top: -2px;
-  text-transform: uppercase;
-}
-
+/* Description text */
 .wp-content .vision-text {
   color: #4b5563;
-  font-size: clamp(14px, 1.05vw, 16px);
-  line-height: 1.7;
-  margin: 8px auto 0 !important;
-  max-width: 580px;
+  font-size: clamp(12px, 0.85vw, 14px);
+  line-height: 1.55;
+  margin: 0 !important;
+  max-width: 200px;
   padding: 0 !important;
   text-align: center;
 }
-.wp-content .vision-row-even .vision-text {
-  margin-left: auto !important;
-  margin-right: auto !important;
-}
 
-/* Decorative circle in bottom-right of some cards (mockup accent) */
-.wp-content .vision-row::after {
-  background: radial-gradient(
-    circle,
-    rgba(56, 189, 248, 0.18) 0%,
-    rgba(56, 189, 248, 0) 70%
-  );
-  border-radius: 50%;
-  content: "";
-  height: 90px;
-  pointer-events: none;
-  position: absolute;
-  right: 20px;
-  bottom: 20px;
-  width: 90px;
-}
-.wp-content .vision-row-even::after {
-  left: 20px;
-  right: auto;
-}
-
-/* Responsive: stack vertically */
-@media (max-width: 720px) {
-  .wp-content .vision-row,
-  .wp-content .vision-row-even {
-    grid-template-columns: minmax(0, 1fr);
-    text-align: center;
+/* Responsive: stack vertically on small screens */
+@media (max-width: 900px) {
+  .wp-content .vision-stack {
+    flex-direction: column;
+    gap: 24px;
   }
-  .wp-content .vision-row .vision-figure,
-  .wp-content .vision-row-even .vision-figure {
-    margin: 0 auto;
-    order: 0;
+  .wp-content .vision-stack > .vision-row {
+    --zigzag-shift: 0px !important;
   }
-  .wp-content .vision-row .vision-content,
-  .wp-content .vision-row-even .vision-content {
-    order: 1;
-    text-align: center !important;
-  }
-  .wp-content .vision-row::after,
-  .wp-content .vision-row-even::after {
-    display: none;
+  .wp-content .vision-row .vision-figure {
+    height: 160px;
+    max-width: 240px;
   }
 }
 
