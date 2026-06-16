@@ -283,17 +283,18 @@ button {
   pointer-events: none;
   position: absolute;
   top: 100%;
-  transform: translateY(8px);
+  transform: translateY(0);
   transition:
     opacity 160ms ease,
     transform 160ms ease;
+  z-index: 5;
 }
 
 .nav-item:hover .nav-dropdown,
 .nav-item:focus-within .nav-dropdown {
   opacity: 1;
   pointer-events: auto;
-  transform: translateY(0);
+  transform: translateY(-4px);
 }
 
 .nav-dropdown a,
