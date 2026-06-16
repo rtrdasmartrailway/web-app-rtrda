@@ -2194,6 +2194,28 @@ body:has(.yutth-lightbox) {
   background: var(--navy-900) !important;
 }
 
+/* Some WP exports wrap the accordion title in <h1> or other
+   block-level heading tags (e.g. /การประเมินคุณธรรม-ita). The global
+   `.wp-content h1 { color: var(--navy-900) }` then sets the heading
+   text to navy — invisible on the navy summary background. Force
+   the heading + its <strong> children to white, and inline-display
+   them so they don't break the flex layout the summary uses. */
+.wp-content .lightweight-accordion summary h1,
+.wp-content .lightweight-accordion summary h2,
+.wp-content .lightweight-accordion summary h3,
+.wp-content .lightweight-accordion summary h4,
+.wp-content .lightweight-accordion summary h5,
+.wp-content .lightweight-accordion summary h6,
+.wp-content .lightweight-accordion summary strong,
+.wp-content .lightweight-accordion summary b {
+  color: #fff !important;
+  display: inline;
+  font-size: inherit;
+  font-weight: inherit;
+  line-height: inherit;
+  margin: 0;
+}
+
 .wp-content
   .lightweight-accordion
   summary.lightweight-accordion-title::-webkit-details-marker {
