@@ -992,6 +992,47 @@ button {
    Image is frameless (no card, no shadow) — title hugs the
    image. Title + body are large and readable.
    ============================================================ */
+
+/* ============================================================
+   Values letters banner — R T R D A row with underline
+   Sits at the top of the ค่านิยมองค์กร page, above the cards.
+   ============================================================ */
+.wp-content .values-letters {
+  align-items: stretch;
+  display: flex;
+  flex-direction: row;
+  gap: clamp(24px, 4vw, 56px);
+  justify-content: space-between;
+  margin: 8px 0 36px;
+  padding: 0;
+  width: 100%;
+}
+.wp-content .values-letters .vl-letter {
+  align-items: center;
+  border-bottom: 1.5px solid #1e3a8a;
+  color: #1e3a8a;
+  display: flex;
+  flex: 1 1 0;
+  font-family: var(--font-sans, system-ui, sans-serif);
+  font-size: clamp(48px, 7vw, 88px);
+  font-weight: 800;
+  justify-content: center;
+  letter-spacing: 0.04em;
+  line-height: 1;
+  padding: 0 0 18px;
+  text-align: center;
+  text-transform: uppercase;
+}
+@media (max-width: 720px) {
+  .wp-content .values-letters {
+    gap: 12px;
+  }
+  .wp-content .values-letters .vl-letter {
+    font-size: clamp(36px, 12vw, 56px);
+    padding-bottom: 10px;
+  }
+}
+
 .wp-content .vision-stack {
   display: flex;
   flex-direction: column;
