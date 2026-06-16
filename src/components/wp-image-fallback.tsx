@@ -44,7 +44,11 @@ export function WpImageFallback() {
       {
         attr: "src",
         match: (v) => v.startsWith("/wp-content/uploads/"),
-        rewrite: (v) => LEGACY_ORIGIN + v,
+        // Add ?v=2 to bust any stale CF/browsing 404 cache.
+        // /เกี่ยวกับ-สทร/วิสัยทัศน์-พันธกิจ has rows 5+6 whose
+        // images (manpower.png, database.png) cached as 404
+        // locally even though the live URL now returns 200.
+        rewrite: (v) => `${LEGACY_ORIGIN}${v}?v=2`,
       },
       {
         attr: "href",
@@ -65,7 +69,7 @@ export function WpImageFallback() {
           v
             .replace(
               /(\s|^)(\/wp-content\/uploads\/[^\s,]+)/g,
-              (_, sp, url) => `${sp}${LEGACY_ORIGIN}${url}`,
+              (_, sp, url) => `${sp}${LEGACY_ORIGIN}${url}?v=2`,
             )
             .replace(
               /(\s|^)(\/wp-content\/[^\s,]+)/g,
