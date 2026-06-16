@@ -1082,31 +1082,26 @@ button {
   opacity: 0.4;
 }
 
-/* Content column — title hugs image, big text */
+/* Content column — title+number grouped (small gap), body below (larger) */
 .wp-content .vision-row .vision-content {
   align-items: flex-start;
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 12px;
   min-width: 0;
   text-align: left;
 }
 
-/* Short horizontal divider above the title */
-.wp-content .vision-row .vision-content::before {
-  background: linear-gradient(90deg, var(--accent) 0%, #93c5fd 100%);
-  content: "";
-  display: block;
-  height: 3px;
-  margin-bottom: 6px;
-  width: 72px;
+/* Group title + number: first two children get tiny gap, rest get the 12px */
+.wp-content .vision-row .vision-content > .vision-title {
+  margin-bottom: -4px !important;
 }
-.wp-content .vision-row-even .vision-content::before {
-  align-self: flex-end;
-  background: linear-gradient(90deg, #93c5fd 0%, var(--accent) 100%);
+.wp-content .vision-row .vision-content > .vision-number + .vision-text,
+.wp-content .vision-row .vision-content > .vision-text {
+  /* nothing extra */
 }
 
-/* Title — bigger, navy, hugs the image */
+/* Title — bigger, navy */
 .wp-content .vision-title {
   background: none !important;
   border: 0 !important;
@@ -1115,7 +1110,7 @@ button {
   font-size: clamp(22px, 2.2vw, 30px);
   font-weight: 800;
   letter-spacing: 0;
-  line-height: 1.2;
+  line-height: 1.1;
   margin: 0 !important;
   padding: 0 !important;
   position: relative;
@@ -1125,15 +1120,15 @@ button {
   display: none !important;
 }
 
-/* Number — large light-gray "01"-"06", inline with title */
+/* Number — large light-gray "01"-"06", tight under title */
 .wp-content .vision-number {
   color: #cbd5e1;
   font-family: var(--font-sans);
-  font-size: clamp(40px, 4.4vw, 60px);
+  font-size: clamp(36px, 4vw, 52px);
   font-weight: 900;
   letter-spacing: 0;
   line-height: 1;
-  margin: 0 !important;
+  margin: -4px 0 0 0 !important;
   text-align: left;
 }
 .wp-content .vision-row-even .vision-number {
