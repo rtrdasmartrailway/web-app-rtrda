@@ -80,3 +80,27 @@ jobs:
           docker compose ps
           docker compose logs --tail=120 web-app-rtrda-test
           exit 1
+
+      - name: Purge Cloudflare edge cache (optional)
+        if: ${{ always() }}
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ZONE_ID: ${{ secrets.CLOUDFLARE_ZONE_ID }}
+        run: |
+          # Without these secrets the deploy relies on the s-maxage we set
+          # in next.config.ts (60s edge TTL, 300s SWR). With them we issue
+          # a "purge everything" so the deploy is visible immediately.
+          if [ -z "$CLOUDFLARE_API_TOKEN" ] || [ -z "$CLOUDFLARE_ZONE_ID" ]; then
+            echo "::notice::No CLOUDFLARE_API_TOKEN/ZONE_ID secrets set; relying on TTL (deploys visible within ~5 min)."
+            exit 0
+          fi
+          echo "Purging Cloudflare cache for zone $CLOUDFLARE_ZONE_ID"
+          curl -fsS -X POST \
+            "https://api.cloudflare.com/client/v4/zones/${CLOUDFLARE_ZONE_ID}/purge_cache" \
+            -H "Authorization: Bearer ${CLOUDFLARE_API_TOKEN}" \
+            -H "Content-Type: application/json" \
+            --data '{"purge_everything":true}' \
+            | tee /tmp/cf-purge.json
+          grep -q '"success":\s*true' /tmp/cf-purge.json || {
+            echo "::warning::Cloudflare purge did not report success; deploy will be visible once the edge TTL expires."
+          }

@@ -28,6 +28,20 @@ const nextConfig: NextConfig = {
           { key: "Cache-Control", value: "public, max-age=14400, s-maxage=86400" },
         ],
       },
+      // HTML pages: keep them on the edge briefly so bursts don't pound the
+      // origin, but make sure deploys are visible within minutes. Without
+      // this rule Next.js defaults to s-maxage=31536000 (1 year) which
+      // makes Cloudflare's stale-while-revalidate window huge — every push
+      // looks like a rollback for the next hour.
+      {
+        source: "/:path*",
+        headers: [
+          {
+            key: "Cache-Control",
+            value: "public, max-age=0, s-maxage=60, stale-while-revalidate=300",
+          },
+        ],
+      },
     ];
   },
   async redirects() {

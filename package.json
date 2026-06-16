@@ -6,6 +6,7 @@
     "dev": "next dev",
     "import:wordpress": "node scripts/import-wordpress.mjs",
     "audit:parity": "node scripts/audit-parity.mjs",
+    "audit:divergence": "node scripts/audit-divergence.mjs",
     "db:migrate": "prisma migrate deploy",
     "db:seed": "node scripts/seed-db.mjs",
     "db:studio": "prisma studio",
