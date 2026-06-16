@@ -1699,8 +1699,12 @@ button {
   z-index: 1;
 }
 .wp-content .wp-block-columns.story > .wp-block-column > figure.wp-block-image img {
-  filter: brightness(0) saturate(100%) invert(15%) sepia(38%) saturate(2456%)
-    hue-rotate(202deg) brightness(95%) contrast(95%);
+  /* Source PNGs (strategy-1.png / mining.png / team.png) are
+     already authored in the brand navy/cyan palette — applying
+     the invert+sepia+hue-rotate filter turned them all into a
+     flat navy blob and erased the per-icon distinction.
+     Per request on /เกี่ยวกับ-สทร/ความเป็นมา, show the original
+     colors so the three cards are visually distinct. */
   height: 42px;
   margin: 0;
   object-fit: contain;
