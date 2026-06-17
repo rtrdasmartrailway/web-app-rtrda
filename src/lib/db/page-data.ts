@@ -11,6 +11,11 @@ import {
   type PresentationNavItem,
   type PresentationSidebarItem,
 } from "@/lib/wp/presentation";
+import {
+  buildPdfReaderTargets,
+  extractIframePdfSource,
+  type PdfReaderTarget,
+} from "@/lib/wp/pdf-reader";
 import { normalizeRoutePath } from "@/lib/wp/url";
 import { extractPartnerLogos } from "@/lib/wp/home";
 import {
@@ -20,6 +25,7 @@ import {
   getCategoryBySlug,
   getChildren,
   getGeneratedAt,
+  getDownloadById,
   getLatestPosts,
   getMediaByIds,
   getNavigation,
@@ -78,6 +84,7 @@ export interface PageData {
   stats: SiteStats | null;
   /** Custom home-page sections; null for non-home pages. */
   home: HomeData | null;
+  pdfReaderTargets: PdfReaderTarget[];
   sidebarItems: PresentationSidebarItem[];
   parentTitle: string;
   shell: ShellData;
@@ -169,19 +176,34 @@ export const getPageData = cache(async (path: string): Promise<PageData | null> 
 
   const isHome = record.path === "/" || record.path === "/en";
   const isCategory = record.kind === "category";
-  const [childRecords, siblingRecords, latestRecords, stats, shell, home] =
-    await Promise.all([
-      getChildren(record.path, record.language),
-      record.parentPath
-        ? getChildren(record.parentPath, record.language)
-        : Promise.resolve([]),
-      isHome && !hasImportedLatestPosts(record)
-        ? getLatestPosts(record.language)
-        : Promise.resolve([]),
-      isHome ? getStats() : Promise.resolve(null),
-      buildShellData(path),
-      isHome ? buildHomeData(record) : Promise.resolve(null),
-    ]);
+  const [
+    childRecords,
+    siblingRecords,
+    latestRecords,
+    stats,
+    shell,
+    home,
+    pdfReaderTargets,
+  ] = await Promise.all([
+    getChildren(record.path, record.language),
+    record.parentPath
+      ? getChildren(record.parentPath, record.language)
+      : Promise.resolve([]),
+    isHome && !hasImportedLatestPosts(record)
+      ? getLatestPosts(record.language)
+      : Promise.resolve([]),
+    isHome ? getStats() : Promise.resolve(null),
+    buildShellData(path),
+    isHome ? buildHomeData(record) : Promise.resolve(null),
+    buildPdfReaderTargets(record.contentHtml, {
+      resolveDownload: getDownloadById,
+      resolveFlipbookPdf: async (flipbookPath) => {
+        const flipbook = await getRecordByPath(flipbookPath);
+        const pdfPath = flipbook ? extractIframePdfSource(flipbook.contentHtml) : null;
+        return pdfPath ? { pdfPath, title: flipbook?.title } : null;
+      },
+    }),
+  ]);
 
   const parentRecord = record.parentPath
     ? await getRecordByPath(record.parentPath)
@@ -201,6 +223,7 @@ export const getPageData = cache(async (path: string): Promise<PageData | null> 
     categoryPagination,
     stats,
     home,
+    pdfReaderTargets,
     sidebarItems:
       record.kind === "page"
         ? buildSidebarItems(record, childRecords, siblingRecords)

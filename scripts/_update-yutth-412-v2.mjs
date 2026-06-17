@@ -1,8 +1,8 @@
-import { PrismaPg } from '@prisma/adapter-pg';
-import { PrismaClient } from '../src/generated/prisma/client.ts';
+import { PrismaPg } from "@prisma/adapter-pg";
+import { PrismaClient } from "../src/generated/prisma/client.ts";
 
-const LEGACY = 'https://www.rtrda.or.th';
-const PATH = '/ผลงานและโครงการเด่น/ยุทธศาสตร์-เทคโนโลยี-ระบ';
+const LEGACY = "https://www.rtrda.or.th";
+const PATH = "/ผลงานและโครงการเด่น/ยุทธศาสตร์-เทคโนโลยี-ระบ";
 
 // Note: `public/wp-content/uploads` is NOT in the Docker image (per
 // the rtrda-web-app skill), so all 5 images 404 locally. Hot-link
@@ -95,10 +95,13 @@ const p = new PrismaClient({
   adapter: new PrismaPg({ connectionString: process.env.DATABASE_URL }),
 });
 const r = await p.contentRecord.findUnique({ where: { path: PATH } });
-if (!r) { console.error('not found:', PATH); process.exit(1); }
+if (!r) {
+  console.error("not found:", PATH);
+  process.exit(1);
+}
 await p.contentRecord.update({
   where: { path: PATH },
   data: { contentHtml: newHtml, modified: new Date().toISOString() },
 });
-console.log('UPDATED. new length:', newHtml.length);
+console.log("UPDATED. new length:", newHtml.length);
 await p.$disconnect();

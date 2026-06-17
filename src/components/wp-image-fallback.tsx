@@ -7,15 +7,10 @@ const LEGACY_ORIGIN = "https://www.rtrda.or.th";
 /**
  * Two responsibilities:
  *
- * 1. URL rewrite — every <img> inside .wp-content whose src is a
- *    relative /wp-content/uploads/ path or a relative /sdc_download/
- *    href (for any <a>) is rewritten at runtime to the absolute
- *    legacy WP host. The frozen src/data/wp-content.json still
- *    contains the relative URLs and the public Docker image is
- *    missing the mirrored public/wp-content/uploads and
- *    public/sdc-downloads directories (see .dockerignore), so without
- *    this rewrite every cover image, every 3d-flip-book link, and
- *    every sdc_download link 404s on the deployed site.
+ * 1. URL rewrite — images inside .wp-content whose src/srcset point to
+ *    relative /wp-content/uploads/ paths are rewritten to the legacy WP host.
+ *    Anchor hrefs stay on the migrated site so PDF/download links can be
+ *    handled by the in-site reader and existing Next routes.
  *
  * 2. Error placeholder — if a rewritten image still fails to load
  *    (e.g. legacy returned 500 and the browser tried the original
@@ -49,14 +44,6 @@ export function WpImageFallback() {
         // images (manpower.png, database.png) cached as 404
         // locally even though the live URL now returns 200.
         rewrite: (v) => `${LEGACY_ORIGIN}${v}?v=2`,
-      },
-      {
-        attr: "href",
-        match: (v) =>
-          v.startsWith("/wp-content/uploads/") ||
-          v.startsWith("/3d-flip-book/") ||
-          v.startsWith("/sdc_download/"),
-        rewrite: (v) => LEGACY_ORIGIN + v,
       },
       {
         attr: "srcset",

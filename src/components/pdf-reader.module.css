@@ -1,0 +1,157 @@
+.backdrop {
+  align-items: center;
+  background: rgba(5, 16, 35, 0.78);
+  display: flex;
+  inset: 0;
+  justify-content: center;
+  padding: 22px;
+  position: fixed;
+  z-index: 1000;
+}
+
+.modal {
+  background: #f7fafc;
+  border-radius: 18px;
+  box-shadow: 0 28px 70px rgba(0, 0, 0, 0.34);
+  display: flex;
+  flex-direction: column;
+  height: min(88vh, 920px);
+  max-width: 1120px;
+  overflow: hidden;
+  width: min(100%, 1120px);
+}
+
+.header {
+  align-items: center;
+  background: #062b5f;
+  color: #fff;
+  display: flex;
+  gap: 18px;
+  justify-content: space-between;
+  padding: 18px 22px;
+}
+
+.titleGroup {
+  min-width: 0;
+}
+
+.titleGroup span {
+  color: #9bd4ff;
+  display: block;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  margin-bottom: 4px;
+  text-transform: uppercase;
+}
+
+.titleGroup h2 {
+  font-size: clamp(18px, 2.2vw, 26px);
+  line-height: 1.28;
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.closeButton {
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  border-radius: 999px;
+  color: #fff;
+  cursor: pointer;
+  flex: 0 0 auto;
+  font: inherit;
+  font-weight: 700;
+  padding: 9px 16px;
+}
+
+.closeButton:hover,
+.closeButton:focus-visible,
+.toolbar a:hover,
+.toolbar a:focus-visible {
+  outline: 3px solid rgba(46, 158, 255, 0.36);
+  outline-offset: 2px;
+}
+
+.toolbar {
+  align-items: center;
+  background: #fff;
+  border-bottom: 1px solid #d8e1ee;
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+  padding: 12px 18px;
+}
+
+.toolbar a {
+  background: linear-gradient(135deg, #006fc9, #063b80);
+  border-radius: 999px;
+  color: #fff;
+  font-weight: 800;
+  padding: 9px 16px;
+  text-decoration: none;
+}
+
+.toolbar a:last-child {
+  background: #eef5ff;
+  color: #063b80;
+}
+
+.frameShell {
+  background: #d9e2ee;
+  flex: 1;
+  min-height: 0;
+  position: relative;
+}
+
+.loading {
+  align-items: center;
+  color: #063b80;
+  display: flex;
+  font-weight: 800;
+  inset: 0;
+  justify-content: center;
+  position: absolute;
+  z-index: 1;
+}
+
+.frame {
+  background: #fff;
+  border: 0;
+  height: 100%;
+  position: relative;
+  width: 100%;
+  z-index: 2;
+}
+
+@media (max-width: 720px) {
+  .backdrop {
+    padding: 0;
+  }
+
+  .modal {
+    border-radius: 0;
+    height: 100dvh;
+    max-width: none;
+    width: 100%;
+  }
+
+  .header {
+    align-items: flex-start;
+    padding: 14px 14px 12px;
+  }
+
+  .closeButton {
+    padding: 8px 12px;
+  }
+
+  .toolbar {
+    justify-content: stretch;
+    padding: 10px 12px;
+  }
+
+  .toolbar a {
+    flex: 1;
+    padding-inline: 10px;
+    text-align: center;
+  }
+}

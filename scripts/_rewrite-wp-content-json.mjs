@@ -1,15 +1,15 @@
-import { readFile, writeFile } from 'node:fs/promises';
-import path from 'node:path';
+import { readFile, writeFile } from "node:fs/promises";
+import path from "node:path";
 
-const JSON_PATH = path.resolve('src/data/wp-content.json');
-const LEGACY = 'https://www.rtrda.or.th';
+const JSON_PATH = path.resolve("src/data/wp-content.json");
+const LEGACY = "https://www.rtrda.or.th";
 
-const raw = await readFile(JSON_PATH, 'utf8');
+const raw = await readFile(JSON_PATH, "utf8");
 let count = { records: 0, srcset: 0, src: 0, href: 0 };
 
 const json = JSON.parse(raw);
 for (const rec of json.records) {
-  if (typeof rec.contentHtml !== 'string') continue;
+  if (typeof rec.contentHtml !== "string") continue;
   const before = rec.contentHtml;
   rec.contentHtml = rec.contentHtml
     // 1) srcset attribute — comma list of "url sizew" pairs
@@ -41,6 +41,6 @@ for (const rec of json.records) {
   if (before !== rec.contentHtml) count.records++;
 }
 
-await writeFile(JSON_PATH, JSON.stringify(json), 'utf8');
-console.log('REWRITTEN:', JSON.stringify(count));
-console.log('records touched:', count.records);
+await writeFile(JSON_PATH, JSON.stringify(json), "utf8");
+console.log("REWRITTEN:", JSON.stringify(count));
+console.log("records touched:", count.records);

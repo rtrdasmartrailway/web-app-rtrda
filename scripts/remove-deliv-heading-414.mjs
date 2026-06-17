@@ -39,11 +39,7 @@ for (const { id, lang } of PAGES) {
   const newHtml = h.replace(headerRe, "");
 
   if (newHtml === h) {
-    console.warn(
-      "[",
-      id,
-      "] WARNING: replacement did nothing — check HTML structure",
-    );
+    console.warn("[", id, "] WARNING: replacement did nothing — check HTML structure");
     continue;
   }
   console.log("[", id, "] new html len:", newHtml.length);
@@ -56,15 +52,10 @@ for (const { id, lang } of PAGES) {
 
   // Mirror to wp-content.json
   const j = JSON.parse(await readFile("src/data/wp-content.json", "utf8"));
-  const idx = j.records.findIndex(
-    (x) => x.path === r.path && x.language === lang,
-  );
+  const idx = j.records.findIndex((x) => x.path === r.path && x.language === lang);
   if (idx >= 0) {
     j.records[idx] = { ...j.records[idx], contentHtml: newHtml };
-    await writeFile(
-      "src/data/wp-content.json",
-      JSON.stringify(j, null, 2) + "\n",
-    );
+    await writeFile("src/data/wp-content.json", JSON.stringify(j, null, 2) + "\n");
     console.log("[", id, "] mirrored to wp-content.json");
   } else {
     console.error("[", id, "] record not found in JSON");

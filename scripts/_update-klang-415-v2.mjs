@@ -1,14 +1,17 @@
-import { PrismaPg } from '@prisma/adapter-pg';
-import { PrismaClient } from '../src/generated/prisma/client.ts';
+import { PrismaPg } from "@prisma/adapter-pg";
+import { PrismaClient } from "../src/generated/prisma/client.ts";
 
-const LEGACY = 'https://www.rtrda.or.th';
-const PATH = '/คลังความรู้';
+const LEGACY = "https://www.rtrda.or.th";
+const PATH = "/คลังความรู้";
 
 const p = new PrismaClient({
   adapter: new PrismaPg({ connectionString: process.env.DATABASE_URL }),
 });
 const r = await p.contentRecord.findUnique({ where: { path: PATH } });
-if (!r) { console.error('not found:', PATH); process.exit(1); }
+if (!r) {
+  console.error("not found:", PATH);
+  process.exit(1);
+}
 
 let html = r.contentHtml;
 
@@ -17,7 +20,7 @@ let html = r.contentHtml;
 //    input + button above the breadcrumb. The header already provides this.
 html = html.replace(
   /ค้นหา<div class="wp-block-search__inside-wrapper[^>]*>[\s\S]*?<\/button><\/div>/,
-  '',
+  "",
 );
 
 // 2) Rewrite every image src to the legacy WP host.
@@ -47,5 +50,5 @@ await p.contentRecord.update({
   where: { path: PATH },
   data: { contentHtml: html, modified: new Date().toISOString() },
 });
-console.log('UPDATED. new length:', html.length);
+console.log("UPDATED. new length:", html.length);
 await p.$disconnect();

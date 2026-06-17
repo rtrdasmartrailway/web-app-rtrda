@@ -5,6 +5,7 @@ import { ArticleCard } from "./article-card";
 import { CategoryNewsListing } from "./category-news-listing";
 import { CategoryPagination } from "./category-pagination";
 import { HomeSections } from "./home/home-sections";
+import { PdfReader } from "./pdf-reader";
 import { SiteShell } from "./site-shell";
 import { YutthLightbox } from "./yutth-lightbox";
 import { WpImageFallback } from "./wp-image-fallback";
@@ -176,6 +177,7 @@ export function ContentPage({ data }: { data: PageData }) {
               />
             )}
             <YutthLightbox />
+            <PdfReader targets={data.pdfReaderTargets} language={record.language} />
             <WpImageFallback />
 
             {/* Category listings already show their own news cards; skip related. */}

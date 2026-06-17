@@ -1,8 +1,8 @@
-import { PrismaPg } from '@prisma/adapter-pg';
-import { PrismaClient } from '../src/generated/prisma/client.ts';
+import { PrismaPg } from "@prisma/adapter-pg";
+import { PrismaClient } from "../src/generated/prisma/client.ts";
 
-const LEGACY = 'https://www.rtrda.or.th';
-const PATH = '/เกี่ยวกับ-สทร/ตราสัญลักษณ์-สทร';
+const LEGACY = "https://www.rtrda.or.th";
+const PATH = "/เกี่ยวกับ-สทร/ตราสัญลักษณ์-สทร";
 
 const newHtml = `
 <figure class="wp-block-image size-full is-style-vk-image-shadow tralat-hero">
@@ -77,13 +77,16 @@ const p = new PrismaClient({
   adapter: new PrismaPg({ connectionString: process.env.DATABASE_URL }),
 });
 const r = await p.contentRecord.findFirst({
-  where: { path: PATH, language: 'th' },
+  where: { path: PATH, language: "th" },
 });
-if (!r) { console.error('not found:', PATH); process.exit(1); }
+if (!r) {
+  console.error("not found:", PATH);
+  process.exit(1);
+}
 await p.contentRecord.update({
   where: { path: PATH },
   data: { contentHtml: newHtml, modified: new Date().toISOString() },
 });
-console.log('UPDATED. new length:', newHtml.length);
-console.log('PATH:', r.path);
+console.log("UPDATED. new length:", newHtml.length);
+console.log("PATH:", r.path);
 await p.$disconnect();

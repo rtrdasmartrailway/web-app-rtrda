@@ -12,8 +12,7 @@ const PAGES = [
 const TH = [
   {
     n: "1",
-    text:
-      "การลงพื้นที่จังหวัดอุดรธานี จังหวัดหนองคาย และ สาธารณรัฐประชาธิปไตยประชาชนลาว (สปป.ลาว) ในระหว่างวันที่ 26-27 ม.ค. 66 ร่วมกับกรมการขนส่งทางราง (ขร.) เพื่อสำรวจแนวเส้นทางการขนส่งสินค้าแบบควบคุมอุณหภูมิในระบบราง (Cold Chain Logistics) และรับรู้ถึงปัญหา และข้อจำกัดของการขนส่งสินค้าทางรางแบบควบคุมอุณหภูมิจากประเทศไทยไปยังจีน โดยผ่านเส้นทางรถไฟความเร็วสูงลาว-จีน",
+    text: "การลงพื้นที่จังหวัดอุดรธานี จังหวัดหนองคาย และ สาธารณรัฐประชาธิปไตยประชาชนลาว (สปป.ลาว) ในระหว่างวันที่ 26-27 ม.ค. 66 ร่วมกับกรมการขนส่งทางราง (ขร.) เพื่อสำรวจแนวเส้นทางการขนส่งสินค้าแบบควบคุมอุณหภูมิในระบบราง (Cold Chain Logistics) และรับรู้ถึงปัญหา และข้อจำกัดของการขนส่งสินค้าทางรางแบบควบคุมอุณหภูมิจากประเทศไทยไปยังจีน โดยผ่านเส้นทางรถไฟความเร็วสูงลาว-จีน",
     imgs: [
       "ข่าวที่1-2.png",
       "ข่าวที่1-3.png",
@@ -25,8 +24,7 @@ const TH = [
   },
   {
     n: "2",
-    text:
-      "เข้าร่วมโครงการทดลองการใช้งาน Fuel cell สำหรับรถไฟ รฟท. ณ สถาบันนวัตกรรม ปตท. อ.วังน้อย จ.พระนครศรีอยุธยา ในวันที่ 17 กุมภาพัฒน์ 2566 นำโดย นายวัชรชาญ สิริสุวรรณทัศน์ รองผู้ว่าการรถไฟแห่งประเทศไทย และ ดร.สันติ เจริญพรพัฒนา ผอ. สถาบันวิจัยและพัฒนาเทคโนโลยีระบบราง (องค์การมหาชน) นำคณะนักวิจัย สทร. โดยมี คุณยุทธนา สุวรรณโชติ ผู้ช่วยกรรมการผู้จัดการใหญ่ สถาบันนวัตกรรม ปตท. และทีมงานร่วมให้การต้อนรับ พร้อมนำเสนอข้อมูลการใช้พลังงานไฮโดรเจน ทั้งในและต่างประเทศ และเข้าเยี่ยมชมอาคารทดสอบต่างๆ",
+    text: "เข้าร่วมโครงการทดลองการใช้งาน Fuel cell สำหรับรถไฟ รฟท. ณ สถาบันนวัตกรรม ปตท. อ.วังน้อย จ.พระนครศรีอยุธยา ในวันที่ 17 กุมภาพัฒน์ 2566 นำโดย นายวัชรชาญ สิริสุวรรณทัศน์ รองผู้ว่าการรถไฟแห่งประเทศไทย และ ดร.สันติ เจริญพรพัฒนา ผอ. สถาบันวิจัยและพัฒนาเทคโนโลยีระบบราง (องค์การมหาชน) นำคณะนักวิจัย สทร. โดยมี คุณยุทธนา สุวรรณโชติ ผู้ช่วยกรรมการผู้จัดการใหญ่ สถาบันนวัตกรรม ปตท. และทีมงานร่วมให้การต้อนรับ พร้อมนำเสนอข้อมูลการใช้พลังงานไฮโดรเจน ทั้งในและต่างประเทศ และเข้าเยี่ยมชมอาคารทดสอบต่างๆ",
     imgs: [
       "ข่าวที่2-1-1024x682.jpg",
       "ข่าวที่2-2.jpg",
@@ -36,8 +34,7 @@ const TH = [
   },
   {
     n: "3",
-    text:
-      "การสัมมนา Hydrogen Thailand symposium ณ Holiday Inn Pattaya ในวันที่ วันที่ 23 กุมภาพัฒน์ 2566 ซึ่งเป็นงานที่เกิดจากความร่วมมือกันของหน่วยงานทั้งภาครัฐและเอกชน เพื่อผลักดันและเตรียมความพร้อมในการใช้พลังงานจากไฮโดรเจนและเซลล์เชื้อเพลิง ภายในงานจัดแสดงนิทรรศการ และให้สัมมนาหัวข้อที่มีความน่าสนใจเกี่ยวกับพลังงานไฮโดรเจน ทั้งในส่วนของการ ผลิต กักเก็บ การใช้ประโยชน์ และนโยบายที่ส่งเสริมให้เกิดการใช้งานอย่างเหมาะสมในต่างประเทศ",
+    text: "การสัมมนา Hydrogen Thailand symposium ณ Holiday Inn Pattaya ในวันที่ วันที่ 23 กุมภาพัฒน์ 2566 ซึ่งเป็นงานที่เกิดจากความร่วมมือกันของหน่วยงานทั้งภาครัฐและเอกชน เพื่อผลักดันและเตรียมความพร้อมในการใช้พลังงานจากไฮโดรเจนและเซลล์เชื้อเพลิง ภายในงานจัดแสดงนิทรรศการ และให้สัมมนาหัวข้อที่มีความน่าสนใจเกี่ยวกับพลังงานไฮโดรเจน ทั้งในส่วนของการ ผลิต กักเก็บ การใช้ประโยชน์ และนโยบายที่ส่งเสริมให้เกิดการใช้งานอย่างเหมาะสมในต่างประเทศ",
     imgs: [
       "ข่าวที่3-1-1024x576.jpg",
       "ข่าวที่3-2-1024x576.jpg",
@@ -47,8 +44,7 @@ const TH = [
   },
   {
     n: "4",
-    text:
-      "การลงพื้นที่สำรวจแนวเส้นทางการขนส่งสินค้าแบบควบคุมอุณหภูมิในระบบราง (Cold Chain Logistics) ณ จังหวัดระยอง และจังหวัดจันทบุรี ในวันที่ 1-2 มีนาคม 2566 โดยทางทีมวิจัยฯร่วมกับกรมการขนส่งทางราง (ขร.) ได้ทำการสัมภาษณ์คุณปัญญา ปะพุธสะโร ประธานกรรมการ บริษัท เก้าเจริญ เทรน ทรานสปอร์ต จำกัด ณ สถานีรถไฟมาบตาพุด ถึงสถานการณ์ปัจจุบัน ปัญหา ข้อจำกัด และแผนในอนาคตของการขนส่งทุเรียนโดยระบบรางจากไทยไปจีน และได้เยี่ยมชมขั้นตอนการบรรจุทุเรียนในตู้ขนส่งสินค้าแบบควบคุมอุณหภูมิ",
+    text: "การลงพื้นที่สำรวจแนวเส้นทางการขนส่งสินค้าแบบควบคุมอุณหภูมิในระบบราง (Cold Chain Logistics) ณ จังหวัดระยอง และจังหวัดจันทบุรี ในวันที่ 1-2 มีนาคม 2566 โดยทางทีมวิจัยฯร่วมกับกรมการขนส่งทางราง (ขร.) ได้ทำการสัมภาษณ์คุณปัญญา ปะพุธสะโร ประธานกรรมการ บริษัท เก้าเจริญ เทรน ทรานสปอร์ต จำกัด ณ สถานีรถไฟมาบตาพุด ถึงสถานการณ์ปัจจุบัน ปัญหา ข้อจำกัด และแผนในอนาคตของการขนส่งทุเรียนโดยระบบรางจากไทยไปจีน และได้เยี่ยมชมขั้นตอนการบรรจุทุเรียนในตู้ขนส่งสินค้าแบบควบคุมอุณหภูมิ",
     imgs: [
       "ข่าวที่4-1-1024x683.jpg",
       "ข่าวที่4-2-1024x576.jpg",
@@ -64,8 +60,7 @@ const TH = [
 const EN = [
   {
     n: "1",
-    text:
-      "On January 26-27, 2023, The R&amp;D Team, together with the Department of Rail Transport, conducted field visits in Udon Thani Province, Nong Khai Province, and the Lao People's Democratic Republic (Lao PDR). The purpose of the visits was to explore the route for temperature-controlled freight in the rail system, also known as cold chain logistics, and to identify any problems or limitations in temperature-controlled rail transport from Thailand to China via the Laos-China high-speed rail route.",
+    text: "On January 26-27, 2023, The R&amp;D Team, together with the Department of Rail Transport, conducted field visits in Udon Thani Province, Nong Khai Province, and the Lao People's Democratic Republic (Lao PDR). The purpose of the visits was to explore the route for temperature-controlled freight in the rail system, also known as cold chain logistics, and to identify any problems or limitations in temperature-controlled rail transport from Thailand to China via the Laos-China high-speed rail route.",
     imgs: [
       "ข่าวที่1-2.png",
       "ข่าวที่1-3.png",
@@ -77,8 +72,7 @@ const EN = [
   },
   {
     n: "2",
-    text:
-      "On February 17, 2023, the R&amp;D team participated in a discussion on the fuel cell trial project for SRT trains at PTT Innovation Institute in Wang Noi District, Phra Nakhon Si Ayutthaya Province. The meeting was led by Mr. Watcharachan Sirisuwantas, Deputy Governor of the State Railway of Thailand, and Dr. Santi Charoenpornpattana, Director of Rail Technology Research and Development Agency (Public Organization), who were accompanied by a team of researchers. Mr. Yuttana Suwanchot, Executive Vice President of PTT Innovation Institute, and his team members welcomed us and provided information on hydrogen energy use both domestically and internationally. We also viewed various laboratories as part of the project.",
+    text: "On February 17, 2023, the R&amp;D team participated in a discussion on the fuel cell trial project for SRT trains at PTT Innovation Institute in Wang Noi District, Phra Nakhon Si Ayutthaya Province. The meeting was led by Mr. Watcharachan Sirisuwantas, Deputy Governor of the State Railway of Thailand, and Dr. Santi Charoenpornpattana, Director of Rail Technology Research and Development Agency (Public Organization), who were accompanied by a team of researchers. Mr. Yuttana Suwanchot, Executive Vice President of PTT Innovation Institute, and his team members welcomed us and provided information on hydrogen energy use both domestically and internationally. We also viewed various laboratories as part of the project.",
     imgs: [
       "ข่าวที่2-1-1024x682.jpg",
       "ข่าวที่2-2.jpg",
@@ -88,8 +82,7 @@ const EN = [
   },
   {
     n: "3",
-    text:
-      "On February 23, 2023, the R&amp;D team participated in the Hydrogen Thailand symposium at Holiday Inn Pattaya. The event was a collaboration between the government and private sectors aimed at promoting the use of hydrogen and fuel cells as a source of energy. The symposium featured an exhibition as well as seminars on various topics related to hydrogen energy, including production, storage, utilization, and policies that promote the fair use of hydrogen in Thailand.",
+    text: "On February 23, 2023, the R&amp;D team participated in the Hydrogen Thailand symposium at Holiday Inn Pattaya. The event was a collaboration between the government and private sectors aimed at promoting the use of hydrogen and fuel cells as a source of energy. The symposium featured an exhibition as well as seminars on various topics related to hydrogen energy, including production, storage, utilization, and policies that promote the fair use of hydrogen in Thailand.",
     imgs: [
       "ข่าวที่3-1-1024x576.jpg",
       "ข่าวที่3-2-1024x576.jpg",
@@ -99,8 +92,7 @@ const EN = [
   },
   {
     n: "4",
-    text:
-      "On March 1-2, 2023, the R&amp;D team, together with the Department of Rail Transport (DRT), conducted field surveys of temperature-controlled freight transport routes in the rail system (Cold Chain Logistics) in Rayong and Chanthaburi provinces. The team interviewed Mr. Panya Paputsaro, Chairman of Kao Charoen Train Transport Co., Ltd., at Map Ta Phut railway station, regarding the current situation, problems, limitations, and future plans for durian transport by rail from Thailand to China. The team also observed the process of loading durian into temperature-controlled cargo containers.",
+    text: "On March 1-2, 2023, the R&amp;D team, together with the Department of Rail Transport (DRT), conducted field surveys of temperature-controlled freight transport routes in the rail system (Cold Chain Logistics) in Rayong and Chanthaburi provinces. The team interviewed Mr. Panya Paputsaro, Chairman of Kao Charoen Train Transport Co., Ltd., at Map Ta Phut railway station, regarding the current situation, problems, limitations, and future plans for durian transport by rail from Thailand to China. The team also observed the process of loading durian into temperature-controlled cargo containers.",
     imgs: [
       "ข่าวที่4-1-1024x683.jpg",
       "ข่าวที่4-2-1024x576.jpg",
@@ -184,8 +176,7 @@ for (const { id, lang } of PAGES) {
 
   const events = lang === "en" ? EN : TH;
   const newSection = buildSection(events, lang);
-  const newHtml =
-    h.slice(0, headingEnd) + "\n\n" + newSection + "\n";
+  const newHtml = h.slice(0, headingEnd) + "\n\n" + newSection + "\n";
 
   await p.contentRecord.update({
     where: { id },
@@ -195,15 +186,10 @@ for (const { id, lang } of PAGES) {
 
   // Mirror to wp-content.json
   const j = JSON.parse(await readFile("src/data/wp-content.json", "utf8"));
-  const idx = j.records.findIndex(
-    (x) => x.path === r.path && x.language === lang,
-  );
+  const idx = j.records.findIndex((x) => x.path === r.path && x.language === lang);
   if (idx >= 0) {
     j.records[idx] = { ...j.records[idx], contentHtml: newHtml };
-    await writeFile(
-      "src/data/wp-content.json",
-      JSON.stringify(j, null, 2) + "\n",
-    );
+    await writeFile("src/data/wp-content.json", JSON.stringify(j, null, 2) + "\n");
     console.log("[", id, "] mirrored to wp-content.json");
   } else {
     console.error("[", id, "] record not found in JSON, manual mirror needed");

@@ -10,7 +10,10 @@ const PATH = "/เกี่ยวกับ-สทร/ค่านิยมอง
 
 // Backup first
 const cur = await p.contentRecord.findUnique({ where: { path: PATH } });
-if (!cur) { console.error("Page not found"); process.exit(1); }
+if (!cur) {
+  console.error("Page not found");
+  process.exit(1);
+}
 
 await p.siteMeta.upsert({
   where: { key: "values_letters_pre_v1" },

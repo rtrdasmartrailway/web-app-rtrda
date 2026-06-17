@@ -1,11 +1,16 @@
-import { PrismaPg } from '@prisma/adapter-pg';
-import { PrismaClient } from '../src/generated/prisma/client.ts';
+import { PrismaPg } from "@prisma/adapter-pg";
+import { PrismaClient } from "../src/generated/prisma/client.ts";
 
-const LEGACY = 'https://www.rtrda.or.th';
-const PATH = '/คลังความรู้';
-const p = new PrismaClient({ adapter: new PrismaPg({ connectionString: process.env.DATABASE_URL }) });
+const LEGACY = "https://www.rtrda.or.th";
+const PATH = "/คลังความรู้";
+const p = new PrismaClient({
+  adapter: new PrismaPg({ connectionString: process.env.DATABASE_URL }),
+});
 const r = await p.contentRecord.findUnique({ where: { path: PATH } });
-if (!r) { console.error('not found'); process.exit(1); }
+if (!r) {
+  console.error("not found");
+  process.exit(1);
+}
 
 let html = r.contentHtml;
 let changed = 0;
@@ -14,7 +19,10 @@ let changed = 0;
 //    The attribute is a comma-separated list of "url sizew" pairs. We'll
 //    only touch the URL portion, leaving the descriptor (e.g. "602w") alone.
 function rewriteSrcset(s) {
-  return s.replace(/(\s|^)(\/wp-content\/uploads\/[^\s,]+)/g, (_, sp, url) => `${sp}${LEGACY}${url}`);
+  return s.replace(
+    /(\s|^)(\/wp-content\/uploads\/[^\s,]+)/g,
+    (_, sp, url) => `${sp}${LEGACY}${url}`,
+  );
 }
 
 html = html.replace(/srcset="([^"]+)"/g, (m, val) => {
@@ -28,18 +36,28 @@ html = html.replace(/srcset="([^"]+)"/g, (m, val) => {
 
 // 3) Belt-and-suspenders: catch any leftover bare /wp-content/ or /sdc_download/
 //    href/src that we may have missed (skip the alt= etc).
-html = html.replace(/(src|href)="\/wp-content\/uploads\//g, (m) => `${m.replace('/"', '"')}${LEGACY.replace(/^https?:\/\//, '')}/wp-content/`.replace('"https', '"https://').replace('/"', '/'));
+html = html.replace(/(src|href)="\/wp-content\/uploads\//g, (m) =>
+  `${m.replace('/"', '"')}${LEGACY.replace(/^https?:\/\//, "")}/wp-content/`
+    .replace('"https', '"https://')
+    .replace('/"', "/"),
+);
 // Simpler: do them in two passes.
-html = html.replace(/src="\/wp-content\/uploads\//g, `src="${LEGACY}/wp-content/uploads/`);
-html = html.replace(/href="\/wp-content\/uploads\//g, `href="${LEGACY}/wp-content/uploads/`);
+html = html.replace(
+  /src="\/wp-content\/uploads\//g,
+  `src="${LEGACY}/wp-content/uploads/`,
+);
+html = html.replace(
+  /href="\/wp-content\/uploads\//g,
+  `href="${LEGACY}/wp-content/uploads/`,
+);
 html = html.replace(/href="\/3d-flip-book\//g, `href="${LEGACY}/3d-flip-book/`);
 html = html.replace(/href="\/sdc_download\//g, `href="${LEGACY}/sdc_download/`);
 
-console.log('Rewrote', changed, 'srcset attributes');
+console.log("Rewrote", changed, "srcset attributes");
 
 await p.contentRecord.update({
   where: { path: PATH },
   data: { contentHtml: html, modified: new Date().toISOString() },
 });
-console.log('UPDATED. length:', html.length);
+console.log("UPDATED. length:", html.length);
 await p.$disconnect();
