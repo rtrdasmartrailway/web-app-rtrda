@@ -2334,22 +2334,44 @@ button {
   text-decoration: none;
 }
 
-/* Compact download buttons inside WordPress tables (ตราสัญลักษณ์ page, etc.) */
+/* Compact download buttons inside WordPress tables (ตราสัญลักษณ์
+   page, กฏหมาย/ระเบียบ accordion, etc.). Polished solid blue
+   with subtle shadow + smooth hover lift — replaces the old
+   135deg gradient that read as a "fancy pill". */
 .wp-content table a {
-  background: linear-gradient(135deg, #2563eb 0%, #06b6d4 100%);
-  border-radius: var(--radius-sm);
+  background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+  border: 0;
+  border-radius: 12px;
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.2) inset,
+    0 4px 12px rgba(37, 99, 235, 0.25);
   color: #fff !important;
   display: inline-block;
   font-size: 14px;
   font-weight: 700;
-  padding: 8px 14px;
+  letter-spacing: 0.01em;
+  line-height: 1.2;
+  padding: 10px 18px;
   text-decoration: none;
+  transition:
+    box-shadow 0.18s ease,
+    transform 0.18s ease,
+    filter 0.18s ease;
   white-space: nowrap;
 }
 
 .wp-content table a:hover {
-  filter: brightness(1.08);
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.25) inset,
+    0 6px 18px rgba(37, 99, 235, 0.35);
+  filter: brightness(1.04);
   text-decoration: none;
+  transform: translateY(-1px);
+}
+
+.wp-content table a:active {
+  filter: brightness(0.96);
+  transform: translateY(0);
 }
 
 /* Force no-wrap inside WordPress <span class="text-nowrap"> in compact links */
@@ -3964,6 +3986,7 @@ a.calendar-cell.has-posts:hover {
     width: 60%;
     /* Thai text has no spaces — let it wrap at any char to
        avoid 1-char-per-line rendering on narrow screens. */
+    padding: 14px 12px 14px 16px;
     word-break: break-word;
     overflow-wrap: anywhere;
     hyphens: none;
@@ -3971,7 +3994,8 @@ a.calendar-cell.has-posts:hover {
 
   .wp-content .lightweight-accordion-body table td:last-child {
     width: 40%;
-    text-align: right;
+    padding: 14px 16px 14px 8px;
+    text-align: center;
     vertical-align: middle;
   }
 
@@ -3979,20 +4003,21 @@ a.calendar-cell.has-posts:hover {
      mobile. Force it into a compact pill that stacks the
      text into ~2 lines centered, matching the mockup. */
   .wp-content .lightweight-accordion-body table a {
+    align-items: center;
+    box-sizing: border-box;
     display: inline-flex;
     flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    max-width: 100%;
-    width: 88px;
-    height: 56px;
-    word-break: normal;
-    overflow-wrap: break-word;
-    line-height: 1.25;
-    text-align: center;
-    padding: 6px 8px;
     font-size: 13px;
     font-weight: 700;
+    height: 56px;
+    justify-content: center;
+    line-height: 1.25;
+    max-width: 100%;
+    overflow-wrap: break-word;
+    padding: 8px 10px;
+    text-align: center;
+    width: 92px;
+    word-break: normal;
   }
 
   .wp-content .lightweight-accordion-body table a .text-nowrap,
