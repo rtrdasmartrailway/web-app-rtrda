@@ -4171,6 +4171,50 @@ a.calendar-cell.has-posts:hover {
     width: auto;
   }
 
+  /* ตราสัญลักษณ์ สทร. page — 3-col table (icon | description |
+     download button). The accordion rule above doesn't match
+     because this table is NOT inside .lightweight-accordion-body.
+     Discriminate by image-in-first-cell (unique to the tralat
+     download table, no other page has an <img> in the first td).
+     Stack to: image on top → description → full-width button. */
+  .wp-content table tr:has(td:nth-child(3)):has(td:first-child img) {
+    display: block;
+    padding: 14px 16px;
+  }
+  .wp-content table tr:has(td:nth-child(3)):has(td:first-child img) td {
+    border: 0;
+    display: block;
+    padding: 0;
+    text-align: center;
+    width: 100% !important;
+  }
+  .wp-content table tr:has(td:nth-child(3)):has(td:first-child img) td:first-child {
+    max-width: 100%;
+    padding: 0 0 10px;
+    width: 100% !important;
+  }
+  .wp-content table tr:has(td:nth-child(3)):has(td:first-child img) td:first-child img {
+    height: 56px;
+    margin: 0 auto;
+    width: 56px;
+  }
+  .wp-content table tr:has(td:nth-child(3)):has(td:first-child img) td:nth-child(2) {
+    color: #1f2937;
+    font-size: 14px;
+    line-height: 1.55;
+    padding: 0 0 12px;
+    text-align: center;
+  }
+  .wp-content table tr:has(td:nth-child(3)):has(td:first-child img) td:last-child {
+    padding: 4px 0 0;
+  }
+  .wp-content table tr:has(td:nth-child(3)):has(td:first-child img) a {
+    height: auto;
+    min-height: 44px;
+    padding: 10px 16px;
+    width: auto;
+  }
+
   /* "ดาวน์โหลด PDF" lives in a narrow button column on
      mobile. Force it into a compact pill that stacks the
      text into ~2 lines centered, matching the mockup. */
