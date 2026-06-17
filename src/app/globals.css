@@ -3969,36 +3969,25 @@ a.calendar-cell.has-posts:hover {
     hyphens: none;
   }
 
+  /* Position the "ดาวน์โหลด PDF" button cleanly inside its
+     narrow cell on mobile: keep its natural size (driven by
+     text + padding), center it, and let the text stack into
+     2 lines naturally instead of stretching the pill. */
   .wp-content .lightweight-accordion-body table td:last-child {
-    width: 40%;
-    text-align: right;
-    vertical-align: middle;
+    text-align: center;
   }
 
-  /* "ดาวน์โหลด PDF" lives in a narrow button column on
-     mobile. Force it into a compact pill that stacks the
-     text into ~2 lines centered, matching the mockup. */
   .wp-content .lightweight-accordion-body table a {
-    display: inline-flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    max-width: 100%;
-    width: 88px;
-    height: 56px;
-    word-break: normal;
-    overflow-wrap: break-word;
-    line-height: 1.25;
+    display: inline-block;
     text-align: center;
-    padding: 6px 8px;
-    font-size: 13px;
-    font-weight: 700;
+    padding: 8px 14px;
+    line-height: 1.25;
   }
 
   .wp-content .lightweight-accordion-body table a .text-nowrap,
   .wp-content .lightweight-accordion-body table a > span {
     white-space: normal;
-    display: block;
+    display: inline;
   }
 
   /* Hide the gradient chip before breadcrumb on mobile — it
