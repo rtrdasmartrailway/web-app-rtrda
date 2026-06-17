@@ -2873,8 +2873,37 @@ body:has(.yutth-lightbox) {
 }
 
 .wp-content .lightweight-accordion-body {
-  background: linear-gradient(180deg, #f8fbff 0%, #fff 100%);
-  padding: 28px 28px 32px;
+  background: transparent;
+  padding: 4px 0 0;
+}
+
+/* Inside accordion body, strip the wrapper chrome from
+   .wp-block-columns and .wp-block-column — the <details>
+   border + .lightweight-accordion-body padding is enough. */
+.wp-content .lightweight-accordion-body > .wp-block-columns {
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  display: grid;
+  gap: 0;
+  grid-template-columns: 100%;
+  margin: 0;
+  overflow: visible;
+  padding: 0;
+}
+
+.wp-content .lightweight-accordion-body > .wp-block-columns > .wp-block-column {
+  align-items: stretch;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  display: block;
+  flex-direction: column;
+  min-height: 0;
+  padding: 0;
+  text-align: left;
 }
 
 .wp-content .lightweight-accordion-body > .wp-block-column > * {
@@ -2905,24 +2934,6 @@ body:has(.yutth-lightbox) {
 .wp-content .lightweight-accordion-body > .wp-block-spacer,
 .wp-content .lightweight-accordion-body > p:empty {
   display: none;
-}
-
-.wp-content .lightweight-accordion-body > .wp-block-columns {
-  display: grid;
-  gap: 22px;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-}
-
-.wp-content .lightweight-accordion-body > .wp-block-columns > .wp-block-column {
-  align-items: center;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  display: flex;
-  flex-direction: column;
-  min-height: 100%;
-  padding: 18px;
-  text-align: center;
 }
 
 .wp-content .lightweight-accordion-body figure {
