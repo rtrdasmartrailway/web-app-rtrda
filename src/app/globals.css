@@ -3941,6 +3941,53 @@ a.calendar-cell.has-posts:hover {
     gap: 18px;
   }
 
+  /* Accordion body table: fix 8px-column bug on mobile.
+     Original WP table layout + .text-nowrap button squeezed
+     the description column down to 1 char wide. */
+  .wp-content .lightweight-accordion-body table {
+    table-layout: fixed;
+    width: 100%;
+  }
+
+  .wp-content .lightweight-accordion-body table td:first-child {
+    width: 50%;
+    /* Thai text has no spaces — let it wrap at any char to
+       avoid 1-char-per-line rendering on narrow screens. */
+    word-break: break-word;
+    overflow-wrap: anywhere;
+    hyphens: none;
+  }
+
+  .wp-content .lightweight-accordion-body table td:last-child {
+    width: 50%;
+    text-align: right;
+    vertical-align: middle;
+  }
+
+  /* "ดาวน์โหลด PDF" is a single Thai word — keep-all would
+     force it onto its own line and ruin the row. Use the
+     regular word-break (any char) so it wraps cleanly. */
+  .wp-content .lightweight-accordion-body table a {
+    display: inline-block;
+    max-width: 100%;
+    word-break: normal;
+    overflow-wrap: break-word;
+    line-height: 1.4;
+    text-align: center;
+  }
+
+  .wp-content .lightweight-accordion-body table a .text-nowrap,
+  .wp-content .lightweight-accordion-body table a > span {
+    white-space: normal;
+    display: inline;
+  }
+
+  /* Hide the gradient chip before breadcrumb on mobile — it
+     reads as a stray blue square next to "หน้าแรก". */
+  .breadcrumb::before {
+    display: none;
+  }
+
   .footer-grid {
     gap: 30px;
     grid-template-columns: 1fr;
