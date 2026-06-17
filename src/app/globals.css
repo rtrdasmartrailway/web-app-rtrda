@@ -3085,6 +3085,160 @@ body:has(.yutth-lightbox) {
   display: inline-block;
 }
 
+/* กฏหมาย/ระเบียบ/ข้อบังคับ page — keep long Thai titles readable while the
+   download action remains a consistent button column. */
+.wp-content .lightweight-accordion.legislation {
+  gap: 18px;
+}
+
+.wp-content .lightweight-accordion.legislation details {
+  border-radius: 18px;
+}
+
+.wp-content .lightweight-accordion.legislation summary.lightweight-accordion-title {
+  padding: 20px 24px;
+}
+
+.wp-content .lightweight-accordion.legislation .lightweight-accordion-body {
+  padding: 0;
+}
+
+.wp-content .lightweight-accordion.legislation .lightweight-accordion-body table {
+  border-collapse: separate;
+  border-spacing: 0;
+  margin: 0;
+  table-layout: fixed;
+}
+
+.wp-content .lightweight-accordion.legislation .lightweight-accordion-body table tr {
+  background: #fff;
+}
+
+.wp-content
+  .lightweight-accordion.legislation
+  .lightweight-accordion-body
+  table
+  tr:nth-child(even) {
+  background: #f8fbff;
+}
+
+.wp-content .lightweight-accordion.legislation .lightweight-accordion-body table td {
+  background: transparent;
+  border-color: #e6edf7;
+  color: #27364b;
+  font-size: calc(14px * var(--reader-scale));
+  line-height: 1.65;
+  overflow-wrap: anywhere;
+  padding: 16px 18px;
+  vertical-align: middle;
+}
+
+.wp-content
+  .lightweight-accordion.legislation
+  .lightweight-accordion-body
+  table
+  td:first-child {
+  width: auto;
+}
+
+.wp-content
+  .lightweight-accordion.legislation
+  .lightweight-accordion-body
+  table
+  td:last-child {
+  text-align: center;
+  white-space: normal;
+  width: 168px;
+}
+
+.wp-content .lightweight-accordion.legislation .lightweight-accordion-body table a {
+  align-items: center;
+  display: inline-flex;
+  justify-content: center;
+  min-height: 42px;
+  min-width: 124px;
+  padding: 10px 16px;
+  white-space: nowrap;
+}
+
+/* Some imported rows split "ดาวน์โหลด PDF" into two adjacent anchors. Make the
+   pair read as one compact action instead of two broken pills. */
+.wp-content
+  .lightweight-accordion.legislation
+  .lightweight-accordion-body
+  table
+  td:has(a + a) {
+  align-items: center;
+  display: flex;
+  flex-wrap: nowrap;
+  justify-content: center;
+  white-space: nowrap;
+}
+
+.wp-content
+  .lightweight-accordion.legislation
+  .lightweight-accordion-body
+  table
+  td:has(a + a)
+  a {
+  border-radius: 0;
+  min-width: 0;
+  padding-left: 8px;
+  padding-right: 8px;
+}
+
+.wp-content
+  .lightweight-accordion.legislation
+  .lightweight-accordion-body
+  table
+  td:has(a + a)
+  a:first-child {
+  border-bottom-left-radius: 12px;
+  border-top-left-radius: 12px;
+}
+
+.wp-content
+  .lightweight-accordion.legislation
+  .lightweight-accordion-body
+  table
+  td:has(a + a)
+  a:last-child {
+  border-bottom-right-radius: 12px;
+  border-top-right-radius: 12px;
+}
+
+/* Plain text "ดาวน์โหลด PDF" means the import has no usable href. Present it as
+   an unavailable badge rather than a broken-looking button. */
+.wp-content
+  .lightweight-accordion.legislation
+  .lightweight-accordion-body
+  table
+  td:last-child:not(:has(a)) {
+  color: #64748b;
+  font-size: 0;
+}
+
+.wp-content
+  .lightweight-accordion.legislation
+  .lightweight-accordion-body
+  table
+  td:last-child:not(:has(a))::before {
+  align-items: center;
+  background: #eef2f7;
+  border: 1px solid #d6dee9;
+  border-radius: 12px;
+  color: #64748b;
+  content: "ไม่พบไฟล์ PDF";
+  display: inline-flex;
+  font-size: 13px;
+  font-weight: 700;
+  justify-content: center;
+  min-height: 42px;
+  min-width: 124px;
+  padding: 9px 14px;
+  white-space: nowrap;
+}
+
 .wp-content .lightweight-accordion-body > .wp-block-spacer,
 .wp-content .lightweight-accordion-body > p:empty {
   display: none;
@@ -3132,6 +3286,352 @@ body:has(.yutth-lightbox) {
 .wp-content .simple-download-counter-link:hover,
 .wp-content .lightweight-accordion-body .detail-btn .wp-block-button__link:hover {
   filter: brightness(0.94);
+}
+
+/* มาตรฐานระบบราง สทร. — document standards catalog.
+   The WordPress import nests rows, cards, button groups, and empty columns.
+   Scope these rules to the page class so other legacy accordions keep their
+   existing table/download behavior. */
+.content-rail-standards .wp-content > p:empty {
+  display: none;
+}
+
+.content-rail-standards .wp-content .lightweight-accordion {
+  gap: 0;
+  margin: 0 0 22px;
+}
+
+.content-rail-standards .wp-content .lightweight-accordion details {
+  background: #ffffff;
+  border: 1px solid rgba(148, 163, 184, 0.26);
+  border-radius: 22px;
+  box-shadow: 0 18px 52px rgba(4, 18, 46, 0.08);
+  overflow: hidden;
+}
+
+.content-rail-standards
+  .wp-content
+  .lightweight-accordion
+  summary.lightweight-accordion-title {
+  background:
+    radial-gradient(circle at 0 0, rgba(56, 189, 248, 0.2), transparent 32%),
+    linear-gradient(135deg, var(--navy-900) 0%, #123a75 100%) !important;
+  color: #ffffff !important;
+  padding: clamp(18px, 2.2vw, 26px) clamp(20px, 3vw, 34px);
+}
+
+.content-rail-standards .wp-content .lightweight-accordion summary span,
+.content-rail-standards .wp-content .lightweight-accordion summary strong {
+  color: inherit !important;
+  font-size: clamp(18px, 1.6vw, 24px);
+  line-height: 1.35;
+}
+
+.content-rail-standards .wp-content .lightweight-accordion-body {
+  background: linear-gradient(180deg, #f8fbff 0%, #eef5ff 100%);
+  padding: clamp(18px, 2.6vw, 30px);
+}
+
+.content-rail-standards .wp-content .lightweight-accordion-body > .wp-block-spacer,
+.content-rail-standards .wp-content .lightweight-accordion-body > p:empty {
+  display: none;
+}
+
+.content-rail-standards .wp-content .lightweight-accordion-body > .wp-block-columns {
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  display: grid;
+  gap: clamp(16px, 2vw, 24px);
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  margin: 0 0 clamp(16px, 2vw, 24px);
+  overflow: visible;
+  padding: 0;
+}
+
+.content-rail-standards
+  .wp-content
+  .lightweight-accordion-body
+  > .wp-block-columns:last-child {
+  margin-bottom: 0;
+}
+
+.content-rail-standards
+  .wp-content
+  .lightweight-accordion-body
+  > .wp-block-columns
+  > .wp-block-column {
+  align-items: center;
+  background: rgba(255, 255, 255, 0.96);
+  border: 1px solid rgba(148, 163, 184, 0.24);
+  border-radius: 20px;
+  box-shadow: 0 14px 36px rgba(4, 18, 46, 0.08);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  justify-content: flex-start;
+  min-height: 100%;
+  overflow: hidden;
+  padding: 20px 18px 18px;
+  position: relative;
+  text-align: center;
+  transition:
+    border-color 180ms ease,
+    box-shadow 180ms ease,
+    transform 180ms ease;
+}
+
+.content-rail-standards
+  .wp-content
+  .lightweight-accordion-body
+  > .wp-block-columns
+  > .wp-block-column:hover {
+  border-color: rgba(37, 99, 235, 0.35);
+  box-shadow: 0 22px 54px rgba(4, 18, 46, 0.13);
+  transform: translateY(-3px);
+}
+
+.content-rail-standards
+  .wp-content
+  .lightweight-accordion-body
+  > .wp-block-columns
+  > .wp-block-column:empty,
+.content-rail-standards .wp-content .lightweight-accordion-body .wp-block-columns:empty,
+.content-rail-standards .wp-content .lightweight-accordion-body .wp-block-column:empty {
+  display: none;
+}
+
+.content-rail-standards
+  .wp-content
+  .lightweight-accordion-body
+  > .wp-block-columns
+  > .wp-block-column
+  .wp-block-columns {
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  display: block;
+  margin: 0;
+  overflow: visible;
+  padding: 0;
+  width: 100%;
+}
+
+.content-rail-standards
+  .wp-content
+  .lightweight-accordion-body
+  > .wp-block-columns
+  > .wp-block-column
+  .wp-block-columns
+  .wp-block-column {
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+  padding: 0;
+}
+
+.content-rail-standards .wp-content .lightweight-accordion-body .wp-block-image {
+  align-items: center;
+  background: linear-gradient(180deg, #eef5ff 0%, #ffffff 100%);
+  border-radius: 18px;
+  display: flex;
+  justify-content: center;
+  margin: 0;
+  padding: 16px;
+  width: 100%;
+}
+
+.content-rail-standards .wp-content .lightweight-accordion-body .wp-block-image figure {
+  margin: 0;
+}
+
+.content-rail-standards .wp-content .lightweight-accordion-body .wp-block-image img {
+  aspect-ratio: 0.7 / 1;
+  background: #ffffff;
+  border: 1px solid rgba(148, 163, 184, 0.22) !important;
+  border-radius: 12px !important;
+  box-shadow: 0 12px 26px rgba(15, 23, 42, 0.16) !important;
+  height: auto !important;
+  margin: 0 auto !important;
+  max-width: min(178px, 72vw) !important;
+  object-fit: cover;
+  padding: 0 !important;
+  width: 100% !important;
+}
+
+.content-rail-standards .wp-content .lightweight-accordion-body h6.wp-block-heading {
+  align-items: center;
+  color: var(--navy-900);
+  display: flex;
+  flex: 1 1 auto;
+  font-size: calc(14.5px * var(--reader-scale));
+  font-weight: 800;
+  justify-content: center;
+  line-height: 1.55;
+  margin: 0;
+  min-height: 96px;
+  padding: 0 2px;
+  text-align: center;
+}
+
+.content-rail-standards
+  .wp-content
+  .lightweight-accordion-body
+  h6.wp-block-heading
+  strong {
+  font-weight: inherit;
+}
+
+.content-rail-standards .wp-content .lightweight-accordion-body .wp-block-buttons,
+.content-rail-standards .wp-content .lightweight-accordion-body .simple-download-counter {
+  margin: 0;
+  width: 100%;
+}
+
+.content-rail-standards .wp-content .lightweight-accordion-body .wp-block-buttons {
+  display: flex;
+  justify-content: center;
+}
+
+.content-rail-standards .wp-content .lightweight-accordion-body .detail-btn,
+.content-rail-standards .wp-content .lightweight-accordion-body .wp-block-button,
+.content-rail-standards .wp-content .lightweight-accordion-body .simple-download-counter {
+  width: 100%;
+}
+
+.content-rail-standards
+  .wp-content
+  .lightweight-accordion-body
+  .detail-btn
+  .wp-block-button__link,
+.content-rail-standards
+  .wp-content
+  .lightweight-accordion-body
+  .simple-download-counter-link {
+  align-items: center;
+  border-radius: 12px;
+  box-sizing: border-box;
+  display: inline-flex;
+  font-size: 13px;
+  font-weight: 800;
+  justify-content: center;
+  min-height: 42px;
+  padding: 10px 14px;
+  text-align: center;
+  text-decoration: none;
+  width: 100%;
+}
+
+.content-rail-standards
+  .wp-content
+  .lightweight-accordion-body
+  .detail-btn
+  .wp-block-button__link {
+  background: #e8f1ff;
+  border: 1px solid rgba(37, 99, 235, 0.18);
+  color: var(--accent-deep);
+}
+
+.content-rail-standards
+  .wp-content
+  .lightweight-accordion-body
+  .simple-download-counter-link {
+  background: var(--rail-gradient);
+  color: #ffffff;
+}
+
+.content-rail-standards
+  .wp-content
+  .lightweight-accordion-body
+  .wp-block-column
+  > p:empty,
+.content-rail-standards
+  .wp-content
+  .lightweight-accordion-body
+  .wp-block-column
+  > .wp-block-columns:has(.wp-block-column:empty):not(:has(a)):not(:has(img)):not(
+    :has(h1, h2, h3, h4, h5, h6)
+  ) {
+  display: none;
+}
+
+@media (max-width: 920px) {
+  .content-rail-standards .wp-content .lightweight-accordion-body > .wp-block-columns {
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  }
+}
+
+@media (max-width: 560px) {
+  .content-rail-standards .content-layout {
+    padding-top: 28px;
+  }
+
+  .content-rail-standards .wp-content .lightweight-accordion {
+    margin-bottom: 16px;
+  }
+
+  .content-rail-standards .wp-content .lightweight-accordion details {
+    border-radius: 18px;
+  }
+
+  .content-rail-standards
+    .wp-content
+    .lightweight-accordion
+    summary.lightweight-accordion-title {
+    padding: 16px 18px;
+  }
+
+  .content-rail-standards .wp-content .lightweight-accordion summary span,
+  .content-rail-standards .wp-content .lightweight-accordion summary strong {
+    font-size: 17px;
+  }
+
+  .content-rail-standards .wp-content .lightweight-accordion-body {
+    padding: 14px;
+  }
+
+  .content-rail-standards .wp-content .lightweight-accordion-body > .wp-block-columns {
+    gap: 14px;
+    grid-template-columns: 1fr;
+    margin-bottom: 14px;
+  }
+
+  .content-rail-standards
+    .wp-content
+    .lightweight-accordion-body
+    > .wp-block-columns
+    > .wp-block-column {
+    border-radius: 16px;
+    gap: 12px;
+    padding: 16px 14px;
+  }
+
+  .content-rail-standards .wp-content .lightweight-accordion-body .wp-block-image {
+    padding: 14px;
+  }
+
+  .content-rail-standards .wp-content .lightweight-accordion-body .wp-block-image img {
+    max-width: min(190px, 78vw) !important;
+  }
+
+  .content-rail-standards .wp-content .lightweight-accordion-body h6.wp-block-heading {
+    font-size: calc(14px * var(--reader-scale));
+    min-height: 0;
+  }
+
+  .content-rail-standards
+    .wp-content
+    .lightweight-accordion-body
+    .detail-btn
+    .wp-block-button__link,
+  .content-rail-standards
+    .wp-content
+    .lightweight-accordion-body
+    .simple-download-counter-link {
+    min-height: 44px;
+  }
 }
 
 .wp-content .wp-block-latest-posts__list {
@@ -4242,6 +4742,146 @@ a.calendar-cell.has-posts:hover {
     display: block;
   }
 
+  /* Legislation accordions have long Thai document titles plus a PDF action.
+     Stack each row into a small card on mobile to prevent squeezed text/buttons. */
+  .wp-content .lightweight-accordion.legislation {
+    gap: 14px;
+    margin: 18px 0;
+  }
+
+  .wp-content .lightweight-accordion.legislation summary.lightweight-accordion-title {
+    padding: 16px 18px;
+  }
+
+  .wp-content .lightweight-accordion.legislation .lightweight-accordion-body table,
+  .wp-content .lightweight-accordion.legislation .lightweight-accordion-body table tbody,
+  .wp-content .lightweight-accordion.legislation .lightweight-accordion-body table tr {
+    display: block;
+    width: 100%;
+  }
+
+  .wp-content .lightweight-accordion.legislation .lightweight-accordion-body table {
+    background: #f4f7fb;
+    border-collapse: separate;
+    border-spacing: 0;
+    padding: 10px;
+    table-layout: auto;
+  }
+
+  .wp-content .lightweight-accordion.legislation .lightweight-accordion-body table tr {
+    background: #fff;
+    border: 1px solid #e0e8f3;
+    border-radius: 14px;
+    box-shadow: 0 6px 18px rgba(4, 18, 46, 0.06);
+    margin: 0 0 10px;
+    overflow: hidden;
+    padding: 0;
+  }
+
+  .wp-content
+    .lightweight-accordion.legislation
+    .lightweight-accordion-body
+    table
+    tr:last-child {
+    margin-bottom: 0;
+  }
+
+  .wp-content .lightweight-accordion.legislation .lightweight-accordion-body table td,
+  .wp-content
+    .lightweight-accordion.legislation
+    .lightweight-accordion-body
+    table
+    td:first-child,
+  .wp-content
+    .lightweight-accordion.legislation
+    .lightweight-accordion-body
+    table
+    td:last-child {
+    border: 0;
+    display: block;
+    padding: 14px 14px 0;
+    text-align: left;
+    width: 100% !important;
+  }
+
+  .wp-content
+    .lightweight-accordion.legislation
+    .lightweight-accordion-body
+    table
+    td:first-child {
+    color: #1f2937;
+    font-size: 14px;
+    line-height: 1.62;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+  }
+
+  .wp-content
+    .lightweight-accordion.legislation
+    .lightweight-accordion-body
+    table
+    td:last-child {
+    padding: 12px 14px 14px;
+    text-align: left;
+    vertical-align: top;
+    white-space: normal;
+  }
+
+  .wp-content .lightweight-accordion.legislation .lightweight-accordion-body table a {
+    display: inline-flex;
+    flex-direction: row;
+    font-size: 13px;
+    height: auto;
+    min-height: 42px;
+    min-width: 126px;
+    padding: 10px 16px;
+    width: auto;
+  }
+
+  .wp-content
+    .lightweight-accordion.legislation
+    .lightweight-accordion-body
+    table
+    a
+    .text-nowrap,
+  .wp-content
+    .lightweight-accordion.legislation
+    .lightweight-accordion-body
+    table
+    a
+    > span {
+    display: inline;
+    white-space: nowrap;
+  }
+
+  .wp-content
+    .lightweight-accordion.legislation
+    .lightweight-accordion-body
+    table
+    td:has(a + a) {
+    display: flex;
+    padding: 12px 14px 14px;
+  }
+
+  .wp-content
+    .lightweight-accordion.legislation
+    .lightweight-accordion-body
+    table
+    td:has(a + a)
+    a {
+    min-width: 0;
+    padding-left: 8px;
+    padding-right: 8px;
+  }
+
+  .wp-content
+    .lightweight-accordion.legislation
+    .lightweight-accordion-body
+    table
+    td:last-child:not(:has(a))::before {
+    min-width: 126px;
+  }
+
   /* Hide the gradient chip before breadcrumb on mobile — it
      reads as a stray blue square next to "หน้าแรก". */
   .breadcrumb::before {
@@ -4251,6 +4891,293 @@ a.calendar-cell.has-posts:hover {
   .footer-grid {
     gap: 30px;
     grid-template-columns: 1fr;
+  }
+
+  /* สมัครงาน (job application) — 6-col table (sequence | date |
+     announcement title | positions | Google Form link | PDF).
+     Unique signature: the only .wp-content table with <thead> and
+     a 6th <th> column. Stack each row as a card:
+       header bar: [#num] [date]
+       title (full width, prominent)
+       meta: positions count (only if not –)
+       meta: Google Form link (only if not –)
+       primary action: PDF download button (full width) */
+  .wp-content table:has(thead th:nth-child(6)) {
+    background: transparent;
+    border-collapse: separate;
+    border-spacing: 0;
+  }
+  .wp-content table:has(thead th:nth-child(6)) thead {
+    display: none;
+  }
+  .wp-content table:has(thead th:nth-child(6)) tbody,
+  .wp-content table:has(thead th:nth-child(6)) tbody tr {
+    display: block;
+  }
+  .wp-content table:has(thead th:nth-child(6)) tbody tr {
+    background: #fff;
+    border: 1px solid var(--border, #e5e7eb);
+    border-radius: 10px;
+    box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04);
+    margin: 0 0 14px;
+    padding: 0;
+  }
+  .wp-content table:has(thead th:nth-child(6)) tbody td {
+    background: transparent !important;
+    border: 0 !important;
+    display: block;
+    padding: 10px 16px;
+    width: auto !important;
+  }
+  /* Header strip: small label "ลำดับที่" + actual number on the right
+     (same flex row), date below in blue. */
+  .wp-content table:has(thead th:nth-child(6)) tbody td:nth-child(1) {
+    align-items: center;
+    border-bottom: 1px solid var(--border, #e5e7eb) !important;
+    color: #1f2937;
+    display: flex;
+    font-size: 14px;
+    font-weight: 700;
+    gap: 8px;
+    justify-content: space-between;
+    padding: 12px 16px;
+  }
+  .wp-content table:has(thead th:nth-child(6)) tbody td:nth-child(1)::before {
+    color: #6b7280;
+    content: "ลำดับที่";
+    font-size: 12px;
+    font-weight: 500;
+  }
+  .wp-content table:has(thead th:nth-child(6)) tbody td:nth-child(2) {
+    color: var(--accent-deep, #1d4ed8);
+    font-size: 13px;
+    font-weight: 600;
+    padding: 4px 16px 6px;
+  }
+  .wp-content table:has(thead th:nth-child(6)) tbody td:nth-child(2)::before {
+    color: #6b7280;
+    content: "วันที่ประกาศ: ";
+    font-weight: 500;
+  }
+  /* Title (ประกาศ) — full width, bold, prominent */
+  .wp-content table:has(thead th:nth-child(6)) tbody td:nth-child(3) {
+    color: #1f2937;
+    font-size: 15px;
+    font-weight: 600;
+    line-height: 1.5;
+    padding: 4px 16px 10px;
+  }
+  /* อัตรา — show "อัตรา: N" only when the value is not the em-dash.
+     We can't use :has() to test text content, so the visual label is
+     always added; rows with "—" show "อัตรา: —" which is acceptable. */
+  .wp-content table:has(thead th:nth-child(6)) tbody td:nth-child(4) {
+    color: #1f2937;
+    font-size: 14px;
+    padding: 2px 16px 4px;
+  }
+  .wp-content table:has(thead th:nth-child(6)) tbody td:nth-child(4)::before {
+    color: #6b7280;
+    content: "อัตรา: ";
+    font-weight: 500;
+  }
+  /* ลิ้งค์ — Google Form link row, label always added */
+  .wp-content table:has(thead th:nth-child(6)) tbody td:nth-child(5) {
+    font-size: 13px;
+    padding: 2px 16px 8px;
+  }
+  .wp-content table:has(thead th:nth-child(6)) tbody td:nth-child(5)::before {
+    color: #6b7280;
+    content: "ลิ้งค์: ";
+    font-weight: 500;
+  }
+  .wp-content table:has(thead th:nth-child(6)) tbody td:nth-child(5) a {
+    color: var(--accent-deep, #1d4ed8);
+    font-weight: 600;
+    overflow-wrap: anywhere;
+    text-decoration: underline;
+    word-break: break-all;
+  }
+  /* เอกสาร (PDF) — primary action button, full width */
+  .wp-content table:has(thead th:nth-child(6)) tbody td:nth-child(6) {
+    background: #f8fafc !important;
+    border-top: 1px solid var(--border, #e5e7eb) !important;
+    padding: 12px 16px !important;
+    text-align: center;
+  }
+  .wp-content table:has(thead th:nth-child(6)) tbody td:nth-child(6) a {
+    align-items: center;
+    box-sizing: border-box;
+    display: inline-flex;
+    font-size: 14px;
+    font-weight: 700;
+    justify-content: center;
+    min-height: 44px;
+    padding: 10px 18px;
+    width: 100%;
+  }
+
+  /* แผนการจัดซื้อจัดจ้าง + ประกาศจัดซื้อฯ — 5-col table
+     (ลำดับ | วันที่ประกาศ | โครงการ | สถานะ | เอกสาร).
+     At 414px the 5 columns get auto-fit to ~63px each, squeezing
+     Thai project names to 8+ lines per cell. Stack each row as a
+     card with labelled sections:
+       [header strip: ลำดับที่ # + วันที่ date]
+       [โครงการ — full width, prominent]
+       [สถานะ — labelled]
+       [เอกสาร — PDF button full width] */
+  .wp-content .lightweight-accordion-body table:has(thead th:nth-child(5)) thead {
+    display: none;
+  }
+  .wp-content .lightweight-accordion-body table:has(thead th:nth-child(5)),
+  .wp-content .lightweight-accordion-body table:has(thead th:nth-child(5)) tbody,
+  .wp-content .lightweight-accordion-body table:has(thead th:nth-child(5)) tbody tr {
+    background: transparent;
+    display: block;
+    width: 100%;
+  }
+  .wp-content .lightweight-accordion-body table:has(thead th:nth-child(5)) tbody tr {
+    background: #fff;
+    border: 1px solid #e0e8f3;
+    border-radius: 12px;
+    box-shadow: 0 4px 14px rgba(4, 18, 46, 0.05);
+    margin: 0 0 10px;
+    overflow: hidden;
+    padding: 0;
+  }
+  .wp-content .lightweight-accordion-body table:has(thead th:nth-child(5)) tbody td,
+  .wp-content
+    .lightweight-accordion-body
+    table:has(thead th:nth-child(5))
+    tbody
+    td:first-child,
+  .wp-content
+    .lightweight-accordion-body
+    table:has(thead th:nth-child(5))
+    tbody
+    td:last-child {
+    background: transparent !important;
+    border: 0 !important;
+    display: block;
+    padding: 10px 16px;
+    text-align: left;
+    width: 100% !important;
+  }
+  /* Header strip: small label "ลำดับที่" + number, date below in blue */
+  .wp-content
+    .lightweight-accordion-body
+    table:has(thead th:nth-child(5))
+    tbody
+    td:nth-child(1) {
+    align-items: center;
+    border-bottom: 1px solid #eef2f7 !important;
+    color: #1f2937;
+    display: flex;
+    font-size: 14px;
+    font-weight: 700;
+    gap: 10px;
+    justify-content: space-between;
+    padding: 12px 16px;
+  }
+  .wp-content
+    .lightweight-accordion-body
+    table:has(thead th:nth-child(5))
+    tbody
+    td:nth-child(1)::before {
+    color: #6b7280;
+    content: "ลำดับที่";
+    font-size: 12px;
+    font-weight: 500;
+  }
+  .wp-content
+    .lightweight-accordion-body
+    table:has(thead th:nth-child(5))
+    tbody
+    td:nth-child(2) {
+    color: var(--accent-deep, #1d4ed8);
+    font-size: 13px;
+    font-weight: 600;
+    padding: 4px 16px 8px;
+  }
+  .wp-content
+    .lightweight-accordion-body
+    table:has(thead th:nth-child(5))
+    tbody
+    td:nth-child(2)::before {
+    color: #6b7280;
+    content: "วันที่ประกาศ: ";
+    font-weight: 500;
+  }
+  /* โครงการ — full width, prominent */
+  .wp-content
+    .lightweight-accordion-body
+    table:has(thead th:nth-child(5))
+    tbody
+    td:nth-child(3) {
+    color: #1f2937;
+    font-size: 15px;
+    font-weight: 600;
+    line-height: 1.55;
+    padding: 4px 16px 8px;
+  }
+  .wp-content
+    .lightweight-accordion-body
+    table:has(thead th:nth-child(5))
+    tbody
+    td:nth-child(3)::before {
+    color: #6b7280;
+    content: "โครงการ: ";
+    display: block;
+    font-size: 12px;
+    font-weight: 500;
+    margin-bottom: 4px;
+  }
+  /* สถานะ — labelled */
+  .wp-content
+    .lightweight-accordion-body
+    table:has(thead th:nth-child(5))
+    tbody
+    td:nth-child(4) {
+    color: #1f2937;
+    font-size: 14px;
+    padding: 2px 16px 6px;
+  }
+  .wp-content
+    .lightweight-accordion-body
+    table:has(thead th:nth-child(5))
+    tbody
+    td:nth-child(4)::before {
+    color: #6b7280;
+    content: "สถานะ: ";
+    font-weight: 500;
+  }
+  /* เอกสาร (PDF) — primary action button, full width */
+  .wp-content
+    .lightweight-accordion-body
+    table:has(thead th:nth-child(5))
+    tbody
+    td:nth-child(5) {
+    background: #f8fafc !important;
+    border-top: 1px solid #eef2f7 !important;
+    padding: 12px 16px !important;
+    text-align: center;
+  }
+  .wp-content
+    .lightweight-accordion-body
+    table:has(thead th:nth-child(5))
+    tbody
+    td:nth-child(5)
+    a {
+    align-items: center;
+    box-sizing: border-box;
+    display: inline-flex;
+    font-size: 14px;
+    font-weight: 700;
+    height: auto;
+    justify-content: center;
+    min-height: 44px;
+    min-width: 0;
+    padding: 10px 18px;
+    width: 100%;
   }
 }
 
