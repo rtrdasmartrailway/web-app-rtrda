@@ -997,41 +997,9 @@ button {
    Values letters banner — R T R D A row with underline
    Sits at the top of the ค่านิยมองค์กร page, above the cards.
    ============================================================ */
-.wp-content .values-letters {
-  align-items: stretch;
-  display: flex;
-  flex-direction: row;
-  gap: clamp(24px, 4vw, 56px);
-  justify-content: space-between;
-  margin: 8px 0 36px;
-  padding: 0;
-  width: 100%;
-}
-.wp-content .values-letters .vl-letter {
-  align-items: center;
-  border-bottom: 1.5px solid #1e3a8a;
-  color: #1e3a8a;
-  display: flex;
-  flex: 1 1 0;
-  font-family: var(--font-sans, system-ui, sans-serif);
-  font-size: clamp(48px, 7vw, 88px);
-  font-weight: 800;
-  justify-content: center;
-  letter-spacing: 0.04em;
-  line-height: 1;
-  padding: 0 0 18px;
-  text-align: center;
-  text-transform: uppercase;
-}
-@media (max-width: 720px) {
-  .wp-content .values-letters {
-    gap: 12px;
-  }
-  .wp-content .values-letters .vl-letter {
-    font-size: clamp(36px, 12vw, 56px);
-    padding-bottom: 10px;
-  }
-}
+/* === .values-letters (R T R D A banner) ===
+   Styled only when inside the values page (`:has(.values-top-cards)`);
+   see the dedicated block below. Old generic styles removed 2026-06-17. */
 
 /* ============================================================
    ค่านิยมองค์กร page — top 5 cards + bottom 5 columns
@@ -1048,6 +1016,169 @@ button {
   grid-template-columns: repeat(5, minmax(0, 1fr));
   margin: 0 0 clamp(28px, 3.5vw, 48px);
   padding: 0;
+}
+
+/* === Layout refactor 2026-06-17: pair card-N with col-N body into a
+   single column. Banner (R T R D A) stays above (handled by .values-letters).
+   The 5 image cards and the 5 .values-col text blocks get merged into
+   a 5-column grid where card1 sits above body1, card2 above body2, etc. ===
+   Use display:contents on both wrappers and grid-row/column on each
+   direct child to align them. */
+.wp-content:has(.values-top-cards) {
+  column-gap: 0;
+  display: grid;
+  gap: 24px;
+  grid-template-columns: 280px minmax(0, 1fr);
+  grid-template-rows: auto auto auto auto auto auto;
+  row-gap: 20px;
+}
+/* Banner spans BOTH columns of the parent grid (image col + text col)
+   so it sits centered across the full content width. Previously it
+   was squished into the left 280px column and looked stacked. */
+.wp-content:has(.values-top-cards) > .values-letters {
+  align-items: stretch;
+  display: flex;
+  flex-direction: row;
+  gap: clamp(20px, 3vw, 48px);
+  grid-column: 1 / -1;
+  justify-content: space-between;
+  margin: 0 0 28px;
+  padding: 8px 12px 22px;
+  width: 100%;
+}
+.wp-content:has(.values-top-cards) > .values-letters .vl-letter {
+  align-items: center;
+  border-bottom: 2px solid #1e3a8a;
+  color: #1e3a8a;
+  display: flex;
+  flex: 1 1 0;
+  font-family: var(--font-sans, system-ui, sans-serif);
+  font-size: clamp(56px, 9vw, 132px);
+  font-weight: 900;
+  justify-content: center;
+  letter-spacing: 0.06em;
+  line-height: 1;
+  padding: 0 0 20px;
+  text-align: center;
+  text-transform: uppercase;
+}
+.wp-content:has(.values-top-cards) > .values-top-cards,
+.wp-content:has(.values-top-cards) > .values-bottom-cols {
+  /* all 5 cards and all 5 cols become direct grid items of the parent */
+  display: contents;
+  gap: 0;
+  margin: 0;
+}
+/* Image card spans its grid column; the matching text col shares the
+   same row. nth-child N on both lists → grid-row N (after banner at row 1).
+   Each row is a 2-column grid: image left, text right. The two
+   halves are glued together visually so the row reads as ONE card,
+   not two — border-radius only on the outer corners, border-left
+   shared on the inner edge. */
+.wp-content:has(.values-top-cards) > .values-top-cards > .values-card,
+.wp-content:has(.values-top-cards) > .values-bottom-cols > .values-col {
+  align-items: stretch;
+  background: #fff;
+  border: 1px solid var(--border, #e2e8f0);
+  border-radius: 0;
+  box-shadow: none;
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  min-height: 200px;
+  transition:
+    transform 200ms ease,
+    box-shadow 200ms ease;
+}
+/* Image card (left half of each row): rounded LEFT corners only,
+   image centered with comfortable padding. */
+.wp-content:has(.values-top-cards) > .values-top-cards > .values-card {
+  border-bottom-left-radius: 12px;
+  border-left: 1px solid var(--border, #e2e8f0);
+  border-top: 1px solid var(--border, #e2e8f0);
+  border-top-left-radius: 12px;
+  justify-content: center;
+  padding: 20px 24px;
+}
+.wp-content:has(.values-top-cards) > .values-top-cards > .values-card:hover,
+.wp-content:has(.values-top-cards) > .values-bottom-cols > .values-col:hover {
+  transform: none;
+}
+/* Text col (right half of each row): rounded RIGHT corners only,
+   no border-left (shared with image card), generous padding,
+   number badge + body centered vertically. */
+.wp-content:has(.values-top-cards) > .values-bottom-cols > .values-col {
+  border-bottom-right-radius: 12px;
+  border-left: 0;
+  border-right: 1px solid var(--border, #e2e8f0);
+  border-top: 1px solid var(--border, #e2e8f0);
+  border-top-right-radius: 12px;
+  justify-content: center;
+  padding: 24px 32px;
+  text-align: left;
+}
+/* Row pairing: card N + col N → row N+1 (row 1 is banner). */
+.wp-content:has(.values-top-cards) > .values-top-cards > .values-card:nth-child(1),
+.wp-content:has(.values-top-cards) > .values-bottom-cols > .values-col:nth-child(1) {
+  grid-row: 2;
+}
+.wp-content:has(.values-top-cards) > .values-top-cards > .values-card:nth-child(2),
+.wp-content:has(.values-top-cards) > .values-bottom-cols > .values-col:nth-child(2) {
+  grid-row: 3;
+}
+.wp-content:has(.values-top-cards) > .values-top-cards > .values-card:nth-child(3),
+.wp-content:has(.values-top-cards) > .values-bottom-cols > .values-col:nth-child(3) {
+  grid-row: 4;
+}
+.wp-content:has(.values-top-cards) > .values-top-cards > .values-card:nth-child(4),
+.wp-content:has(.values-top-cards) > .values-bottom-cols > .values-col:nth-child(4) {
+  grid-row: 5;
+}
+.wp-content:has(.values-top-cards) > .values-top-cards > .values-card:nth-child(5),
+.wp-content:has(.values-top-cards) > .values-bottom-cols > .values-col:nth-child(5) {
+  grid-row: 6;
+}
+/* Image card goes in column 1 (left), text col goes in column 2 (right). */
+.wp-content:has(.values-top-cards) > .values-top-cards > .values-card {
+  grid-column: 1;
+}
+.wp-content:has(.values-top-cards) > .values-bottom-cols > .values-col {
+  grid-column: 2;
+}
+/* Body text inside the col — larger and well-spaced for readability.
+   Sits below the image card (left half of the row), so generous
+   font-size is appropriate. */
+.wp-content:has(.values-top-cards) > .values-bottom-cols > .values-col .values-col-body {
+  color: #1f2937;
+  font-size: clamp(17px, 1.2vw, 19px);
+  line-height: 1.8;
+  margin: 0 !important;
+  padding: 0 !important;
+  text-align: left;
+}
+/* (was: .values-col-number "01"/"02" big badge — removed per user request 2026-06-17.
+   The badge is now hidden via .display:none above.) */
+
+/* Body text inside the col is left-aligned, multi-line, generous. */
+/* (was: nth-child column assignment grid-column: 1..5 — superseded by
+   the row-based layout above. Removed 2026-06-17.) */
+
+/* Hide letter/rule/label/number inside .values-col — the letter circle
+   is baked into the PNG, the label sits beneath the PNG, the number
+   badge has been removed per user request (2026-06-17). Show only body. */
+.wp-content .values-col-letter,
+.wp-content .values-col-rule,
+.wp-content .values-col-label,
+.wp-content .values-col-number {
+  display: none !important;
+}
+.wp-content .values-col-body {
+  margin: 0 !important;
+  padding: 0 !important;
+}
+.wp-content .values-col {
+  align-items: flex-start;
+  text-align: left;
 }
 .wp-content .values-card {
   align-items: center;
@@ -1178,36 +1309,39 @@ button {
 .wp-content .vision-stack {
   display: flex;
   flex-direction: column;
-  gap: clamp(28px, 3vw, 44px);
+  gap: 24px;
   margin: 36px 0 56px;
   position: relative;
 }
 
 .wp-content .vision-row {
   align-items: center;
-  background: transparent;
-  border: 0;
-  border-radius: 0;
-  box-shadow: none;
+  background: #fff;
+  border: 1px solid var(--border, #e2e8f0);
+  border-radius: var(--radius-md, 12px);
+  box-shadow: 0 4px 16px rgba(0, 52, 113, 0.08);
   display: grid;
-  gap: clamp(24px, 3vw, 48px);
-  grid-template-columns: minmax(0, 240px) minmax(0, 1fr);
-  overflow: visible;
-  padding: 0;
+  gap: clamp(20px, 2.4vw, 36px);
+  grid-template-columns: minmax(0, 220px) minmax(0, 1fr);
+  overflow: hidden;
+  padding: 24px 28px;
   position: relative;
-  transition: transform 200ms ease;
+  transition:
+    transform 200ms ease,
+    box-shadow 200ms ease;
 }
 .wp-content .vision-row:hover {
+  box-shadow: 0 8px 24px rgba(0, 52, 113, 0.12);
   transform: translateY(-2px);
 }
 
-/* Even rows: image right, content left (zigzag flip).
-   Text stays LTR (left) — only the block position changes. */
+/* Even rows: same layout as odd (no zigzag). Image stays on the left,
+   text on the right for every row. */
 .wp-content .vision-row-even {
-  grid-template-columns: minmax(0, 1fr) minmax(0, 240px);
+  grid-template-columns: minmax(0, 220px) minmax(0, 1fr);
 }
 .wp-content .vision-row-even .vision-figure {
-  order: 2;
+  order: 0;
 }
 .wp-content .vision-row-even .vision-content {
   align-items: flex-start;
@@ -3433,11 +3567,13 @@ a.calendar-cell.has-posts:hover {
 }
 
 .footer-grid {
+  column-gap: 56px;
   display: grid;
-  gap: 36px 40px;
-  grid-template-columns: 1.5fr 1fr 1fr 1fr;
+  gap: 36px 56px;
+  grid-template-columns: 1.4fr 1fr 1fr;
   padding-bottom: 44px;
   padding-top: 48px;
+  row-gap: 40px;
 }
 
 .footer-brand img {
@@ -3452,7 +3588,7 @@ a.calendar-cell.has-posts:hover {
   color: #fff;
   font-size: 15px;
   font-weight: 700;
-  margin: 18px 0 14px;
+  margin: 22px 0 14px;
   padding-bottom: 10px;
   position: relative;
 }
@@ -3483,30 +3619,14 @@ a.calendar-cell.has-posts:hover {
 
 .site-footer ul {
   display: grid;
-  gap: 9px;
   font-size: 14px;
+  gap: 10px;
   list-style: none;
   padding: 0;
 }
 
-/* Multi-column variant — used for longer link lists to consume
-   the right-side empty space when the brand column is the tallest.
-   Activate by adding `is-multi` class to a <ul> (see site-shell.tsx). */
-.site-footer ul.is-multi {
-  column-count: 2;
-  column-gap: 18px;
-  display: block;
-}
-.site-footer ul.is-multi li {
-  -webkit-column-break-inside: avoid;
-  break-inside: avoid;
-  page-break-inside: avoid;
-}
-@media (max-width: 540px) {
-  .site-footer ul.is-multi {
-    column-count: 1;
-  }
-}
+/* (was: .site-footer ul.is-multi multi-column variant — removed 2026-06-17:
+   user wants link lists to flow vertically (1 column) not split into 2.) */
 
 .site-footer a {
   transition: color 150ms ease;
@@ -3557,12 +3677,7 @@ a.calendar-cell.has-posts:hover {
   margin-top: 20px;
   padding: 12px 14px;
 }
-.footer-visitor-counter-icon {
-  display: inline-block;
-  font-size: 18px;
-  margin-right: 6px;
-  vertical-align: middle;
-}
+/* .footer-visitor-counter-icon removed — emoji icon no longer used */
 .footer-visitor-counter strong {
   color: #fff;
   display: inline-block;
@@ -3621,7 +3736,7 @@ a.calendar-cell.has-posts:hover {
   font-style: italic;
 }
 .footer-section-spaced {
-  margin-top: 26px !important;
+  margin-top: 32px !important;
 }
 
 .footer-bar {

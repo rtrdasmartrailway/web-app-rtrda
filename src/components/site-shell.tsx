@@ -189,9 +189,6 @@ export function SiteShell({
               className="footer-visitor-counter"
               aria-label={isEn ? "Visitor statistics" : "สถิติผู้เข้าชม"}
             >
-              <span className="footer-visitor-counter-icon" aria-hidden="true">
-                📊
-              </span>
               <strong>{isEn ? "Visitors" : "ผู้เข้าชม"}</strong>
               <ul>
                 <li>
@@ -213,7 +210,7 @@ export function SiteShell({
           {/* Column 2: ส่วนราชการในสังกัดกระทรวงคมนาคม */}
           <section>
             <h2>{isEn ? "Government Agencies" : "ส่วนราชการในสังกัดกระทรวงคมนาคม"}</h2>
-            <ul className="is-multi">
+            <ul>
               {govAgencies.map((a) => (
                 <li key={a.href}>
                   <a href={a.href} rel="noreferrer">
@@ -276,7 +273,7 @@ export function SiteShell({
                 ? "State Enterprises under the Ministry of Transport"
                 : "รัฐวิสาหกิจในสังกัดกระทรวงคมนาคม"}
             </h2>
-            <ul className="is-multi">
+            <ul>
               {stateEnterprises.map((a) => (
                 <li key={a.href}>
                   <a href={a.href} rel="noreferrer">
