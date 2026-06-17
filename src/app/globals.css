@@ -1060,7 +1060,9 @@ button {
   gap: 10px;
   padding: clamp(12px, 1.4vw, 18px);
   position: relative;
-  transition: transform 200ms ease, box-shadow 200ms ease;
+  transition:
+    transform 200ms ease,
+    box-shadow 200ms ease;
 }
 .wp-content .values-card:hover {
   box-shadow: 0 8px 22px rgba(0, 52, 113, 0.12);
@@ -1421,7 +1423,9 @@ button {
   gap: clamp(14px, 1.6vw, 20px);
   padding: clamp(14px, 1.6vw, 20px) clamp(16px, 1.8vw, 24px);
   position: relative;
-  transition: transform 180ms ease, box-shadow 180ms ease;
+  transition:
+    transform 180ms ease,
+    box-shadow 180ms ease;
 }
 .wp-content .strategy-step:hover {
   box-shadow: 0 6px 18px rgba(0, 52, 113, 0.1);
@@ -1499,7 +1503,9 @@ button {
   overflow: hidden;
   padding: clamp(8px, 1vw, 12px);
   position: relative;
-  transition: transform 180ms ease, box-shadow 180ms ease;
+  transition:
+    transform 180ms ease,
+    box-shadow 180ms ease;
 }
 .wp-content .strategy-grid-cell:hover {
   box-shadow: 0 6px 18px rgba(0, 52, 113, 0.1);
@@ -3524,57 +3530,79 @@ a.calendar-cell.has-posts:hover {
   gap: 6px;
 }
 
-.footer-visitor {
-  background: var(--surface);
-  border: 1px solid var(--border);
+.footer-visitor-counter {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: var(--radius-sm);
   font-size: 13px;
   margin-top: 20px;
-  padding: 14px 16px;
+  padding: 12px 14px;
 }
-
-.footer-visitor-title {
-  color: var(--foreground);
-  font-size: 13px;
-  font-weight: 600;
-  margin-bottom: 10px;
+.footer-visitor-counter-icon {
+  display: inline-block;
+  font-size: 18px;
+  margin-right: 6px;
+  vertical-align: middle;
 }
-
-.footer-visitor-row {
-  align-items: center;
-  color: var(--muted);
+.footer-visitor-counter strong {
+  color: #fff;
+  display: inline-block;
+  margin-bottom: 6px;
+}
+.footer-visitor-counter ul {
+  display: grid;
+  gap: 4px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.footer-visitor-counter li {
+  align-items: baseline;
+  color: rgba(226, 232, 240, 0.7);
   display: flex;
   justify-content: space-between;
-  padding: 3px 0;
+  padding: 2px 0;
 }
-
-.footer-visitor-num {
-  color: var(--accent-strong);
-  font-weight: 600;
-}
-
-.footer-visitor-total {
-  align-items: baseline;
-  border-top: 1px solid var(--border);
-  display: flex;
+.footer-visitor-counter li strong {
+  color: var(--accent, #38bdf8);
   font-size: 14px;
   font-weight: 700;
-  justify-content: space-between;
-  margin-top: 8px;
-  padding-top: 8px;
+  margin: 0;
 }
-
-.footer-visitor-total-num {
-  color: var(--accent-strong);
-  font-size: 18px;
-  font-weight: 700;
-}
-
-.footer-visitor-sublabel {
-  color: var(--muted);
+.footer-visitor-counter-note {
+  color: rgba(226, 232, 240, 0.4);
   display: block;
   font-size: 11px;
-  text-align: right;
+  margin-top: 6px;
+}
+
+.footer-address {
+  color: rgba(226, 232, 240, 0.78);
+  font-size: 13px;
+  font-style: normal;
+  line-height: 1.65;
+  margin: 12px 0 14px;
+}
+.footer-contact {
+  color: rgba(226, 232, 240, 0.78);
+  font-size: 13px;
+  line-height: 1.7;
+  margin: 0 0 4px;
+}
+.footer-contact > span:first-child {
+  color: var(--accent, #38bdf8);
+  display: inline-block;
+  font-weight: 700;
+  margin-right: 4px;
+  min-width: 38px;
+}
+.footer-contact-note {
+  color: rgba(226, 232, 240, 0.5);
+  font-size: 12px;
+  font-style: italic;
+}
+.footer-section-spaced {
+  margin-top: 26px !important;
 }
 
 .footer-bar {
