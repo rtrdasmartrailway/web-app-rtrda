@@ -141,7 +141,12 @@
     transform 150ms ease;
 }
 
-.download {
+.root .action {
+  color: var(--accent-deep);
+  text-decoration: none;
+}
+
+.root .download {
   background: var(--rail-gradient);
   color: #fff;
 }
