@@ -3956,27 +3956,12 @@ a.calendar-cell.has-posts:hover {
      Original WP table layout + .text-nowrap button squeezed
      the description column down to 1 char wide. */
   .wp-content .lightweight-accordion-body table {
+    table-layout: fixed;
     width: 100%;
-  }
-
-  /* Stack the 2 cells vertically on mobile so the long
-     description sits on top and the "ดาวน์โหลด PDF"
-     button lives underneath it on its own row. */
-  .wp-content .lightweight-accordion-body table,
-  .wp-content .lightweight-accordion-body tbody,
-  .wp-content .lightweight-accordion-body tr {
-    display: block;
-    width: 100%;
-  }
-
-  .wp-content .lightweight-accordion-body table td {
-    display: block;
-    width: 100%;
-    padding: 12px 14px;
   }
 
   .wp-content .lightweight-accordion-body table td:first-child {
-    border-bottom: 1px solid var(--border);
+    width: 50%;
     /* Thai text has no spaces — let it wrap at any char to
        avoid 1-char-per-line rendering on narrow screens. */
     word-break: break-word;
@@ -3985,8 +3970,9 @@ a.calendar-cell.has-posts:hover {
   }
 
   .wp-content .lightweight-accordion-body table td:last-child {
-    padding-top: 14px;
-    text-align: center;
+    width: 50%;
+    text-align: right;
+    vertical-align: middle;
   }
 
   /* "ดาวน์โหลด PDF" is a single Thai word — keep-all would
