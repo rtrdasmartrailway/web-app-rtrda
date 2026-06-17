@@ -213,7 +213,7 @@ export function SiteShell({
           {/* Column 2: ส่วนราชการในสังกัดกระทรวงคมนาคม */}
           <section>
             <h2>{isEn ? "Government Agencies" : "ส่วนราชการในสังกัดกระทรวงคมนาคม"}</h2>
-            <ul>
+            <ul className="is-multi">
               {govAgencies.map((a) => (
                 <li key={a.href}>
                   <a href={a.href} rel="noreferrer">
@@ -276,7 +276,7 @@ export function SiteShell({
                 ? "State Enterprises under the Ministry of Transport"
                 : "รัฐวิสาหกิจในสังกัดกระทรวงคมนาคม"}
             </h2>
-            <ul>
+            <ul className="is-multi">
               {stateEnterprises.map((a) => (
                 <li key={a.href}>
                   <a href={a.href} rel="noreferrer">
