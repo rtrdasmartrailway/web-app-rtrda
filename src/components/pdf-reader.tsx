@@ -99,6 +99,9 @@ export function PdfReader({
       if (!anchor || !root.contains(anchor)) {
         return;
       }
+      if (anchor.dataset.pdfReaderIgnore === "true") {
+        return;
+      }
 
       const key = normalizeReaderKey(anchor.getAttribute("href") ?? "");
       const readerTarget = key ? targetByHref.get(key) : undefined;

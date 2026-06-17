@@ -196,6 +196,11 @@ export async function getDownloadById(id: string): Promise<WpDownloadAsset | nul
   return prisma.download.findUnique({ where: { id } });
 }
 
+export async function getDownloadIds(): Promise<string[]> {
+  const rows = await prisma.download.findMany({ select: { id: true } });
+  return rows.map((row) => row.id);
+}
+
 export interface SiteStats {
   posts: number;
   pages: number;

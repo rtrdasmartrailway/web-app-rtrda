@@ -5,6 +5,7 @@ import { ArticleCard } from "./article-card";
 import { CategoryNewsListing } from "./category-news-listing";
 import { CategoryPagination } from "./category-pagination";
 import { HomeSections } from "./home/home-sections";
+import { KnowledgeDocuments } from "./knowledge-documents";
 import { PdfReader } from "./pdf-reader";
 import { SiteShell } from "./site-shell";
 import { YutthLightbox } from "./yutth-lightbox";
@@ -170,6 +171,11 @@ export function ContentPage({ data }: { data: PageData }) {
               </>
             ) : isHome && data.home ? (
               <HomeSections home={data.home} language={record.language} />
+            ) : data.knowledgeDocuments ? (
+              <KnowledgeDocuments
+                groups={data.knowledgeDocuments}
+                language={record.language}
+              />
             ) : (
               <div
                 className="wp-content"

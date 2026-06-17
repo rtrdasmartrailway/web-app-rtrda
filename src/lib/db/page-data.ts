@@ -16,6 +16,11 @@ import {
   extractIframePdfSource,
   type PdfReaderTarget,
 } from "@/lib/wp/pdf-reader";
+import {
+  buildKnowledgeDocumentGroups,
+  isKnowledgeDocumentPath,
+  type KnowledgeDocumentGroup,
+} from "@/lib/wp/knowledge-documents";
 import { normalizeRoutePath } from "@/lib/wp/url";
 import { extractPartnerLogos } from "@/lib/wp/home";
 import {
@@ -26,6 +31,7 @@ import {
   getChildren,
   getGeneratedAt,
   getDownloadById,
+  getDownloadIds,
   getLatestPosts,
   getMediaByIds,
   getNavigation,
@@ -84,6 +90,8 @@ export interface PageData {
   stats: SiteStats | null;
   /** Custom home-page sections; null for non-home pages. */
   home: HomeData | null;
+  /** Normalized document groups for the knowledge-base pages only. */
+  knowledgeDocuments: KnowledgeDocumentGroup[] | null;
   pdfReaderTargets: PdfReaderTarget[];
   sidebarItems: PresentationSidebarItem[];
   parentTitle: string;
@@ -176,6 +184,7 @@ export const getPageData = cache(async (path: string): Promise<PageData | null> 
 
   const isHome = record.path === "/" || record.path === "/en";
   const isCategory = record.kind === "category";
+  const isKnowledgeDocuments = isKnowledgeDocumentPath(record.path);
   const [
     childRecords,
     siblingRecords,
@@ -184,6 +193,7 @@ export const getPageData = cache(async (path: string): Promise<PageData | null> 
     shell,
     home,
     pdfReaderTargets,
+    downloadIds,
   ] = await Promise.all([
     getChildren(record.path, record.language),
     record.parentPath
@@ -203,6 +213,7 @@ export const getPageData = cache(async (path: string): Promise<PageData | null> 
         return pdfPath ? { pdfPath, title: flipbook?.title } : null;
       },
     }),
+    isKnowledgeDocuments ? getDownloadIds() : Promise.resolve([]),
   ]);
 
   const parentRecord = record.parentPath
@@ -223,6 +234,11 @@ export const getPageData = cache(async (path: string): Promise<PageData | null> 
     categoryPagination,
     stats,
     home,
+    knowledgeDocuments: isKnowledgeDocuments
+      ? buildKnowledgeDocumentGroups(record.contentHtml, {
+          validDownloadIds: new Set(downloadIds),
+        })
+      : null,
     pdfReaderTargets,
     sidebarItems:
       record.kind === "page"
