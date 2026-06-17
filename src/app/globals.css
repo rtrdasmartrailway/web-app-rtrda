@@ -3961,7 +3961,7 @@ a.calendar-cell.has-posts:hover {
   }
 
   .wp-content .lightweight-accordion-body table td:first-child {
-    width: 50%;
+    width: 60%;
     /* Thai text has no spaces — let it wrap at any char to
        avoid 1-char-per-line rendering on narrow screens. */
     word-break: break-word;
@@ -3970,27 +3970,35 @@ a.calendar-cell.has-posts:hover {
   }
 
   .wp-content .lightweight-accordion-body table td:last-child {
-    width: 50%;
+    width: 40%;
     text-align: right;
     vertical-align: middle;
   }
 
-  /* "ดาวน์โหลด PDF" is a single Thai word — keep-all would
-     force it onto its own line and ruin the row. Use the
-     regular word-break (any char) so it wraps cleanly. */
+  /* "ดาวน์โหลด PDF" lives in a narrow button column on
+     mobile. Force it into a compact pill that stacks the
+     text into ~2 lines centered, matching the mockup. */
   .wp-content .lightweight-accordion-body table a {
-    display: inline-block;
+    display: inline-flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
     max-width: 100%;
+    width: 88px;
+    height: 56px;
     word-break: normal;
     overflow-wrap: break-word;
-    line-height: 1.4;
+    line-height: 1.25;
     text-align: center;
+    padding: 6px 8px;
+    font-size: 13px;
+    font-weight: 700;
   }
 
   .wp-content .lightweight-accordion-body table a .text-nowrap,
   .wp-content .lightweight-accordion-body table a > span {
     white-space: normal;
-    display: inline;
+    display: block;
   }
 
   /* Hide the gradient chip before breadcrumb on mobile — it
