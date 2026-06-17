@@ -1291,7 +1291,12 @@ button {
   text-align: left;
 }
 
-/* Responsive: stack to 2 columns then 1 */
+/* Responsive: stack to 2 columns then 1.
+   The 2/1-col rules below are now superseded by the parent-grid
+   layout (`.wp-content:has(.values-top-cards) display:grid` +
+   `display:contents` on the wrappers). On mobile we collapse the
+   parent grid back to 1 column so image and text stack vertically
+   inside each row. */
 @media (max-width: 960px) {
   .wp-content .values-top-cards,
   .wp-content .values-bottom-cols {
@@ -1303,6 +1308,133 @@ button {
   .wp-content .values-bottom-cols {
     gap: 16px;
     grid-template-columns: 1fr;
+  }
+}
+
+/* ============================================================
+   Values page — mobile responsive (≤720px)
+   Collapse the parent grid to 1 column so each row reads as
+   image-card on top + text-card below (stacked, not glued).
+   Each card becomes its OWN box with full 4-corner radius —
+   the desktop "glued two-halves" treatment is meaningless once
+   they're stacked vertically.
+   ============================================================ */
+@media (max-width: 720px) {
+  .wp-content:has(.values-top-cards) {
+    column-gap: 0;
+    display: grid;
+    gap: 16px;
+    grid-template-columns: 1fr;
+    grid-template-rows: auto auto auto auto auto auto auto auto auto auto auto;
+    row-gap: 14px;
+  }
+
+  /* Banner — full-width as before, slightly tighter font + padding */
+  .wp-content:has(.values-top-cards) > .values-letters {
+    grid-column: 1;
+    gap: 8px;
+    margin: 0 0 6px;
+    padding: 4px 4px 14px;
+  }
+  .wp-content:has(.values-top-cards) > .values-letters .vl-letter {
+    font-size: clamp(34px, 11vw, 60px);
+    letter-spacing: 0.04em;
+    padding: 0 0 10px;
+  }
+
+  /* Each card/col is now its own box — restore full border-radius
+     and add ALL 4 borders (no more shared seam) */
+  .wp-content:has(.values-top-cards) > .values-top-cards > .values-card,
+  .wp-content:has(.values-top-cards) > .values-bottom-cols > .values-col {
+    background: #fff;
+    border: 1px solid var(--border, #e2e8f0);
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(0, 52, 113, 0.06);
+    grid-column: 1;
+    min-height: 0;
+  }
+
+  /* Image card on top of each row: full radius, tighter padding */
+  .wp-content:has(.values-top-cards) > .values-top-cards > .values-card {
+    border-bottom-left-radius: 12px;
+    border-bottom-right-radius: 12px;
+    border-left: 1px solid var(--border, #e2e8f0);
+    border-right: 1px solid var(--border, #e2e8f0);
+    border-top-left-radius: 12px;
+    border-top-right-radius: 12px;
+    padding: 14px 16px;
+  }
+
+  /* Text card below: full radius, tighter padding */
+  .wp-content:has(.values-top-cards) > .values-bottom-cols > .values-col {
+    border-bottom-left-radius: 12px;
+    border-bottom-right-radius: 12px;
+    border-left: 1px solid var(--border, #e2e8f0);
+    border-right: 1px solid var(--border, #e2e8f0);
+    border-top-left-radius: 12px;
+    border-top-right-radius: 12px;
+    padding: 16px 18px;
+  }
+
+  /* Image sizing — keep aspect ratio, max-height for compact mobile */
+  .wp-content:has(.values-top-cards)
+    > .values-top-cards
+    > .values-card
+    .values-card-image
+    img {
+    max-height: 220px;
+    width: auto;
+  }
+
+  /* Body text — smaller font on mobile, still readable */
+  .wp-content:has(.values-top-cards)
+    > .values-bottom-cols
+    > .values-col
+    .values-col-body {
+    font-size: 15px;
+    line-height: 1.7;
+  }
+
+  /* Row assignment: image card-N → row N*2-1, text col-N → row N*2.
+     With 6 wrapper children (1 banner + 5 cards + 5 cols = 11 grid items),
+     we use direct :nth-child on the parent. But since wrappers use
+     display:contents, the cards/cols become DIRECT children. We need
+     to target by class instead. */
+
+  /* card-1 + col-1 → rows 2 & 3 */
+  .wp-content:has(.values-top-cards) > .values-top-cards > .values-card:nth-child(1) {
+    grid-row: 2;
+  }
+  .wp-content:has(.values-top-cards) > .values-bottom-cols > .values-col:nth-child(1) {
+    grid-row: 3;
+  }
+  /* card-2 + col-2 → rows 4 & 5 */
+  .wp-content:has(.values-top-cards) > .values-top-cards > .values-card:nth-child(2) {
+    grid-row: 4;
+  }
+  .wp-content:has(.values-top-cards) > .values-bottom-cols > .values-col:nth-child(2) {
+    grid-row: 5;
+  }
+  /* card-3 + col-3 → rows 6 & 7 */
+  .wp-content:has(.values-top-cards) > .values-top-cards > .values-card:nth-child(3) {
+    grid-row: 6;
+  }
+  .wp-content:has(.values-top-cards) > .values-bottom-cols > .values-col:nth-child(3) {
+    grid-row: 7;
+  }
+  /* card-4 + col-4 → rows 8 & 9 */
+  .wp-content:has(.values-top-cards) > .values-top-cards > .values-card:nth-child(4) {
+    grid-row: 8;
+  }
+  .wp-content:has(.values-top-cards) > .values-bottom-cols > .values-col:nth-child(4) {
+    grid-row: 9;
+  }
+  /* card-5 + col-5 → rows 10 & 11 */
+  .wp-content:has(.values-top-cards) > .values-top-cards > .values-card:nth-child(5) {
+    grid-row: 10;
+  }
+  .wp-content:has(.values-top-cards) > .values-bottom-cols > .values-col:nth-child(5) {
+    grid-row: 11;
   }
 }
 
