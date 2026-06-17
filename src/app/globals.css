@@ -4131,6 +4131,46 @@ a.calendar-cell.has-posts:hover {
     vertical-align: middle;
   }
 
+  /* 3-column tables (date | description | PDF) — middle col is
+     squeezed to 0 width by the :first/:last rules above, so it
+     disappears. Detect via `td:nth-child(2)` matching a non-empty
+     cell and stack the row vertically on mobile:
+     [date] / [description] / [PDF button full-width centered]. */
+  .wp-content .lightweight-accordion-body table tr:has(td:nth-child(3)) {
+    display: block;
+    padding: 12px 16px;
+  }
+  .wp-content .lightweight-accordion-body table tr:has(td:nth-child(3)) td {
+    border: 0;
+    display: block;
+    padding: 6px 0;
+    text-align: left;
+    width: 100% !important;
+  }
+  .wp-content .lightweight-accordion-body table tr:has(td:nth-child(3)) td:first-child {
+    color: var(--accent-deep, #1d4ed8);
+    font-size: 13px;
+    font-weight: 700;
+    padding: 0 0 4px;
+  }
+  .wp-content .lightweight-accordion-body table tr:has(td:nth-child(3)) td:nth-child(2) {
+    color: #1f2937;
+    font-size: 14px;
+    line-height: 1.55;
+    padding: 0 0 10px;
+  }
+  .wp-content .lightweight-accordion-body table tr:has(td:nth-child(3)) td:last-child {
+    padding: 4px 0 0;
+    text-align: left;
+  }
+  /* Make the PDF link button full-width-ish on mobile for tap target */
+  .wp-content .lightweight-accordion-body table tr:has(td:nth-child(3)) a {
+    height: auto;
+    min-height: 44px;
+    padding: 10px 14px;
+    width: auto;
+  }
+
   /* "ดาวน์โหลด PDF" lives in a narrow button column on
      mobile. Force it into a compact pill that stacks the
      text into ~2 lines centered, matching the mockup. */
