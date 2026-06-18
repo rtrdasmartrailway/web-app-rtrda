@@ -3254,16 +3254,10 @@ body:has(.yutth-lightbox) {
   position: relative;
 }
 /* alternating zebra, but only on plain link rows (skip O1/O2 heading rows) */
-.wp-content
-  .lightweight-accordion-body
-  h4.wp-block-heading
-  ~ p:nth-of-type(odd) {
+.wp-content .lightweight-accordion-body h4.wp-block-heading ~ p:nth-of-type(odd) {
   background: #f8fbff;
 }
-.wp-content
-  .lightweight-accordion-body
-  h4.wp-block-heading
-  ~ p:nth-of-type(even) {
+.wp-content .lightweight-accordion-body h4.wp-block-heading ~ p:nth-of-type(even) {
   background: #ffffff;
 }
 /* the LAST <p> in a section (the one whose next sibling is an h4) → round the
@@ -3292,10 +3286,7 @@ body:has(.yutth-lightbox) {
      <p><strong>O1 โครงสร้างฯ</strong></p>                            — plain heading
      <p><a><strong>O2 ข้อมูลผู้บริหาร</strong></a></p>               — clickable heading
    In both cases the <p> has a <strong> that is its sole "weight" marker. */
-.wp-content
-  .lightweight-accordion-body
-  h4.wp-block-heading
-  ~ p:has(> strong:only-child),
+.wp-content .lightweight-accordion-body h4.wp-block-heading ~ p:has(> strong:only-child),
 .wp-content
   .lightweight-accordion-body
   h4.wp-block-heading
@@ -5174,6 +5165,173 @@ a.calendar-cell.has-posts:hover {
     min-height: 220px;
   }
 
+  /* Common imported document tables outside accordions, including
+     procurement lists. Stack rows as cards instead of leaving a
+     horizontally scrollable 5-column WordPress table on phones. */
+  .wp-content table:has(thead th:nth-child(5)):not(:has(thead th:nth-child(6))) thead {
+    display: none;
+  }
+
+  .wp-content table:has(thead th:nth-child(5)):not(:has(thead th:nth-child(6))),
+  .wp-content table:has(thead th:nth-child(5)):not(:has(thead th:nth-child(6))) tbody,
+  .wp-content table:has(thead th:nth-child(5)):not(:has(thead th:nth-child(6))) tbody tr {
+    background: transparent;
+    display: block;
+    width: 100%;
+  }
+
+  .wp-content table:has(thead th:nth-child(5)):not(:has(thead th:nth-child(6))) tbody tr {
+    background: #fff;
+    border: 1px solid #e0e8f3;
+    border-radius: 12px;
+    box-shadow: 0 4px 14px rgba(4, 18, 46, 0.05);
+    margin: 0 0 10px;
+    overflow: hidden;
+    padding: 0;
+  }
+
+  .wp-content table:has(thead th:nth-child(5)):not(:has(thead th:nth-child(6))) tbody td,
+  .wp-content
+    table:has(thead th:nth-child(5)):not(:has(thead th:nth-child(6)))
+    tbody
+    td:first-child,
+  .wp-content
+    table:has(thead th:nth-child(5)):not(:has(thead th:nth-child(6)))
+    tbody
+    td:last-child {
+    background: transparent !important;
+    border: 0 !important;
+    display: block;
+    min-width: 0;
+    padding: 10px 16px;
+    text-align: left;
+    white-space: normal;
+    width: 100% !important;
+  }
+
+  .wp-content
+    table:has(thead th:nth-child(5)):not(:has(thead th:nth-child(6)))
+    tbody
+    td:nth-child(1) {
+    align-items: center;
+    border-bottom: 1px solid #eef2f7 !important;
+    color: #1f2937;
+    display: flex;
+    font-size: 14px;
+    font-weight: 700;
+    gap: 10px;
+    justify-content: space-between;
+    padding: 12px 16px;
+  }
+
+  .wp-content
+    table:has(thead th:nth-child(5)):not(:has(thead th:nth-child(6)))
+    tbody
+    td:nth-child(1)::before {
+    color: #6b7280;
+    content: "ลำดับที่";
+    font-size: 12px;
+    font-weight: 500;
+  }
+
+  .wp-content
+    table:has(thead th:nth-child(5)):not(:has(thead th:nth-child(6)))
+    tbody
+    td:nth-child(2) {
+    color: var(--accent-deep, #1d4ed8);
+    font-size: 13px;
+    font-weight: 600;
+    padding: 4px 16px 8px;
+  }
+
+  .wp-content
+    table:has(thead th:nth-child(5)):not(:has(thead th:nth-child(6)))
+    tbody
+    td:nth-child(2)::before {
+    color: #6b7280;
+    content: "วันที่ประกาศ: ";
+    font-weight: 500;
+  }
+
+  .wp-content
+    table:has(thead th:nth-child(5)):not(:has(thead th:nth-child(6)))
+    tbody
+    td:nth-child(3) {
+    color: #1f2937;
+    font-size: 15px;
+    font-weight: 600;
+    line-height: 1.55;
+    padding: 4px 16px 8px;
+    overflow-wrap: anywhere;
+  }
+
+  .wp-content
+    table:has(thead th:nth-child(5)):not(:has(thead th:nth-child(6)))
+    tbody
+    td:nth-child(3)::before {
+    color: #6b7280;
+    content: "โครงการ: ";
+    display: block;
+    font-size: 12px;
+    font-weight: 500;
+    margin-bottom: 4px;
+  }
+
+  .wp-content
+    table:has(thead th:nth-child(5)):not(:has(thead th:nth-child(6)))
+    tbody
+    td:nth-child(4) {
+    color: #1f2937;
+    font-size: 14px;
+    padding: 2px 16px 6px;
+  }
+
+  .wp-content
+    table:has(thead th:nth-child(5)):not(:has(thead th:nth-child(6)))
+    tbody
+    td:nth-child(4)::before {
+    color: #6b7280;
+    content: "สถานะ: ";
+    font-weight: 500;
+  }
+
+  .wp-content
+    table:has(thead th:nth-child(5)):not(:has(thead th:nth-child(6)))
+    tbody
+    td:nth-child(5) {
+    background: #f8fafc !important;
+    border-top: 1px solid #eef2f7 !important;
+    padding: 12px 16px !important;
+    text-align: center;
+  }
+
+  .wp-content
+    table:has(thead th:nth-child(5)):not(:has(thead th:nth-child(6)))
+    tbody
+    td:nth-child(5)
+    a {
+    align-items: center;
+    box-sizing: border-box;
+    display: inline-flex;
+    font-size: 14px;
+    font-weight: 700;
+    height: auto;
+    justify-content: center;
+    min-height: 44px;
+    min-width: 0;
+    overflow-wrap: anywhere;
+    padding: 10px 18px;
+    white-space: normal;
+    width: 100%;
+  }
+
+  .wp-content table a[href$=".pdf"]:empty::before,
+  .wp-content table a[href$=".PDF"]:empty::before,
+  .wp-content table a[href*=".pdf"]:has(> span:empty:only-child)::before,
+  .wp-content table a[href*=".PDF"]:has(> span:empty:only-child)::before {
+    content: "ดาวน์โหลด PDF";
+  }
+
   /* Accordion body table: fix 8px-column bug on mobile.
      Original WP table layout + .text-nowrap button squeezed
      the description column down to 1 char wide. */
@@ -5231,6 +5389,52 @@ a.calendar-cell.has-posts:hover {
     padding: 4px 0 0;
     text-align: left;
   }
+
+  .wp-content
+    .lightweight-accordion-body
+    table:has(thead th:nth-child(3)):not(:has(thead th:nth-child(4)))
+    thead {
+    display: none;
+  }
+
+  .wp-content
+    .lightweight-accordion-body
+    table:has(thead th:nth-child(3)):not(:has(thead th:nth-child(4))),
+  .wp-content
+    .lightweight-accordion-body
+    table:has(thead th:nth-child(3)):not(:has(thead th:nth-child(4)))
+    tbody {
+    background: transparent;
+    display: block;
+    width: 100%;
+  }
+
+  .wp-content
+    .lightweight-accordion-body
+    table:has(thead th:nth-child(3)):not(:has(thead th:nth-child(4)))
+    tbody
+    td {
+    min-width: 0;
+    white-space: normal;
+  }
+
+  .wp-content
+    .lightweight-accordion-body
+    table:has(thead th:nth-child(3)):not(:has(thead th:nth-child(4)))
+    tbody
+    td:nth-child(2) {
+    overflow-wrap: anywhere;
+  }
+
+  .wp-content
+    .lightweight-accordion-body
+    table:has(thead th:nth-child(3)):not(:has(thead th:nth-child(4)))
+    tbody
+    td:nth-child(3)
+    a {
+    width: 100%;
+  }
+
   /* Make the PDF link button full-width-ish on mobile for tap target */
   .wp-content .lightweight-accordion-body table tr:has(td:nth-child(3)) a {
     height: auto;
@@ -5575,12 +5779,27 @@ a.calendar-cell.has-posts:hover {
   .wp-content table:has(thead th:nth-child(6)) tbody td:nth-child(6) a {
     align-items: center;
     box-sizing: border-box;
-    display: inline-flex;
+    display: flex;
     font-size: 14px;
     font-weight: 700;
     justify-content: center;
     min-height: 44px;
     padding: 10px 18px;
+    width: 100%;
+  }
+
+  .wp-content table td:has(a + a) {
+    display: flex !important;
+    flex-direction: column;
+    gap: 8px;
+    white-space: normal;
+  }
+
+  .wp-content table td:has(a + a) a {
+    align-items: center;
+    display: flex !important;
+    justify-content: center;
+    white-space: normal;
     width: 100%;
   }
 
@@ -6134,8 +6353,12 @@ a.calendar-cell.has-posts:hover {
 }
 
 /* Responsive */
-/* ── Tablet (≤900px): shrink nav font, tighten padding ── */
+/* ── Tablet (≤900px): use drawer nav before desktop items overflow ── */
 @media (max-width: 900px) {
+  .intranet-nav {
+    display: none;
+  }
+
   .intranet-nav-link {
     padding: 18px 10px;
     font-size: 13px;
@@ -6146,12 +6369,8 @@ a.calendar-cell.has-posts:hover {
   }
 }
 
-/* ── Mobile (≤720px): hide desktop nav, logo + hamburger only ── */
+/* ── Mobile (≤720px): logo + hamburger only ── */
 @media (max-width: 720px) {
-  .intranet-nav {
-    display: none;
-  }
-
   .intranet-header-inner {
     padding: 0 16px;
     gap: 0;

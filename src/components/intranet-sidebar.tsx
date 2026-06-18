@@ -130,7 +130,7 @@ export function IntranetSidebar() {
         createPortal(
           <div
             aria-hidden={!open}
-            className={`fixed inset-0 z-[1000] ${open ? "" : "pointer-events-none"}`}
+            className={`fixed inset-0 z-[1000] overflow-hidden ${open ? "" : "pointer-events-none"}`}
           >
             {/* Backdrop */}
             <div
