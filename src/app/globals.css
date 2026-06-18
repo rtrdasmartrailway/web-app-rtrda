@@ -3397,7 +3397,7 @@ body:has(.yutth-lightbox) {
   box-shadow: none;
   display: grid;
   gap: clamp(16px, 2vw, 24px);
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr));
   margin: 0 0 clamp(16px, 2vw, 24px);
   overflow: visible;
   padding: 0;
@@ -3515,16 +3515,15 @@ body:has(.yutth-lightbox) {
 }
 
 .content-rail-standards .wp-content .lightweight-accordion-body h6.wp-block-heading {
-  align-items: center;
   color: var(--navy-900);
-  display: flex;
+  display: block;
   flex: 1 1 auto;
   font-size: calc(14.5px * var(--reader-scale));
   font-weight: 800;
-  justify-content: center;
   line-height: 1.55;
   margin: 0;
   min-height: 96px;
+  overflow-wrap: anywhere;
   padding: 0 2px;
   text-align: center;
 }
@@ -3534,6 +3533,7 @@ body:has(.yutth-lightbox) {
   .lightweight-accordion-body
   h6.wp-block-heading
   strong {
+  display: inline;
   font-weight: inherit;
 }
 

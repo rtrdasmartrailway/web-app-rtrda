@@ -52,6 +52,16 @@ function StatCard({ value, label }: { value: number; label: string }) {
   );
 }
 
+function contentRouteClass(path: string): string {
+  const canonicalPath = path.replace(/^\/en(?=\/)/, "");
+
+  if (canonicalPath === "/มาตรฐานระบบราง-สทร") {
+    return "content-rail-standards";
+  }
+
+  return "";
+}
+
 export function ContentPage({ data }: { data: PageData }) {
   const {
     record,
@@ -65,12 +75,19 @@ export function ContentPage({ data }: { data: PageData }) {
   const isHome = record.path === "/" || record.path === "/en";
   const isCategory = record.kind === "category";
   const dateText = formatDate(record.date, record.language);
+  const routeClass = contentRouteClass(record.path);
+  const pageClassName = [
+    "content-page",
+    `content-${record.kind}`,
+    isHome ? "content-home" : "",
+    routeClass,
+  ]
+    .filter(Boolean)
+    .join(" ");
 
   return (
     <SiteShell shell={data.shell}>
-      <article
-        className={`content-page content-${record.kind} ${isHome ? "content-home" : ""}`}
-      >
+      <article className={pageClassName}>
         <section className={`page-hero ${isHome ? "home-hero" : ""}`}>
           <div className="site-container hero-inner">
             <p className="breadcrumb">
