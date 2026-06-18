@@ -21,6 +21,10 @@ import {
   isKnowledgeDocumentPath,
   type KnowledgeDocumentGroup,
 } from "@/lib/wp/knowledge-documents";
+import {
+  buildBoardExecutivePresentation,
+  type BoardExecutivePresentation,
+} from "@/lib/wp/board-executives";
 import { normalizeRoutePath } from "@/lib/wp/url";
 import { extractPartnerLogos } from "@/lib/wp/home";
 import {
@@ -92,6 +96,8 @@ export interface PageData {
   home: HomeData | null;
   /** Normalized document groups for the knowledge-base pages only. */
   knowledgeDocuments: KnowledgeDocumentGroup[] | null;
+  /** Normalized org chart for the board/executive page only. */
+  boardExecutivePresentation: BoardExecutivePresentation | null;
   pdfReaderTargets: PdfReaderTarget[];
   sidebarItems: PresentationSidebarItem[];
   parentTitle: string;
@@ -239,6 +245,10 @@ export const getPageData = cache(async (path: string): Promise<PageData | null> 
           validDownloadIds: new Set(downloadIds),
         })
       : null,
+    boardExecutivePresentation: buildBoardExecutivePresentation(
+      record.path,
+      record.contentHtml,
+    ),
     pdfReaderTargets,
     sidebarItems:
       record.kind === "page"

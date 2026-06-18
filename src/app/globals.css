@@ -277,6 +277,7 @@ button {
   display: grid;
   gap: 2px;
   left: 0;
+  max-width: min(380px, calc(100vw - 32px));
   min-width: 300px;
   opacity: 0;
   padding: 10px;
@@ -288,6 +289,11 @@ button {
     opacity 160ms ease,
     transform 160ms ease;
   z-index: 5;
+}
+
+.nav-item:nth-last-child(-n + 2) .nav-dropdown {
+  left: auto;
+  right: 0;
 }
 
 .nav-item:hover .nav-dropdown,
@@ -307,8 +313,10 @@ button {
   font-size: 14px;
   font-weight: 600;
   line-height: 1.45;
+  overflow-wrap: anywhere;
   padding: 10px 12px;
   text-align: left;
+  white-space: normal;
   width: 100%;
 }
 
@@ -691,54 +699,6 @@ button {
 
 .hero-button.secondary:hover {
   background: var(--glass-strong);
-}
-
-.stats-band {
-  position: relative;
-  z-index: 1;
-}
-
-.stats-grid {
-  display: grid;
-  gap: 18px;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  padding-bottom: 54px;
-}
-
-.stat-card {
-  backdrop-filter: blur(12px);
-  background: var(--glass);
-  border: 1px solid var(--glass-border);
-  border-radius: var(--radius-lg);
-  padding: 22px 24px;
-  position: relative;
-  overflow: hidden;
-}
-
-.stat-card::before {
-  background: var(--rail-gradient);
-  content: "";
-  height: 3px;
-  left: 0;
-  position: absolute;
-  top: 0;
-  width: 44px;
-}
-
-.stat-number {
-  color: #fff;
-  display: block;
-  font-size: clamp(26px, 2.6vw, 38px);
-  font-weight: 800;
-  line-height: 1.1;
-}
-
-.stat-label {
-  color: var(--on-dark-muted);
-  display: block;
-  font-size: 13px;
-  font-weight: 600;
-  margin-top: 6px;
 }
 
 /* ============================================================
@@ -2317,6 +2277,11 @@ button {
   min-width: 0;
 }
 
+.wp-content .wp-block-column:empty,
+.wp-content .wp-block-column:has(> p:empty:only-child) {
+  display: none;
+}
+
 /* Card layout for "story" columns block (used on ความเป็นมา page) */
 .wp-content .wp-block-columns.story {
   align-items: stretch;
@@ -3248,6 +3213,103 @@ body:has(.yutth-lightbox) {
   margin: 0 auto 14px;
 }
 
+/* ITA page — wrap h4 section heading + its sibling <p> items as a single card.
+   Markup is flat (h4 → N × <p> → next h4), so use sibling combinators + :has()
+   to fake the card chrome without touching the DB / contentHtml. */
+.wp-content .lightweight-accordion-body h4.wp-block-heading {
+  background: linear-gradient(180deg, #f0f5fc 0%, #e6eef9 100%);
+  border: 1px solid #c8d6ec;
+  border-bottom: 0;
+  border-radius: 12px 12px 0 0;
+  color: #003471 !important;
+  font-size: calc(18px * var(--reader-scale));
+  font-weight: 800;
+  margin: 22px 0 0;
+  padding: 10px 16px;
+  position: relative;
+}
+/* add a small left rail so the section heading reads as a section opener */
+.wp-content .lightweight-accordion-body h4.wp-block-heading::before {
+  background: var(--accent-strong);
+  border-radius: 2px;
+  content: "";
+  height: 60%;
+  left: 0;
+  position: absolute;
+  top: 20%;
+  width: 4px;
+}
+.wp-content .lightweight-accordion-body h4.wp-block-heading strong {
+  color: #003471;
+}
+/* all <p> that follow an h4, until the next h4 → card body rows */
+.wp-content .lightweight-accordion-body h4.wp-block-heading ~ p {
+  border-left: 1px solid #c8d6ec;
+  border-right: 1px solid #c8d6ec;
+  color: #1f2a44;
+  font-size: calc(15px * var(--reader-scale));
+  line-height: 1.6;
+  margin: 0;
+  padding: 8px 16px 8px 26px;
+  position: relative;
+}
+/* alternating zebra, but only on plain link rows (skip O1/O2 heading rows) */
+.wp-content
+  .lightweight-accordion-body
+  h4.wp-block-heading
+  ~ p:nth-of-type(odd) {
+  background: #f8fbff;
+}
+.wp-content
+  .lightweight-accordion-body
+  h4.wp-block-heading
+  ~ p:nth-of-type(even) {
+  background: #ffffff;
+}
+/* the LAST <p> in a section (the one whose next sibling is an h4) → round the
+   bottom corners and close the card. `:has(+ h4.wp-block-heading)` is the
+   correct selector — `:last-of-type` is relative to the whole parent, not
+   to a single h4 section. */
+.wp-content
+  .lightweight-accordion-body
+  h4.wp-block-heading
+  ~ p:has(+ h4.wp-block-heading) {
+  border-bottom: 1px solid #c8d6ec;
+  border-radius: 0 0 12px 12px;
+  margin-bottom: 6px;
+  padding-bottom: 10px;
+}
+/* the very last <p> in the accordion body (no h4 follows) → close the final
+   card the same way */
+.wp-content .lightweight-accordion-body p:last-of-type {
+  border-bottom: 1px solid #c8d6ec;
+  border-radius: 0 0 12px 12px;
+  margin-bottom: 6px;
+  padding-bottom: 10px;
+}
+/* the O1/O2/O3… heading rows inside a card need to read as the row title,
+   not as just another link line. Two shapes in the DB:
+     <p><strong>O1 โครงสร้างฯ</strong></p>                            — plain heading
+     <p><a><strong>O2 ข้อมูลผู้บริหาร</strong></a></p>               — clickable heading
+   In both cases the <p> has a <strong> that is its sole "weight" marker. */
+.wp-content
+  .lightweight-accordion-body
+  h4.wp-block-heading
+  ~ p:has(> strong:only-child),
+.wp-content
+  .lightweight-accordion-body
+  h4.wp-block-heading
+  ~ p:has(> a:only-child > strong:only-child) {
+  background: #eaf2fc;
+  color: #003471;
+  font-weight: 700;
+  padding: 6px 16px 6px 26px;
+}
+/* a leading "–" em-dash prefix for plain link rows, to make them scan as a list */
+.wp-content .lightweight-accordion-body h4.wp-block-heading ~ p:has(> a) {
+  padding-left: 26px;
+}
+
 .wp-content .lightweight-accordion-body h5,
 .wp-content .lightweight-accordion-body h6 {
   color: var(--navy-900);
@@ -3631,6 +3693,231 @@ body:has(.yutth-lightbox) {
     .lightweight-accordion-body
     .simple-download-counter-link {
     min-height: 44px;
+  }
+}
+
+/* คณะกรรมการและผู้บริหาร — keep the original WordPress hierarchy
+   (chair centered, then advisors/committees in rows) while removing the
+   empty columns/spacers that look broken in the migrated layout. */
+.content-board-executives .wp-content .lightweight-accordion {
+  margin: 0 0 24px;
+}
+
+.content-board-executives .wp-content .lightweight-accordion details {
+  border-radius: 20px;
+  overflow: hidden;
+}
+
+.content-board-executives
+  .wp-content
+  .lightweight-accordion
+  summary.lightweight-accordion-title {
+  background:
+    radial-gradient(circle at 0 0, rgba(56, 189, 248, 0.18), transparent 32%),
+    linear-gradient(135deg, var(--navy-900) 0%, #123a75 100%) !important;
+  color: #fff !important;
+  padding: clamp(18px, 2.2vw, 26px) clamp(20px, 3vw, 34px);
+}
+
+.content-board-executives .wp-content .lightweight-accordion summary h1,
+.content-board-executives .wp-content .lightweight-accordion summary strong {
+  color: inherit !important;
+  font-size: clamp(18px, 1.5vw, 23px);
+  line-height: 1.35;
+}
+
+.content-board-executives .wp-content .lightweight-accordion-body {
+  background: linear-gradient(180deg, #f8fbff 0%, #eef5ff 100%);
+  padding: clamp(20px, 2.8vw, 34px);
+}
+
+.content-board-executives .wp-content .lightweight-accordion-body > p:empty,
+.content-board-executives .wp-content .lightweight-accordion-body > .wp-block-spacer,
+.content-board-executives .wp-content .lightweight-accordion-body .wp-block-column:empty {
+  display: none;
+}
+
+.content-board-executives .wp-content .lightweight-accordion-body > .wp-block-columns {
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  display: grid;
+  gap: clamp(18px, 2vw, 26px);
+  grid-template-columns: repeat(auto-fit, minmax(210px, 260px));
+  justify-content: center;
+  margin: 0 0 clamp(18px, 2.4vw, 34px);
+  overflow: visible;
+  padding: 0;
+}
+
+.content-board-executives
+  .wp-content
+  .lightweight-accordion-body
+  > .wp-block-columns:last-child {
+  margin-bottom: 0;
+}
+
+.content-board-executives
+  .wp-content
+  .lightweight-accordion-body
+  > .wp-block-columns
+  > .wp-block-column:not(:empty) {
+  align-items: center;
+  background: rgba(255, 255, 255, 0.97);
+  border: 1px solid rgba(148, 163, 184, 0.24);
+  border-radius: 18px;
+  box-shadow: 0 14px 36px rgba(4, 18, 46, 0.08);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-height: 100%;
+  padding: 20px 18px 18px;
+  text-align: center;
+  transition:
+    border-color 180ms ease,
+    box-shadow 180ms ease,
+    transform 180ms ease;
+}
+
+.content-board-executives
+  .wp-content
+  .lightweight-accordion-body
+  > .wp-block-columns
+  > .wp-block-column:not(:empty):hover {
+  border-color: rgba(37, 99, 235, 0.35);
+  box-shadow: 0 22px 54px rgba(4, 18, 46, 0.13);
+  transform: translateY(-3px);
+}
+
+.content-board-executives .wp-content .lightweight-accordion-body .wp-block-image {
+  align-items: center;
+  background: linear-gradient(180deg, #eef5ff 0%, #fff 100%);
+  border-radius: 16px;
+  display: flex;
+  justify-content: center;
+  margin: 0 0 6px;
+  padding: 12px;
+  width: 100%;
+}
+
+.content-board-executives .wp-content .lightweight-accordion-body figure {
+  margin: 0;
+}
+
+.content-board-executives .wp-content .lightweight-accordion-body .wp-block-image img {
+  aspect-ratio: 4 / 5;
+  background: #fff;
+  border: 1px solid rgba(148, 163, 184, 0.28) !important;
+  border-radius: 14px !important;
+  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.16) !important;
+  height: auto !important;
+  margin: 0 auto !important;
+  max-width: min(180px, 68vw) !important;
+  object-fit: cover;
+  padding: 0 !important;
+  width: 100% !important;
+}
+
+.content-board-executives
+  .wp-content
+  .lightweight-accordion-body
+  .wp-block-image
+  img[src*="LOGO"],
+.content-board-executives
+  .wp-content
+  .lightweight-accordion-body
+  .wp-block-image
+  img[src*="RAILWAY"],
+.content-board-executives
+  .wp-content
+  .lightweight-accordion-body
+  .wp-block-image
+  img[src*="ตรา"] {
+  object-fit: contain;
+  padding: 14px !important;
+}
+
+.content-board-executives .wp-content .lightweight-accordion-body h4.wp-block-heading {
+  color: var(--navy-900);
+  font-size: calc(16px * var(--reader-scale));
+  font-weight: 800;
+  line-height: 1.35;
+  margin: 0;
+  padding: 0;
+  text-align: center;
+}
+
+.content-board-executives .wp-content .lightweight-accordion-body h5.wp-block-heading {
+  color: var(--accent-deep);
+  font-size: calc(13.5px * var(--reader-scale));
+  font-weight: 700;
+  line-height: 1.45;
+  margin: 0;
+  min-height: 40px;
+  padding: 0;
+  text-align: center;
+}
+
+.content-board-executives .wp-content .lightweight-accordion-body .wp-block-buttons {
+  margin-top: auto;
+  width: 100%;
+}
+
+.content-board-executives .wp-content .lightweight-accordion-body .detail-btn,
+.content-board-executives
+  .wp-content
+  .lightweight-accordion-body
+  .detail-btn
+  .wp-block-button__link {
+  width: 100%;
+}
+
+.content-board-executives
+  .wp-content
+  .lightweight-accordion-body
+  .detail-btn
+  .wp-block-button__link {
+  align-items: center;
+  background: #e8f1ff;
+  border: 1px solid rgba(37, 99, 235, 0.18);
+  border-radius: 12px;
+  color: var(--accent-deep);
+  display: inline-flex;
+  font-size: 13px;
+  font-weight: 800;
+  justify-content: center;
+  min-height: 40px;
+  padding: 9px 14px;
+  text-decoration: none;
+}
+
+@media (max-width: 720px) {
+  .content-board-executives .wp-content .lightweight-accordion-body {
+    padding: 14px;
+  }
+
+  .content-board-executives .wp-content .lightweight-accordion-body > .wp-block-columns {
+    gap: 14px;
+    grid-template-columns: 1fr;
+    margin-bottom: 14px;
+  }
+
+  .content-board-executives
+    .wp-content
+    .lightweight-accordion-body
+    > .wp-block-columns
+    > .wp-block-column:not(:empty) {
+    border-radius: 16px;
+    padding: 16px 14px;
+  }
+
+  .content-board-executives .wp-content .lightweight-accordion-body .wp-block-image img {
+    max-width: min(190px, 76vw) !important;
+  }
+
+  .content-board-executives .wp-content .lightweight-accordion-body h5.wp-block-heading {
+    min-height: 0;
   }
 }
 
@@ -4294,6 +4581,7 @@ a.calendar-cell.has-posts:hover {
    user wants link lists to flow vertically (1 column) not split into 2.) */
 
 .site-footer a {
+  overflow-wrap: anywhere;
   transition: color 150ms ease;
 }
 
@@ -4310,6 +4598,7 @@ a.calendar-cell.has-posts:hover {
 .footer-bottom {
   border-top: 1px solid var(--glass-border);
   font-size: 13px;
+  line-height: 1.6;
   padding: 18px 0;
 }
 
@@ -4384,7 +4673,11 @@ a.calendar-cell.has-posts:hover {
 }
 .footer-contact {
   color: rgba(226, 232, 240, 0.78);
+  display: flex;
+  flex-wrap: wrap;
   font-size: 13px;
+  gap: 0 6px;
+  align-items: baseline;
   line-height: 1.7;
   margin: 0 0 4px;
 }
@@ -4399,6 +4692,72 @@ a.calendar-cell.has-posts:hover {
   color: rgba(226, 232, 240, 0.5);
   font-size: 12px;
   font-style: italic;
+}
+
+.footer-utility {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: var(--radius-md);
+  display: grid;
+  gap: 12px;
+  margin-top: 18px;
+  padding: 14px 16px;
+}
+
+.footer-utility .reader-controls,
+.footer-utility-links {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 12px;
+  white-space: normal;
+}
+
+.footer-utility .reader-controls {
+  color: rgba(226, 232, 240, 0.78);
+  font-size: 13px;
+}
+
+.footer-utility .reader-controls span {
+  color: var(--accent);
+  font-weight: 800;
+}
+
+.footer-utility .reader-controls button {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 999px;
+  color: rgba(226, 232, 240, 0.78);
+  min-height: 30px;
+  min-width: 34px;
+  padding: 4px 9px;
+}
+
+.footer-utility .reader-controls button[aria-pressed="true"] {
+  background: rgba(56, 189, 248, 0.18);
+  border-color: rgba(56, 189, 248, 0.45);
+  color: #fff;
+}
+
+.footer-utility-links a {
+  color: rgba(226, 232, 240, 0.78);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.footer-utility-links a:last-child {
+  align-items: center;
+  background: rgba(56, 189, 248, 0.14);
+  border: 1px solid rgba(56, 189, 248, 0.28);
+  border-radius: 999px;
+  color: #fff;
+  display: inline-flex;
+  min-height: 30px;
+  padding: 4px 12px;
+}
+
+.footer-visitor-counter {
+  display: none;
 }
 .footer-section-spaced {
   margin-top: 32px !important;
@@ -4416,18 +4775,155 @@ a.calendar-cell.has-posts:hover {
 /* ============================================================
    Responsive
    ============================================================ */
+@media (max-width: 1180px) {
+  .header-inner {
+    min-height: 74px;
+  }
+
+  .desktop-nav {
+    display: none;
+  }
+
+  .mobile-menu-button {
+    display: inline-flex;
+  }
+
+  .brand-link {
+    padding: 6px 12px;
+  }
+
+  .brand-link img {
+    height: 44px;
+  }
+
+  .mobile-nav {
+    background: var(--navy-900);
+    border-top: 1px solid var(--glass-border);
+    display: grid;
+    max-height: 0;
+    overflow: hidden;
+    padding: 0 24px;
+    transition:
+      max-height 220ms ease,
+      padding 220ms ease;
+  }
+
+  .mobile-nav.open {
+    max-height: calc(100vh - 100px);
+    overflow-y: auto;
+    padding-bottom: 22px;
+    padding-top: 16px;
+  }
+
+  .mobile-search {
+    margin-bottom: 12px;
+  }
+
+  .mobile-nav > a,
+  .mobile-nav > button,
+  .mobile-nav summary {
+    align-items: center;
+    background: transparent;
+    border-bottom: 1px solid var(--glass-border);
+    border-left: 0;
+    border-right: 0;
+    border-top: 0;
+    color: var(--on-dark);
+    display: flex;
+    font-size: 15px;
+    font-weight: 700;
+    justify-content: space-between;
+    list-style: none;
+    padding: 14px 0;
+    text-align: left;
+    width: 100%;
+  }
+
+  .mobile-nav summary a,
+  .mobile-nav summary button,
+  .mobile-summary-label {
+    background: transparent;
+    border: 0;
+    color: inherit;
+    display: inline-block;
+    font: inherit;
+    padding: 0;
+    text-align: left;
+  }
+
+  .mobile-nav summary::-webkit-details-marker {
+    display: none;
+  }
+
+  .mobile-nav details > div {
+    display: grid;
+    gap: 2px;
+    padding: 4px 0 12px 16px;
+  }
+
+  .mobile-nav details > div a,
+  .mobile-nav details > div button {
+    background: transparent;
+    border: 0;
+    color: var(--on-dark-muted);
+    font-size: 14px;
+    font-weight: 600;
+    padding: 9px 0;
+    text-align: left;
+  }
+
+  .mobile-nav a.active,
+  .mobile-nav button.active,
+  .mobile-summary-label.active,
+  .mobile-nav details > div a.active,
+  .mobile-nav details > div button.active {
+    color: var(--accent);
+  }
+
+  .mobile-language {
+    color: var(--accent) !important;
+  }
+}
+
 @media (max-width: 1024px) {
   .footer-grid {
     grid-template-columns: 1fr 1fr;
   }
+}
 
-  .stats-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+@media (max-width: 900px) {
+  .content-layout.with-sidebar {
+    grid-template-columns: 1fr;
+  }
+
+  .page-sidebar {
+    position: static;
+  }
+
+  .wp-content table {
+    display: block;
+    max-width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .wp-content iframe {
+    aspect-ratio: 16 / 9;
+    height: auto;
+    min-height: 280px;
+  }
+
+  .footer-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .footer-brand,
+  .site-footer section {
+    min-width: 0;
   }
 }
 
 @media (max-width: 760px) {
-  .utility-inner,
   .header-inner {
     min-height: 72px;
   }
@@ -4485,10 +4981,12 @@ a.calendar-cell.has-posts:hover {
   }
 
   .mobile-nav summary a,
-  .mobile-nav summary button {
+  .mobile-nav summary button,
+  .mobile-summary-label {
     background: transparent;
     border: 0;
     color: inherit;
+    display: inline-block;
     font: inherit;
     padding: 0;
     text-align: left;
@@ -4517,6 +5015,7 @@ a.calendar-cell.has-posts:hover {
 
   .mobile-nav a.active,
   .mobile-nav button.active,
+  .mobile-summary-label.active,
   .mobile-nav details > div a.active,
   .mobile-nav details > div button.active {
     color: var(--accent);
@@ -4544,16 +5043,33 @@ a.calendar-cell.has-posts:hover {
     padding: 0 20px;
   }
 
-  .utility-inner {
-    align-items: stretch;
-    flex-direction: column;
-    gap: 6px;
-    padding-bottom: 8px;
-    padding-top: 8px;
+  .footer-contact {
+    display: block;
   }
 
-  .utility-inner nav {
-    justify-content: space-between;
+  .footer-utility {
+    padding: 14px;
+  }
+
+  .footer-utility .reader-controls,
+  .footer-utility-links {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .footer-utility .reader-controls {
+    align-items: center;
+    flex-direction: row;
+  }
+
+  .footer-contact > span:first-child,
+  .footer-contact-note {
+    display: block;
+    margin-top: 2px;
+  }
+
+  .footer-bottom {
+    text-align: center;
   }
 
   .brand-link img {
@@ -4581,16 +5097,6 @@ a.calendar-cell.has-posts:hover {
     font-size: calc(16px * var(--reader-scale));
   }
 
-  .stats-grid {
-    gap: 12px;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    padding-bottom: 40px;
-  }
-
-  .stat-card {
-    padding: 16px 18px;
-  }
-
   .content-layout,
   .search-results {
     padding-bottom: 48px;
@@ -4604,6 +5110,68 @@ a.calendar-cell.has-posts:hover {
   .wp-content .wp-block-columns,
   .wp-content .is-layout-flex {
     gap: 18px;
+  }
+
+  .wp-content .wp-block-columns {
+    margin: 16px 0;
+    padding: 18px;
+  }
+
+  .wp-content .wp-block-column {
+    flex-basis: 100% !important;
+    max-width: 100% !important;
+  }
+
+  .wp-content .wp-block-column:empty,
+  .wp-content .wp-block-column:has(> p:empty:only-child) {
+    display: none;
+  }
+
+  .wp-content .wp-block-spacer {
+    height: 16px !important;
+    max-height: 16px;
+  }
+
+  .wp-content figure {
+    margin-block: 16px;
+  }
+
+  .wp-content img {
+    margin-bottom: 16px;
+    margin-top: 16px;
+    padding: 6px;
+  }
+
+  .wp-content .wp-block-columns img,
+  .wp-content table img {
+    margin: 0;
+    padding: 0;
+  }
+
+  .wp-content table {
+    display: block;
+    max-width: 100%;
+    overflow-x: auto;
+    table-layout: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .wp-content th,
+  .wp-content td {
+    min-width: 120px;
+    overflow-wrap: anywhere;
+    padding: 9px 10px;
+  }
+
+  .wp-content thead th,
+  .wp-content th[scope="col"] {
+    white-space: normal;
+  }
+
+  .wp-content iframe {
+    aspect-ratio: 16 / 9;
+    height: auto;
+    min-height: 220px;
   }
 
   /* Accordion body table: fix 8px-column bug on mobile.

@@ -2,6 +2,7 @@ import Link from "next/link";
 import type { PageData } from "@/lib/db/page-data";
 import type { PresentationSidebarItem } from "@/lib/wp/presentation";
 import { ArticleCard } from "./article-card";
+import { BoardExecutiveContent } from "./board-executive-org-chart";
 import { CategoryNewsListing } from "./category-news-listing";
 import { CategoryPagination } from "./category-pagination";
 import { HomeSections } from "./home/home-sections";
@@ -176,6 +177,8 @@ export function ContentPage({ data }: { data: PageData }) {
                 groups={data.knowledgeDocuments}
                 language={record.language}
               />
+            ) : data.boardExecutivePresentation ? (
+              <BoardExecutiveContent presentation={data.boardExecutivePresentation} />
             ) : (
               <div
                 className="wp-content"

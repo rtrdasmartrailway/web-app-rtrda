@@ -1,0 +1,255 @@
+.root {
+  margin: 0 0 24px;
+}
+
+.chart {
+  display: grid;
+  gap: 0;
+  justify-items: center;
+  margin: 0 auto;
+  max-width: 1160px;
+}
+
+.director {
+  position: relative;
+  width: min(100%, 290px);
+}
+
+.branch {
+  margin-top: 36px;
+  padding-top: 30px;
+  position: relative;
+  width: 100%;
+}
+
+.branch::before,
+.branch::after,
+.node::before {
+  background: linear-gradient(180deg, rgba(37, 99, 235, 0.38), rgba(0, 78, 143, 0.58));
+  content: "";
+  position: absolute;
+}
+
+.branch::before {
+  height: 2px;
+  left: var(--line-left);
+  right: var(--line-right);
+  top: 0;
+}
+
+.branch::after {
+  height: 30px;
+  left: 50%;
+  top: -30px;
+  transform: translateX(-50%);
+  width: 2px;
+}
+
+.row {
+  display: grid;
+  gap: clamp(16px, 1.8vw, 22px);
+  justify-content: center;
+  width: 100%;
+}
+
+.deputies {
+  --line-left: 25%;
+  --line-right: 25%;
+}
+
+.deputies .row {
+  grid-template-columns: repeat(2, minmax(220px, 280px));
+}
+
+.generalManagers {
+  --line-left: 10%;
+  --line-right: 10%;
+}
+
+.generalManagers .row {
+  grid-template-columns: repeat(5, minmax(168px, 1fr));
+}
+
+.node {
+  position: relative;
+}
+
+.node::before {
+  height: 30px;
+  left: 50%;
+  top: -30px;
+  transform: translateX(-50%);
+  width: 2px;
+}
+
+.card {
+  align-items: stretch;
+  background: rgba(255, 255, 255, 0.98);
+  border: 1px solid rgba(148, 163, 184, 0.28);
+  border-radius: 18px;
+  box-shadow: 0 16px 38px rgba(4, 18, 46, 0.1);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  height: 100%;
+  min-height: 100%;
+  padding: 18px;
+  text-align: center;
+}
+
+.vacant {
+  background: rgba(248, 251, 255, 0.96);
+  border-style: dashed;
+}
+
+.portrait {
+  align-items: center;
+  aspect-ratio: 4 / 5;
+  background: linear-gradient(180deg, #edf4ff 0%, #fff 100%);
+  border-radius: 16px;
+  display: flex;
+  justify-content: center;
+  margin: 0 auto;
+  max-width: 180px;
+  overflow: hidden;
+  position: relative;
+  width: 100%;
+}
+
+.image {
+  border: 1px solid rgba(148, 163, 184, 0.28);
+  border-radius: 14px;
+  object-fit: cover;
+}
+
+.placeholder {
+  align-items: center;
+  background:
+    radial-gradient(circle at 50% 20%, rgba(56, 189, 248, 0.22), transparent 34%),
+    linear-gradient(135deg, #e8f2ff 0%, #c8d9ef 100%);
+  color: var(--navy-900);
+  display: flex;
+  font-size: calc(15px * var(--reader-scale));
+  font-weight: 900;
+  height: 100%;
+  justify-content: center;
+  line-height: 1.35;
+  padding: 16px;
+  text-align: center;
+  width: 100%;
+}
+
+.copy {
+  display: grid;
+  gap: 8px;
+}
+
+.copy h3 {
+  color: var(--navy-900);
+  font-size: calc(16px * var(--reader-scale));
+  font-weight: 800;
+  line-height: 1.35;
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.role {
+  color: var(--accent-deep);
+  font-size: calc(13.5px * var(--reader-scale));
+  font-weight: 750;
+  line-height: 1.45;
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.contact {
+  border-top: 1px solid rgba(148, 163, 184, 0.22);
+  display: grid;
+  gap: 8px;
+  margin: auto 0 0;
+  padding-top: 12px;
+}
+
+.contact div {
+  display: grid;
+  gap: 4px;
+}
+
+.contact dt {
+  color: #64748b;
+  font-size: calc(12px * var(--reader-scale));
+  font-weight: 800;
+  letter-spacing: 0;
+  margin: 0;
+  text-transform: uppercase;
+}
+
+.contact dd {
+  color: var(--navy-900);
+  font-size: calc(12.5px * var(--reader-scale));
+  font-weight: 750;
+  line-height: 1.35;
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.contact a {
+  color: var(--accent-deep);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+@media (max-width: 1020px) {
+  .generalManagers .row {
+    grid-template-columns: repeat(3, minmax(190px, 1fr));
+  }
+
+  .generalManagers {
+    --line-left: 17%;
+    --line-right: 17%;
+  }
+}
+
+@media (max-width: 720px) {
+  .body {
+    padding: 18px 14px;
+  }
+
+  .summary {
+    font-size: calc(18px * var(--reader-scale));
+    padding: 16px 18px;
+  }
+
+  .director {
+    width: 100%;
+  }
+
+  .branch {
+    margin-top: 18px;
+    padding-top: 18px;
+  }
+
+  .branch::before,
+  .branch::after {
+    display: none;
+  }
+
+  .deputies .row,
+  .generalManagers .row {
+    grid-template-columns: 1fr;
+  }
+
+  .node::before {
+    height: 18px;
+    top: -18px;
+  }
+
+  .card {
+    border-radius: 16px;
+    padding: 16px 14px;
+  }
+
+  .portrait {
+    max-width: 170px;
+  }
+}
