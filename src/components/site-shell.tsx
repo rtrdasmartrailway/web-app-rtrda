@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { FooterUtility } from "./footer-utility";
+import { LandingPopup } from "./landing-popup";
 import { SafeImage } from "./safe-image";
 import type { ShellData } from "@/lib/db/page-data";
 import { RtrdaNavigation } from "./rtrda-navigation";
@@ -120,6 +121,7 @@ export function SiteShell({
         language={language}
         navItems={shell.navItems}
       />
+      <LandingPopup path={shell.path} />
 
       <main>{children}</main>
 

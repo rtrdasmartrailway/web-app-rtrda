@@ -2946,6 +2946,113 @@ body:has(.yutth-lightbox) {
   overflow: hidden;
 }
 
+/* Landing popup — mirrors the legacy AYS Popup Box without plugin scripts */
+.landing-popup-overlay {
+  align-items: center;
+  animation: landingPopupFadeIn 180ms ease-out;
+  background: rgba(6, 13, 29, 0.7);
+  display: flex;
+  inset: 0;
+  justify-content: center;
+  padding: clamp(18px, 4vw, 52px);
+  position: fixed;
+  z-index: 10050;
+}
+
+@keyframes landingPopupFadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.landing-popup-modal {
+  background: #fff;
+  border: 1px dotted #fff;
+  border-radius: 4px;
+  box-shadow: 0 28px 72px rgba(0, 0, 0, 0.45);
+  color: var(--navy-900);
+  display: flex;
+  flex-direction: column;
+  font-size: 14px;
+  max-height: min(650px, calc(100dvh - 56px));
+  overflow: hidden;
+  width: min(55vw, 860px);
+}
+
+.landing-popup-header {
+  align-items: center;
+  background: #fff;
+  border-bottom: 1px solid rgba(0, 52, 113, 0.12);
+  display: flex;
+  gap: 18px;
+  justify-content: space-between;
+  padding: 18px 24px;
+}
+
+.landing-popup-header h2 {
+  color: var(--primary);
+  font-size: clamp(20px, 2vw, 30px);
+  line-height: 1.25;
+  margin: 0;
+}
+
+.landing-popup-close {
+  align-items: center;
+  background: var(--primary);
+  border: 0;
+  border-radius: 999px;
+  color: #fff;
+  cursor: pointer;
+  display: inline-flex;
+  flex: 0 0 auto;
+  font-size: 26px;
+  font-weight: 700;
+  height: 42px;
+  justify-content: center;
+  line-height: 1;
+  padding: 0;
+  transition:
+    background 150ms ease,
+    transform 150ms ease;
+  width: 42px;
+}
+
+.landing-popup-close:hover,
+.landing-popup-close:focus-visible {
+  background: var(--navy-950);
+  transform: scale(1.03);
+}
+
+.landing-popup-body {
+  overflow: auto;
+  padding: 24px;
+}
+
+.landing-popup-section + .landing-popup-section {
+  margin-top: 24px;
+}
+
+.landing-popup-section h3 {
+  color: #333;
+  font-size: 18px;
+  line-height: 1.35;
+  margin: 0 0 10px;
+}
+
+.landing-popup-section ul {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding-left: 22px;
+}
+
+.landing-popup-section li {
+  line-height: 1.62;
+}
+
 .wp-content .lightweight-accordion {
   display: grid;
   gap: 16px;
@@ -4942,6 +5049,10 @@ a.calendar-cell.has-posts:hover {
 }
 
 @media (max-width: 900px) {
+  .landing-popup-modal {
+    width: min(92vw, 760px);
+  }
+
   .content-layout.with-sidebar {
     grid-template-columns: 1fr;
   }
@@ -5102,6 +5213,26 @@ a.calendar-cell.has-posts:hover {
 @media (max-width: 680px) {
   .site-container {
     padding: 0 20px;
+  }
+
+  .landing-popup-overlay {
+    align-items: stretch;
+    padding: 0;
+  }
+
+  .landing-popup-modal {
+    border-radius: 0;
+    height: 100dvh;
+    max-height: none;
+    width: 100vw;
+  }
+
+  .landing-popup-header {
+    padding: 16px 18px;
+  }
+
+  .landing-popup-body {
+    padding: 20px 18px 28px;
   }
 
   .footer-contact {

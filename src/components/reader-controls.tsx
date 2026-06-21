@@ -7,9 +7,7 @@ const FONT_SCALES = [1, 1.08, 1.16] as const;
 
 function labelForScale(language: WpLanguage, index: number): string {
   if (language === "th") {
-    return ["ขนาดตัวอักษรปกติ", "เพิ่มขนาดตัวอักษร", "เพิ่มขนาดตัวอักษรมากที่สุด"][
-      index
-    ];
+    return ["ขนาดตัวอักษรปกติ", "เพิ่มขนาดตัวอักษร", "เพิ่มขนาดตัวอักษรมากที่สุด"][index];
   }
 
   return ["Default font size", "Larger font size", "Largest font size"][index];
