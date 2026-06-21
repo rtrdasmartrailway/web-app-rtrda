@@ -21,7 +21,12 @@ src/generated/
 # next.js
 /.next/
 /out/
-public/wp-content/uploads/
+public/wp-content/uploads/*
+!public/wp-content/uploads/2026/
+public/wp-content/uploads/2026/*
+!public/wp-content/uploads/2026/06/
+public/wp-content/uploads/2026/06/*
+!public/wp-content/uploads/2026/06/อินโฟภายนอก-11-2-1024x1024.png
 public/sdc-downloads/
 src/data/wp-content.json
 

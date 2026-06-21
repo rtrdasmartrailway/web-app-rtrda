@@ -1,6 +1,7 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import {
+  LANDING_POPUP_CONTENT,
   LANDING_POPUP_SESSION_KEY,
   LandingPopup,
   isPublicLandingPopupPath,
@@ -21,15 +22,17 @@ class MemoryStorage {
 }
 
 describe("LandingPopup", () => {
-  it("renders the old WordPress popup biography when opened", () => {
+  it("renders the old WordPress image-only popup when opened", () => {
     const html = renderToStaticMarkup(<LandingPopup path="/" forceOpen />);
 
     expect(html).toContain('role="dialog"');
-    expect(html).toContain("ดร. โชติชัย เจริญงาม");
-    expect(html).toContain("การศึกษา");
-    expect(html).toContain("ประสบการณ์การทำงาน");
-    expect(html).toContain("ประวัติด้านกรรมการ/อนุกรรมการ/ที่ปรึกษา");
-    expect(html).toContain("University of Texas at Austin");
+    expect(html).toContain("landing-popup-image");
+    expect(html).toContain(encodeURIComponent(LANDING_POPUP_CONTENT.src));
+    expect(html).toContain(LANDING_POPUP_CONTENT.alt);
+    expect(html).toContain('width="1024"');
+    expect(html).toContain('height="1024"');
+    expect(html).not.toContain("ดร. โชติชัย เจริญงาม");
+    expect(html).not.toContain("การศึกษา");
   });
 
   it("renders only a hidden mount point before client hydration opens it", () => {
@@ -38,7 +41,7 @@ describe("LandingPopup", () => {
     expect(html).toContain("data-landing-popup-root");
     expect(html).toContain("hidden");
     expect(html).not.toContain('role="dialog"');
-    expect(html).not.toContain("ดร. โชติชัย เจริญงาม");
+    expect(html).not.toContain(LANDING_POPUP_CONTENT.src);
   });
 
   it("does not render on intranet routes", () => {
