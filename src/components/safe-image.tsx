@@ -33,8 +33,7 @@ export function SafeImage({
             ? undefined
             : {
                 width: typeof props.width === "number" ? props.width : "100%",
-                height:
-                  typeof props.height === "number" ? props.height : "100%",
+                height: typeof props.height === "number" ? props.height : "100%",
                 display: "inline-block",
               }
         }
