@@ -1,9 +1,10 @@
 "use client";
 
 import { SafeImage } from "./safe-image";
+import { LanguageToggle } from "./language-toggle";
 import Link from "next/link";
 import type { ReactNode } from "react";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import type { WpLanguage } from "@/lib/wp/types";
 import type { PresentationNavItem } from "@/lib/wp/presentation";
 
@@ -145,38 +146,17 @@ export function RtrdaNavigation({
 }) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
-  const [fontScale, setFontScale] = useState(1);
   const homePath = language === "th" ? "/" : "/en";
-
-  useEffect(() => {
-    document.documentElement.style.setProperty("--reader-scale", String(fontScale));
-  }, [fontScale]);
 
   return (
     <>
       <div className="utility-bar">
-        <div className="site-container utility-inner">
-          <div
-            className="reader-controls"
-            aria-label={language === "th" ? "ขนาดตัวอักษร" : "Font size"}
-          >
-            <span>{language === "th" ? "ขนาดตัวอักษร" : "Font Size"}</span>
-            {[1, 1.08, 1.16].map((scale, index) => (
-              <button
-                key={scale}
-                type="button"
-                aria-pressed={fontScale === scale}
-                onClick={() => setFontScale(scale)}
-              >
-                {"A".repeat(index + 1)}
-              </button>
-            ))}
-          </div>
+        <div className="site-container utility-inner utility-inner-compact">
           <nav aria-label="Utility navigation">
             <Link href={language === "th" ? "/แผนที่เว็บไซต์" : "/en/แผนที่เว็บไซต์"}>
               {language === "th" ? "แผนที่เว็บไซต์" : "Sitemap"}
             </Link>
-            <Link href={alternatePath}>{language === "th" ? "EN" : "TH"}</Link>
+            <LanguageToggle alternatePath={alternatePath} language={language} />
           </nav>
         </div>
       </div>
@@ -272,9 +252,11 @@ export function RtrdaNavigation({
           {navItems.map((item) => (
             <MobileNavItem item={item} key={`${item.href}-${item.label}`} />
           ))}
-          <Link className="mobile-language" href={alternatePath}>
-            {language === "th" ? "English" : "ภาษาไทย"}
-          </Link>
+          <LanguageToggle
+            alternatePath={alternatePath}
+            className="mobile-language-toggle"
+            language={language}
+          />
         </nav>
       </header>
     </>

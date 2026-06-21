@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { FooterUtility } from "./footer-utility";
 import { SafeImage } from "./safe-image";
 import type { ShellData } from "@/lib/db/page-data";
 import { RtrdaNavigation } from "./rtrda-navigation";
@@ -206,6 +207,8 @@ export function SiteShell({
                 ({isEn ? "counter not yet wired up" : "รอเชื่อมต่อระบบนับ"})
               </p>
             </div>
+
+            <FooterUtility alternatePath={shell.alternatePath} language={language} />
           </section>
 
           {/* Column 2: ส่วนราชการในสังกัดกระทรวงคมนาคม */}
