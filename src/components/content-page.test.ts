@@ -12,8 +12,6 @@ describe("contentRouteClass", () => {
   });
 
   it("keeps standards route styling intact", () => {
-    expect(contentRouteClass("/มาตรฐานระบบราง-สทร")).toBe(
-      "content-rail-standards",
-    );
+    expect(contentRouteClass("/มาตรฐานระบบราง-สทร")).toBe("content-rail-standards");
   });
 });

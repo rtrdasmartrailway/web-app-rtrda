@@ -25,6 +25,7 @@ import {
   buildBoardExecutivePresentation,
   type BoardExecutivePresentation,
 } from "@/lib/wp/board-executives";
+import { applyContactMapOverride } from "@/lib/wp/contact-map";
 import { normalizeRoutePath } from "@/lib/wp/url";
 import { extractPartnerLogos } from "@/lib/wp/home";
 import {
@@ -180,10 +181,11 @@ export const buildShellData = cache(async (path: string): Promise<ShellData> => 
 
 /** Everything a content page needs, in one cached call (shared by metadata + page). */
 export const getPageData = cache(async (path: string): Promise<PageData | null> => {
-  const record = await getRecordByPath(path);
-  if (!record) {
+  const importedRecord = await getRecordByPath(path);
+  if (!importedRecord) {
     return null;
   }
+  const record = applyContactMapOverride(importedRecord);
 
   const isHome = record.path === "/" || record.path === "/en";
   const isCategory = record.kind === "category";
