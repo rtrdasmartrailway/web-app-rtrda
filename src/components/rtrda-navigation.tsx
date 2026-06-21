@@ -1,6 +1,6 @@
 "use client";
 
-import Image from "next/image";
+import { SafeImage } from "./safe-image";
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { useEffect, useState } from "react";
@@ -184,8 +184,9 @@ export function RtrdaNavigation({
       <header className="site-header">
         <div className="site-container header-inner">
           <Link href={homePath} className="brand-link" aria-label="RTRDA home">
-            <Image
+            <SafeImage
               src="/wp-content/uploads/2023/02/Logo_RTRDA_full-1.png"
+              fallbackSrc="/stitch-assets/rail-network.png"
               alt="RTRDA"
               width={260}
               height={72}

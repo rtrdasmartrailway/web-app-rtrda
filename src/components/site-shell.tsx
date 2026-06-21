@@ -1,5 +1,5 @@
 import Link from "next/link";
-import Image from "next/image";
+import { SafeImage } from "./safe-image";
 import type { ShellData } from "@/lib/db/page-data";
 import { RtrdaNavigation } from "./rtrda-navigation";
 import { formatDate } from "./site-helpers";
@@ -127,8 +127,9 @@ export function SiteShell({
         <div className="site-container footer-grid">
           {/* Column 1: Brand — address, email, phone, visitor placeholder */}
           <section className="footer-brand">
-            <Image
+            <SafeImage
               src="/wp-content/uploads/2023/02/Logo_RTRDA_full-1.png"
+              fallbackSrc="/stitch-assets/rail-network.png"
               alt="RTRDA"
               width={220}
               height={62}

@@ -1,5 +1,5 @@
 import Link from "next/link";
-import Image from "next/image";
+import { SafeImage } from "./safe-image";
 import type { Card } from "@/lib/db/page-data";
 import { formatDate } from "./site-helpers";
 
@@ -18,8 +18,9 @@ export function CategoryNewsListing({ cards }: { cards: Card[] }) {
         return (
           <Link key={record.id} href={record.path} className="news-card">
             <span className="news-card-image">
-              <Image
+              <SafeImage
                 src={imagePath}
+                fallbackSrc="/stitch-assets/rail-lab.png"
                 alt=""
                 fill
                 sizes="(max-width: 680px) 100vw, (max-width: 980px) 50vw, 33vw"

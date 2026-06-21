@@ -1,5 +1,11 @@
 FROM node:22-bookworm-slim AS deps
 WORKDIR /app
+
+# sharp needs libvips and build tooling for its native bindings.
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends libvips-dev build-essential \
+  && rm -rf /var/lib/apt/lists/*
+
 COPY package.json package-lock.json ./
 RUN npm ci
 # Generate the Prisma client (reads prisma/schema.prisma); needed for typecheck/build.
@@ -25,9 +31,9 @@ ENV NODE_ENV=production
 ENV HOSTNAME=0.0.0.0
 ENV PORT=3000
 
-# Prisma's query engine needs OpenSSL at runtime.
+# Prisma's query engine needs OpenSSL at runtime; sharp needs libvips.
 RUN apt-get update \
-  && apt-get install -y --no-install-recommends openssl \
+  && apt-get install -y --no-install-recommends openssl libvips42 \
   && rm -rf /var/lib/apt/lists/*
 
 RUN groupadd --system --gid 1001 nodejs \
