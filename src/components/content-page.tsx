@@ -43,8 +43,12 @@ function SideNavigation({
   );
 }
 
-function contentRouteClass(path: string): string {
+export function contentRouteClass(path: string): string {
   const canonicalPath = path.replace(/^\/en(?=\/)/, "");
+
+  if (canonicalPath === "/เกี่ยวกับ-สทร/คณะกรรมการ-ผู้บริหาร") {
+    return "content-board-executives";
+  }
 
   if (canonicalPath === "/มาตรฐานระบบราง-สทร") {
     return "content-rail-standards";
