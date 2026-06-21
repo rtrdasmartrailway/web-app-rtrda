@@ -43,15 +43,6 @@ function SideNavigation({
   );
 }
 
-function StatCard({ value, label }: { value: number; label: string }) {
-  return (
-    <div className="stat-card">
-      <span className="stat-number">{value.toLocaleString()}+</span>
-      <span className="stat-label">{label}</span>
-    </div>
-  );
-}
-
 function contentRouteClass(path: string): string {
   const canonicalPath = path.replace(/^\/en(?=\/)/, "");
 
@@ -145,32 +136,6 @@ export function ContentPage({ data }: { data: PageData }) {
               </>
             ) : null}
           </div>
-          {isHome && data.stats ? (
-            <div className="stats-band">
-              <div className="site-container stats-grid">
-                <StatCard
-                  value={data.stats.posts}
-                  label={
-                    record.language === "th" ? "ข่าวสารและบทความ" : "News & articles"
-                  }
-                />
-                <StatCard
-                  value={data.stats.pages}
-                  label={record.language === "th" ? "หน้าข้อมูล" : "Information pages"}
-                />
-                <StatCard
-                  value={data.stats.flipbooks}
-                  label={record.language === "th" ? "สิ่งพิมพ์/เอกสาร" : "Publications"}
-                />
-                <StatCard
-                  value={data.stats.downloads}
-                  label={
-                    record.language === "th" ? "ไฟล์ดาวน์โหลด" : "Downloadable files"
-                  }
-                />
-              </div>
-            </div>
-          ) : null}
         </section>
 
         <div

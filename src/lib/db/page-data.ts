@@ -42,11 +42,9 @@ import {
   getPostCalendar,
   getPostsByCategory,
   getRecordByPath,
-  getStats,
   getTopLevelPages,
   recordExists,
   type CalendarDay,
-  type SiteStats,
 } from "./queries";
 
 export interface Card {
@@ -91,7 +89,6 @@ export interface PageData {
   newsCards: Card[];
   /** Pagination state for category listing pages; null on non-category pages. */
   categoryPagination: CategoryPagination | null;
-  stats: SiteStats | null;
   /** Custom home-page sections; null for non-home pages. */
   home: HomeData | null;
   /** Normalized document groups for the knowledge-base pages only. */
@@ -195,7 +192,6 @@ export const getPageData = cache(async (path: string): Promise<PageData | null> 
     childRecords,
     siblingRecords,
     latestRecords,
-    stats,
     shell,
     home,
     pdfReaderTargets,
@@ -208,7 +204,6 @@ export const getPageData = cache(async (path: string): Promise<PageData | null> 
     isHome && !hasImportedLatestPosts(record)
       ? getLatestPosts(record.language)
       : Promise.resolve([]),
-    isHome ? getStats() : Promise.resolve(null),
     buildShellData(path),
     isHome ? buildHomeData(record) : Promise.resolve(null),
     buildPdfReaderTargets(record.contentHtml, {
@@ -238,7 +233,6 @@ export const getPageData = cache(async (path: string): Promise<PageData | null> 
     latest,
     newsCards,
     categoryPagination,
-    stats,
     home,
     knowledgeDocuments: isKnowledgeDocuments
       ? buildKnowledgeDocumentGroups(record.contentHtml, {

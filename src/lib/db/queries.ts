@@ -201,23 +201,6 @@ export async function getDownloadIds(): Promise<string[]> {
   return rows.map((row) => row.id);
 }
 
-export interface SiteStats {
-  posts: number;
-  pages: number;
-  flipbooks: number;
-  downloads: number;
-}
-
-export async function getStats(): Promise<SiteStats> {
-  const [posts, pages, flipbooks, downloads] = await Promise.all([
-    prisma.contentRecord.count({ where: { kind: "post" } }),
-    prisma.contentRecord.count({ where: { kind: "page" } }),
-    prisma.contentRecord.count({ where: { kind: "flipbook" } }),
-    prisma.download.count(),
-  ]);
-  return { posts, pages, flipbooks, downloads };
-}
-
 /**
  * Site search. Rank 0: title/excerpt substring; rank 1: body substring;
  * rank 2: fuzzy (pg_trgm) title match. Trigram similarity works for Thai,
