@@ -3,7 +3,7 @@
 import Image from "next/image";
 import { useCallback, useEffect, useRef, useState } from "react";
 
-export const LANDING_POPUP_SESSION_KEY = "rtrda-landing-popup-dismissed";
+export const LANDING_POPUP_SESSION_KEY = "rtrda-landing-popup-85-dismissed";
 
 type PopupStorage = Pick<Storage, "getItem" | "setItem">;
 

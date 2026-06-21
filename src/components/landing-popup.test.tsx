@@ -62,4 +62,13 @@ describe("landing popup session storage", () => {
     expect(storage.getItem(LANDING_POPUP_SESSION_KEY)).toBe("1");
     expect(shouldShowLandingPopup(storage)).toBe(false);
   });
+
+  it("ignores the legacy biography popup dismissal key", () => {
+    const storage = new MemoryStorage();
+
+    storage.setItem("rtrda-landing-popup-dismissed", "1");
+
+    expect(LANDING_POPUP_SESSION_KEY).not.toBe("rtrda-landing-popup-dismissed");
+    expect(shouldShowLandingPopup(storage)).toBe(true);
+  });
 });
