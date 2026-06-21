@@ -26,6 +26,7 @@ import {
   type BoardExecutivePresentation,
 } from "@/lib/wp/board-executives";
 import { applyContactMapOverride } from "@/lib/wp/contact-map";
+import { applyProcurementPlanOverride } from "@/lib/wp/procurement-plan";
 import { normalizeRoutePath } from "@/lib/wp/url";
 import { extractPartnerLogos } from "@/lib/wp/home";
 import {
@@ -185,7 +186,7 @@ export const getPageData = cache(async (path: string): Promise<PageData | null> 
   if (!importedRecord) {
     return null;
   }
-  const record = applyContactMapOverride(importedRecord);
+  const record = applyProcurementPlanOverride(applyContactMapOverride(importedRecord));
 
   const isHome = record.path === "/" || record.path === "/en";
   const isCategory = record.kind === "category";
