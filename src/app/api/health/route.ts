@@ -1,1 +1,11 @@
-export { GET, dynamic } from "../../healthz/route";
+import { NextResponse } from "next/server";
+
+export const dynamic = "force-dynamic";
+
+export function GET() {
+  return NextResponse.json({
+    ok: true,
+    service: "web-app-rtrda",
+    timestamp: new Date().toISOString(),
+  });
+}
