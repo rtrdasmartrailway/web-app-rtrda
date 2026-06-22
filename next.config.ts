@@ -8,18 +8,6 @@ const nextConfig: NextConfig = {
   },
   images: {
     formats: ["image/avif", "image/webp"],
-    remotePatterns: [
-      {
-        protocol: "https",
-        hostname: "www.rtrda.or.th",
-        pathname: "/wp-content/uploads/**",
-      },
-      {
-        protocol: "https",
-        hostname: "www.rtrda.or.th",
-        pathname: "/wp-content/**",
-      },
-    ],
   },
   // The generated Prisma client and its native query engine live outside
   // node_modules; make sure the standalone bundle traces them in.

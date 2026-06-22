@@ -2,51 +2,50 @@
 
 import { useEffect } from "react";
 
-export const LEGACY_ORIGIN = "https://www.rtrda.or.th";
-export const LOCAL_PREFIXES = ["/wp-content/uploads/", "/wp-content/"];
+export const LOCAL_ASSET_PREFIXES = ["/wp-content/", "/sdc-downloads/"];
+export const LEGACY_HOSTS = new Set(["www.rtrda.or.th", "rtrda.or.th"]);
 
-export function isLocalContentPath(value: string): boolean {
-  return LOCAL_PREFIXES.some((prefix) => value.startsWith(prefix));
+export function isLocalAssetPath(value: string): boolean {
+  return LOCAL_ASSET_PREFIXES.some((prefix) => value.startsWith(prefix));
 }
 
-export function toLegacyUrl(path: string): string {
-  return `${LEGACY_ORIGIN}${path}`;
-}
+export function toLocalAssetPath(value: string): string {
+  if (isLocalAssetPath(value)) return value;
 
-export function addCacheBuster(url: string): string {
-  const separator = url.includes("?") ? "&" : "?";
-  return `${url}${separator}v=2`;
-}
-
-/**
- * Extract the local path from an img src that may be a relative path,
- * an absolute legacy URL, or an already-rewritten legacy URL.
- */
-export function getLocalPath(url: string): string | null {
-  if (url.startsWith("/")) return url.split("?")[0];
   try {
-    const parsed = new URL(url);
-    if (parsed.hostname === "www.rtrda.or.th" || parsed.hostname === "rtrda.or.th") {
-      return parsed.pathname;
+    const parsed = new URL(value);
+    if (LEGACY_HOSTS.has(parsed.hostname) && isLocalAssetPath(parsed.pathname)) {
+      return `${parsed.pathname}${parsed.search}${parsed.hash}`;
     }
   } catch {
-    // ignore malformed URLs
+    // Relative non-URL values are returned unchanged below.
   }
-  return null;
+
+  return value;
+}
+
+export function rewriteSrcsetToLocal(value: string): string {
+  return value
+    .split(",")
+    .map((candidate) => {
+      const trimmed = candidate.trim();
+      if (!trimmed) return candidate;
+      const [url, ...descriptor] = trimmed.split(/\s+/);
+      const rewritten = toLocalAssetPath(url);
+      return [rewritten, ...descriptor].join(" ");
+    })
+    .join(", ");
 }
 
 /**
- * Fallback handler for images inside .wp-content.
+ * Local-only WordPress asset normalizer.
  *
- * Images keep their original local /wp-content/uploads/ paths so the
- * migrated site serves them directly. Only if a local image actually fails
- * to load do we retry against the legacy WordPress host. Anchor hrefs are
- * left untouched so in-site PDF/download handling keeps working.
- *
- * Images that still cannot be loaded (or have zero natural width) get the
- * .error class so a CSS placeholder takes over instead of an empty box.
- *
- * MutationObserver re-scans the DOM for client-navigation re-renders.
+ * This site is becoming the source of truth, so browser-visible assets must
+ * resolve from the migrated app's local `/wp-content/...` and `/sdc-downloads/...`
+ * mirrors. We do not fallback to the legacy WordPress host. Legacy absolute
+ * asset URLs that survive imported HTML are rewritten back to local paths;
+ * missing local files are marked with `.error` so the CSS placeholder shows the
+ * problem instead of silently hotlinking from the old production site.
  */
 export function WpImageFallback() {
   useEffect(() => {
@@ -64,47 +63,32 @@ export function WpImageFallback() {
     const watchImage = (img: HTMLImageElement) => {
       if (watchedImgs.has(img)) return;
       watchedImgs.add(img);
-
-      const originalSrc = img.getAttribute("src") || "";
-
-      const retryWithLegacy = () => {
-        const currentSrc = img.getAttribute("src") || "";
-        const localPath = getLocalPath(currentSrc);
-        if (!localPath || !isLocalContentPath(localPath)) {
-          markError(img);
-          return;
-        }
-        const legacyUrl = addCacheBuster(toLegacyUrl(localPath));
-        img.setAttribute("src", legacyUrl);
-        // Keep watching for the legacy attempt's result.
-        watchedImgs.delete(img);
-        watchImage(img);
-      };
-
       if (img.complete && img.naturalWidth === 0 && img.src) {
-        retryWithLegacy();
+        markError(img);
         return;
       }
-
-      img.addEventListener("error", retryWithLegacy, { once: true });
+      img.addEventListener("error", () => markError(img), { once: true });
       img.addEventListener(
         "load",
         () => {
-          if (img.naturalWidth === 0) {
-            retryWithLegacy();
-          }
+          if (img.naturalWidth === 0) markError(img);
         },
         { once: true },
       );
-
-      // Preserve the original local src in case another script or React
-      // re-render tries to mutate it back to a broken value.
-      if (originalSrc && !img.hasAttribute("data-local-src")) {
-        img.setAttribute("data-local-src", originalSrc);
-      }
     };
 
     const scan = () => {
+      root.querySelectorAll<HTMLElement>("[src], [srcset], [href]").forEach((node) => {
+        const src = node.getAttribute("src");
+        if (src) node.setAttribute("src", toLocalAssetPath(src));
+
+        const srcset = node.getAttribute("srcset");
+        if (srcset) node.setAttribute("srcset", rewriteSrcsetToLocal(srcset));
+
+        const href = node.getAttribute("href");
+        if (href) node.setAttribute("href", toLocalAssetPath(href));
+      });
+
       root.querySelectorAll<HTMLImageElement>("img").forEach(watchImage);
     };
 

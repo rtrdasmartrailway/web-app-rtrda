@@ -1,0 +1,56 @@
+# Production-preview runtime. Copy this file plus .env.production-preview and public asset dirs to move hosts.
+# Override bind ports/IPs with RTRDA_WEB_BIND_IP, RTRDA_WEB_PORT, RTRDA_DB_BIND_IP, RTRDA_DB_PORT.
+services:
+  web-app-rtrda-preview:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: ${RTRDA_IMAGE:-web-app-rtrda:prod-preview}
+    container_name: web-app-rtrda-preview
+    restart: unless-stopped
+    env_file:
+      - .env.production-preview
+    environment:
+      NODE_ENV: production
+      HOSTNAME: 0.0.0.0
+      PORT: 3000
+      SITE_ORIGIN: ${SITE_ORIGIN:-https://prod-preview.rtrda.or.th}
+      DATABASE_URL: postgresql://rtrda:${POSTGRES_PASSWORD}@db-preview:5432/rtrda
+    depends_on:
+      db-preview:
+        condition: service_healthy
+    ports:
+      - "${RTRDA_WEB_BIND_IP:-100.91.174.121}:${RTRDA_WEB_PORT:-3020}:3000"
+    volumes:
+      - ./public/wp-content/uploads:/app/public/wp-content/uploads:ro
+      - ./public/sdc-downloads:/app/public/sdc-downloads:ro
+    group_add:
+      - "${RTRDA_ASSET_GID:-1002}"
+    healthcheck:
+      test: ["CMD-SHELL", "node -e \"fetch('http://127.0.0.1:3000/healthz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\""]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+
+  db-preview:
+    image: postgres:17-alpine
+    container_name: web-app-rtrda-db-preview
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: rtrda
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: rtrda
+    ports:
+      - "${RTRDA_DB_BIND_IP:-127.0.0.1}:${RTRDA_DB_PORT:-5433}:5432"
+    volumes:
+      - rtrda-preview-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U rtrda -d rtrda"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  rtrda-preview-db-data:
+    name: rtrda-preview-db-data
