@@ -2,6 +2,7 @@ import Link from "next/link";
 import { FooterUtility } from "./footer-utility";
 import { LandingPopup } from "./landing-popup";
 import { SafeImage } from "./safe-image";
+import { StickyFacebookButton } from "./sticky-facebook-button";
 import type { ShellData } from "@/lib/db/page-data";
 import { RtrdaNavigation } from "./rtrda-navigation";
 import { formatDate } from "./site-helpers";
@@ -306,6 +307,7 @@ export function SiteShell({
           </div>
         </div>
       </footer>
+      <StickyFacebookButton />
     </div>
   );
 }
