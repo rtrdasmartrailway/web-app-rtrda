@@ -245,11 +245,7 @@ export function SiteShell({
             </h2>
             <ul>
               <li>
-                <a
-                  href="#"
-                  rel="noreferrer"
-                  target="_blank"
-                >
+                <a href="#" rel="noreferrer" target="_blank">
                   {isEn ? "Terms of Use" : "ข้อกำหนดการใช้งาน"}
                 </a>
               </li>
@@ -307,7 +303,7 @@ export function SiteShell({
           </div>
         </div>
       </footer>
-      <StickyFacebookButton />
+      <StickyFacebookButton isHome={shell.path === "/" || shell.path === "/en"} />
     </div>
   );
 }

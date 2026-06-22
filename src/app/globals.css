@@ -6686,9 +6686,49 @@ a.calendar-cell.has-posts:hover {
 }
 
 /* ============================================================
-   Sticky Facebook Button — shockwave animation
+   Sticky Facebook Messenger button — bottom-right shockwave
    ============================================================ */
-@keyframes shockwave {
+.sticky-fb-btn {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 56px;
+  height: 56px;
+  border-radius: 9999px;
+  background-color: #0075ff;
+  color: #fff;
+  box-shadow: 0 8px 24px rgba(0, 53, 138, 0.35);
+  text-decoration: none;
+  transition: transform 0.2s ease;
+}
+.sticky-fb-btn:hover,
+.sticky-fb-btn:focus-visible {
+  transform: scale(1.1);
+  outline: none;
+}
+.sticky-fb-btn-icon {
+  position: relative;
+  width: 28px;
+  height: 28px;
+}
+.sticky-fb-btn-ring {
+  position: absolute;
+  inset: 0;
+  border-radius: 9999px;
+  background-color: #0075ff;
+  opacity: 0.45;
+  pointer-events: none;
+  animation: sticky-fb-shockwave 2s infinite;
+}
+.sticky-fb-btn-ring-delay {
+  animation-delay: 0.6s;
+  opacity: 0.35;
+}
+@keyframes sticky-fb-shockwave {
   0% {
     transform: scale(1);
     opacity: 0.6;
@@ -6697,12 +6737,4 @@ a.calendar-cell.has-posts:hover {
     transform: scale(2.2);
     opacity: 0;
   }
-}
-
-.shockwave-ring {
-  animation: shockwave 2s infinite;
-}
-
-.shockwave-ring-delay {
-  animation: shockwave 2s infinite 0.6s;
 }
