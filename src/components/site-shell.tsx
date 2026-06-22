@@ -245,7 +245,7 @@ export function SiteShell({
             <ul>
               <li>
                 <a
-                  href="https://www.rtrda.or.th/wp-content/uploads/2025/01/ประกาศ-สทร_ข้อกำหนดการใช้งาน.pdf"
+                  href="#"
                   rel="noreferrer"
                   target="_blank"
                 >
@@ -254,7 +254,7 @@ export function SiteShell({
               </li>
               <li>
                 <a
-                  href="https://www.rtrda.or.th/wp-content/uploads/2025/01/ประกาศ-สทร_นโยบายการคุ้มครองข้อมูลส่วนบุค.pdf"
+                  href="/wp-content/uploads/2025/01/ประกาศ-สทร_นโยบายการคุ้มครองข้อมูลส่วนบุค.pdf"
                   rel="noreferrer"
                   target="_blank"
                 >
