@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { isLocalAssetPath, rewriteSrcsetToLocal, toLocalAssetPath } from "./wp-image-fallback";
+import {
+  isLocalAssetPath,
+  rewriteSrcsetToLocal,
+  toLocalAssetPath,
+} from "./wp-image-fallback";
 
 describe("local-only WordPress asset handling", () => {
   it("keeps local wp-content paths local", () => {
@@ -22,7 +26,9 @@ describe("local-only WordPress asset handling", () => {
   });
 
   it("does not rewrite unrelated external URLs", () => {
-    expect(toLocalAssetPath("https://cdn.example.com/a.jpg")).toBe("https://cdn.example.com/a.jpg");
+    expect(toLocalAssetPath("https://cdn.example.com/a.jpg")).toBe(
+      "https://cdn.example.com/a.jpg",
+    );
   });
 
   it("rewrites srcset legacy candidates to local paths", () => {
