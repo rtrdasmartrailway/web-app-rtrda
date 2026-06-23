@@ -286,4 +286,81 @@ describe("presentation helpers", () => {
       selectFallbackAsset(record({ kind: "flipbook", path: "/3d-flip-book/6267" })),
     ).toBe("/stitch-assets/rail-strategy-map.png");
   });
+
+  it("appends NACC and PACC complaint links to the Thai contact dropdown", () => {
+    const wordpressMenu: WpNavigationItem[] = [
+      {
+        label: "ติดต่อเรา",
+        href: "#contact",
+        path: null,
+        external: false,
+        children: [
+          {
+            label: "ช่องทางการติดต่อ",
+            href: "/ติดต่อเรา/ช่องทางการติดต่อ",
+            path: "/ติดต่อเรา/ช่องทางการติดต่อ",
+            external: false,
+            children: [],
+          },
+          {
+            label: "ช่องทางการแจ้งเรื่องการทุจริตและประพฤติมิชอบ",
+            href: "/ช่องทางการแจ้งเรื่องกา",
+            path: "/ช่องทางการแจ้งเรื่องกา",
+            external: false,
+            children: [],
+          },
+          {
+            label: "ช่องทางการรับเรื่องร้องเรียน / ร้องทุกข์",
+            href: "/ช่องทางการแจ้งเรื่องร้",
+            path: "/ช่องทางการแจ้งเรื่องร้",
+            external: false,
+            children: [],
+          },
+        ],
+      },
+    ];
+
+    const nav = buildPrimaryNavigation([], "th", "/", wordpressMenu);
+    const contact = nav.find((item) => item.label === "ติดต่อเรา");
+
+    expect(contact?.children).toHaveLength(5);
+    const lastTwo = contact!.children.slice(-2);
+    expect(lastTwo[0]).toMatchObject({
+      label: "ช่องทางแจ้งเรื่องร้องเรียนฯ สำนักงาน ป.ป.ช.",
+      href: "https://www.nacc.go.th/allcomplaint?csrt=930900954617268973",
+      path: null,
+      external: true,
+    });
+    expect(lastTwo[1]).toMatchObject({
+      label: "ช่องทางแจ้งเรื่องร้องเรียนฯ สำนักงาน ป.ป.ท",
+      href: "https://www.pacc.go.th/e-service/index.html",
+      path: null,
+      external: true,
+    });
+  });
+
+  it("does not append complaint links to the English contact dropdown", () => {
+    const wordpressMenu: WpNavigationItem[] = [
+      {
+        label: "Contact Us",
+        href: "#contact",
+        path: null,
+        external: false,
+        children: [
+          {
+            label: "Contact Information",
+            href: "/en/ติดต่อเรา/ช่องทางการติดต่อ",
+            path: "/en/ติดต่อเรา/ช่องทางการติดต่อ",
+            external: false,
+            children: [],
+          },
+        ],
+      },
+    ];
+
+    const nav = buildPrimaryNavigation([], "en", "/en", wordpressMenu);
+    const contact = nav.find((item) => item.label === "Contact Us");
+    expect(contact?.children).toHaveLength(1);
+    expect(contact?.children[0].label).toBe("Contact Information");
+  });
 });

@@ -13,6 +13,8 @@ describe("StickyFacebookButton", () => {
     expect(html).toContain('aria-label="Facebook Messenger"');
     expect(html).toContain("sticky-fb-btn-icon");
     expect(html).toContain("sticky-fb-btn-ring");
+    expect(html).toMatch(/<path d="M12 2C6\.477 2/);
+    expect(html).not.toMatch(/M12 2C6\.48 2 2 6\.03/);
   });
 
   it("renders nothing on inner pages", () => {

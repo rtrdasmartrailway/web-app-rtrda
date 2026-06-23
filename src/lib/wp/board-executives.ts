@@ -5,8 +5,7 @@ import { getRtrdaPathFromUrl, normalizeRoutePath } from "./url";
 
 const THAI_BOARD_PATH = "/เกี่ยวกับ-สทร/คณะกรรมการ-ผู้บริหาร";
 const ENGLISH_BOARD_PATH = "/en/เกี่ยวกับ-สทร/คณะกรรมการ-ผู้บริหาร";
-const OFFICE_PHONE = "082 204 2998 / 02 248 2988";
-const FORCED_VACANT_NAMES = new Set(["ชัชวาล พานวงษ์", "ดร.กิติพันธุ์ นุตยกุล"]);
+const FORCED_VACANT_NAMES = new Set(["ชัชวาล พานวงษ์"]);
 
 export interface BoardExecutivePerson {
   name: string;
@@ -14,7 +13,6 @@ export interface BoardExecutivePerson {
   imageSrc: string | null;
   imageAlt: string;
   email: string | null;
-  officePhone: string;
   vacant: boolean;
 }
 
@@ -110,7 +108,6 @@ function parsePerson($: CheerioAPI, element: AnyNode): BoardExecutivePerson | nu
     imageSrc: vacant ? null : normalizeImageSrc(image.attr("src")),
     imageAlt: vacant ? "" : compactText(image.attr("alt") ?? name),
     email: vacant ? null : email,
-    officePhone: OFFICE_PHONE,
     vacant,
   };
 }
@@ -133,7 +130,6 @@ function placeholder(role: string): BoardExecutivePerson {
     imageSrc: null,
     imageAlt: "",
     email: null,
-    officePhone: OFFICE_PHONE,
     vacant: true,
   };
 }

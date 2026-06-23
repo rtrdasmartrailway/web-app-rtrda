@@ -58,7 +58,7 @@
 }
 
 .deputies .row {
-  grid-template-columns: repeat(2, minmax(220px, 280px));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 .generalManagers {
@@ -67,7 +67,7 @@
 }
 
 .generalManagers .row {
-  grid-template-columns: repeat(5, minmax(168px, 1fr));
+  grid-template-columns: repeat(5, minmax(0, 1fr));
 }
 
 .node {
@@ -199,9 +199,9 @@
   text-underline-offset: 3px;
 }
 
-@media (max-width: 1020px) {
+@media (max-width: 1140px) {
   .generalManagers .row {
-    grid-template-columns: repeat(3, minmax(190px, 1fr));
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
   .generalManagers {

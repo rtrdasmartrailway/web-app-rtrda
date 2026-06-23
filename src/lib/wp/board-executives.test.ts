@@ -8,6 +8,10 @@ import {
 } from "@/components/board-executive-org-chart";
 import type { WpImportManifest } from "./types";
 import {
+  applyBoardExecutiveOverride,
+  TACHAKORN_IMAGE_SRC,
+} from "./board-executive-override";
+import {
   buildBoardExecutivePresentation,
   isBoardExecutivePath,
 } from "./board-executives";
@@ -18,7 +22,7 @@ async function boardRecord(path = "/เกี่ยวกับ-สทร/คณ
   ) as WpImportManifest;
   const record = manifest.records.find((item) => item.path === path);
   expect(record).toBeDefined();
-  return record!;
+  return applyBoardExecutiveOverride(record!);
 }
 
 describe("board executive parser", () => {
@@ -52,9 +56,16 @@ describe("board executive parser", () => {
       "ผู้จัดการกลุ่มกลยุทธ์และสื่อสารองค์กร",
       "ผู้จัดการกลุ่มบริหารภายใน",
     ]);
+    expect(presentation?.chart.generalManagers[0]).toMatchObject({
+      name: "ธัชกร ธนวัฒนาดำรง",
+      role: "ผู้จัดการกลุ่มวิจัยและมาตรฐาน",
+      email: "touchakorn.t@rtrda.or.th",
+      imageSrc: TACHAKORN_IMAGE_SRC,
+      vacant: false,
+    });
   });
 
-  it("cleans inline email labels out of positions and keeps office phone on every card", async () => {
+  it("cleans inline email labels out of positions", async () => {
     const record = await boardRecord();
     const presentation = buildBoardExecutivePresentation(record.path, record.contentHtml);
     const people = presentation
@@ -68,32 +79,30 @@ describe("board executive parser", () => {
     expect(people).toHaveLength(8);
     for (const person of people) {
       expect(person.role).not.toMatch(/อีเมล|e-mail|@/i);
-      expect(person.officePhone).toBe("082 204 2998 / 02 248 2988");
     }
-    expect(people.filter((person) => person.vacant)).toHaveLength(6);
+    expect(people.filter((person) => person.vacant)).toHaveLength(5);
   });
 
-  it("marks the requested GM roles as waiting for appointment", async () => {
+  it("fills the research and standards GM and keeps the requested digital GM vacant", async () => {
     const record = await boardRecord();
     const presentation = buildBoardExecutivePresentation(record.path, record.contentHtml);
     const generalManagers = presentation?.chart.generalManagers ?? [];
     const gmByRole = new Map(generalManagers.map((person) => [person.role, person]));
 
-    for (const role of [
-      "ผู้จัดการกลุ่มวิจัยและมาตรฐาน",
-      "ผู้จัดการกลุ่มพัฒนาดิจิทัลระบบราง",
-    ]) {
-      expect(gmByRole.get(role)).toMatchObject({
-        name: "",
-        imageSrc: null,
-        email: null,
-        vacant: true,
-      });
-    }
+    expect(gmByRole.get("ผู้จัดการกลุ่มวิจัยและมาตรฐาน")).toMatchObject({
+      name: "ธัชกร ธนวัฒนาดำรง",
+      imageSrc: TACHAKORN_IMAGE_SRC,
+      email: "touchakorn.t@rtrda.or.th",
+      vacant: false,
+    });
 
-    expect(generalManagers.map((person) => person.name)).not.toContain(
-      "ดร.กิติพันธุ์ นุตยกุล",
-    );
+    expect(gmByRole.get("ผู้จัดการกลุ่มพัฒนาดิจิทัลระบบราง")).toMatchObject({
+      name: "",
+      imageSrc: null,
+      email: null,
+      vacant: true,
+    });
+
     expect(generalManagers.map((person) => person.name)).not.toContain("ชัชวาล พานวงษ์");
   });
 
@@ -110,8 +119,10 @@ describe("board executive parser", () => {
       }),
     );
 
-    expect(html).toContain("082 204 2998 / 02 248 2988");
     expect(html).toContain("mailto:piangor@rtrda.or.th");
+    expect(html).toContain("mailto:touchakorn.t@rtrda.or.th");
+    expect(html).not.toContain("TEL");
+    expect(html).not.toContain("082 204 2998 / 02 248 2988");
     expect(html).toContain('aria-hidden="true"');
     expect(html).toContain(">รอการแต่งตั้ง</span>");
     expect(html).not.toContain(">?</span>");
@@ -137,7 +148,8 @@ describe("board executive parser", () => {
     expect(html).toContain("<details>");
     expect(html).not.toContain('<details open="">');
     expect(html).toContain("รอการแต่งตั้ง");
-    expect(html).toContain("082 204 2998 / 02 248 2988");
+    expect(html).toContain("ธัชกร ธนวัฒนาดำรง");
+    expect(html).not.toContain("082 204 2998 / 02 248 2988");
     expect(html).not.toContain("ผู้อำนวยการ<br");
   });
 });

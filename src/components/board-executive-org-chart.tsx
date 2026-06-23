@@ -13,13 +13,11 @@ function labels(language: WpLanguage) {
         vacant: "รอการแต่งตั้ง",
         email: "Email",
         noEmail: "-",
-        phone: "TEL",
       }
     : {
         vacant: "Vacant",
         email: "Email",
         noEmail: "-",
-        phone: "TEL",
       };
 }
 
@@ -65,10 +63,6 @@ function PersonCard({
               text.noEmail
             )}
           </dd>
-        </div>
-        <div>
-          <dt>{text.phone}</dt>
-          <dd>{person.officePhone}</dd>
         </div>
       </dl>
     </article>

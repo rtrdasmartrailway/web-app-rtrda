@@ -1,4 +1,5 @@
 import { normalizeRoutePath } from "./url";
+import { applyContactNavOverride } from "./contact-nav-override";
 import type {
   WpContentRecord,
   WpLanguage,
@@ -78,10 +79,13 @@ export function buildPrimaryNavigation(
   navigation?: WpNavigationItem[],
 ): PresentationNavItem[] {
   if (navigation?.length) {
-    return navigation.map((item) => mapNavigationItem(item, language, currentPath, true));
+    const mapped = navigation.map((item) =>
+      mapNavigationItem(item, language, currentPath, true),
+    );
+    return applyContactNavOverride(mapped, language);
   }
 
-  return PRIMARY_NAV[language].map((item) => {
+  const fromRecords = PRIMARY_NAV[language].map((item) => {
     const children = records
       .filter((record) => record.language === language)
       .filter((record) => record.parentPath === item.path)
@@ -105,6 +109,8 @@ export function buildPrimaryNavigation(
       children,
     };
   });
+
+  return applyContactNavOverride(fromRecords, language);
 }
 
 function mapNavigationItem(
