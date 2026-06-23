@@ -110,9 +110,9 @@ describe("applyItaHeadingsOverride", () => {
   });
 
   it("rewrites the real th-page-4837 JSON: 2569 section changes, 2568 section is intact", async () => {
-    const manifest = JSON.parse(
-      await readFile("src/data/wp-content.json", "utf8"),
-    ) as { records: WpContentRecord[] };
+    const manifest = JSON.parse(await readFile("src/data/wp-content.json", "utf8")) as {
+      records: WpContentRecord[];
+    };
     const r = manifest.records.find((x) => x.id === "th-page-4837");
     expect(r).toBeDefined();
     if (!r) return;

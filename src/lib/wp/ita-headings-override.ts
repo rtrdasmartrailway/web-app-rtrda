@@ -9,10 +9,7 @@ export const ITA_HEADING_REPLACEMENTS: ReadonlyArray<[string, string]> = [
     "O3 ข้อมูลการติดต่อ",
     "O3 แบบวัดการเปิดเผยข้อมูลสาธารณะ (MOPH Open Data Integrity & Transparency Assessment: MOIT) ประจำปีงบประมาณ พ.ศ. 2569",
   ],
-  [
-    "O10 E–Service",
-    "O10 ระบบการให้บริการผ่านช่องทางออนไลน์ (E-SERVICE)",
-  ],
+  ["O10 E–Service", "O10 ระบบการให้บริการผ่านช่องทางออนไลน์ (E-SERVICE)"],
   [
     "O11 ข้อมูลสถิติการให้บริการ",
     "O11 สรุปผลการจัดซื้อจัดจ้างหรือการจัดหาพัสดุรายเดือน ประจำปีงบประมาณ พ.ศ. 2569",
@@ -85,9 +82,7 @@ function shouldOverride(record: WpContentRecord): boolean {
   return record.id === THAI_ITA_PAGE_ID;
 }
 
-function findIt2024Section(
-  $: cheerio.CheerioAPI,
-): cheerio.Cheerio<AnyNode> | null {
+function findIt2024Section($: cheerio.CheerioAPI): cheerio.Cheerio<AnyNode> | null {
   const sections = $("div.lightweight-accordion-body").toArray();
   for (const element of sections) {
     const $node = $(element);
@@ -119,20 +114,18 @@ function applyReplacementsToSubtree(
       continue;
     }
     let nodeChanged = false;
-    subtree.find("p, h1, h2, h3, h4, h5, h6, strong, a, li, span").each(
-      (_, element) => {
-        const $el = $(element);
-        const html = $el.html();
-        if (!html || !html.includes(needle)) {
-          return;
-        }
-        const replaced = html.split(needle).join(replacement);
-        if (replaced !== html) {
-          $el.html(replaced);
-          nodeChanged = true;
-        }
-      },
-    );
+    subtree.find("p, h1, h2, h3, h4, h5, h6, strong, a, li, span").each((_, element) => {
+      const $el = $(element);
+      const html = $el.html();
+      if (!html || !html.includes(needle)) {
+        return;
+      }
+      const replaced = html.split(needle).join(replacement);
+      if (replaced !== html) {
+        $el.html(replaced);
+        nodeChanged = true;
+      }
+    });
     if (nodeChanged) {
       didChange = true;
     }
@@ -140,9 +133,7 @@ function applyReplacementsToSubtree(
   return { didChange };
 }
 
-export function applyItaHeadingsOverride(
-  record: WpContentRecord,
-): WpContentRecord {
+export function applyItaHeadingsOverride(record: WpContentRecord): WpContentRecord {
   if (!shouldOverride(record)) {
     return record;
   }
@@ -162,11 +153,7 @@ export function applyItaHeadingsOverride(
     ),
   );
 
-  const { didChange } = applyReplacementsToSubtree(
-    $,
-    subtree,
-    expectedHeadingMarkers,
-  );
+  const { didChange } = applyReplacementsToSubtree($, subtree, expectedHeadingMarkers);
   if (!didChange) {
     return record;
   }

@@ -6,9 +6,7 @@ import {
   PACC_COMPLAINT_URL,
 } from "./contact-nav-override";
 
-function contactItem(
-  children: PresentationNavItem[] = [],
-): PresentationNavItem {
+function contactItem(children: PresentationNavItem[] = []): PresentationNavItem {
   return {
     label: "ติดต่อเรา",
     href: "/ติดต่อเรา",
