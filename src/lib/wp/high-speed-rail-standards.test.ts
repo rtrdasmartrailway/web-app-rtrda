@@ -1,0 +1,48 @@
+import { describe, expect, it } from "vitest";
+import {
+  buildHighSpeedRailPdfReaderTargets,
+  highSpeedRailStandardDocuments,
+  stripImportedHighSpeedRailSection,
+} from "./high-speed-rail-standards";
+
+describe("high-speed rail standards override", () => {
+  it("removes the malformed imported high-speed rail accordion only", () => {
+    const cleaned = stripImportedHighSpeedRailSection(`
+      <p></p>
+      <div class="lightweight-accordion has-text-color">
+        <details>
+          <summary class="lightweight-accordion-title">
+            <span><strong>มาตรฐานโครงการรถไฟความเร็วสูง</strong></span>
+          </summary>
+          <div class="lightweight-accordion-body">
+            <div class="wp-block-columns">
+              <div class="wp-block-column">
+                <p></p><p <div="" class="wp-block-columns"></p>
+                <div class="wp-block-column"><h6>มาตรฐานงานสำรวจ</h6></div>
+              </div>
+            </div>
+          </div>
+        </details>
+      </div>
+      <div class="lightweight-accordion has-text-color">
+        <details>
+          <summary class="lightweight-accordion-title">
+            <span><strong>มาตรฐานอื่น</strong></span>
+          </summary>
+          <div class="lightweight-accordion-body"><p>ยังต้องแสดงอยู่</p></div>
+        </details>
+      </div>
+    `);
+
+    expect(cleaned).not.toContain("มาตรฐานโครงการรถไฟความเร็วสูง");
+    expect(cleaned).not.toContain("มาตรฐานงานสำรวจ");
+    expect(cleaned).toContain("มาตรฐานอื่น");
+    expect(cleaned).toContain("ยังต้องแสดงอยู่");
+  });
+
+  it("adds one PDF reader target for each replacement card", () => {
+    expect(buildHighSpeedRailPdfReaderTargets()).toHaveLength(
+      highSpeedRailStandardDocuments.length,
+    );
+  });
+});

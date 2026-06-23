@@ -1,10 +1,12 @@
 import Link from "next/link";
 import type { PageData } from "@/lib/db/page-data";
+import { isRailStandardsPath } from "@/lib/wp/high-speed-rail-standards";
 import type { PresentationSidebarItem } from "@/lib/wp/presentation";
 import { ArticleCard } from "./article-card";
 import { BoardExecutiveContent } from "./board-executive-org-chart";
 import { CategoryNewsListing } from "./category-news-listing";
 import { CategoryPagination } from "./category-pagination";
+import { HighSpeedRailStandardsContent } from "./high-speed-rail-standards";
 import { HomeSections } from "./home/home-sections";
 import { KnowledgeDocuments } from "./knowledge-documents";
 import { PdfReader } from "./pdf-reader";
@@ -50,7 +52,7 @@ export function contentRouteClass(path: string): string {
     return "content-board-executives";
   }
 
-  if (canonicalPath === "/มาตรฐานระบบราง-สทร") {
+  if (isRailStandardsPath(canonicalPath)) {
     return "content-rail-standards";
   }
 
@@ -158,6 +160,8 @@ export function ContentPage({ data }: { data: PageData }) {
               </>
             ) : isHome && data.home ? (
               <HomeSections home={data.home} language={record.language} />
+            ) : isRailStandardsPath(record.path) ? (
+              <HighSpeedRailStandardsContent html={record.contentHtml} />
             ) : data.knowledgeDocuments ? (
               <KnowledgeDocuments
                 groups={data.knowledgeDocuments}

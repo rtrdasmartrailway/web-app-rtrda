@@ -17,6 +17,10 @@ import {
   type PdfReaderTarget,
 } from "@/lib/wp/pdf-reader";
 import {
+  buildHighSpeedRailPdfReaderTargets,
+  isRailStandardsPath,
+} from "@/lib/wp/high-speed-rail-standards";
+import {
   buildKnowledgeDocumentGroups,
   isKnowledgeDocumentPath,
   type KnowledgeDocumentGroup,
@@ -191,6 +195,7 @@ export const getPageData = cache(async (path: string): Promise<PageData | null> 
   const isHome = record.path === "/" || record.path === "/en";
   const isCategory = record.kind === "category";
   const isKnowledgeDocuments = isKnowledgeDocumentPath(record.path);
+  const isRailStandards = isRailStandardsPath(record.path);
   const [
     childRecords,
     siblingRecords,
@@ -219,6 +224,9 @@ export const getPageData = cache(async (path: string): Promise<PageData | null> 
     }),
     isKnowledgeDocuments ? getDownloadIds() : Promise.resolve([]),
   ]);
+  const pagePdfReaderTargets = isRailStandards
+    ? [...buildHighSpeedRailPdfReaderTargets(), ...pdfReaderTargets]
+    : pdfReaderTargets;
 
   const parentRecord = record.parentPath
     ? await getRecordByPath(record.parentPath)
@@ -246,7 +254,7 @@ export const getPageData = cache(async (path: string): Promise<PageData | null> 
       record.path,
       record.contentHtml,
     ),
-    pdfReaderTargets,
+    pdfReaderTargets: pagePdfReaderTargets,
     sidebarItems:
       record.kind === "page"
         ? buildSidebarItems(record, childRecords, siblingRecords)
