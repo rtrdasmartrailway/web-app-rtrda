@@ -29,7 +29,9 @@ import {
   buildBoardExecutivePresentation,
   type BoardExecutivePresentation,
 } from "@/lib/wp/board-executives";
+import { applyBoardExecutiveOverride } from "@/lib/wp/board-executive-override";
 import { applyContactMapOverride } from "@/lib/wp/contact-map";
+import { applyItaHeadingsOverride } from "@/lib/wp/ita-headings-override";
 import { applyProcurementPlanOverride } from "@/lib/wp/procurement-plan";
 import { normalizeRoutePath } from "@/lib/wp/url";
 import { extractPartnerLogos } from "@/lib/wp/home";
@@ -190,7 +192,11 @@ export const getPageData = cache(async (path: string): Promise<PageData | null> 
   if (!importedRecord) {
     return null;
   }
-  const record = applyProcurementPlanOverride(applyContactMapOverride(importedRecord));
+  const record = applyItaHeadingsOverride(
+    applyBoardExecutiveOverride(
+      applyProcurementPlanOverride(applyContactMapOverride(importedRecord)),
+    ),
+  );
 
   const isHome = record.path === "/" || record.path === "/en";
   const isCategory = record.kind === "category";
