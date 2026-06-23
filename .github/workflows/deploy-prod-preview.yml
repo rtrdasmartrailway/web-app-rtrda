@@ -122,8 +122,9 @@ jobs:
           cd /srv/apps/web-app-rtrda
           export RTRDA_IMAGE="web-app-rtrda:prod-preview-${DEPLOY_SHA}"
           docker compose -f docker-compose.preview.yml up -d --build web-app-rtrda-preview
-          echo "$DEPLOY_SHA" > .release
-          printf '%s %s\n' "$(date -Is)" "$DEPLOY_SHA" >> releases.log
+          mkdir -p /srv/apps/web-app-rtrda-deploy-state
+          echo "$DEPLOY_SHA" > /srv/apps/web-app-rtrda-deploy-state/release
+          printf '%s %s\n' "$(date -Is)" "$DEPLOY_SHA" >> /srv/apps/web-app-rtrda-deploy-state/releases.log
 
       - name: Wait for local preview health check
         run: |
