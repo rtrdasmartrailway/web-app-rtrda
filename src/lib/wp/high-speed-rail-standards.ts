@@ -3,10 +3,11 @@ import type { PdfReaderTarget } from "./pdf-reader";
 import { normalizeRoutePath } from "./url";
 
 export interface HighSpeedRailStandardDocument {
-  code: string;
+  code?: string;
   title: string;
   coverImage: string;
-  pdfHref: string;
+  previewHref: string;
+  downloadHref: string;
 }
 
 const assetBase = "/standards/high-speed-rail";
@@ -16,37 +17,110 @@ export function isRailStandardsPath(path: string): boolean {
   return normalized === "/มาตรฐานระบบราง-สทร" || normalized === "/en/มาตรฐานระบบราง-สทร";
 }
 
-export const highSpeedRailStandardDocuments: HighSpeedRailStandardDocument[] = [
+export const importedHighSpeedRailStandardDocuments: HighSpeedRailStandardDocument[] = [
+  {
+    title:
+      "ชุดมาตรฐานการทดสอบเพื่อควบคุมคุณภาพคอนกรีตสด(FRESH CONCRETE) สำหรับโครงการรถไฟความเร็วสูง",
+    coverImage: "/wp-content/uploads/2025/05/2025-05-30-164836.jpg",
+    previewHref: "/sdc_download/5545",
+    downloadHref: "/sdc_download/5545",
+  },
+  {
+    title: "ชุดมาตรฐานกำหนดคุณลักษณะคอนกรีตสำหรับโครงการรถไฟความเร็วสูง",
+    coverImage: "/wp-content/uploads/2025/12/1.jpg",
+    previewHref: "/3d-flip-book/สทร-hsr-ct-2001-20032568",
+    downloadHref: "/sdc_download/7202",
+  },
+  {
+    title: "มาตรฐานการทดสอบการขยายตัวอิสระของคอนกรีตขยายตัวสำหรับโครงการรถไฟความเร็วสูง",
+    coverImage: "/wp-content/uploads/2025/12/2-1.jpg",
+    previewHref: "/3d-flip-book/สทร-hsr-ct-40112568",
+    downloadHref: "/sdc_download/7199",
+  },
+  {
+    title:
+      "มาตรฐานการทดสอบความเป็นไปได้ในการทำปฏิกิริยาระหว่างด่างกับมวลรวม (ทดสอบโดยตัวอย่างทดสอบมอร์ตาร์) สำหรับโครงการรถไฟความเร็วสูง",
+    coverImage: "/wp-content/uploads/2025/12/3.jpg",
+    previewHref: "/3d-flip-book/สทร-hsr-ct-4007-2568",
+    downloadHref: "/sdc_download/7196",
+  },
+  {
+    title:
+      "มาตรฐานการทดสอบการขยายตัวเนื่องจากการทำปฏิกิริยาระหว่างด่างกับซิลิกา (ทดสอบโดยตัวอย่างทดสอบคอนกรีต) สำหรับโครงการรถไฟความเร็วสูง",
+    coverImage: "/wp-content/uploads/2025/12/4.jpg",
+    previewHref: "/3d-flip-book/สทร-hsr-ct-4008-2568",
+    downloadHref: "/sdc_download/7193",
+  },
+  {
+    title: "มาตรฐานการทดสอบการคืบตัวของคอนกรีตภายใต้แรงอัด สำหรับโครงการรถไฟความเร็วสูง",
+    coverImage: "/wp-content/uploads/2025/12/5.jpg",
+    previewHref: "/3d-flip-book/สทร-hsr-ct-4009-2568",
+    downloadHref: "/sdc_download/7190",
+  },
+  {
+    title:
+      "มาตรฐานการทดสอบการเปลี่ยนแปลงน้ำหนักของมอร์ตาร์ที่สัมผัสสารละลายแมกนีเซียมซัลเฟตสำหรับโครงการรถไฟความเร็วสูง",
+    coverImage: "/wp-content/uploads/2025/12/6.jpg",
+    previewHref: "/3d-flip-book/สทร-hsr-ct-4010-2568",
+    downloadHref: "/sdc_download/7187",
+  },
+  {
+    title:
+      "มาตรฐานการก่อสร้างสำหรับงานติดตั้งเกอร์เดอร์รูปกล่องแบบชิ้นส่วนชนิดหล่อสำเร็จด้วยวิธีช่วงต่อช่วงโดยแกนทรีลำเลียงสำหรับโครงสร้างทางยกระดับในโครงการรถไฟความเร็วสูง",
+    coverImage: "/wp-content/uploads/2026/01/1-1.png",
+    previewHref: "/3d-flip-book/hsr-ct-3004-2569",
+    downloadHref: "/sdc_download/7161",
+  },
+  {
+    title:
+      "มาตรฐานการตรวจสอบ การทดสอบ และการประเมินผลสมรรถนะของแกนทรีลำเลียงสำหรับงานติดตั้งเกอร์เดอร์รูปกล่องแบบชิ้นส่วนชนิดหล่อสำเร็จสำหรับโครงสร้างทางยกระดับในโครงการรถไฟความเร็วสูง",
+    coverImage: "/wp-content/uploads/2026/01/2.png",
+    previewHref: "/3d-flip-book/hsr-ct-4013-2569",
+    downloadHref: "/sdc_download/8001",
+  },
+];
+
+export const additionalHighSpeedRailStandardDocuments: HighSpeedRailStandardDocument[] = [
   {
     code: "HSR-CT-1001",
     title: "มาตรฐานงานสำรวจ",
     coverImage: `${assetBase}/hsr-ct-1001-2568.png`,
-    pdfHref: `${assetBase}/hsr-ct-1001-2568.pdf`,
+    previewHref: `${assetBase}/hsr-ct-1001-2568.pdf`,
+    downloadHref: `${assetBase}/hsr-ct-1001-2568.pdf`,
   },
   {
     code: "HSR-CT-1002",
     title: "มาตรฐานงานป้องกันน้ำ",
     coverImage: `${assetBase}/hsr-ct-1002-2568.png`,
-    pdfHref: `${assetBase}/hsr-ct-1002-2568.pdf`,
+    previewHref: `${assetBase}/hsr-ct-1002-2568.pdf`,
+    downloadHref: `${assetBase}/hsr-ct-1002-2568.pdf`,
   },
   {
     code: "HSR-CT-3001",
     title: "มาตรฐานงานเจาะและระเบิด",
     coverImage: `${assetBase}/hsr-ct-3001-2568.png`,
-    pdfHref: `${assetBase}/hsr-ct-3001-2568.pdf`,
+    previewHref: `${assetBase}/hsr-ct-3001-2568.pdf`,
+    downloadHref: `${assetBase}/hsr-ct-3001-2568.pdf`,
   },
   {
     code: "HSR-CT-4012",
     title: "มาตรฐานงานตรวจวัด",
     coverImage: `${assetBase}/hsr-ct-4012-2568.png`,
-    pdfHref: `${assetBase}/hsr-ct-4012-2568.pdf`,
+    previewHref: `${assetBase}/hsr-ct-4012-2568.pdf`,
+    downloadHref: `${assetBase}/hsr-ct-4012-2568.pdf`,
   },
   {
     code: "HSR-CT-5001",
     title: "มาตรฐานงานค้ำยัน",
     coverImage: `${assetBase}/hsr-ct-5001-2568.png`,
-    pdfHref: `${assetBase}/hsr-ct-5001-2568.pdf`,
+    previewHref: `${assetBase}/hsr-ct-5001-2568.pdf`,
+    downloadHref: `${assetBase}/hsr-ct-5001-2568.pdf`,
   },
+];
+
+export const highSpeedRailStandardDocuments: HighSpeedRailStandardDocument[] = [
+  ...importedHighSpeedRailStandardDocuments,
+  ...additionalHighSpeedRailStandardDocuments,
 ];
 
 export function stripImportedHighSpeedRailSection(html: string): string {
@@ -64,10 +138,10 @@ export function stripImportedHighSpeedRailSection(html: string): string {
 }
 
 export function buildHighSpeedRailPdfReaderTargets(): PdfReaderTarget[] {
-  return highSpeedRailStandardDocuments.map((document) => ({
-    sourceHref: document.pdfHref,
-    inlineHref: document.pdfHref,
-    downloadHref: document.pdfHref,
+  return additionalHighSpeedRailStandardDocuments.map((document) => ({
+    sourceHref: document.previewHref,
+    inlineHref: document.previewHref,
+    downloadHref: document.downloadHref,
     title: `สทร. ${document.code} 2568 ${document.title}`,
     kind: "upload",
   }));

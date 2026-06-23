@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
+  additionalHighSpeedRailStandardDocuments,
   buildHighSpeedRailPdfReaderTargets,
   highSpeedRailStandardDocuments,
+  importedHighSpeedRailStandardDocuments,
   stripImportedHighSpeedRailSection,
 } from "./high-speed-rail-standards";
 
@@ -40,9 +42,15 @@ describe("high-speed rail standards override", () => {
     expect(cleaned).toContain("ยังต้องแสดงอยู่");
   });
 
-  it("adds one PDF reader target for each replacement card", () => {
+  it("keeps the original cards and appends the replacement cards", () => {
+    expect(importedHighSpeedRailStandardDocuments).toHaveLength(9);
+    expect(additionalHighSpeedRailStandardDocuments).toHaveLength(5);
+    expect(highSpeedRailStandardDocuments).toHaveLength(14);
+  });
+
+  it("adds one PDF reader target for each additional static PDF card", () => {
     expect(buildHighSpeedRailPdfReaderTargets()).toHaveLength(
-      highSpeedRailStandardDocuments.length,
+      additionalHighSpeedRailStandardDocuments.length,
     );
   });
 });

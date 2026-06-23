@@ -7,7 +7,7 @@ import {
 function HighSpeedRailStandardsSection() {
   return (
     <div className="lightweight-accordion has-text-color">
-      <details>
+      <details open>
         <summary className="lightweight-accordion-title" style={{ color: "#003471" }}>
           <span>
             <strong>มาตรฐานโครงการรถไฟความเร็วสูง</strong>
@@ -33,8 +33,12 @@ function HighSpeedRailStandardsSection() {
                 </div>
 
                 <h6 className="wp-block-heading has-text-align-center is-style-vk-heading-default">
-                  <strong>สทร. {document.code} 2568</strong>
-                  <br />
+                  {document.code ? (
+                    <>
+                      <strong>สทร. {document.code} 2568</strong>
+                      <br />
+                    </>
+                  ) : null}
                   <strong>{document.title}</strong>
                 </h6>
 
@@ -42,7 +46,7 @@ function HighSpeedRailStandardsSection() {
                   <div className="wp-block-button detail-btn">
                     <a
                       className="wp-block-button__link wp-element-button"
-                      href={document.pdfHref}
+                      href={document.previewHref}
                     >
                       อ่านเพิ่มเติม
                     </a>
@@ -54,7 +58,7 @@ function HighSpeedRailStandardsSection() {
                     className="simple-download-counter-link"
                     data-pdf-reader-ignore="true"
                     download
-                    href={document.pdfHref}
+                    href={document.downloadHref}
                   >
                     ดาวน์โหลดไฟล์
                   </a>
