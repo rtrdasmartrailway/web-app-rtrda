@@ -81,6 +81,12 @@ jobs:
           docker compose logs --tail=120 web-app-rtrda-test
           exit 1
 
+      - name: Sync mirrored assets to production-preview host
+        run: |
+          set -euo pipefail
+          rsync -az --info=stats2             -e "ssh -i ~/.ssh/rtrda02_prod_preview_sync_ed25519 -o StrictHostKeyChecking=accept-new"             public/wp-content/uploads/             rtrda@100.91.174.121:/srv/apps/web-app-rtrda/public/wp-content/uploads/
+          rsync -az --info=stats2             -e "ssh -i ~/.ssh/rtrda02_prod_preview_sync_ed25519 -o StrictHostKeyChecking=accept-new"             public/sdc-downloads/             rtrda@100.91.174.121:/srv/apps/web-app-rtrda/public/sdc-downloads/
+
       - name: Purge Cloudflare edge cache (optional)
         if: ${{ always() }}
         env:
