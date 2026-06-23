@@ -104,3 +104,114 @@ jobs:
           grep -q '"success":\s*true' /tmp/cf-purge.json || {
             echo "::warning::Cloudflare purge did not report success; deploy will be visible once the edge TTL expires."
           }
+
+  deploy-prod-preview:
+    name: Deploy prod-preview.rtrda.or.th
+    needs: deploy
+    runs-on:
+      - self-hosted
+      - rtrda-web-prod-preview
+
+    steps:
+      - name: Resolve deploy SHA
+        id: resolve
+        run: |
+          set -euo pipefail
+          cd /srv/apps/web-app-rtrda
+          git fetch origin test --prune
+          DEPLOY_SHA="${GITHUB_SHA}"
+          git merge-base --is-ancestor "$DEPLOY_SHA" origin/test
+          echo "deploy_sha=$DEPLOY_SHA" >> "$GITHUB_OUTPUT"
+          echo "Deploy SHA: $DEPLOY_SHA"
+
+      - name: Refuse dirty production-preview worktree
+        run: |
+          set -euo pipefail
+          cd /srv/apps/web-app-rtrda
+          if [ -n "$(git status --porcelain)" ]; then
+            echo "::error::/srv/apps/web-app-rtrda has uncommitted or untracked files; refusing deploy."
+            git status --short
+            exit 1
+          fi
+
+      - name: Update production-preview checkout
+        env:
+          DEPLOY_SHA: ${{ steps.resolve.outputs.deploy_sha }}
+        run: |
+          set -euo pipefail
+          cd /srv/apps/web-app-rtrda
+          git fetch origin test --prune
+          git checkout -B test "$DEPLOY_SHA"
+          git status -sb
+          git log --oneline -1
+
+      - name: Install dependencies
+        run: |
+          set -euo pipefail
+          cd /srv/apps/web-app-rtrda
+          npm ci
+
+      - name: Generate Prisma client
+        run: |
+          set -euo pipefail
+          cd /srv/apps/web-app-rtrda
+          npx prisma generate
+
+      - name: Start preview database and apply migrations
+        run: |
+          set -euo pipefail
+          cd /srv/apps/web-app-rtrda
+          docker compose -f docker-compose.preview.yml up -d db-preview
+          for attempt in $(seq 1 30); do
+            if docker compose -f docker-compose.preview.yml exec -T db-preview pg_isready -U rtrda -d rtrda >/dev/null 2>&1; then
+              break
+            fi
+            sleep 2
+          done
+          npm run db:migrate
+
+      - name: Seed production-preview database
+        run: |
+          set -euo pipefail
+          cd /srv/apps/web-app-rtrda
+          npm run db:seed
+
+      - name: Run validation gates
+        run: |
+          set -euo pipefail
+          cd /srv/apps/web-app-rtrda
+          npm test
+          npm run lint
+          npm run typecheck
+          npm run format:check
+
+      - name: Build and restart production-preview Docker Compose service
+        env:
+          DEPLOY_SHA: ${{ steps.resolve.outputs.deploy_sha }}
+        run: |
+          set -euo pipefail
+          cd /srv/apps/web-app-rtrda
+          export RTRDA_IMAGE="web-app-rtrda:prod-preview-${DEPLOY_SHA}"
+          docker compose -f docker-compose.preview.yml up -d --build web-app-rtrda-preview
+          echo "$DEPLOY_SHA" > .release
+          printf '%s %s\n' "$(date -Is)" "$DEPLOY_SHA" >> releases.log
+
+      - name: Wait for local preview health check
+        run: |
+          set -euo pipefail
+          for attempt in $(seq 1 40); do
+            if curl -fsS http://100.91.174.121:3020/healthz; then
+              exit 0
+            fi
+            sleep 3
+          done
+          cd /srv/apps/web-app-rtrda
+          docker compose -f docker-compose.preview.yml ps
+          docker compose -f docker-compose.preview.yml logs --tail=160 web-app-rtrda-preview
+          exit 1
+
+      - name: Verify public preview health check
+        run: |
+          set -euo pipefail
+          curl -fsS https://prod-preview.rtrda.or.th/healthz
+          curl -fsSI https://prod-preview.rtrda.or.th/ | sed -n '1,20p'
