@@ -131,6 +131,7 @@ describe("applyItaHeadingsOverride", () => {
     expect(sections.length).toBe(2);
 
     const section2024 = $after(sections[0]).text();
+    const section2024Html = $after(sections[0]).html() ?? "";
     const section2023 = $after(sections[1]).text();
 
     // 2569: every old heading is gone, every new MOPH MOIT 2569 heading is
@@ -175,5 +176,19 @@ describe("applyItaHeadingsOverride", () => {
     );
     expect(section2024).not.toContain("O20 การเปิดโอกาสให้เกิดการมีส่วนร่วม");
     expect(section2023).toContain("O20 การเปิดโอกาสให้เกิดการมีส่วนร่วม");
+
+    expect(section2024).toContain("o15_ประมวลจริยธรรม(1.1)");
+    expect(section2024).toContain("รายงานข้อมูลสถิติเรื่องร้องเรียนการทุจร (Excel)");
+    expect(section2024).toContain("การประเมินความเสี่ยงทุจริต_5_ขั้นตอน_ตามคู");
+    expect(section2024).toContain("รายงานผลการดำเนินงานตามแผนบริหารจัดการค");
+    expect(section2024).toContain(
+      "สทร. จัดประชุมเทคนิคพิจารณ์ ร่าง มาตรฐานหมอนคอนกรีตและอุปกรณ์ยึดเหนี่ยวราง ครั้งที่ 1/2568 มุ่งยกระดับคุณภาพและความปลอดภัยของระบบรางไทยสู่ระดับสากล",
+    );
+    expect(section2024Html).toContain("https://test.rtrda.or.th/");
+    expect(section2024Html).toContain("/sdc_download/ita2569-o15-07");
+    expect(section2024Html).toContain("/sdc_download/ita2569-o18-02");
+    expect(section2024Html).toContain("/sdc_download/ita2569-o21-01");
+    expect(section2024Html).toContain("/sdc_download/ita2569-o22-01");
+    expect(section2024Html).not.toContain("https://www.rtrda.or.th/en/");
   });
 });
