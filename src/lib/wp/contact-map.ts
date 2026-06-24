@@ -7,6 +7,8 @@ const CONTACT_INFORMATION_PATH = "/ติดต่อเรา/ช่องท�
 export const RTRDA_CONTACT_MAP_EMBED_URL =
   "https://www.google.com/maps?q=13.7505783,100.5681343&z=18&output=embed";
 
+const CONTACT_FORM_LINK_SELECTOR = 'a[href*="forms.gle/"]';
+
 function isContactInformationPath(path: string): boolean {
   return normalizeRoutePath(path).replace(/^\/en(?=\/)/, "") === CONTACT_INFORMATION_PATH;
 }
@@ -18,15 +20,36 @@ export function applyContactMapOverride(record: WpContentRecord): WpContentRecor
 
   const $ = cheerio.load(record.contentHtml, null, false);
   const mapIframes = $('iframe[src*="google.com/maps"]');
-  if (mapIframes.length === 0) {
-    return record;
+  const contactFormLink = $(CONTACT_FORM_LINK_SELECTOR).first();
+
+  if (mapIframes.length > 0) {
+    mapIframes.attr("src", RTRDA_CONTACT_MAP_EMBED_URL);
+    mapIframes.attr(
+      "title",
+      record.language === "th" ? "แผนที่ตั้ง สทร." : "RTRDA location map",
+    );
   }
 
-  mapIframes.attr("src", RTRDA_CONTACT_MAP_EMBED_URL);
-  mapIframes.attr(
-    "title",
-    record.language === "th" ? "แผนที่ตั้ง สทร." : "RTRDA location map",
-  );
+  if (contactFormLink.length > 0 && $(".contact-form-cta").length === 0) {
+    const href = contactFormLink.attr("href") ?? "";
+    const label = record.language === "th" ? "ช่องทางการติดต่อ" : "Contact Form";
+    const description =
+      record.language === "th"
+        ? "กรอกแบบฟอร์มออนไลน์สำหรับติดต่อสอบถามข้อมูลหรือแจ้งเรื่องร้องเรียน"
+        : "Submit the online form for inquiries or complaints.";
+
+    contactFormLink.closest(".elementor-widget-button").remove();
+    $.root().prepend(
+      `<section class="contact-form-cta" aria-label="${label}">` +
+        `<div><strong>${label}</strong><p>${description}</p></div>` +
+        `<a href="${href}" target="_blank" rel="noreferrer">${label}</a>` +
+        `</section>`,
+    );
+  }
+
+  if (mapIframes.length === 0 && contactFormLink.length === 0) {
+    return record;
+  }
 
   return {
     ...record,

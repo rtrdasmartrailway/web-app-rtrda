@@ -865,6 +865,60 @@ a.language-toggle-item:hover {
   text-underline-offset: 3px;
 }
 
+.contact-form-cta {
+  align-items: center;
+  background: linear-gradient(135deg, #0f3d6e 0%, #006bb8 55%, #00a6c8 100%);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-card);
+  color: #fff;
+  display: flex;
+  gap: 24px;
+  justify-content: space-between;
+  margin: 0 0 28px;
+  padding: 24px;
+}
+
+.contact-form-cta strong {
+  display: block;
+  font-size: clamp(20px, 2vw, 28px);
+  line-height: 1.25;
+  margin-bottom: 6px;
+}
+
+.contact-form-cta p {
+  color: rgba(255, 255, 255, 0.86);
+  margin: 0;
+}
+
+.wp-content .contact-form-cta a {
+  background: #fff;
+  border-radius: 999px;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.18);
+  color: var(--navy-900);
+  flex: 0 0 auto;
+  font-weight: 800;
+  padding: 12px 22px;
+  text-decoration: none;
+}
+
+.wp-content .contact-form-cta a:hover {
+  color: var(--accent-strong);
+  transform: translateY(-1px);
+}
+
+@media (max-width: 680px) {
+  .contact-form-cta {
+    align-items: stretch;
+    flex-direction: column;
+    padding: 20px;
+  }
+
+  .wp-content .contact-form-cta a {
+    text-align: center;
+    width: 100%;
+  }
+}
+
 .wp-content h1,
 .wp-content h2,
 .wp-content h3,

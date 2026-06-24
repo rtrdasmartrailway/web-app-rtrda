@@ -39,6 +39,39 @@ describe("applyContactMapOverride", () => {
     expect(updated.contentHtml).toContain('height="450"');
   });
 
+  it("promotes the Google contact form link to a visible CTA", () => {
+    const updated = applyContactMapOverride(
+      record({
+        contentHtml:
+          '<div class="elementor-widget-button"><a class="elementor-button" href="https://forms.gle/z7bMYh5qMdHBoG2HA" target="_blank">ช่องทางการติดต่อ</a></div><p>Address</p>',
+      }),
+    );
+    const $ = cheerio.load(updated.contentHtml, null, false);
+    const cta = $(".contact-form-cta");
+
+    expect(cta).toHaveLength(1);
+    expect(cta.find("a").attr("href")).toBe("https://forms.gle/z7bMYh5qMdHBoG2HA");
+    expect(cta.find("a").attr("target")).toBe("_blank");
+    expect(cta.find("a").attr("rel")).toBe("noreferrer");
+    expect($.root().children().first().hasClass("contact-form-cta")).toBe(true);
+    expect($(".elementor-widget-button")).toHaveLength(0);
+  });
+
+  it("uses an English label for the contact form CTA on English pages", () => {
+    const updated = applyContactMapOverride(
+      record({
+        id: "en-page-452",
+        language: "en",
+        path: "/en/ติดต่อเรา/ช่องทางการติดต่อ",
+        title: "Contact Information",
+        contentHtml:
+          '<a class="elementor-button" href="https://forms.gle/z7bMYh5qMdHBoG2HA">ช่องทางการติดต่อ</a>',
+      }),
+    );
+
+    expect(updated.contentHtml).toContain("Contact Form");
+  });
+
   it("rewrites the English contact page map iframe to the same RTRDA coordinates", () => {
     const updated = applyContactMapOverride(
       record({
