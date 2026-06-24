@@ -8,6 +8,8 @@ export const RTRDA_CONTACT_MAP_EMBED_URL =
   "https://www.google.com/maps?q=13.7505783,100.5681343&z=18&output=embed";
 
 const CONTACT_FORM_LINK_SELECTOR = 'a[href*="forms.gle/"]';
+const CONTACT_FORM_URL =
+  "https://docs.google.com/forms/d/e/1FAIpQLSd8nY4Dt-vjvl6Ag4Jnwq_Ko5zEUT7FgKH8DB-wql74KAVe5w/viewform";
 
 function isContactInformationPath(path: string): boolean {
   return normalizeRoutePath(path).replace(/^\/en(?=\/)/, "") === CONTACT_INFORMATION_PATH;
@@ -31,7 +33,6 @@ export function applyContactMapOverride(record: WpContentRecord): WpContentRecor
   }
 
   if (contactFormLink.length > 0 && $(".contact-form-cta").length === 0) {
-    const href = contactFormLink.attr("href") ?? "";
     const label = record.language === "th" ? "ช่องทางการติดต่อ" : "Contact Form";
     const description =
       record.language === "th"
@@ -42,7 +43,7 @@ export function applyContactMapOverride(record: WpContentRecord): WpContentRecor
     $.root().prepend(
       `<section class="contact-form-cta" aria-label="${label}">` +
         `<div><strong>${label}</strong><p>${description}</p></div>` +
-        `<a href="${href}" target="_blank" rel="noreferrer">${label}</a>` +
+        `<a href="${CONTACT_FORM_URL}" target="_blank" rel="noreferrer">${label}</a>` +
         `</section>`,
     );
   }

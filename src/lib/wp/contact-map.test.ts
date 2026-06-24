@@ -3,6 +3,9 @@ import * as cheerio from "cheerio";
 import type { WpContentRecord } from "./types";
 import { applyContactMapOverride, RTRDA_CONTACT_MAP_EMBED_URL } from "./contact-map";
 
+const CONTACT_FORM_URL =
+  "https://docs.google.com/forms/d/e/1FAIpQLSd8nY4Dt-vjvl6Ag4Jnwq_Ko5zEUT7FgKH8DB-wql74KAVe5w/viewform";
+
 function record(overrides: Partial<WpContentRecord>): WpContentRecord {
   return {
     id: "th-page-452",
@@ -50,11 +53,13 @@ describe("applyContactMapOverride", () => {
     const cta = $(".contact-form-cta");
 
     expect(cta).toHaveLength(1);
-    expect(cta.find("a").attr("href")).toBe("https://forms.gle/z7bMYh5qMdHBoG2HA");
+    expect(cta.find("a")).toHaveLength(1);
+    expect(cta.find("a").attr("href")).toBe(CONTACT_FORM_URL);
     expect(cta.find("a").attr("target")).toBe("_blank");
     expect(cta.find("a").attr("rel")).toBe("noreferrer");
     expect($.root().children().first().hasClass("contact-form-cta")).toBe(true);
     expect($(".elementor-widget-button")).toHaveLength(0);
+    expect(updated.contentHtml).not.toContain("https://forms.gle/z7bMYh5qMdHBoG2HA");
   });
 
   it("uses an English label for the contact form CTA on English pages", () => {
