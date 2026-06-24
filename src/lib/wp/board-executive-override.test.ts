@@ -3,6 +3,8 @@ import { describe, expect, it } from "vitest";
 import type { WpContentRecord } from "./types";
 import {
   applyBoardExecutiveOverride,
+  CHAIYUT_IMAGE_SRC,
+  CHAIYUT_NAME,
   TACHAKORN_IMAGE_SRC,
 } from "./board-executive-override";
 
@@ -71,5 +73,63 @@ describe("applyBoardExecutiveOverride", () => {
     const source = record({ contentHtml: "<h4>คนอื่น</h4>" });
 
     expect(applyBoardExecutiveOverride(source)).toBe(source);
+  });
+
+  it("fills the internal-admin manager card with Chaiyut Tanchai", () => {
+    const updated = applyBoardExecutiveOverride(
+      record({
+        contentHtml: `
+          <div class="lightweight-accordion">
+            <div class="wp-block-column">
+              <div class="wp-block-image is-style-default">
+                <figure class="aligncenter size-full is-resized">
+                  <img loading="lazy" decoding="async" width="240" height="240"
+                    src="/wp-content/uploads/2024/05/IMG_2233.png"
+                    srcset="/wp-content/uploads/2024/05/IMG_2233.png 240w"
+                    sizes="auto" alt=""
+                    style="width:118px;height:auto" />
+                </figure>
+              </div>
+              <h4 class="wp-block-heading">–</h4>
+              <h5 class="wp-block-heading">ผู้จัดการกลุ่มบริหารภายใน<br />อีเมล: <a href="mailto:kanyasiri.p@rtrda.or.th">–</a></h5>
+            </div>
+          </div>
+        `,
+      }),
+    );
+    const $ = cheerio.load(updated.contentHtml, null, false);
+    const image = $("img").first();
+    const heading = $("h4").first();
+    const role = $("h5").first();
+
+    expect(image.attr("src")).toBe(CHAIYUT_IMAGE_SRC);
+    expect(image.attr("alt")).toBe(CHAIYUT_NAME);
+    expect(image.attr("srcset")).toBeUndefined();
+    expect(image.attr("sizes")).toBeUndefined();
+    expect(heading.text()).toBe(CHAIYUT_NAME);
+    expect(role.text()).toBe("ผู้จัดการกลุ่มบริหารภายใน");
+    expect(role.find('a[href^="mailto:"]').length).toBe(0);
+  });
+
+  it("does not duplicate Chaiyut on the entrepreneur card", () => {
+    const source = `
+      <div class="lightweight-accordion">
+        <div class="wp-block-column">
+          <img src="/wp-content/uploads/2025/10/ชัยวุฒิ-ตันไชย-ผู้จัดการกลุ่มพัฒนาผู้ประกอบการและธุรกิจใหม่.jpg" alt="ชัยวุฒิ ตันไชย" />
+          <h4>ชัยวุฒิ ตันไชย</h4>
+          <h5>ผู้จัดการกลุ่มพัฒนาผู้ประกอบการและธุรกิจใหม่</h5>
+        </div>
+        <div class="wp-block-column">
+          <img src="/wp-content/uploads/2024/05/IMG_2233.png" alt="" />
+          <h4>–</h4>
+          <h5>ผู้จัดการกลุ่มบริหารภายใน</h5>
+        </div>
+      </div>
+    `;
+    const updated = applyBoardExecutiveOverride(record({ contentHtml: source }));
+    const $ = cheerio.load(updated.contentHtml, null, false);
+
+    expect($('img[src*="IMG_2233.png"]').length).toBe(0);
+    expect($('img[src*="ชัยวุฒิ"]').length).toBe(2);
   });
 });

@@ -199,6 +199,13 @@
   text-underline-offset: 3px;
 }
 
+.subUnitsButtonWrap {
+  display: flex;
+  justify-content: center;
+  margin-top: auto;
+  padding-top: 12px;
+}
+
 @media (max-width: 1140px) {
   .generalManagers .row {
     grid-template-columns: repeat(3, minmax(0, 1fr));

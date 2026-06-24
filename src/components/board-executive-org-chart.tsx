@@ -5,6 +5,7 @@ import type {
   BoardExecutivePresentation,
 } from "@/lib/wp/board-executives";
 import type { WpLanguage } from "@/lib/wp/types";
+import { ManagerSubUnitsButton } from "./manager-sub-units-button";
 import styles from "./board-executive-org-chart.module.css";
 
 function labels(language: WpLanguage) {
@@ -24,9 +25,11 @@ function labels(language: WpLanguage) {
 function PersonCard({
   person,
   language,
+  showSubUnitsButton = false,
 }: {
   person: BoardExecutivePerson;
   language: WpLanguage;
+  showSubUnitsButton?: boolean;
 }) {
   const text = labels(language);
   const displayName = person.vacant ? text.vacant : person.name;
@@ -65,6 +68,11 @@ function PersonCard({
           </dd>
         </div>
       </dl>
+      {showSubUnitsButton ? (
+        <div className={styles.subUnitsButtonWrap}>
+          <ManagerSubUnitsButton role={person.role} language={language} />
+        </div>
+      ) : null}
     </article>
   );
 }
@@ -73,17 +81,23 @@ function BranchRow({
   people,
   className,
   language,
+  showSubUnitsButton = false,
 }: {
   people: BoardExecutivePerson[];
   className: string;
   language: WpLanguage;
+  showSubUnitsButton?: boolean;
 }) {
   return (
     <div className={`${styles.branch} ${className}`}>
       <div className={styles.row}>
         {people.map((person, index) => (
           <div className={styles.node} key={`${person.role}-${person.name}-${index}`}>
-            <PersonCard person={person} language={language} />
+            <PersonCard
+              person={person}
+              language={language}
+              showSubUnitsButton={showSubUnitsButton}
+            />
           </div>
         ))}
       </div>
@@ -120,6 +134,7 @@ export function BoardExecutiveOrgChart({
               people={chart.generalManagers}
               className={styles.generalManagers}
               language={language}
+              showSubUnitsButton
             />
           </div>
         </div>

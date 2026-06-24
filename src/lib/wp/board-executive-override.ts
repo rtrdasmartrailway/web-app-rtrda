@@ -10,6 +10,11 @@ const NEW_NAME = "ธัชกร ธนวัฒนาดำรง";
 const NEW_EMAIL = "touchakorn.t@rtrda.or.th";
 export const TACHAKORN_IMAGE_SRC =
   "/wp-content/uploads/2025/10/ธัชกร-ธนวัฒนาดำรง-ผู้จัดการกลุ่มวิจัยและมาตรฐาน.jpg";
+const ADMIN_ROLE = "ผู้จัดการกลุ่มบริหารภายใน";
+export const CHAIYUT_NAME = "ชัยวุฒิ ตันไชย";
+export const CHAIYUT_IMAGE_SRC =
+  "/wp-content/uploads/2025/10/ชัยวุฒิ-ตันไชย-ผู้จัดการกลุ่มพัฒนาผู้ประกอบการและธุรกิจใหม่.jpg";
+const ADMIN_OLD_EMAIL_LINK_SELECTOR = 'a[href^="mailto:"]';
 
 function compactText(value: string): string {
   return value.replace(/\s+/g, " ").trim();
@@ -47,17 +52,42 @@ function rewriteTargetColumn($: cheerio.CheerioAPI, element: AnyNode): boolean {
   return true;
 }
 
+function rewriteAdminColumn($: cheerio.CheerioAPI, element: AnyNode): boolean {
+  const column = $(element);
+  const role = column.find("h5").first();
+
+  if (!role.text().includes(ADMIN_ROLE)) {
+    return false;
+  }
+
+  const image = column.find("img").first();
+  image.attr("src", CHAIYUT_IMAGE_SRC);
+  image.attr("alt", CHAIYUT_NAME);
+  image.removeAttr("srcset");
+  image.removeAttr("sizes");
+
+  const heading = column.find("h4").first();
+  heading.text(CHAIYUT_NAME);
+
+  role.empty();
+  role.append(ADMIN_ROLE);
+
+  column.find(ADMIN_OLD_EMAIL_LINK_SELECTOR).remove();
+
+  return true;
+}
+
 export function applyBoardExecutiveOverride(record: WpContentRecord): WpContentRecord {
   if (!isThaiBoardExecutivePath(record)) {
     return record;
   }
 
   const $ = cheerio.load(record.contentHtml, null, false);
-  const didRewrite = $(".lightweight-accordion .wp-block-column")
-    .toArray()
-    .some((element) => rewriteTargetColumn($, element));
+  const columns = $(".lightweight-accordion .wp-block-column").toArray();
+  const didRewriteResearch = columns.some((element) => rewriteTargetColumn($, element));
+  const didRewriteAdmin = columns.some((element) => rewriteAdminColumn($, element));
 
-  if (!didRewrite) {
+  if (!didRewriteResearch && !didRewriteAdmin) {
     return record;
   }
 

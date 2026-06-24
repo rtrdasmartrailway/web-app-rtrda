@@ -9,6 +9,8 @@ import {
 import type { WpImportManifest } from "./types";
 import {
   applyBoardExecutiveOverride,
+  CHAIYUT_IMAGE_SRC,
+  CHAIYUT_NAME,
   TACHAKORN_IMAGE_SRC,
 } from "./board-executive-override";
 import {
@@ -80,7 +82,7 @@ describe("board executive parser", () => {
     for (const person of people) {
       expect(person.role).not.toMatch(/อีเมล|e-mail|@/i);
     }
-    expect(people.filter((person) => person.vacant)).toHaveLength(5);
+    expect(people.filter((person) => person.vacant)).toHaveLength(4);
   });
 
   it("fills the research and standards GM and keeps the requested digital GM vacant", async () => {
@@ -101,6 +103,13 @@ describe("board executive parser", () => {
       imageSrc: null,
       email: null,
       vacant: true,
+    });
+
+    expect(gmByRole.get("ผู้จัดการกลุ่มบริหารภายใน")).toMatchObject({
+      name: CHAIYUT_NAME,
+      imageSrc: CHAIYUT_IMAGE_SRC,
+      email: null,
+      vacant: false,
     });
 
     expect(generalManagers.map((person) => person.name)).not.toContain("ชัชวาล พานวงษ์");
@@ -151,5 +160,21 @@ describe("board executive parser", () => {
     expect(html).toContain("ธัชกร ธนวัฒนาดำรง");
     expect(html).not.toContain("082 204 2998 / 02 248 2988");
     expect(html).not.toContain("ผู้อำนวยการ<br");
+  });
+
+  it("renders the sub-units เพิ่มเติม trigger on every manager card", async () => {
+    const record = await boardRecord();
+    const presentation = buildBoardExecutivePresentation(record.path, record.contentHtml);
+    expect(presentation).not.toBeNull();
+
+    const html = renderToStaticMarkup(
+      createElement(BoardExecutiveContent, {
+        presentation: presentation!,
+      }),
+    );
+
+    const matches = html.match(/manager-sub-units-trigger/g) ?? [];
+    expect(matches.length).toBe(5);
+    expect(html).toContain("เพิ่มเติม");
   });
 });

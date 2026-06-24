@@ -6777,3 +6777,123 @@ a.calendar-cell.has-posts:hover {
     opacity: 0;
   }
 }
+
+.manager-sub-units-trigger {
+  align-items: center;
+  background: linear-gradient(180deg, #1e3a8a 0%, #0b2867 100%);
+  border: 0;
+  border-radius: 999px;
+  color: #fff;
+  cursor: pointer;
+  display: inline-flex;
+  font-size: calc(13px * var(--reader-scale));
+  font-weight: 800;
+  gap: 6px;
+  letter-spacing: 0;
+  padding: 8px 18px;
+  text-decoration: none;
+  transition:
+    background-color 160ms ease-out,
+    box-shadow 160ms ease-out,
+    transform 160ms ease-out;
+  white-space: nowrap;
+}
+
+.manager-sub-units-trigger:hover,
+.manager-sub-units-trigger:focus-visible {
+  background: linear-gradient(180deg, #2548a8 0%, #133a8a 100%);
+  box-shadow: 0 6px 18px rgba(11, 40, 103, 0.32);
+  outline: none;
+  transform: translateY(-1px);
+}
+
+.manager-sub-units-overlay {
+  align-items: center;
+  animation: manager-sub-units-fade-in 160ms ease-out;
+  background: rgba(6, 13, 29, 0.82);
+  display: flex;
+  inset: 0;
+  justify-content: center;
+  padding: 24px;
+  position: fixed;
+  z-index: 9999;
+}
+
+@keyframes manager-sub-units-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.manager-sub-units-modal {
+  background: #fff;
+  border-radius: 18px;
+  box-shadow: 0 24px 60px rgba(4, 18, 46, 0.32);
+  display: grid;
+  gap: 14px;
+  max-width: min(560px, calc(100vw - 32px));
+  padding: 28px 28px 24px;
+  position: relative;
+  width: 100%;
+}
+
+.manager-sub-units-title {
+  color: var(--navy-900, #0b2867);
+  font-size: calc(20px * var(--reader-scale));
+  font-weight: 900;
+  line-height: 1.3;
+  margin: 0;
+}
+
+.manager-sub-units-role {
+  color: var(--accent-deep, #1e3a8a);
+  font-size: calc(13px * var(--reader-scale));
+  font-weight: 700;
+  line-height: 1.4;
+  margin: 0;
+}
+
+.manager-sub-units-list {
+  color: var(--navy-900, #0b2867);
+  font-size: calc(15px * var(--reader-scale));
+  line-height: 1.5;
+  margin: 0;
+  padding-left: 22px;
+}
+
+.manager-sub-units-list li {
+  padding: 4px 0;
+}
+
+.manager-sub-units-close {
+  align-items: center;
+  background: rgba(11, 40, 103, 0.08);
+  border: 0;
+  border-radius: 999px;
+  color: var(--navy-900, #0b2867);
+  cursor: pointer;
+  display: inline-flex;
+  font-size: 22px;
+  font-weight: 700;
+  height: 36px;
+  justify-content: center;
+  line-height: 1;
+  padding: 0;
+  position: absolute;
+  right: 14px;
+  top: 14px;
+  transition:
+    background-color 160ms ease-out,
+    color 160ms ease-out;
+  width: 36px;
+}
+
+.manager-sub-units-close:hover,
+.manager-sub-units-close:focus-visible {
+  background: rgba(11, 40, 103, 0.18);
+  color: #000;
+  outline: none;
+}
