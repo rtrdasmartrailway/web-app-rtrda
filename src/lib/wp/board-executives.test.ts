@@ -138,6 +138,31 @@ describe("board executive parser", () => {
     expect(html).not.toContain("รายละเอียด");
   });
 
+  it("renders both deputy cards empty without vacant copy or contact text", async () => {
+    const record = await boardRecord();
+    const presentation = buildBoardExecutivePresentation(record.path, record.contentHtml);
+    expect(presentation).not.toBeNull();
+
+    const html = renderToStaticMarkup(
+      createElement(BoardExecutiveOrgChart, {
+        chart: presentation!.chart,
+        language: record.language,
+        open: presentation!.open,
+      }),
+    );
+
+    const deputyCards =
+      html.match(
+        /<article[^>]*_vacant[^>]*><div class="[^"]*_portrait[^"]*"><\/div><div class="[^"]*_copy[^"]*"><p class="[^"]*_role[^"]*">รองผู้อำนวยการ<\/p><\/div><\/article>/g,
+      ) ?? [];
+    expect(deputyCards).toHaveLength(2);
+    for (const card of deputyCards) {
+      expect(card).not.toContain("รอการแต่งตั้ง");
+      expect(card).not.toContain("Email");
+      expect(card).not.toContain("mailto:");
+    }
+  });
+
   it("replaces the executive WordPress block when rendering the full board content", async () => {
     const record = await boardRecord();
     const presentation = buildBoardExecutivePresentation(record.path, record.contentHtml);

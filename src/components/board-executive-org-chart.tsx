@@ -25,14 +25,16 @@ function labels(language: WpLanguage) {
 function PersonCard({
   person,
   language,
+  hideVacantLabel = false,
   showSubUnitsButton = false,
 }: {
   person: BoardExecutivePerson;
   language: WpLanguage;
+  hideVacantLabel?: boolean;
   showSubUnitsButton?: boolean;
 }) {
   const text = labels(language);
-  const displayName = person.vacant ? text.vacant : person.name;
+  const displayName = person.vacant ? (hideVacantLabel ? "" : text.vacant) : person.name;
 
   return (
     <article className={`${styles.card} ${person.vacant ? styles.vacant : ""}`}>
@@ -46,28 +48,30 @@ function PersonCard({
             sizes="(max-width: 720px) 170px, 180px"
             unoptimized
           />
-        ) : (
+        ) : hideVacantLabel ? null : (
           <span aria-hidden="true" className={styles.placeholder}>
             {text.vacant}
           </span>
         )}
       </div>
       <div className={styles.copy}>
-        <h3>{displayName}</h3>
+        {displayName ? <h3>{displayName}</h3> : null}
         <p className={styles.role}>{person.role}</p>
       </div>
-      <dl className={styles.contact}>
-        <div>
-          <dt>{text.email}</dt>
-          <dd>
-            {person.email ? (
-              <a href={`mailto:${person.email}`}>{person.email}</a>
-            ) : (
-              text.noEmail
-            )}
-          </dd>
-        </div>
-      </dl>
+      {person.vacant && hideVacantLabel ? null : (
+        <dl className={styles.contact}>
+          <div>
+            <dt>{text.email}</dt>
+            <dd>
+              {person.email ? (
+                <a href={`mailto:${person.email}`}>{person.email}</a>
+              ) : (
+                text.noEmail
+              )}
+            </dd>
+          </div>
+        </dl>
+      )}
       {showSubUnitsButton ? (
         <div className={styles.subUnitsButtonWrap}>
           <ManagerSubUnitsButton role={person.role} language={language} />
@@ -80,11 +84,13 @@ function PersonCard({
 function BranchRow({
   people,
   className,
+  hideVacantLabels = false,
   language,
   showSubUnitsButton = false,
 }: {
   people: BoardExecutivePerson[];
   className: string;
+  hideVacantLabels?: boolean;
   language: WpLanguage;
   showSubUnitsButton?: boolean;
 }) {
@@ -96,6 +102,7 @@ function BranchRow({
             <PersonCard
               person={person}
               language={language}
+              hideVacantLabel={hideVacantLabels}
               showSubUnitsButton={showSubUnitsButton}
             />
           </div>
@@ -128,6 +135,7 @@ export function BoardExecutiveOrgChart({
             <BranchRow
               people={chart.deputies}
               className={styles.deputies}
+              hideVacantLabels
               language={language}
             />
             <BranchRow
