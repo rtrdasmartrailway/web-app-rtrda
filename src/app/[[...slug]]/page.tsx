@@ -9,6 +9,8 @@ import { normalizeRoutePath } from "@/lib/wp/url";
 export const revalidate = 300;
 export const dynamicParams = true;
 
+const logoImage = "/wp-content/uploads/2023/02/Logo_RTRDA_full-1.png";
+
 export async function generateStaticParams() {
   return [];
 }
@@ -36,6 +38,28 @@ export async function generateMetadata({
     description: data.record.excerpt || data.record.title,
     alternates: {
       canonical: data.record.path,
+    },
+    openGraph: {
+      title: `${data.record.title} | RTRDA`,
+      description: data.record.excerpt || data.record.title,
+      url: data.record.path,
+      siteName: "RTRDA",
+      images: [
+        {
+          url: logoImage,
+          width: 364,
+          height: 75,
+          alt: "RTRDA Logo",
+        },
+      ],
+      locale: data.record.language === "en" ? "en_US" : "th_TH",
+      type: "article",
+    },
+    twitter: {
+      card: "summary_large_image",
+      title: `${data.record.title} | RTRDA`,
+      description: data.record.excerpt || data.record.title,
+      images: [logoImage],
     },
   };
 }

@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import type { PresentationNavItem } from "@/lib/wp/presentation";
 import type { WpContentRecord } from "@/lib/wp/types";
 import { buildSidebarItems, deriveCounterpartCandidate, toCards } from "./page-data";
 
@@ -18,6 +19,18 @@ function record(overrides: Partial<WpContentRecord>): WpContentRecord {
     parentPath: null,
     categoryIds: [],
     featuredMediaId: null,
+    ...overrides,
+  };
+}
+
+function navItem(overrides: Partial<PresentationNavItem>): PresentationNavItem {
+  return {
+    label: "Nav item",
+    href: "#",
+    path: null,
+    external: false,
+    active: false,
+    children: [],
     ...overrides,
   };
 }
@@ -54,11 +67,62 @@ describe("buildSidebarItems", () => {
     expect(items).toEqual([{ label: "ลูก", path: "/parent/me/ลูก", active: false }]);
   });
 
-  it("falls back to siblings, filters self, and marks the current page active", () => {
+  it("falls back to siblings and keeps the current page active when useful", () => {
     // current is included in the siblings list (real DB query returns it
-    // when fetching by parentPath), so the filter must remove it.
+    // when fetching by parentPath), so keep it when there are other entries
+    // to make the active sidebar state visible.
     const items = buildSidebarItems(current, [], [sibling, current]);
-    expect(items).toEqual([{ label: "อื่น", path: "/parent/อื่น", active: false }]);
+    expect(items).toEqual([
+      { label: "อื่น", path: "/parent/อื่น", active: false },
+      { label: "หน้า", path: "/parent/me", active: true },
+    ]);
+  });
+
+  it("uses active navbar children before fallback records", () => {
+    const navItems = [
+      navItem({
+        label: "Parent",
+        active: true,
+        children: [
+          navItem({ label: "Second in DB", path: "/parent/อื่น", href: "/parent/อื่น" }),
+          navItem({ label: "Current", path: "/parent/me", href: "/parent/me" }),
+        ],
+      }),
+    ];
+
+    expect(buildSidebarItems(current, [child], [current, sibling], navItems)).toEqual([
+      { label: "Second in DB", path: "/parent/อื่น", active: false },
+      { label: "Current", path: "/parent/me", active: true },
+    ]);
+  });
+
+  it("flattens internal nested navbar entries in menu order", () => {
+    const navItems = [
+      navItem({
+        label: "News",
+        children: [
+          navItem({ label: "Category", path: "/news/category", href: "/news/category" }),
+          navItem({
+            label: "Jobs",
+            active: true,
+            children: [
+              navItem({
+                label: "Apply",
+                path: "/news/jobs/apply",
+                href: "/news/jobs/apply",
+              }),
+            ],
+          }),
+          navItem({ label: "External", href: "https://example.com", external: true }),
+        ],
+      }),
+    ];
+    const nestedCurrent = record({ path: "/news/jobs/apply", parentPath: "/news/jobs" });
+
+    expect(buildSidebarItems(nestedCurrent, [], [nestedCurrent], navItems)).toEqual([
+      { label: "Category", path: "/news/category", active: false },
+      { label: "Apply", path: "/news/jobs/apply", active: true },
+    ]);
   });
 
   it("filters the current page itself when it is the only sibling", () => {

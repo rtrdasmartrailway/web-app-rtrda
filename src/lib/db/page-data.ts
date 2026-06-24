@@ -126,18 +126,86 @@ export function buildSidebarItems(
   record: WpContentRecord,
   children: WpContentRecord[],
   siblings: WpContentRecord[],
+  navItems: PresentationNavItem[] = [],
 ): PresentationSidebarItem[] {
+  const navSidebarItems = buildSidebarItemsFromNavigation(record, navItems);
+  if (navSidebarItems.length > 0) {
+    return navSidebarItems;
+  }
+
   const source = children.length > 0 ? children : record.parentPath ? siblings : [];
   // Filter out the current page itself (a "siblings = [self]" result is useless
-  // for navigation). When everything is filtered out, return [] so the layout
+  // for navigation). Keep it when there are other siblings so the active page
+  // can be highlighted in the sidebar. When everything is filtered out, return [] so the layout
   // collapses sidebar and gives content-main the full width.
   const selfPath = normalizeRoutePath(record.path);
-  const filtered = source.filter((item) => normalizeRoutePath(item.path) !== selfPath);
+  const filtered =
+    source.length > 1
+      ? source
+      : source.filter((item) => normalizeRoutePath(item.path) !== selfPath);
   return filtered.map((item) => ({
     label: item.title,
     path: item.path,
-    active: normalizeRoutePath(item.path) === selfPath,
+    active: isSidebarPathActive(item.path, record.path),
   }));
+}
+
+function buildSidebarItemsFromNavigation(
+  record: WpContentRecord,
+  navItems: PresentationNavItem[],
+): PresentationSidebarItem[] {
+  const currentPath = normalizeRoutePath(record.path);
+  const activeTopLevel = navItems.find(
+    (item) =>
+      item.active ||
+      (item.path ? isSidebarPathActive(item.path, currentPath) : false) ||
+      item.children.some((child) => navItemContainsPath(child, currentPath)),
+  );
+
+  if (!activeTopLevel || activeTopLevel.children.length === 0) {
+    return [];
+  }
+
+  return flattenSidebarNavItems(activeTopLevel.children, record.path);
+}
+
+function flattenSidebarNavItems(
+  items: PresentationNavItem[],
+  currentPath: string,
+): PresentationSidebarItem[] {
+  return items.flatMap((item) => {
+    const children = flattenSidebarNavItems(item.children, currentPath);
+    if (!item.path || item.external) {
+      return children;
+    }
+
+    return [
+      {
+        label: item.label,
+        path: item.path,
+        active: isSidebarPathActive(item.path, currentPath),
+      },
+      ...children,
+    ];
+  });
+}
+
+function navItemContainsPath(item: PresentationNavItem, currentPath: string): boolean {
+  return (
+    (item.path ? isSidebarPathActive(item.path, currentPath) : false) ||
+    item.children.some((child) => navItemContainsPath(child, currentPath))
+  );
+}
+
+function isSidebarPathActive(itemPath: string, currentPath: string): boolean {
+  const item = normalizeRoutePath(itemPath);
+  const current = normalizeRoutePath(currentPath);
+
+  if (item === "/" || item === "/en") {
+    return current === item;
+  }
+
+  return current === item || current.startsWith(`${item}/`);
 }
 
 export function toCards(records: WpContentRecord[], media: WpMediaAsset[]): Card[] {
@@ -263,7 +331,7 @@ export const getPageData = cache(async (path: string): Promise<PageData | null> 
     pdfReaderTargets: pagePdfReaderTargets,
     sidebarItems:
       record.kind === "page"
-        ? buildSidebarItems(record, childRecords, siblingRecords)
+        ? buildSidebarItems(record, childRecords, siblingRecords, shell.navItems)
         : [],
     parentTitle: parentRecord?.title ?? record.title,
     shell,

@@ -771,7 +771,8 @@ a.language-toggle-item:hover {
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-card);
-  overflow: hidden;
+  max-height: calc(100vh - 148px);
+  overflow: auto;
   padding: 24px;
   position: sticky;
   top: 124px;
@@ -784,7 +785,10 @@ a.language-toggle-item:hover {
   font-weight: 800;
   margin: 0 0 14px;
   padding-bottom: 14px;
-  position: relative;
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--surface);
 }
 
 .page-sidebar h2::after {
@@ -5025,6 +5029,8 @@ a.calendar-cell.has-posts:hover {
   }
 
   .page-sidebar {
+    max-height: none;
+    overflow: visible;
     position: static;
   }
 
@@ -5169,6 +5175,8 @@ a.calendar-cell.has-posts:hover {
   }
 
   .page-sidebar {
+    max-height: none;
+    overflow: visible;
     position: static;
   }
 

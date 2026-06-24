@@ -35,6 +35,7 @@ function SideNavigation({
             key={item.path}
             href={item.path}
             className={item.active ? "active" : undefined}
+            aria-current={item.active ? "page" : undefined}
           >
             <span>{item.label}</span>
             <span aria-hidden="true" className="sidebar-arrow" />
