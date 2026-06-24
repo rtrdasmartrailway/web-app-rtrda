@@ -34,17 +34,12 @@ export function applyContactMapOverride(record: WpContentRecord): WpContentRecor
 
   if (contactFormLink.length > 0 && $(".contact-form-cta").length === 0) {
     const label = record.language === "th" ? "ช่องทางการติดต่อ" : "Contact Form";
-    const description =
-      record.language === "th"
-        ? "กรอกแบบฟอร์มออนไลน์สำหรับติดต่อสอบถามข้อมูลหรือแจ้งเรื่องร้องเรียน"
-        : "Submit the online form for inquiries or complaints.";
 
     contactFormLink.closest(".elementor-widget-button").remove();
     $.root().prepend(
-      `<section class="contact-form-cta" aria-label="${label}">` +
-        `<div><strong>${label}</strong><p>${description}</p></div>` +
+      `<div class="contact-form-cta">` +
         `<a href="${CONTACT_FORM_URL}" target="_blank" rel="noreferrer">${label}</a>` +
-        `</section>`,
+        `</div>`,
     );
   }
 

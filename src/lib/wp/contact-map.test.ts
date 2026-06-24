@@ -53,6 +53,8 @@ describe("applyContactMapOverride", () => {
     const cta = $(".contact-form-cta");
 
     expect(cta).toHaveLength(1);
+    expect(cta.find("strong")).toHaveLength(0);
+    expect(cta.find("p")).toHaveLength(0);
     expect(cta.find("a")).toHaveLength(1);
     expect(cta.find("a").attr("href")).toBe(CONTACT_FORM_URL);
     expect(cta.find("a").attr("target")).toBe("_blank");
