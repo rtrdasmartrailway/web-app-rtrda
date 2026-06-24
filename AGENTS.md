@@ -34,3 +34,38 @@ This version has breaking changes — APIs, conventions, and file structure may 
 - `src/components/` — kebab-case server components (site-shell, content-page,
   search-results, article-card, intranet-*)
 - `src/app/` — App Router; `[[...slug]]` serves all records from the DB (ISR)
+
+---
+
+## Paperclip RTRDA Web Dev Team Policy
+
+This workspace is also used by the Paperclip RTRDA Web Dev Team.
+
+### Mission
+
+- Complete human-assigned website update tasks on **test only**.
+- Target runtime: `https://test.rtrda.or.th` on `rtrda-dgt-server`.
+- Worktree: `/srv/workspace/web-app-rtrda`.
+
+### Hard Boundary
+
+Paperclip agents must **not** promote production.
+
+Forbidden unless พี่ J explicitly asks Valent outside Paperclip with `push rtrda production`:
+
+- Do not push `main`.
+- Do not run GitHub Actions workflow `Deploy rtrda.or.th production`.
+- Do not deploy to `rtrda.or.th` or `www.rtrda.or.th`.
+- Do not SSH to `rtrda02` for production changes.
+- Do not edit Cloudflare production ingress for `rtrda.or.th` / `www.rtrda.or.th`.
+
+If a human asks for production from inside Paperclip, prepare a handoff note only. Production push is performed by Valent after พี่ J says `push rtrda production`.
+
+### Required Verification Before Reporting Done
+
+- Inspect current git status before editing.
+- Preserve unrelated local changes.
+- Run focused tests appropriate to the change: `npm test`, `npm run lint`, `npm run typecheck`, `npm run build` when relevant.
+- Verify `https://test.rtrda.or.th/healthz` returns 200.
+- For content/UI changes, verify the real test URL/page, not only the database or source file.
+- Never print secret values from `.env`; mention key names only.
