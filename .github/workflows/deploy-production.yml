@@ -185,6 +185,7 @@ jobs:
           test -f .env.production
           grep -q '^POSTGRES_PASSWORD=' .env.production
           grep -q '^DATABASE_URL=' .env.production
+          cp .env.production .env
 
       - name: Install dependencies
         run: |
