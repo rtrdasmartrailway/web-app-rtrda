@@ -89,7 +89,7 @@ export const ICON_ROWS: IconItem[][] = [
     },
     {
       img: "/intranet/icons/Icon-Intranet-06.png",
-      href: "https://docs.google.com/forms/d/e/1FAIpQLScuUBLi6YbkLdpez4wMrbarJ6ZG2cJQho0wKwPNdD6MztZkVg/viewform",
+      href: "https://docs.google.com/forms/d/e/1FAIpQLSeJS1fSlq9YcaTDkdBJRBMLpy4p1XuJ7_5ABGGxzae8nNu08Q/viewform?usp=send_form",
       caption: "",
     },
   ],
