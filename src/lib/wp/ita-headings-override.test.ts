@@ -130,8 +130,9 @@ describe("applyItaHeadingsOverride", () => {
     const sections = $after("div.lightweight-accordion-body").toArray();
     expect(sections.length).toBe(2);
 
-    const section2024 = $after(sections[0]).text();
-    const section2024Html = $after(sections[0]).html() ?? "";
+    const section2024Node = $after(sections[0]);
+    const section2024 = section2024Node.text();
+    const section2024Html = section2024Node.html() ?? "";
     const section2023 = $after(sections[1]).text();
 
     // 2569: every old heading is gone, every new MOPH MOIT 2569 heading is
@@ -184,6 +185,22 @@ describe("applyItaHeadingsOverride", () => {
     expect(section2024).toContain(
       "สทร. จัดประชุมเทคนิคพิจารณ์ ร่าง มาตรฐานหมอนคอนกรีตและอุปกรณ์ยึดเหนี่ยวราง ครั้งที่ 1/2568 มุ่งยกระดับคุณภาพและความปลอดภัยของระบบรางไทยสู่ระดับสากล",
     );
+    expect(section2024).toContain(
+      "ข้อมูลสถิติการขอรับบริการผ่านช่องทางออนไลน์(E-service)",
+    );
+    expect(section2024).not.toContain("– Analytics");
+    const o10StatsLink = section2024Node
+      .find("a")
+      .toArray()
+      .find((element) =>
+        $after(element).text().includes("ข้อมูลสถิติการขอรับบริการผ่านช่องทางออนไลน์"),
+      );
+    expect(o10StatsLink).toBeDefined();
+    if (o10StatsLink) {
+      expect($after(o10StatsLink).attr("href")).toBe(
+        "/wp-content/uploads/ita2569/O10/ข้อมูลสถิติการขอรับบริการผ่านช่องทางออนไลน์(E-service).pdf",
+      );
+    }
     expect(section2024Html).toContain("https://test.rtrda.or.th/");
     expect(section2024Html).toContain("/sdc_download/ita2569-o15-07");
     expect(section2024Html).toContain("/sdc_download/ita2569-o18-02");

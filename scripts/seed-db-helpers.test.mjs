@@ -140,6 +140,54 @@ describe("manifestToRows", () => {
     expect(rows.downloads[0]).toMatchObject({ id: "dl-1", sizeBytes: 123 });
   });
 
+  it("adds supplemental ITA 2569 O19 downloads", () => {
+    const o19Downloads = rows.downloads.filter((download) =>
+      download.id.startsWith("ita2569-o19-"),
+    );
+
+    expect(o19Downloads.map((download) => download.id)).toEqual([
+      "ita2569-o19-01",
+      "ita2569-o19-02",
+      "ita2569-o19-03",
+      "ita2569-o19-04",
+      "ita2569-o19-05",
+      "ita2569-o19-06",
+      "ita2569-o19-07",
+    ]);
+    expect(o19Downloads[0]).toMatchObject({
+      localPath: "/sdc-downloads/ita2569-o19-01.pdf",
+      mimeType: "application/pdf",
+      group: "O19",
+      sourcePages: ["/การประเมินคุณธรรมและคว"],
+    });
+  });
+
+  it("does not duplicate supplemental ITA 2569 O19 downloads from the manifest", () => {
+    const rowsWithExistingO19 = manifestToRows({
+      ...manifest,
+      downloads: [
+        ...manifest.downloads,
+        {
+          id: "ita2569-o19-01",
+          sourceUrl: "https://www.rtrda.or.th/sdc_download/ita2569-o19-01/",
+          localPath: "/sdc-downloads/ita2569-o19-01.pdf",
+          fileName: "existing.pdf",
+          mimeType: "application/pdf",
+          sizeBytes: 1,
+          title: "existing",
+          group: "O19",
+          sourcePages: ["/existing"],
+        },
+      ],
+    });
+
+    expect(
+      rowsWithExistingO19.downloads.filter(
+        (download) => download.id === "ita2569-o19-01",
+      ),
+    ).toHaveLength(1);
+  });
+
   it("builds site meta entries", () => {
     const byKey = Object.fromEntries(rows.meta.map((entry) => [entry.key, entry.value]));
     expect(byKey.generatedAt).toBe("2026-06-11T07:52:02.737Z");

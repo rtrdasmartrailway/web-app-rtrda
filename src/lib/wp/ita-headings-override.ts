@@ -79,10 +79,30 @@ export const ITA_HEADING_REPLACEMENTS: ReadonlyArray<[string, string]> = [
 const ITA_O19_NEWS_TITLE =
   "สทร. จัดประชุมเทคนิคพิจารณ์ ร่าง มาตรฐานหมอนคอนกรีตและอุปกรณ์ยึดเหนี่ยวราง ครั้งที่ 1/2568 มุ่งยกระดับคุณภาพและความปลอดภัยของระบบรางไทยสู่ระดับสากล";
 
+const ITA_O10_E_SERVICE_STATS_HREF =
+  "/wp-content/uploads/ita2569/O10/ข้อมูลสถิติการขอรับบริการผ่านช่องทางออนไลน์(E-service).pdf";
+
 const ITA_LINK_OVERRIDES: ReadonlyArray<{
   marker: string;
   links: ReadonlyArray<{ title: string; href: string }>;
 }> = [
+  {
+    marker: "O10",
+    links: [
+      {
+        title: "ข้อมูลสถิติการขอรับบริการผ่านช่องทางออนไลน์(E-service)",
+        href: ITA_O10_E_SERVICE_STATS_HREF,
+      },
+      {
+        title: "คู่มือการให้บริการ-E-Service",
+        href: "/wp-content/uploads/ita2569/O10/o10-คู่มือการให้บริการ-E-Service.pdf",
+      },
+      {
+        title: "E-Service",
+        href: "/e-services",
+      },
+    ],
+  },
   {
     marker: "O15",
     links: [

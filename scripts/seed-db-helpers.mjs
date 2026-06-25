@@ -1,3 +1,64 @@
+const ITA_O19_SUPPLEMENTAL_DOWNLOADS = [
+  {
+    id: "ita2569-o19-01",
+    fileName: "แบบฟอร์มการมีส่วนร่วมo19_v3.pdf",
+    sizeBytes: 903600,
+    title: "แบบฟอร์มการมีส่วนร่วมo19_v3",
+  },
+  {
+    id: "ita2569-o19-02",
+    fileName: "เอกสารประกอบที่ 1 คำสั่งสทรที่52-2568.pdf",
+    sizeBytes: 2609099,
+    title: "เอกสารประกอบที่ 1 คำสั่งสทรที่52-2568",
+  },
+  {
+    id: "ita2569-o19-03",
+    fileName: "เอกสารประกอบที่ 2 รายงานประชุม ครั้งที่ 4-2568.pdf",
+    sizeBytes: 1004907,
+    title: "เอกสารประกอบที่ 2 รายงานประชุม ครั้งที่ 4-2568",
+  },
+  {
+    id: "ita2569-o19-04",
+    fileName: "เอกสารประกอบที่ 3 สรุปการประชุมTechnical Hearing.pdf",
+    sizeBytes: 2214606,
+    title: "เอกสารประกอบที่ 3 สรุปการประชุมTechnical Hearing",
+  },
+  {
+    id: "ita2569-o19-05",
+    fileName: "เอกสารประกอบที่ 4 รายงานประชุม ครั้งที่ 10-2568.pdf",
+    sizeBytes: 1940053,
+    title: "เอกสารประกอบที่ 4 รายงานประชุม ครั้งที่ 10-2568",
+  },
+  {
+    id: "ita2569-o19-06",
+    fileName: "เอกสารประกอบที่ 5 รายงานการประชุม ครั้งที่ 26(4)-2568.pdf",
+    sizeBytes: 1350481,
+    title: "เอกสารประกอบที่ 5 รายงานการประชุม ครั้งที่ 26(4)-2568",
+  },
+  {
+    id: "ita2569-o19-07",
+    fileName: "เอกสารประกอบที่ 6 รายงานการจัดทำประชาพิจารณ์.pdf",
+    sizeBytes: 435085,
+    title: "เอกสารประกอบที่ 6 รายงานการจัดทำประชาพิจารณ์",
+  },
+].map((download) => ({
+  ...download,
+  sourceUrl: `https://www.rtrda.or.th/sdc_download/${download.id}/`,
+  localPath: `/sdc-downloads/${download.id}.pdf`,
+  mimeType: "application/pdf",
+  group: "O19",
+  sourcePages: ["/การประเมินคุณธรรมและคว"],
+}));
+
+function withSupplementalDownloads(downloads) {
+  const existingIds = new Set(downloads.map((download) => download.id));
+  const supplemental = ITA_O19_SUPPLEMENTAL_DOWNLOADS.filter(
+    (download) => !existingIds.has(download.id),
+  );
+
+  return [...downloads, ...supplemental];
+}
+
 /**
  * Pure transforms turning the import manifest (src/data/wp-content.json) into
  * database rows for scripts/seed-db.mjs. No database access here.
@@ -50,7 +111,9 @@ export function manifestToRows(manifest) {
     skippedDuplicates,
     categories: manifest.categories.map((category) => ({ ...category })),
     media: manifest.media.map((asset) => ({ ...asset, id: String(asset.id) })),
-    downloads: manifest.downloads.map((download) => ({ ...download })),
+    downloads: withSupplementalDownloads(
+      manifest.downloads.map((download) => ({ ...download })),
+    ),
     meta: [
       { key: "generatedAt", value: manifest.generatedAt },
       { key: "source", value: manifest.source },
