@@ -105,7 +105,7 @@ describe("manifestToRows", () => {
   const rows = manifestToRows(manifest);
 
   it("maps records, coercing wpId to string and defaulting optional fields", () => {
-    expect(rows.records).toHaveLength(2);
+    expect(rows.records).toHaveLength(3);
     const [page, post] = rows.records;
     expect(page).toMatchObject({
       id: "th-page-1",
@@ -183,6 +183,90 @@ describe("manifestToRows", () => {
         }),
       ]),
     );
+  });
+
+  it("adds the supplemental No Gift Policy news record and media", () => {
+    const news = rows.records.find((record) => record.id === "th-post-8063");
+    expect(news).toMatchObject({
+      wpId: "8063",
+      language: "th",
+      kind: "post",
+      path: "/สทร-ร่วมประกาศเจตนารมณ์-no-gift-policy-2569",
+      categoryIds: [7],
+      featuredMediaId: 8063,
+      date: "2026-02-24T00:00:00",
+    });
+    expect(news?.title).toContain("No Gift Policy");
+    expect(news?.contentHtml).toContain(
+      "/wp-content/uploads/2026/02/no-gift-policy-240269-10.jpg",
+    );
+    expect(news?.searchText).toContain("ต่อต้านการทุจริตคอร์รัปชัน");
+
+    const noGiftMedia = rows.media.filter((asset) =>
+      asset.localPath.includes("/wp-content/uploads/2026/02/no-gift-policy-240269-"),
+    );
+    expect(noGiftMedia).toHaveLength(10);
+    expect(noGiftMedia[0]).toMatchObject({
+      id: "8063",
+      localPath: "/wp-content/uploads/2026/02/no-gift-policy-240269-01.jpg",
+      width: 2048,
+      height: 1365,
+      mimeType: "image/jpeg",
+    });
+  });
+
+  it("adds the No Gift Policy news link to the news category listing", () => {
+    const rowsWithCategory = manifestToRows({
+      ...manifest,
+      records: [
+        ...manifest.records,
+        {
+          id: "th-category-7",
+          wpId: 7,
+          language: "th",
+          kind: "category",
+          path: "/category/ข่าวและกิจกรรม",
+          sourceUrl: "https://www.rtrda.or.th/category/ข่าวและกิจกรรม/",
+          title: "ข่าวและกิจกรรม",
+          excerpt: "",
+          contentHtml:
+            '<ul class="wp-import-list"><li><a href="/existing-news">ข่าวเดิม</a></li></ul>',
+          modified: "2026-01-01T00:00:00",
+          date: "2026-01-01T00:00:00",
+          parentPath: null,
+          categoryIds: [],
+          featuredMediaId: null,
+        },
+      ],
+      categories: [
+        ...manifest.categories,
+        {
+          id: 7,
+          language: "th",
+          path: "/category/ข่าวและกิจกรรม",
+          slug: "ข่าวและกิจกรรม",
+          name: "ข่าวและกิจกรรม",
+          count: 1,
+          parent: 0,
+        },
+      ],
+    });
+
+    const category = rowsWithCategory.records.find(
+      (record) => record.path === "/category/ข่าวและกิจกรรม",
+    );
+    expect(category?.contentHtml).toContain(
+      "/สทร-ร่วมประกาศเจตนารมณ์-no-gift-policy-2569",
+    );
+    expect(category?.contentHtml).toContain("No Gift Policy");
+    expect(category?.contentHtml.indexOf("no-gift-policy-2569")).toBeLessThan(
+      category?.contentHtml.indexOf("/existing-news") ?? Number.POSITIVE_INFINITY,
+    );
+    expect(
+      rowsWithCategory.categories.find(
+        (category) => category.id === 7 && category.language === "th",
+      )?.count,
+    ).toBe(2);
   });
 
   it("does not duplicate supplemental ITA 2569 downloads from the manifest", () => {
