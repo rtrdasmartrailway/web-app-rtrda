@@ -24,7 +24,7 @@ export const ITA_HEADING_REPLACEMENTS: ReadonlyArray<[string, string]> = [
   ],
   [
     "O14 แผนการบริหารและพัฒนาทรัพยากรบุคคลประจำปีงบประมาณ พ.ศ. 2569",
-    "O14 รายงานผลการบริหารและพัฒนาทรัพยากรบุคคล ประจำปีงบประมาณ พ.ศ.. 2568",
+    "O14 รายงานผลการบริหารและพัฒนาทรัพยากรบุคคล ประจำปีงบประมาณ พ.ศ. 2568",
   ],
   [
     "O15 รายงานผลการบริหารและพัฒนาทรัพยากรบุคคลประจำปี พ.ศ. 2568",
@@ -82,10 +82,32 @@ const ITA_O19_NEWS_TITLE =
 const ITA_O10_E_SERVICE_STATS_HREF =
   "/wp-content/uploads/ita2569/O10/ข้อมูลสถิติการขอรับบริการผ่านช่องทางออนไลน์(E-service).pdf";
 
+const ITA_O11_UPLOAD_DIR = "/wp-content/uploads/ita2569/O11";
+const ITA_O12_UPLOAD_DIR = "/wp-content/uploads/ita2569/O12";
+const ITA_O13_UPLOAD_DIR = "/wp-content/uploads/ita2569/O13";
+const ITA_O14_UPLOAD_DIR = "/wp-content/uploads/ita2569/O14";
+const ITA_O15_UPLOAD_DIR = "/wp-content/uploads/ita2569/O15";
+const ITA_O16_UPLOAD_DIR = "/wp-content/uploads/ita2569/O16";
+const ITA_O18_UPLOAD_DIR = "/wp-content/uploads/ita2569/O18";
+const ITA_O25_UPLOAD_DIR = "/wp-content/uploads/ita2569/O25";
+
+const ITA_O4_NEWS_HREF =
+  "/สทร-เดินหน้ายกระดับองค์กรโปร่งใส-จัดโครงการพัฒนาและเพิ่มประสิทธิภาพการประเมิน-ITA-ประจำปี-2569";
+
 const ITA_LINK_OVERRIDES: ReadonlyArray<{
   marker: string;
   links: ReadonlyArray<{ title: string; href: string }>;
 }> = [
+  {
+    marker: "O4",
+    links: [
+      {
+        title:
+          "สทร. เดินหน้ายกระดับองค์กรโปร่งใส จัดโครงการพัฒนาและเพิ่มประสิทธิภาพการประเมิน ITA ประจำปี 2569",
+        href: ITA_O4_NEWS_HREF,
+      },
+    ],
+  },
   {
     marker: "O10",
     links: [
@@ -104,35 +126,225 @@ const ITA_LINK_OVERRIDES: ReadonlyArray<{
     ],
   },
   {
+    marker: "O11",
+    links: [
+      {
+        title: "O11 ไตรมาสที่ 1",
+        href: `${ITA_O11_UPLOAD_DIR}/O11_ไตรมาสที่_1.pdf`,
+      },
+      {
+        title: "O11 ไตรมาสที่ 1 (Excel)",
+        href: `${ITA_O11_UPLOAD_DIR}/O11_ไตรมาสที่_1.xlsx`,
+      },
+      {
+        title: "O11 ไตรมาสที่ 2",
+        href: `${ITA_O11_UPLOAD_DIR}/O11_ไตรมาสที่_2.pdf`,
+      },
+      {
+        title: "O11 ไตรมาสที่ 2 (Excel)",
+        href: `${ITA_O11_UPLOAD_DIR}/O11_ไตรมาสที่_2.xlsx`,
+      },
+    ],
+  },
+  {
+    marker: "O12",
+    links: [
+      {
+        title: "แบบสรุปผลการจัดซื้อจัดจ้าง ประจำปีงบประมาณ พ.ศ.2568",
+        href: itaO12Href("แบบสรุปผลการจัดซื้อจัดจ้าง ประจำปีงบประมาณ พ.ศ.2568.pdf"),
+      },
+      {
+        title: "12.สขร.เดือน กันยายน 2568",
+        href: itaO12Href("12.สขร.เดือน กันยายน 2568.pdf"),
+      },
+      {
+        title: "12.สขร. เดือน กันยายน2568",
+        href: itaO12Href("12.สขร. เดือน กันยายน2568.xlsx"),
+      },
+      {
+        title: "11.สขร เดือน สิงหาคม 2568",
+        href: itaO12Href("11.สขร เดือน สิงหาคม 2568.pdf"),
+      },
+      {
+        title: "11.สขร เดือน สิงหาคม 2568",
+        href: itaO12Href("11.สขร เดือน สิงหาคม 2568.xlsx"),
+      },
+      {
+        title: "10.สขร เดือน กรกฎาคม 2568",
+        href: itaO12Href("10.สขร เดือน กรกฎาคม 2568.pdf"),
+      },
+      {
+        title: "10.สขร เดือน กรกฎาคม 2568",
+        href: itaO12Href("10.สขร เดือน กรกฎาคม 2568.xlsx"),
+      },
+      {
+        title: "9.สขร เดือน มิถุนายน 2568",
+        href: itaO12Href("9.สขร เดือน มิถุนายน 2568.pdf"),
+      },
+      {
+        title: "9.สขร เดือน มิถุนายน 2568",
+        href: itaO12Href("9.สขร เดือน มิถุนายน 2568.xlsx"),
+      },
+      {
+        title: "8.สขร เดือน พฤษภาคม 2568",
+        href: itaO12Href("8.สขร เดือน พฤษภาคม 2568.pdf"),
+      },
+      {
+        title: "8.สขร เดือน พฤษภาคม 2568",
+        href: itaO12Href("8.สขร เดือน พฤษภาคม 2568.xlsx"),
+      },
+      {
+        title: "7.สขร เดือน เมษายน 2568",
+        href: itaO12Href("7.สขร เดือน เมษายน 2568.pdf"),
+      },
+      {
+        title: "7. สขร.เดือน เมษายน 2568",
+        href: itaO12Href("7. สขร.เดือน เมษายน 2568.xlsx"),
+      },
+      {
+        title: "6.สขร เดือน มีนาคม 2568",
+        href: itaO12Href("6.สขร เดือน มีนาคม 2568.pdf"),
+      },
+      {
+        title: "6.สขร เดือน มีนาคม 2568",
+        href: itaO12Href("6.สขร เดือน มีนาคม 2568.xlsx"),
+      },
+      {
+        title: "5.สขร.เดือน กุมภาพันธ์ 2568",
+        href: itaO12Href("5.สขร.เดือน กุมภาพันธ์ 2568.pdf"),
+      },
+      {
+        title: "5. สขร.เดือน กุมภาพันธ์ 2568",
+        href: itaO12Href("5. สขร.เดือน กุมภาพันธ์ 2568.xlsx"),
+      },
+      {
+        title: "4.สขร.เดือน มกราคม 2568",
+        href: itaO12Href("4.สขร.เดือน มกราคม 2568.pdf"),
+      },
+      {
+        title: "4.สขร.เดือน มกราคม 2568",
+        href: itaO12Href("4.สขร.เดือน มกราคม 2568.xlsx"),
+      },
+      {
+        title: "3.สขร. เดือน ธันวาคม2567",
+        href: itaO12Href("3.สขร. เดือน ธันวาคม2567.pdf"),
+      },
+      {
+        title: "3.สขร.เดือน ธันวาคม 2567",
+        href: itaO12Href("3.สขร.เดือน ธันวาคม 2567.xlsx"),
+      },
+      {
+        title: "2..สขร.เดือน พฤศจิกายน 2567",
+        href: itaO12Href("2..สขร.เดือน พฤศจิกายน 2567.pdf"),
+      },
+      {
+        title: "2.สขร.เดือน พฤศจิกายน 2567",
+        href: itaO12Href("2.สขร.เดือน พฤศจิกายน 2567.xlsx"),
+      },
+      {
+        title: "1.สขร.เดือน ตุลาคม 2567",
+        href: itaO12Href("1.สขร.เดือน ตุลาคม 2567.pdf"),
+      },
+      {
+        title: "1.สขร.เดือน ตุลาคม 2567",
+        href: itaO12Href("1.สขร.เดือน ตุลาคม 2567.xlsx"),
+      },
+    ],
+  },
+  {
+    marker: "O13",
+    links: [
+      {
+        title: "ข้อบังคับว่าด้วยการบริหารงานบุคคล",
+        href: `${ITA_O13_UPLOAD_DIR}/o13_ข้อบังคับว่าด้วยการบริหารงานบุคคล.pdf`,
+      },
+      {
+        title: "หลักเกณฑ์สรรหา บรรจุ แต่งตั้ง",
+        href: `${ITA_O13_UPLOAD_DIR}/o13_หลักเกณฑ์สรรหา_บรรจุ_แต่งตั้ง.pdf`,
+      },
+      {
+        title: "แผนบริหารทรัพยากรบุคคล ปี 2569",
+        href: `${ITA_O13_UPLOAD_DIR}/o13_แผนบริหารทรัพยากรบุคคล_ปี_2569.pdf`,
+      },
+      {
+        title: "แผนพัฒนาทรัพยากรบุคคล ปี 2569",
+        href: `${ITA_O13_UPLOAD_DIR}/o13_แผนพัฒนาทรัพยากรบุคคล_ปี_2569.pdf`,
+      },
+    ],
+  },
+  {
+    marker: "O14",
+    links: [
+      {
+        title: "รายงานผลการบริหารทรัพยากรบุคคล ประจำปีงบประมาณ 2568",
+        href: `${ITA_O14_UPLOAD_DIR}/o14_รายงานผลการบริหารทรัพยากรบุคคล_ประจำปีงบประมาณ2568(2).pdf`,
+      },
+      {
+        title: "รายงานผลการพัฒนาทรัพยากรบุคคล ประจำปีงบประมาณ 2568",
+        href: `${ITA_O14_UPLOAD_DIR}/o14_รายงานผลการพัฒนาทรัพยากรบุคคล_ประจำปีงบประมาณ2568(2).pdf`,
+      },
+    ],
+  },
+  {
     marker: "O15",
     links: [
       {
-        title: "o15 406.34 แต่งตั้งคณะทำงานขับเคลื่อนจริยธรรม(2.1)",
-        href: sdcDownloadHref("ita2569-o15-01"),
+        title: "o15 การลงนามปฏิญญาคุณธรรม",
+        href: `${ITA_O15_UPLOAD_DIR}/o15_การลงนามปฏิญญาคุณธรรม.pdf`,
       },
       {
-        title: "o15 การลงนามปฏิญญาคุณธรรม(2.2)",
-        href: sdcDownloadHref("ita2569-o15-02"),
+        title: "o15 กิจกรรมอบรมสอดแทรกสาระด้านจริยธรรมฯ",
+        href: `${ITA_O15_UPLOAD_DIR}/o15_กิจกรรมอบรมสอดแทรกสาระด้านจริยธรรมฯ.pdf`,
       },
       {
-        title: "o15 กิจกรรมอบรมสอดแทรกสาระด้านจริยธรรมฯ(2.3)",
-        href: sdcDownloadHref("ita2569-o15-03"),
+        title: "o15 ข้อบังคับ คกก สทร ว่าด้วยประมวลจริยธรรมในการปฏิบัติงาน 2565",
+        href: `${ITA_O15_UPLOAD_DIR}/o15_ข้อบังคับ_คกก_สทร_ว่าด้วยประมวลจริยธรรมในการปฏิบัติงาน_2565.pdf`,
       },
       {
-        title: "o15 ข้อบังคับ คกก สทร ว่าด้วยประมวลจริยธรรมใ",
-        href: sdcDownloadHref("ita2569-o15-04"),
+        title: "o15 คำสั่งแต่งตั้งคณะทำงานขับเคลื่อนจริยธรรม 2569",
+        href: `${ITA_O15_UPLOAD_DIR}/o15_คำสั่งแต่งตั้งคณะทำงานขับเคลื่อนจริยธรรม_2569.pdf`,
       },
       {
-        title: "o15 สื่อ DO and Dont RTRDA(2,2.1)",
-        href: sdcDownloadHref("ita2569-o15-05"),
+        title: "o15 สรุปสาระสำคัญ มาตรา 128 Infographic",
+        href: `${ITA_O15_UPLOAD_DIR}/o15_สรุปสาระสำคัญ_มาตรา_128_Infographic.png`,
       },
       {
-        title: "o15_ข้อกำหนดว่าด้วยกระบวนการรักษาจริยธรรม(1.2",
-        href: sdcDownloadHref("ita2569-o15-06"),
+        title: "o15 สื่อ DO and Dont RTRDA",
+        href: `${ITA_O15_UPLOAD_DIR}/o15_สื่อ_DO_and_Dont_RTRDA.pdf`,
       },
       {
-        title: "o15_ประมวลจริยธรรม(1.1)",
-        href: sdcDownloadHref("ita2569-o15-07"),
+        title: "o15 ข้อกำหนดว่าด้วยกระบวนการรักษาจริยธรรม",
+        href: `${ITA_O15_UPLOAD_DIR}/o15_ข้อกำหนดว่าด้วยกระบวนการรักษาจริยธรรม.pdf`,
+      },
+      {
+        title: "o15 ประมวลจริยธรรม",
+        href: `${ITA_O15_UPLOAD_DIR}/o15_ประมวลจริยธรรม.pdf`,
+      },
+    ],
+  },
+  {
+    marker: "O16",
+    links: [
+      {
+        title: "o 16 แนวทางปฏิบัติ การจัดการเรื่องร้องเรียน",
+        href: `${ITA_O16_UPLOAD_DIR}/o_16_แนวทางปฏิบัติ_การจัดการเรื่องร้องเรียน.pdf`,
+      },
+    ],
+  },
+  {
+    marker: "O17",
+    links: [
+      {
+        title: "ตัวอย่าง ช่องทางแจ้งเรื่องร้องเรียนการทุจริตและประพฤติมิชอบ",
+        href: "/wp-content/uploads/ita2569/O17/o17_ตัวอย่าง_ชองทางแจ้งเรื่องร้องเรียนการทุจริตและประพฤติมิชอบ.pdf",
+      },
+      {
+        title: "ช่องทางแจ้งร้องเรียนฯ สำนักงาน ป.ป.ช.",
+        href: "https://wbs.nacc.go.th/",
+      },
+      {
+        title: "ช่องทางแจ้งร้องเรียนฯ สำนักงาน ป.ป.ท.",
+        href: "https://www.pacc.go.th/e-service/index.html",
       },
     ],
   },
@@ -141,11 +353,11 @@ const ITA_LINK_OVERRIDES: ReadonlyArray<{
     links: [
       {
         title: "รายงานข้อมูลสถิติเรื่องร้องเรียนการทุจร",
-        href: sdcDownloadHref("ita2569-o18-01"),
+        href: `${ITA_O18_UPLOAD_DIR}/รายงานข้อมูลสถิติเรื่องร้องเรียนการทุจร.pdf`,
       },
       {
         title: "รายงานข้อมูลสถิติเรื่องร้องเรียนการทุจร (Excel)",
-        href: sdcDownloadHref("ita2569-o18-02"),
+        href: `${ITA_O18_UPLOAD_DIR}/รายงานข้อมูลสถิติเรื่องร้องเรียนการทุจร.xlsx`,
       },
     ],
   },
@@ -204,12 +416,25 @@ const ITA_LINK_OVERRIDES: ReadonlyArray<{
       },
     ],
   },
+  {
+    marker: "O25",
+    links: [
+      {
+        title: "นำผลการประเมิน ITA ไปสู่การพัฒนาองค์กร",
+        href: `${ITA_O25_UPLOAD_DIR}/นำผลการประเมิน_ITA_ไปสู่การพัฒนาองค์กร.pdf`,
+      },
+    ],
+  },
 ];
 
 const ITA_2024_ANCHOR = "การประเมิน ITA ปี 2569";
 
 function sdcDownloadHref(id: string): string {
   return `/sdc_download/${id}`;
+}
+
+function itaO12Href(fileName: string): string {
+  return `${ITA_O12_UPLOAD_DIR}/${fileName.replaceAll(" ", "_")}`;
 }
 
 function shouldOverride(record: WpContentRecord): boolean {

@@ -29,6 +29,7 @@ function record(overrides: Partial<WpContentRecord>): WpContentRecord {
 function fixtureContent(): string {
   const oldHeadings = [
     "O3 ข้อมูลการติดต่อ",
+    "O4 ข่าวประชาสัมพันธ์",
     "O10 E–Service",
     "O11 ข้อมูลสถิติการให้บริการ",
     "O12 รายการการจัดซื้อจัดจ้างหรือการจัดหาพัสดุ และความก้าวหน้าการจัดซื้อจัดจ้างหรือการจัดหาพัสดุ",
@@ -178,7 +179,7 @@ describe("applyItaHeadingsOverride", () => {
     expect(section2024).not.toContain("O20 การเปิดโอกาสให้เกิดการมีส่วนร่วม");
     expect(section2023).toContain("O20 การเปิดโอกาสให้เกิดการมีส่วนร่วม");
 
-    expect(section2024).toContain("o15_ประมวลจริยธรรม(1.1)");
+    expect(section2024).toContain("o15 ประมวลจริยธรรม");
     expect(section2024).toContain("รายงานข้อมูลสถิติเรื่องร้องเรียนการทุจร (Excel)");
     expect(section2024).toContain("การประเมินความเสี่ยงทุจริต_5_ขั้นตอน_ตามคู");
     expect(section2024).toContain("รายงานผลการดำเนินงานตามแผนบริหารจัดการค");
@@ -189,6 +190,159 @@ describe("applyItaHeadingsOverride", () => {
       "ข้อมูลสถิติการขอรับบริการผ่านช่องทางออนไลน์(E-service)",
     );
     expect(section2024).not.toContain("– Analytics");
+    const linksFor = (
+      marker: string,
+    ): Array<{ title: string; href: string | undefined }> => {
+      const heading = section2024Node
+        .find("p")
+        .toArray()
+        .find((element) => $after(element).text().trim().startsWith(`${marker} `));
+      expect(heading).toBeDefined();
+      if (!heading) {
+        return [];
+      }
+
+      const links: Array<{ title: string; href: string | undefined }> = [];
+      let next = $after(heading).next();
+      while (next.length) {
+        if (next.is("p") && /^O\d+\b/.test(next.text().trim())) {
+          break;
+        }
+        if (next.is("h1, h2, h3, h4, h5, h6")) {
+          break;
+        }
+        const link = next.find("a").first();
+        if (link.length) {
+          links.push({ title: link.text().trim(), href: link.attr("href") });
+        }
+        next = next.next();
+      }
+      return links;
+    };
+
+    expect(linksFor("O4")).toEqual([
+      {
+        title:
+          "– สทร. เดินหน้ายกระดับองค์กรโปร่งใส จัดโครงการพัฒนาและเพิ่มประสิทธิภาพการประเมิน ITA ประจำปี 2569",
+        href: "/สทร-เดินหน้ายกระดับองค์กรโปร่งใส-จัดโครงการพัฒนาและเพิ่มประสิทธิภาพการประเมิน-ITA-ประจำปี-2569",
+      },
+    ]);
+    expect(linksFor("O11")).toEqual([
+      {
+        title: "– O11 ไตรมาสที่ 1",
+        href: "/wp-content/uploads/ita2569/O11/O11_ไตรมาสที่_1.pdf",
+      },
+      {
+        title: "– O11 ไตรมาสที่ 1 (Excel)",
+        href: "/wp-content/uploads/ita2569/O11/O11_ไตรมาสที่_1.xlsx",
+      },
+      {
+        title: "– O11 ไตรมาสที่ 2",
+        href: "/wp-content/uploads/ita2569/O11/O11_ไตรมาสที่_2.pdf",
+      },
+      {
+        title: "– O11 ไตรมาสที่ 2 (Excel)",
+        href: "/wp-content/uploads/ita2569/O11/O11_ไตรมาสที่_2.xlsx",
+      },
+    ]);
+    expect(linksFor("O13")).toEqual([
+      {
+        title: "– ข้อบังคับว่าด้วยการบริหารงานบุคคล",
+        href: "/wp-content/uploads/ita2569/O13/o13_ข้อบังคับว่าด้วยการบริหารงานบุคคล.pdf",
+      },
+      {
+        title: "– หลักเกณฑ์สรรหา บรรจุ แต่งตั้ง",
+        href: "/wp-content/uploads/ita2569/O13/o13_หลักเกณฑ์สรรหา_บรรจุ_แต่งตั้ง.pdf",
+      },
+      {
+        title: "– แผนบริหารทรัพยากรบุคคล ปี 2569",
+        href: "/wp-content/uploads/ita2569/O13/o13_แผนบริหารทรัพยากรบุคคล_ปี_2569.pdf",
+      },
+      {
+        title: "– แผนพัฒนาทรัพยากรบุคคล ปี 2569",
+        href: "/wp-content/uploads/ita2569/O13/o13_แผนพัฒนาทรัพยากรบุคคล_ปี_2569.pdf",
+      },
+    ]);
+    expect(linksFor("O14")).toEqual([
+      {
+        title: "– รายงานผลการบริหารทรัพยากรบุคคล ประจำปีงบประมาณ 2568",
+        href: "/wp-content/uploads/ita2569/O14/o14_รายงานผลการบริหารทรัพยากรบุคคล_ประจำปีงบประมาณ2568(2).pdf",
+      },
+      {
+        title: "– รายงานผลการพัฒนาทรัพยากรบุคคล ประจำปีงบประมาณ 2568",
+        href: "/wp-content/uploads/ita2569/O14/o14_รายงานผลการพัฒนาทรัพยากรบุคคล_ประจำปีงบประมาณ2568(2).pdf",
+      },
+    ]);
+    expect(linksFor("O15")).toEqual([
+      {
+        title: "– o15 การลงนามปฏิญญาคุณธรรม",
+        href: "/wp-content/uploads/ita2569/O15/o15_การลงนามปฏิญญาคุณธรรม.pdf",
+      },
+      {
+        title: "– o15 กิจกรรมอบรมสอดแทรกสาระด้านจริยธรรมฯ",
+        href: "/wp-content/uploads/ita2569/O15/o15_กิจกรรมอบรมสอดแทรกสาระด้านจริยธรรมฯ.pdf",
+      },
+      {
+        title: "– o15 ข้อบังคับ คกก สทร ว่าด้วยประมวลจริยธรรมในการปฏิบัติงาน 2565",
+        href: "/wp-content/uploads/ita2569/O15/o15_ข้อบังคับ_คกก_สทร_ว่าด้วยประมวลจริยธรรมในการปฏิบัติงาน_2565.pdf",
+      },
+      {
+        title: "– o15 คำสั่งแต่งตั้งคณะทำงานขับเคลื่อนจริยธรรม 2569",
+        href: "/wp-content/uploads/ita2569/O15/o15_คำสั่งแต่งตั้งคณะทำงานขับเคลื่อนจริยธรรม_2569.pdf",
+      },
+      {
+        title: "– o15 สรุปสาระสำคัญ มาตรา 128 Infographic",
+        href: "/wp-content/uploads/ita2569/O15/o15_สรุปสาระสำคัญ_มาตรา_128_Infographic.png",
+      },
+      {
+        title: "– o15 สื่อ DO and Dont RTRDA",
+        href: "/wp-content/uploads/ita2569/O15/o15_สื่อ_DO_and_Dont_RTRDA.pdf",
+      },
+      {
+        title: "– o15 ข้อกำหนดว่าด้วยกระบวนการรักษาจริยธรรม",
+        href: "/wp-content/uploads/ita2569/O15/o15_ข้อกำหนดว่าด้วยกระบวนการรักษาจริยธรรม.pdf",
+      },
+      {
+        title: "– o15 ประมวลจริยธรรม",
+        href: "/wp-content/uploads/ita2569/O15/o15_ประมวลจริยธรรม.pdf",
+      },
+    ]);
+    expect(linksFor("O16")).toEqual([
+      {
+        title: "– o 16 แนวทางปฏิบัติ การจัดการเรื่องร้องเรียน",
+        href: "/wp-content/uploads/ita2569/O16/o_16_แนวทางปฏิบัติ_การจัดการเรื่องร้องเรียน.pdf",
+      },
+    ]);
+    expect(linksFor("O17")).toEqual([
+      {
+        title: "– ตัวอย่าง ช่องทางแจ้งเรื่องร้องเรียนการทุจริตและประพฤติมิชอบ",
+        href: "/wp-content/uploads/ita2569/O17/o17_ตัวอย่าง_ชองทางแจ้งเรื่องร้องเรียนการทุจริตและประพฤติมิชอบ.pdf",
+      },
+      {
+        title: "– ช่องทางแจ้งร้องเรียนฯ สำนักงาน ป.ป.ช.",
+        href: "https://wbs.nacc.go.th/",
+      },
+      {
+        title: "– ช่องทางแจ้งร้องเรียนฯ สำนักงาน ป.ป.ท.",
+        href: "https://www.pacc.go.th/e-service/index.html",
+      },
+    ]);
+    expect(linksFor("O18")).toEqual([
+      {
+        title: "– รายงานข้อมูลสถิติเรื่องร้องเรียนการทุจร",
+        href: "/wp-content/uploads/ita2569/O18/รายงานข้อมูลสถิติเรื่องร้องเรียนการทุจร.pdf",
+      },
+      {
+        title: "– รายงานข้อมูลสถิติเรื่องร้องเรียนการทุจร (Excel)",
+        href: "/wp-content/uploads/ita2569/O18/รายงานข้อมูลสถิติเรื่องร้องเรียนการทุจร.xlsx",
+      },
+    ]);
+    expect(linksFor("O25")).toEqual([
+      {
+        title: "– นำผลการประเมิน ITA ไปสู่การพัฒนาองค์กร",
+        href: "/wp-content/uploads/ita2569/O25/นำผลการประเมิน_ITA_ไปสู่การพัฒนาองค์กร.pdf",
+      },
+    ]);
     const o10StatsLink = section2024Node
       .find("a")
       .toArray()
@@ -201,9 +355,67 @@ describe("applyItaHeadingsOverride", () => {
         "/wp-content/uploads/ita2569/O10/ข้อมูลสถิติการขอรับบริการผ่านช่องทางออนไลน์(E-service).pdf",
       );
     }
+    const o12Heading = section2024Node
+      .find("p")
+      .toArray()
+      .find((element) => $after(element).text().trim().startsWith("O12 "));
+    expect(o12Heading).toBeDefined();
+    if (o12Heading) {
+      const o12Links: Array<{ title: string; href: string | undefined }> = [];
+      let next = $after(o12Heading).next();
+      while (next.length) {
+        if (next.is("p") && /^O\d+\b/.test(next.text().trim())) {
+          break;
+        }
+        const link = next.find("a").first();
+        if (link.length) {
+          o12Links.push({ title: link.text().trim(), href: link.attr("href") });
+        }
+        next = next.next();
+      }
+
+      expect(o12Links.map((link) => link.title)).toEqual([
+        "– แบบสรุปผลการจัดซื้อจัดจ้าง ประจำปีงบประมาณ พ.ศ.2568",
+        "– 12.สขร.เดือน กันยายน 2568",
+        "– 12.สขร. เดือน กันยายน2568",
+        "– 11.สขร เดือน สิงหาคม 2568",
+        "– 11.สขร เดือน สิงหาคม 2568",
+        "– 10.สขร เดือน กรกฎาคม 2568",
+        "– 10.สขร เดือน กรกฎาคม 2568",
+        "– 9.สขร เดือน มิถุนายน 2568",
+        "– 9.สขร เดือน มิถุนายน 2568",
+        "– 8.สขร เดือน พฤษภาคม 2568",
+        "– 8.สขร เดือน พฤษภาคม 2568",
+        "– 7.สขร เดือน เมษายน 2568",
+        "– 7. สขร.เดือน เมษายน 2568",
+        "– 6.สขร เดือน มีนาคม 2568",
+        "– 6.สขร เดือน มีนาคม 2568",
+        "– 5.สขร.เดือน กุมภาพันธ์ 2568",
+        "– 5. สขร.เดือน กุมภาพันธ์ 2568",
+        "– 4.สขร.เดือน มกราคม 2568",
+        "– 4.สขร.เดือน มกราคม 2568",
+        "– 3.สขร. เดือน ธันวาคม2567",
+        "– 3.สขร.เดือน ธันวาคม 2567",
+        "– 2..สขร.เดือน พฤศจิกายน 2567",
+        "– 2.สขร.เดือน พฤศจิกายน 2567",
+        "– 1.สขร.เดือน ตุลาคม 2567",
+        "– 1.สขร.เดือน ตุลาคม 2567",
+      ]);
+      expect(o12Links[0]?.href).toBe(
+        "/wp-content/uploads/ita2569/O12/แบบสรุปผลการจัดซื้อจัดจ้าง_ประจำปีงบประมาณ_พ.ศ.2568.pdf",
+      );
+      expect(o12Links.at(-1)?.href).toBe(
+        "/wp-content/uploads/ita2569/O12/1.สขร.เดือน_ตุลาคม_2567.xlsx",
+      );
+    }
     expect(section2024Html).toContain("https://test.rtrda.or.th/");
-    expect(section2024Html).toContain("/sdc_download/ita2569-o15-07");
-    expect(section2024Html).toContain("/sdc_download/ita2569-o18-02");
+    expect(section2024Html).toContain(
+      "/wp-content/uploads/ita2569/O15/o15_ประมวลจริยธรรม.pdf",
+    );
+    expect(section2024Html).not.toContain("/sdc_download/ita2569-o15-");
+    expect(section2024Html).toContain(
+      "/wp-content/uploads/ita2569/O18/รายงานข้อมูลสถิติเรื่องร้องเรียนการทุจร.xlsx",
+    );
     expect(section2024Html).toContain("/sdc_download/ita2569-o21-01");
     expect(section2024Html).toContain("/sdc_download/ita2569-o22-01");
     expect(section2024Html).not.toContain("https://www.rtrda.or.th/en/");

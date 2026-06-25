@@ -1,4 +1,4 @@
-const ITA_O19_SUPPLEMENTAL_DOWNLOADS = [
+const ITA_2569_SUPPLEMENTAL_DOWNLOADS = [
   {
     id: "ita2569-o19-01",
     fileName: "แบบฟอร์มการมีส่วนร่วมo19_v3.pdf",
@@ -41,18 +41,32 @@ const ITA_O19_SUPPLEMENTAL_DOWNLOADS = [
     sizeBytes: 435085,
     title: "เอกสารประกอบที่ 6 รายงานการจัดทำประชาพิจารณ์",
   },
+  {
+    id: "ita2569-o21-01",
+    fileName: "การประเมินความเสี่ยงทุจริต_5_ขั้นตอน_ตามคู.pdf",
+    sizeBytes: 4773342,
+    title: "การประเมินความเสี่ยงทุจริต_5_ขั้นตอน_ตามคู",
+    group: "O21",
+  },
+  {
+    id: "ita2569-o22-01",
+    fileName: "รายงานผลการดำเนินงานตามแผนบริหารจัดการค.pdf",
+    sizeBytes: 642714,
+    title: "รายงานผลการดำเนินงานตามแผนบริหารจัดการค",
+    group: "O22",
+  },
 ].map((download) => ({
   ...download,
   sourceUrl: `https://www.rtrda.or.th/sdc_download/${download.id}/`,
   localPath: `/sdc-downloads/${download.id}.pdf`,
   mimeType: "application/pdf",
-  group: "O19",
+  group: download.group ?? "O19",
   sourcePages: ["/การประเมินคุณธรรมและคว"],
 }));
 
 function withSupplementalDownloads(downloads) {
   const existingIds = new Set(downloads.map((download) => download.id));
-  const supplemental = ITA_O19_SUPPLEMENTAL_DOWNLOADS.filter(
+  const supplemental = ITA_2569_SUPPLEMENTAL_DOWNLOADS.filter(
     (download) => !existingIds.has(download.id),
   );
 

@@ -33,6 +33,7 @@ import { applyBoardExecutiveOverride } from "@/lib/wp/board-executive-override";
 import { applyContactMapOverride } from "@/lib/wp/contact-map";
 import { applyItaHeadingsOverride } from "@/lib/wp/ita-headings-override";
 import { applyProcurementPlanOverride } from "@/lib/wp/procurement-plan";
+import { applyProcurementWinnerOverride } from "@/lib/wp/procurement-winner";
 import { normalizeRoutePath } from "@/lib/wp/url";
 import { extractPartnerLogos } from "@/lib/wp/home";
 import {
@@ -265,11 +266,12 @@ export const getPageData = cache(async (path: string): Promise<PageData | null> 
       applyProcurementPlanOverride(applyContactMapOverride(importedRecord)),
     ),
   );
+  const recordWithOverrides = applyProcurementWinnerOverride(record);
 
-  const isHome = record.path === "/" || record.path === "/en";
-  const isCategory = record.kind === "category";
-  const isKnowledgeDocuments = isKnowledgeDocumentPath(record.path);
-  const isRailStandards = isRailStandardsPath(record.path);
+  const isHome = recordWithOverrides.path === "/" || recordWithOverrides.path === "/en";
+  const isCategory = recordWithOverrides.kind === "category";
+  const isKnowledgeDocuments = isKnowledgeDocumentPath(recordWithOverrides.path);
+  const isRailStandards = isRailStandardsPath(recordWithOverrides.path);
   const [
     childRecords,
     siblingRecords,
@@ -279,16 +281,16 @@ export const getPageData = cache(async (path: string): Promise<PageData | null> 
     pdfReaderTargets,
     downloadIds,
   ] = await Promise.all([
-    getChildren(record.path, record.language),
-    record.parentPath
-      ? getChildren(record.parentPath, record.language)
+    getChildren(recordWithOverrides.path, recordWithOverrides.language),
+    recordWithOverrides.parentPath
+      ? getChildren(recordWithOverrides.parentPath, recordWithOverrides.language)
       : Promise.resolve([]),
-    isHome && !hasImportedLatestPosts(record)
-      ? getLatestPosts(record.language)
+    isHome && !hasImportedLatestPosts(recordWithOverrides)
+      ? getLatestPosts(recordWithOverrides.language)
       : Promise.resolve([]),
     buildShellData(path),
-    isHome ? buildHomeData(record) : Promise.resolve(null),
-    buildPdfReaderTargets(record.contentHtml, {
+    isHome ? buildHomeData(recordWithOverrides) : Promise.resolve(null),
+    buildPdfReaderTargets(recordWithOverrides.contentHtml, {
       resolveDownload: getDownloadById,
       resolveFlipbookPdf: async (flipbookPath) => {
         const flipbook = await getRecordByPath(flipbookPath);
@@ -302,38 +304,43 @@ export const getPageData = cache(async (path: string): Promise<PageData | null> 
     ? [...buildHighSpeedRailPdfReaderTargets(), ...pdfReaderTargets]
     : pdfReaderTargets;
 
-  const parentRecord = record.parentPath
-    ? await getRecordByPath(record.parentPath)
+  const parentRecord = recordWithOverrides.parentPath
+    ? await getRecordByPath(recordWithOverrides.parentPath)
     : null;
   const [children, latest, newsCards, categoryPagination] = await Promise.all([
     fetchCards(childRecords),
     fetchCards(latestRecords),
-    isCategory ? fetchCategoryNewsCards(record) : Promise.resolve([]),
-    isCategory ? fetchCategoryPagination(record) : Promise.resolve(null),
+    isCategory ? fetchCategoryNewsCards(recordWithOverrides) : Promise.resolve([]),
+    isCategory ? fetchCategoryPagination(recordWithOverrides) : Promise.resolve(null),
   ]);
 
   return {
-    record,
+    record: recordWithOverrides,
     children,
     latest,
     newsCards,
     categoryPagination,
     home,
     knowledgeDocuments: isKnowledgeDocuments
-      ? buildKnowledgeDocumentGroups(record.contentHtml, {
+      ? buildKnowledgeDocumentGroups(recordWithOverrides.contentHtml, {
           validDownloadIds: new Set(downloadIds),
         })
       : null,
     boardExecutivePresentation: buildBoardExecutivePresentation(
-      record.path,
-      record.contentHtml,
+      recordWithOverrides.path,
+      recordWithOverrides.contentHtml,
     ),
     pdfReaderTargets: pagePdfReaderTargets,
     sidebarItems:
-      record.kind === "page"
-        ? buildSidebarItems(record, childRecords, siblingRecords, shell.navItems)
+      recordWithOverrides.kind === "page"
+        ? buildSidebarItems(
+            recordWithOverrides,
+            childRecords,
+            siblingRecords,
+            shell.navItems,
+          )
         : [],
-    parentTitle: parentRecord?.title ?? record.title,
+    parentTitle: parentRecord?.title ?? recordWithOverrides.title,
     shell,
   };
 });

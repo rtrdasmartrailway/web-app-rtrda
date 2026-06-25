@@ -162,7 +162,30 @@ describe("manifestToRows", () => {
     });
   });
 
-  it("does not duplicate supplemental ITA 2569 O19 downloads from the manifest", () => {
+  it("adds supplemental ITA 2569 O21 and O22 downloads", () => {
+    expect(rows.downloads).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: "ita2569-o21-01",
+          localPath: "/sdc-downloads/ita2569-o21-01.pdf",
+          fileName: "การประเมินความเสี่ยงทุจริต_5_ขั้นตอน_ตามคู.pdf",
+          mimeType: "application/pdf",
+          group: "O21",
+          sourcePages: ["/การประเมินคุณธรรมและคว"],
+        }),
+        expect.objectContaining({
+          id: "ita2569-o22-01",
+          localPath: "/sdc-downloads/ita2569-o22-01.pdf",
+          fileName: "รายงานผลการดำเนินงานตามแผนบริหารจัดการค.pdf",
+          mimeType: "application/pdf",
+          group: "O22",
+          sourcePages: ["/การประเมินคุณธรรมและคว"],
+        }),
+      ]),
+    );
+  });
+
+  it("does not duplicate supplemental ITA 2569 downloads from the manifest", () => {
     const rowsWithExistingO19 = manifestToRows({
       ...manifest,
       downloads: [
@@ -178,12 +201,28 @@ describe("manifestToRows", () => {
           group: "O19",
           sourcePages: ["/existing"],
         },
+        {
+          id: "ita2569-o21-01",
+          sourceUrl: "https://www.rtrda.or.th/sdc_download/ita2569-o21-01/",
+          localPath: "/sdc-downloads/ita2569-o21-01.pdf",
+          fileName: "existing-o21.pdf",
+          mimeType: "application/pdf",
+          sizeBytes: 1,
+          title: "existing O21",
+          group: "O21",
+          sourcePages: ["/existing"],
+        },
       ],
     });
 
     expect(
       rowsWithExistingO19.downloads.filter(
         (download) => download.id === "ita2569-o19-01",
+      ),
+    ).toHaveLength(1);
+    expect(
+      rowsWithExistingO19.downloads.filter(
+        (download) => download.id === "ita2569-o21-01",
       ),
     ).toHaveLength(1);
   });
