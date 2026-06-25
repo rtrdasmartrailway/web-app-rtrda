@@ -365,7 +365,14 @@ async function fetchCategoryNewsCards(record: WpContentRecord): Promise<Card[]> 
     await Promise.all(newsPaths.map((p) => getRecordByPath(normalizeRoutePath(p))))
   ).filter((r): r is WpContentRecord => r !== null);
 
-  return fetchCards(newsRecords);
+  return fetchCards(sortCategoryNewsByDateDesc(newsRecords));
+}
+
+/** Sort category news records by date descending (newest first). */
+export function sortCategoryNewsByDateDesc(
+  records: WpContentRecord[],
+): WpContentRecord[] {
+  return [...records].sort((a, b) => b.date.localeCompare(a.date));
 }
 
 /**

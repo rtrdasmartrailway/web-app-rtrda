@@ -1,7 +1,12 @@
 import { describe, expect, it } from "vitest";
 import type { PresentationNavItem } from "@/lib/wp/presentation";
 import type { WpContentRecord } from "@/lib/wp/types";
-import { buildSidebarItems, deriveCounterpartCandidate, toCards } from "./page-data";
+import {
+  buildSidebarItems,
+  deriveCounterpartCandidate,
+  sortCategoryNewsByDateDesc,
+  toCards,
+} from "./page-data";
 
 function record(overrides: Partial<WpContentRecord>): WpContentRecord {
   return {
@@ -134,6 +139,34 @@ describe("buildSidebarItems", () => {
 
   it("is empty for top-level pages without children", () => {
     expect(buildSidebarItems(record({}), [], [])).toEqual([]);
+  });
+});
+
+describe("sortCategoryNewsByDateDesc", () => {
+  it("orders records by date descending (newest first)", () => {
+    const records = [
+      record({ id: "old", date: "2026-02-24T00:00:00" }),
+      record({ id: "newest", date: "2026-06-09T02:43:33" }),
+      record({ id: "middle", date: "2026-05-14T16:57:50" }),
+    ];
+
+    expect(sortCategoryNewsByDateDesc(records).map((entry) => entry.id)).toEqual([
+      "newest",
+      "middle",
+      "old",
+    ]);
+  });
+
+  it("does not mutate the input array", () => {
+    const records = [
+      record({ id: "a", date: "2026-02-24T00:00:00" }),
+      record({ id: "b", date: "2026-06-09T02:43:33" }),
+    ];
+    const before = records.map((entry) => entry.id);
+
+    sortCategoryNewsByDateDesc(records);
+
+    expect(records.map((entry) => entry.id)).toEqual(before);
   });
 });
 
