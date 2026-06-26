@@ -107,8 +107,11 @@ describe("applyBoardExecutiveOverride", () => {
     expect(image.attr("srcset")).toBeUndefined();
     expect(image.attr("sizes")).toBeUndefined();
     expect(heading.text()).toBe(CHAIYUT_NAME);
-    expect(role.text()).toBe("ผู้จัดการกลุ่มบริหารภายใน");
-    expect(role.find('a[href^="mailto:"]').length).toBe(0);
+    expect(role.text()).toBe(
+      "ผู้จัดการกลุ่มบริหารภายใน (รักษาการแทน)อีเมล: chaiwooth.t@rtrda.or.th",
+    );
+    expect(role.find('a[href^="mailto:"]').length).toBe(1);
+    expect(role.find("a").attr("href")).toBe("mailto:chaiwooth.t@rtrda.or.th");
   });
 
   it("does not duplicate Chaiyut on the entrepreneur card", () => {

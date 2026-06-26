@@ -11,10 +11,11 @@ const NEW_EMAIL = "touchakorn.t@rtrda.or.th";
 export const TACHAKORN_IMAGE_SRC =
   "/wp-content/uploads/2025/10/ธัชกร-ธนวัฒนาดำรง-ผู้จัดการกลุ่มวิจัยและมาตรฐาน.jpg";
 const ADMIN_ROLE = "ผู้จัดการกลุ่มบริหารภายใน";
+const ADMIN_ROLE_DISPLAY = "ผู้จัดการกลุ่มบริหารภายใน (รักษาการแทน)";
 export const CHAIYUT_NAME = "ชัยวุฒิ ตันไชย";
+const CHAIYUT_EMAIL = "chaiwooth.t@rtrda.or.th";
 export const CHAIYUT_IMAGE_SRC =
   "/wp-content/uploads/2025/10/ชัยวุฒิ-ตันไชย-ผู้จัดการกลุ่มพัฒนาผู้ประกอบการและธุรกิจใหม่.jpg";
-const ADMIN_OLD_EMAIL_LINK_SELECTOR = 'a[href^="mailto:"]';
 
 function compactText(value: string): string {
   return value.replace(/\s+/g, " ").trim();
@@ -70,9 +71,10 @@ function rewriteAdminColumn($: cheerio.CheerioAPI, element: AnyNode): boolean {
   heading.text(CHAIYUT_NAME);
 
   role.empty();
-  role.append(ADMIN_ROLE);
-
-  column.find(ADMIN_OLD_EMAIL_LINK_SELECTOR).remove();
+  role.append(ADMIN_ROLE_DISPLAY);
+  role.append("<br>");
+  role.append("อีเมล: ");
+  role.append(`<a href="mailto:${CHAIYUT_EMAIL}">${CHAIYUT_EMAIL}</a>`);
 
   return true;
 }

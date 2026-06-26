@@ -56,7 +56,7 @@ describe("board executive parser", () => {
       "ผู้จัดการกลุ่มพัฒนาผู้ประกอบการและธุรกิจใหม่",
       "ผู้จัดการกลุ่มพัฒนาดิจิทัลระบบราง",
       "ผู้จัดการกลุ่มกลยุทธ์และสื่อสารองค์กร",
-      "ผู้จัดการกลุ่มบริหารภายใน",
+      "ผู้จัดการกลุ่มบริหารภายใน (รักษาการแทน)",
     ]);
     expect(presentation?.chart.generalManagers[0]).toMatchObject({
       name: "ธัชกร ธนวัฒนาดำรง",
@@ -105,10 +105,10 @@ describe("board executive parser", () => {
       vacant: true,
     });
 
-    expect(gmByRole.get("ผู้จัดการกลุ่มบริหารภายใน")).toMatchObject({
+    expect(gmByRole.get("ผู้จัดการกลุ่มบริหารภายใน (รักษาการแทน)")).toMatchObject({
       name: CHAIYUT_NAME,
       imageSrc: CHAIYUT_IMAGE_SRC,
-      email: null,
+      email: "chaiwooth.t@rtrda.or.th",
       vacant: false,
     });
 
