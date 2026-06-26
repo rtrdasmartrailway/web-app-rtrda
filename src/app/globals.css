@@ -580,10 +580,7 @@ a.language-toggle-item:hover {
 
 .home-hero {
   background: #06101f;
-}
-
-.home-hero .hero-inner {
-  z-index: 3;
+  min-height: min(56vw, 560px);
 }
 
 .home-hero::before {
@@ -694,11 +691,6 @@ a.language-toggle-item:hover {
   z-index: 1;
 }
 
-.home-hero .hero-inner {
-  min-height: 480px;
-  padding-bottom: 86px;
-}
-
 .breadcrumb {
   align-items: center;
   color: var(--on-dark-muted);
@@ -785,62 +777,6 @@ a.language-toggle-item:hover {
   height: 8px;
   transform: rotate(45deg);
   width: 8px;
-}
-
-/* Home hero search + stats band */
-.home-hero-actions {
-  background: rgba(6, 13, 29, 0.42);
-  backdrop-filter: blur(14px);
-  border: 1px solid rgba(255, 255, 255, 0.16);
-  border-radius: 22px;
-  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.22);
-  display: grid;
-  gap: 16px;
-  margin-top: 30px;
-  max-width: 660px;
-  padding: 16px;
-}
-
-.home-search {
-  align-items: stretch;
-  background: rgba(255, 255, 255, 0.14);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  border-radius: var(--radius-md);
-  display: flex;
-  margin: 0;
-  max-width: none;
-  overflow: hidden;
-}
-
-.home-search input {
-  background: transparent;
-  border: 0;
-  color: #fff;
-  flex: 1;
-  min-width: 0;
-  padding: 16px 18px;
-}
-
-.home-search input::placeholder {
-  color: var(--on-dark-muted);
-}
-
-.home-search button {
-  background: var(--rail-gradient);
-  border: 0;
-  color: #fff;
-  font-weight: 700;
-  padding: 0 26px;
-}
-
-.hero-cta-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 14px;
-}
-
-.hero-cta-row .hero-button {
-  margin-top: 0;
 }
 
 .hero-button.secondary {
@@ -5384,31 +5320,12 @@ a.calendar-cell.has-posts:hover {
   .hero-inner,
   .home-hero .hero-inner {
     min-height: 340px;
-    padding-bottom: 96px;
+    padding-bottom: 44px;
     padding-top: 44px;
   }
 
-  .home-hero-actions {
-    border-radius: 18px;
-    margin-top: 24px;
-    padding: 12px;
-  }
-
-  .home-search {
-    flex-direction: column;
-  }
-
-  .home-search button {
-    min-height: 44px;
-  }
-
-  .hero-cta-row {
-    flex-direction: column;
-  }
-
-  .hero-cta-row .hero-button {
-    justify-content: space-between;
-    width: 100%;
+  .home-hero {
+    min-height: clamp(280px, 68vw, 420px);
   }
 
   .home-hero-nav {

@@ -89,62 +89,20 @@ export function ContentPage({ data }: { data: PageData }) {
       <article className={pageClassName}>
         <section className={`page-hero ${isHome ? "home-hero" : ""}`}>
           {isHome ? <HomeHeroSlider /> : null}
-          <div className="site-container hero-inner">
-            <p className="breadcrumb">
-              <Link href={record.language === "th" ? "/" : "/en"}>
-                {record.language === "th" ? "หน้าแรก" : "Home"}
-              </Link>
-              {!isHome ? <span> / {record.title}</span> : null}
-            </p>
-            <h1>{record.title}</h1>
-            {record.kind === "post" && dateText ? (
-              <time dateTime={record.date}>{dateText}</time>
-            ) : null}
-            {isHome ? (
-              <div className="home-hero-actions">
-                <form
-                  action="/search"
-                  className="home-search"
-                  role="search"
-                  aria-label={
-                    record.language === "th" ? "ค้นหางานวิจัย" : "Search research"
-                  }
-                >
-                  <input
-                    name="q"
-                    type="search"
-                    placeholder={
-                      record.language === "th"
-                        ? "ค้นหางานวิจัย เอกสาร และข่าวสาร…"
-                        : "Search research, documents and news…"
-                    }
-                    aria-label={record.language === "th" ? "ค้นหา" : "Search"}
-                  />
-                  {record.language === "en" ? (
-                    <input type="hidden" name="lang" value="en" />
-                  ) : null}
-                  <button type="submit">
-                    {record.language === "th" ? "ค้นหา" : "Search"}
-                  </button>
-                </form>
-                <div className="hero-cta-row">
-                  <a className="hero-button" href="#main-content">
-                    {record.language === "th" ? "ดูข้อมูลล่าสุด" : "Explore Content"}
-                    <span aria-hidden="true" />
-                  </a>
-                  <Link
-                    className="hero-button secondary"
-                    href={
-                      record.language === "th" ? "/เอกสารเผยแพร่" : "/en/เอกสารเผยแพร่"
-                    }
-                  >
-                    {record.language === "th" ? "เอกสารเผยแพร่" : "Publications"}
-                    <span aria-hidden="true" />
-                  </Link>
-                </div>
-              </div>
-            ) : null}
-          </div>
+          {!isHome ? (
+            <div className="site-container hero-inner">
+              <p className="breadcrumb">
+                <Link href={record.language === "th" ? "/" : "/en"}>
+                  {record.language === "th" ? "หน้าแรก" : "Home"}
+                </Link>
+                <span> / {record.title}</span>
+              </p>
+              <h1>{record.title}</h1>
+              {record.kind === "post" && dateText ? (
+                <time dateTime={record.date}>{dateText}</time>
+              ) : null}
+            </div>
+          ) : null}
         </section>
 
         <div
