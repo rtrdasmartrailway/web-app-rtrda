@@ -7,6 +7,7 @@ import { BoardExecutiveContent } from "./board-executive-org-chart";
 import { CategoryNewsListing } from "./category-news-listing";
 import { CategoryPagination } from "./category-pagination";
 import { HighSpeedRailStandardsContent } from "./high-speed-rail-standards";
+import { HomeHeroSlider } from "./home-hero-slider";
 import { HomeSections } from "./home/home-sections";
 import { KnowledgeDocuments } from "./knowledge-documents";
 import { PdfReader } from "./pdf-reader";
@@ -87,6 +88,7 @@ export function ContentPage({ data }: { data: PageData }) {
     <SiteShell shell={data.shell}>
       <article className={pageClassName}>
         <section className={`page-hero ${isHome ? "home-hero" : ""}`}>
+          {isHome ? <HomeHeroSlider /> : null}
           <div className="site-container hero-inner">
             <p className="breadcrumb">
               <Link href={record.language === "th" ? "/" : "/en"}>
