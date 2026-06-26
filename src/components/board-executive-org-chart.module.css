@@ -101,15 +101,27 @@
   align-items: center;
   background: rgba(248, 251, 255, 0.96);
   border-style: dashed;
+  gap: 12px;
   justify-content: center;
   min-height: 180px;
+  padding: 22px 18px;
 }
 
 .emptyLabel {
   color: var(--navy-900);
-  font-size: calc(18px * var(--reader-scale));
+  font-size: calc(20px * var(--reader-scale));
   font-weight: 850;
+  line-height: 1.3;
+  text-align: center;
+}
+
+.vacant .role {
+  color: var(--accent-deep);
+  font-size: calc(13.5px * var(--reader-scale));
+  font-weight: 750;
   line-height: 1.4;
+  margin: 0;
+  text-align: center;
 }
 
 .portrait {

@@ -42,6 +42,7 @@ function PersonCard({
     return (
       <article className={`${styles.card} ${styles.vacant}`}>
         <span className={styles.emptyLabel}>{text.empty}</span>
+        <p className={styles.role}>{person.role}</p>
       </article>
     );
   }

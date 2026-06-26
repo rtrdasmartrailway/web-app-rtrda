@@ -154,8 +154,9 @@ describe("board executive parser", () => {
     expect(vacantCards).toHaveLength(4);
     for (const card of vacantCards) {
       expect(card).toContain("(ว่าง)");
-      expect(card).not.toContain("รองผู้อำนวยการ");
-      expect(card).not.toContain("ผู้จัดการกลุ่ม");
+      expect(card).toMatch(
+        /รองผู้อำนวยการ|ผู้จัดการกลุ่มพัฒนาดิจิทัลระบบราง|ผู้จัดการกลุ่มกลยุทธ์และสื่อสารองค์กร/,
+      );
       expect(card).not.toContain("รอการแต่งตั้ง");
       expect(card).not.toContain("Email");
       expect(card).not.toContain("mailto:");
