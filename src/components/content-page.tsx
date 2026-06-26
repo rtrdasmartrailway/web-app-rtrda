@@ -101,7 +101,7 @@ export function ContentPage({ data }: { data: PageData }) {
               <time dateTime={record.date}>{dateText}</time>
             ) : null}
             {isHome ? (
-              <>
+              <div className="home-hero-actions">
                 <form
                   action="/search"
                   className="home-search"
@@ -142,7 +142,7 @@ export function ContentPage({ data }: { data: PageData }) {
                     <span aria-hidden="true" />
                   </Link>
                 </div>
-              </>
+              </div>
             ) : null}
           </div>
         </section>
