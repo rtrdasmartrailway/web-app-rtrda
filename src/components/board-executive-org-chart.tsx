@@ -36,32 +36,25 @@ function PersonCard({
   showSubUnitsButton?: boolean;
 }) {
   const text = labels(language);
-  const displayName = person.vacant ? (hideVacantLabel ? "" : text.vacant) : person.name;
-
-  if (person.vacant) {
-    return (
-      <article className={`${styles.card} ${styles.vacant}`}>
-        <span className={styles.emptyLabel}>{text.empty}</span>
-        <p className={styles.role}>{person.role}</p>
-      </article>
-    );
-  }
+  const displayName = person.vacant ? (hideVacantLabel ? "" : text.empty) : person.name;
+  const showImage = !person.vacant && Boolean(person.imageSrc);
+  const showContact = !hideVacantLabel;
 
   return (
-    <article className={styles.card}>
+    <article className={`${styles.card} ${person.vacant ? styles.vacant : ""}`}>
       <div className={styles.portrait}>
-        {person.imageSrc ? (
+        {showImage ? (
           <Image
-            src={person.imageSrc}
+            src={person.imageSrc as string}
             alt={person.imageAlt || displayName}
             className={styles.image}
             fill
             sizes="(max-width: 720px) 170px, 180px"
             unoptimized
           />
-        ) : hideVacantLabel ? null : (
+        ) : (
           <span aria-hidden="true" className={styles.placeholder}>
-            {text.vacant}
+            {text.empty}
           </span>
         )}
       </div>
@@ -69,7 +62,7 @@ function PersonCard({
         {displayName ? <h3>{displayName}</h3> : null}
         <p className={styles.role}>{person.role}</p>
       </div>
-      {person.vacant && hideVacantLabel ? null : (
+      {showContact ? (
         <dl className={styles.contact}>
           <div>
             <dt>{text.email}</dt>
@@ -82,8 +75,8 @@ function PersonCard({
             </dd>
           </div>
         </dl>
-      )}
-      {showSubUnitsButton ? (
+      ) : null}
+      {showSubUnitsButton && !person.vacant ? (
         <div className={styles.subUnitsButtonWrap}>
           <ManagerSubUnitsButton role={person.role} language={language} />
         </div>

@@ -137,7 +137,7 @@ describe("board executive parser", () => {
     expect(html).not.toContain("รายละเอียด");
   });
 
-  it("renders vacant cards with only the empty label", async () => {
+  it("renders vacant cards with the full card structure", async () => {
     const record = await boardRecord();
     const presentation = buildBoardExecutivePresentation(record.path, record.contentHtml);
     expect(presentation).not.toBeNull();
@@ -152,14 +152,26 @@ describe("board executive parser", () => {
 
     const vacantCards = html.match(/<article[^>]*_vacant[^>]*>.*?<\/article>/g) ?? [];
     expect(vacantCards).toHaveLength(4);
+    const managerRoles = new Set([
+      "ผู้จัดการกลุ่มพัฒนาดิจิทัลระบบราง",
+      "ผู้จัดการกลุ่มกลยุทธ์และสื่อสารองค์กร",
+    ]);
     for (const card of vacantCards) {
       expect(card).toContain("(ว่าง)");
-      expect(card).toMatch(
-        /รองผู้อำนวยการ|ผู้จัดการกลุ่มพัฒนาดิจิทัลระบบราง|ผู้จัดการกลุ่มกลยุทธ์และสื่อสารองค์กร/,
-      );
+      const roleMatch = card.match(/_(role_[^"]+)">([^<]+)</);
+      expect(roleMatch).not.toBeNull();
+      const role = roleMatch?.[2] ?? "";
       expect(card).not.toContain("รอการแต่งตั้ง");
-      expect(card).not.toContain("Email");
+      expect(card).not.toMatch(/<img/);
       expect(card).not.toContain("mailto:");
+      expect(card).not.toContain("manager-sub-units-trigger");
+      if (managerRoles.has(role)) {
+        expect(card).toContain("Email");
+        expect(card).toMatch(/<dd[^>]*>-<\/dd>/);
+      } else {
+        expect(card).not.toContain("Email");
+        expect(card).not.toContain("mailto:");
+      }
     }
   });
 
