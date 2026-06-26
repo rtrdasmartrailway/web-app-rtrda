@@ -579,16 +579,16 @@ a.language-toggle-item:hover {
 }
 
 .home-hero {
-  background: #06101f;
-  min-height: min(56vw, 560px);
+  background: #fff;
+  height: clamp(240px, 31.6vw, 600px);
 }
 
 .home-hero::before {
-  z-index: 2;
+  display: none;
 }
 
 .home-hero::after {
-  z-index: 4;
+  display: none;
 }
 
 .home-hero-slider,
@@ -600,28 +600,17 @@ a.language-toggle-item:hover {
 .home-hero-slider {
   overflow: hidden;
   pointer-events: none;
+  z-index: 0;
 }
 
 .home-hero-slides::after {
-  background:
-    linear-gradient(
-      110deg,
-      rgba(6, 13, 29, 0.94),
-      rgba(10, 22, 40, 0.84) 48%,
-      rgba(16, 35, 65, 0.44)
-    ),
-    radial-gradient(circle at 78% 45%, rgba(37, 99, 235, 0.26), transparent 42%);
-  content: "";
-  inset: 0;
-  pointer-events: none;
-  position: absolute;
-  z-index: 1;
+  display: none;
 }
 
 .home-hero-slide {
-  object-fit: cover;
+  object-fit: contain;
   opacity: 0;
-  transform: translateX(4%) scale(1.03);
+  transform: translateX(3%);
   transition:
     opacity 900ms ease,
     transform 1200ms ease;
@@ -629,13 +618,13 @@ a.language-toggle-item:hover {
 
 .home-hero-slide.is-active {
   opacity: 1;
-  transform: translateX(0) scale(1);
+  transform: translateX(0);
 }
 
 .home-hero-nav {
   align-items: center;
-  background: rgba(6, 13, 29, 0.48);
-  border: 1px solid rgba(255, 255, 255, 0.24);
+  background: rgba(0, 52, 113, 0.44);
+  border: 1px solid rgba(255, 255, 255, 0.7);
   border-radius: 999px;
   color: #fff;
   cursor: pointer;
@@ -644,7 +633,8 @@ a.language-toggle-item:hover {
   justify-content: center;
   pointer-events: auto;
   position: absolute;
-  bottom: 32px;
+  top: 50%;
+  transform: translateY(-50%);
   transition:
     background 180ms ease,
     border-color 180ms ease,
@@ -655,9 +645,9 @@ a.language-toggle-item:hover {
 
 .home-hero-nav:hover,
 .home-hero-nav:focus-visible {
-  background: rgba(37, 99, 235, 0.72);
+  background: rgba(0, 52, 113, 0.72);
   border-color: rgba(255, 255, 255, 0.58);
-  transform: scale(1.04);
+  transform: translateY(-50%) scale(1.04);
 }
 
 .home-hero-nav:focus-visible {
@@ -673,11 +663,11 @@ a.language-toggle-item:hover {
 }
 
 .home-hero-nav-prev {
-  right: max(74px, calc((100vw - var(--container)) / 2 + 68px));
+  left: 20px;
 }
 
 .home-hero-nav-next {
-  right: max(18px, calc((100vw - var(--container)) / 2 + 12px));
+  right: 20px;
 }
 
 .hero-inner {
@@ -5325,11 +5315,10 @@ a.calendar-cell.has-posts:hover {
   }
 
   .home-hero {
-    min-height: clamp(280px, 68vw, 420px);
+    height: clamp(150px, 42vw, 320px);
   }
 
   .home-hero-nav {
-    bottom: 24px;
     height: 38px;
     width: 38px;
   }
@@ -5339,11 +5328,11 @@ a.calendar-cell.has-posts:hover {
   }
 
   .home-hero-nav-prev {
-    right: 58px;
+    left: 10px;
   }
 
   .home-hero-nav-next {
-    right: 14px;
+    right: 10px;
   }
 
   .page-hero h1 {
