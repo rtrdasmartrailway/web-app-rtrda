@@ -98,8 +98,18 @@
 }
 
 .vacant {
+  align-items: center;
   background: rgba(248, 251, 255, 0.96);
   border-style: dashed;
+  justify-content: center;
+  min-height: 180px;
+}
+
+.emptyLabel {
+  color: var(--navy-900);
+  font-size: calc(18px * var(--reader-scale));
+  font-weight: 850;
+  line-height: 1.4;
 }
 
 .portrait {

@@ -12,11 +12,13 @@ function labels(language: WpLanguage) {
   return language === "th"
     ? {
         vacant: "รอการแต่งตั้ง",
+        empty: "(ว่าง)",
         email: "Email",
         noEmail: "-",
       }
     : {
         vacant: "Vacant",
+        empty: "(Vacant)",
         email: "Email",
         noEmail: "-",
       };
@@ -36,8 +38,16 @@ function PersonCard({
   const text = labels(language);
   const displayName = person.vacant ? (hideVacantLabel ? "" : text.vacant) : person.name;
 
+  if (person.vacant) {
+    return (
+      <article className={`${styles.card} ${styles.vacant}`}>
+        <span className={styles.emptyLabel}>{text.empty}</span>
+      </article>
+    );
+  }
+
   return (
-    <article className={`${styles.card} ${person.vacant ? styles.vacant : ""}`}>
+    <article className={styles.card}>
       <div className={styles.portrait}>
         {person.imageSrc ? (
           <Image

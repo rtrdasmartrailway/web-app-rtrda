@@ -132,13 +132,12 @@ describe("board executive parser", () => {
     expect(html).toContain("mailto:touchakorn.t@rtrda.or.th");
     expect(html).not.toContain("TEL");
     expect(html).not.toContain("082 204 2998 / 02 248 2988");
-    expect(html).toContain('aria-hidden="true"');
-    expect(html).toContain(">รอการแต่งตั้ง</span>");
+    expect(html).toContain(">(ว่าง)</span>");
     expect(html).not.toContain(">?</span>");
     expect(html).not.toContain("รายละเอียด");
   });
 
-  it("renders both deputy cards empty without vacant copy or contact text", async () => {
+  it("renders vacant cards with only the empty label", async () => {
     const record = await boardRecord();
     const presentation = buildBoardExecutivePresentation(record.path, record.contentHtml);
     expect(presentation).not.toBeNull();
@@ -151,12 +150,12 @@ describe("board executive parser", () => {
       }),
     );
 
-    const deputyCards =
-      html.match(
-        /<article[^>]*_vacant[^>]*><div class="[^"]*_portrait[^"]*"><\/div><div class="[^"]*_copy[^"]*"><p class="[^"]*_role[^"]*">รองผู้อำนวยการ<\/p><\/div><\/article>/g,
-      ) ?? [];
-    expect(deputyCards).toHaveLength(2);
-    for (const card of deputyCards) {
+    const vacantCards = html.match(/<article[^>]*_vacant[^>]*>.*?<\/article>/g) ?? [];
+    expect(vacantCards).toHaveLength(4);
+    for (const card of vacantCards) {
+      expect(card).toContain("(ว่าง)");
+      expect(card).not.toContain("รองผู้อำนวยการ");
+      expect(card).not.toContain("ผู้จัดการกลุ่ม");
       expect(card).not.toContain("รอการแต่งตั้ง");
       expect(card).not.toContain("Email");
       expect(card).not.toContain("mailto:");
@@ -181,13 +180,13 @@ describe("board executive parser", () => {
     expect(html).toContain("lightweight-accordion-body");
     expect(html).toContain("<details>");
     expect(html).not.toContain('<details open="">');
-    expect(html).toContain("รอการแต่งตั้ง");
+    expect(html).toContain("(ว่าง)");
     expect(html).toContain("ธัชกร ธนวัฒนาดำรง");
     expect(html).not.toContain("082 204 2998 / 02 248 2988");
     expect(html).not.toContain("ผู้อำนวยการ<br");
   });
 
-  it("renders the sub-units เพิ่มเติม trigger on every manager card", async () => {
+  it("renders the sub-units เพิ่มเติม trigger on filled manager cards", async () => {
     const record = await boardRecord();
     const presentation = buildBoardExecutivePresentation(record.path, record.contentHtml);
     expect(presentation).not.toBeNull();
@@ -199,7 +198,7 @@ describe("board executive parser", () => {
     );
 
     const matches = html.match(/manager-sub-units-trigger/g) ?? [];
-    expect(matches.length).toBe(5);
+    expect(matches.length).toBe(3);
     expect(html).toContain("เพิ่มเติม");
   });
 });
