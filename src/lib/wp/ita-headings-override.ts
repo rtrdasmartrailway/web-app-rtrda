@@ -502,8 +502,12 @@ const ITA_LINK_OVERRIDES: ReadonlyArray<{
     marker: "O22",
     links: [
       {
-        title: "รายงานผลการดำเนินงานตามแผนบริหารจัดการค",
+        title: "ด้านที่ 2 .รายงานผลด้านการใช้อำนาจตำแหน่งห",
         href: sdcDownloadHref("ita2569-o22-01"),
+      },
+      {
+        title: "ด้านที่ 4.รายงานผล งานบุคคล ปี 2568",
+        href: sdcDownloadHref("ita2569-o22-02"),
       },
     ],
   },
