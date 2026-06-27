@@ -30,6 +30,8 @@ function fixtureContent(): string {
   const oldHeadings = [
     "O3 ข้อมูลการติดต่อ",
     "O4 ข่าวประชาสัมพันธ์",
+    "O8 คู่มือหรือแนวทางการปฏิบัติงานของเจ้าหน้าที่",
+    "O9 คู่มือหรือแนวทางการขอรับบริการสำหรับผู้รับบริการหรือผู้มาติดต่อ",
     "O10 E–Service",
     "O11 ข้อมูลสถิติการให้บริการ",
     "O12 รายการการจัดซื้อจัดจ้างหรือการจัดหาพัสดุ และความก้าวหน้าการจัดซื้อจัดจ้างหรือการจัดหาพัสดุ",
@@ -190,6 +192,8 @@ describe("applyItaHeadingsOverride", () => {
       "ข้อมูลสถิติการขอรับบริการผ่านช่องทางออนไลน์(E-service)",
     );
     expect(section2024).not.toContain("– Analytics");
+    expect(section2024).not.toContain("Messenger Live Chat");
+    expect(section2023).toContain("Messenger Live Chat");
     const linksFor = (
       marker: string,
     ): Array<{ title: string; href: string | undefined }> => {
@@ -227,6 +231,41 @@ describe("applyItaHeadingsOverride", () => {
         href: "/สทร-เดินหน้ายกระดับองค์กรโปร่งใส-จัดโครงการพัฒนาและเพิ่มประสิทธิภาพการประเมิน-ITA-ประจำปี-2569",
       },
     ]);
+    expect(linksFor("O3")).toEqual([
+      {
+        title: "– ช่องทางการติดต่อ",
+        href: "/ติดต่อเรา/ช่องทางการติดต่อ",
+      },
+    ]);
+    expect(linksFor("O8")).toEqual([
+      {
+        title: "– คู่มือการปฏิบัติงาน การรับ-ส่งหนังสือที่เป็นข้อมูลข่าวสารลับ",
+        href: "/wp-content/uploads/ita2569/O8/1.wi_ข้อมูลข่าวสารลับสำนักอำนวยการ_ปรียามิต.docx",
+      },
+      {
+        title: "– คู่มือ การจัดการเรื่องร้องเรียนการทุจริตและประพฤติมิชอบ",
+        href: "/wp-content/uploads/ita2569/O8/คู่มือ_จนท._เรื่องการจัดการเรื่องร้องเรีย.pdf",
+      },
+      {
+        title: "– คู่มือ การจัดการเรื่องร้องเรียนแจ้งเบาะแส",
+        href: "/wp-content/uploads/ita2569/O8/คู่มือ_จนท._เรื่องปฏิบัติการจัดการเรื่องร.pdf",
+      },
+      {
+        title: "– คู่มือการปฏิบัติงานศูนย์ข้อมูลข่าวสาร สทร. (ฉบับปรับปรุง พ.ศ. 2569)",
+        href: "/wp-content/uploads/ita2569/O8/คู่มือการปฏิบัติงานศูนย์ข้อมูลข่าวสาร_สทร._ฉบับปรับปรุง_พ.ศ._2569_.pdf",
+      },
+    ]);
+    expect(linksFor("O9")).toEqual([
+      {
+        title: "– คู่มือการให้บริการการยืมครุภัณฑ์บุคคลภายนอก",
+        href: "/wp-content/uploads/ita2569/O9/09คู่มือ_การยืมทรัพย์สินทางราชการ_บุคคลภาย.pdf",
+      },
+      {
+        title: "– คู่มือการให้บริการข้อมูลข่าวสารของ สทร. (ฉบับปรับปรุง)",
+        href: "/wp-content/uploads/ita2569/O9/09คู่มือการให้บริการข้อมูลข่าวสารของ_สทร._.pdf",
+      },
+    ]);
+    expect(section2024).not.toContain("Mobile-Lab-v7-Final");
     expect(linksFor("O11")).toEqual([
       {
         title: "– O11 ไตรมาสที่ 1",
@@ -341,6 +380,12 @@ describe("applyItaHeadingsOverride", () => {
       {
         title: "– นำผลการประเมิน ITA ไปสู่การพัฒนาองค์กร",
         href: "/wp-content/uploads/ita2569/O25/นำผลการประเมิน_ITA_ไปสู่การพัฒนาองค์กร.pdf",
+      },
+    ]);
+    expect(linksFor("O26")).toEqual([
+      {
+        title: "– o26 (ปรับ) 25.6.69",
+        href: "/wp-content/uploads/ita2569/O26/o26.pdf",
       },
     ]);
     const o10StatsLink = section2024Node

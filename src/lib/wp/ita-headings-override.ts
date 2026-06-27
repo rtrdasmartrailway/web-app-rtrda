@@ -82,6 +82,8 @@ const ITA_O19_NEWS_TITLE =
 const ITA_O10_E_SERVICE_STATS_HREF =
   "/wp-content/uploads/ita2569/O10/ข้อมูลสถิติการขอรับบริการผ่านช่องทางออนไลน์(E-service).pdf";
 
+const ITA_O8_UPLOAD_DIR = "/wp-content/uploads/ita2569/O8";
+const ITA_O9_UPLOAD_DIR = "/wp-content/uploads/ita2569/O9";
 const ITA_O11_UPLOAD_DIR = "/wp-content/uploads/ita2569/O11";
 const ITA_O12_UPLOAD_DIR = "/wp-content/uploads/ita2569/O12";
 const ITA_O13_UPLOAD_DIR = "/wp-content/uploads/ita2569/O13";
@@ -90,6 +92,7 @@ const ITA_O15_UPLOAD_DIR = "/wp-content/uploads/ita2569/O15";
 const ITA_O16_UPLOAD_DIR = "/wp-content/uploads/ita2569/O16";
 const ITA_O18_UPLOAD_DIR = "/wp-content/uploads/ita2569/O18";
 const ITA_O25_UPLOAD_DIR = "/wp-content/uploads/ita2569/O25";
+const ITA_O26_UPLOAD_DIR = "/wp-content/uploads/ita2569/O26";
 
 const ITA_O4_NEWS_HREF =
   "/สทร-เดินหน้ายกระดับองค์กรโปร่งใส-จัดโครงการพัฒนาและเพิ่มประสิทธิภาพการประเมิน-ITA-ประจำปี-2569";
@@ -99,12 +102,55 @@ const ITA_LINK_OVERRIDES: ReadonlyArray<{
   links: ReadonlyArray<{ title: string; href: string }>;
 }> = [
   {
+    marker: "O3",
+    links: [
+      {
+        title: "ช่องทางการติดต่อ",
+        href: "/ติดต่อเรา/ช่องทางการติดต่อ",
+      },
+    ],
+  },
+  {
     marker: "O4",
     links: [
       {
         title:
           "สทร. เดินหน้ายกระดับองค์กรโปร่งใส จัดโครงการพัฒนาและเพิ่มประสิทธิภาพการประเมิน ITA ประจำปี 2569",
         href: ITA_O4_NEWS_HREF,
+      },
+    ],
+  },
+  {
+    marker: "O8",
+    links: [
+      {
+        title: "คู่มือการปฏิบัติงาน การรับ-ส่งหนังสือที่เป็นข้อมูลข่าวสารลับ",
+        href: `${ITA_O8_UPLOAD_DIR}/1.wi_ข้อมูลข่าวสารลับสำนักอำนวยการ_ปรียามิต.docx`,
+      },
+      {
+        title: "คู่มือ การจัดการเรื่องร้องเรียนการทุจริตและประพฤติมิชอบ",
+        href: `${ITA_O8_UPLOAD_DIR}/คู่มือ_จนท._เรื่องการจัดการเรื่องร้องเรีย.pdf`,
+      },
+      {
+        title: "คู่มือ การจัดการเรื่องร้องเรียนแจ้งเบาะแส",
+        href: `${ITA_O8_UPLOAD_DIR}/คู่มือ_จนท._เรื่องปฏิบัติการจัดการเรื่องร.pdf`,
+      },
+      {
+        title: "คู่มือการปฏิบัติงานศูนย์ข้อมูลข่าวสาร สทร. (ฉบับปรับปรุง พ.ศ. 2569)",
+        href: `${ITA_O8_UPLOAD_DIR}/คู่มือการปฏิบัติงานศูนย์ข้อมูลข่าวสาร_สทร._ฉบับปรับปรุง_พ.ศ._2569_.pdf`,
+      },
+    ],
+  },
+  {
+    marker: "O9",
+    links: [
+      {
+        title: "คู่มือการให้บริการการยืมครุภัณฑ์บุคคลภายนอก",
+        href: `${ITA_O9_UPLOAD_DIR}/09คู่มือ_การยืมทรัพย์สินทางราชการ_บุคคลภาย.pdf`,
+      },
+      {
+        title: "คู่มือการให้บริการข้อมูลข่าวสารของ สทร. (ฉบับปรับปรุง)",
+        href: `${ITA_O9_UPLOAD_DIR}/09คู่มือการให้บริการข้อมูลข่าวสารของ_สทร._.pdf`,
       },
     ],
   },
@@ -422,6 +468,15 @@ const ITA_LINK_OVERRIDES: ReadonlyArray<{
       {
         title: "นำผลการประเมิน ITA ไปสู่การพัฒนาองค์กร",
         href: `${ITA_O25_UPLOAD_DIR}/นำผลการประเมิน_ITA_ไปสู่การพัฒนาองค์กร.pdf`,
+      },
+    ],
+  },
+  {
+    marker: "O26",
+    links: [
+      {
+        title: "o26 (ปรับ) 25.6.69",
+        href: `${ITA_O26_UPLOAD_DIR}/o26.pdf`,
       },
     ],
   },
