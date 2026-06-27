@@ -32,14 +32,20 @@ describe("applyContactMapOverride", () => {
     return cheerio.load(html, null, false)("iframe").attr("src");
   }
 
-  it("rewrites the Thai contact page map iframe to the RTRDA coordinates", () => {
+  it("rewrites the Thai contact page map iframe to the RTRDA named Google place", () => {
     const updated = applyContactMapOverride(record({}));
 
     expect(iframeSrc(updated.contentHtml)).toBe(RTRDA_CONTACT_MAP_EMBED_URL);
+    expect(decodeURIComponent(iframeSrc(updated.contentHtml) ?? "")).toContain(
+      "สถาบันวิจัยและพัฒนาเทคโนโลยีระบบราง (องค์การมหาชน)",
+    );
     expect(updated.contentHtml).toContain("13.7505783");
     expect(updated.contentHtml).toContain("100.5681343");
     expect(updated.contentHtml).toContain('width="600"');
     expect(updated.contentHtml).toContain('height="450"');
+    expect(updated.contentHtml).toContain("contact-map-place-card");
+    expect(updated.contentHtml).toContain("เปิดใน Google Maps");
+    expect(updated.contentHtml).toContain("0x30e29f004355d1b7:0xd97ebac98e579c96");
   });
 
   it("promotes the Google contact form link to a visible CTA", () => {
@@ -90,6 +96,7 @@ describe("applyContactMapOverride", () => {
     );
 
     expect(iframeSrc(updated.contentHtml)).toBe(RTRDA_CONTACT_MAP_EMBED_URL);
+    expect(updated.contentHtml).toContain("Open in Google Maps");
   });
 
   it("leaves non-contact pages unchanged", () => {
