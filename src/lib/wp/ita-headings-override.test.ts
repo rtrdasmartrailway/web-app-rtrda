@@ -28,6 +28,7 @@ function record(overrides: Partial<WpContentRecord>): WpContentRecord {
 
 function fixtureContent(): string {
   const oldHeadings = [
+    "O1 โครงสร้างและอำนาจหน้าที่",
     "O3 ข้อมูลการติดต่อ",
     "O4 ข่าวประชาสัมพันธ์",
     "O8 คู่มือหรือแนวทางการปฏิบัติงานของเจ้าหน้าที่",
@@ -121,6 +122,7 @@ describe("applyItaHeadingsOverride", () => {
     if (!r) return;
 
     const before2569 = cheerio.load(r.contentHtml, null, false).text();
+    expect(before2569).toContain("O1 โครงสร้างและอำนาจหน้าที่");
     expect(before2569).toContain("O3 ข้อมูลการติดต่อ");
     expect(before2569).toContain("O10 E–Service");
     expect(before2569).toContain("O11 ข้อมูลสถิติการให้บริการ");
@@ -231,6 +233,21 @@ describe("applyItaHeadingsOverride", () => {
         href: "/สทร-เดินหน้ายกระดับองค์กรโปร่งใส-จัดโครงการพัฒนาและเพิ่มประสิทธิภาพการประเมิน-ITA-ประจำปี-2569",
       },
     ]);
+    expect(linksFor("O1")).toEqual([
+      {
+        title: "– โครงสร้าง",
+        href: "/เกี่ยวกับ-สทร/โครงสร้างองค์กร",
+      },
+      {
+        title: "– หน้าที่และอำนาจ",
+        href: "/วัตถุประสงค์การจัดตั้ง",
+      },
+      {
+        title:
+          "– พระราชกฤษฎีการจัดตั้งสถาบันวิจัยและพัฒนาเทคโนโลยีระบบราง (องค์การมหาชน) พ.ศ.2564",
+        href: "/wp-content/uploads/2023/04/พระราชกฤษฎีการจัดตั้งสถาบันวิจัยและพัฒนาเทคโนโลยีระบบราง-องค์การมหาชน-พ.ศ.2564.pdf",
+      },
+    ]);
     expect(linksFor("O3")).toEqual([
       {
         title: "– ช่องทางการติดต่อ",
@@ -263,6 +280,10 @@ describe("applyItaHeadingsOverride", () => {
       {
         title: "– คู่มือการให้บริการข้อมูลข่าวสารของ สทร. (ฉบับปรับปรุง)",
         href: "/wp-content/uploads/ita2569/O9/09คู่มือการให้บริการข้อมูลข่าวสารของ_สทร._.pdf",
+      },
+      {
+        title: "– คู่มือการขอเข้าศึกษาดูงานสถาบันฯ",
+        href: "/ita-assets/2569/O9/study-visit-guide.png",
       },
     ]);
     expect(section2024).not.toContain("Mobile-Lab-v7-Final");
@@ -354,8 +375,8 @@ describe("applyItaHeadingsOverride", () => {
     ]);
     expect(linksFor("O17")).toEqual([
       {
-        title: "– ตัวอย่าง ช่องทางแจ้งเรื่องร้องเรียนการทุจริตและประพฤติมิชอบ",
-        href: "/wp-content/uploads/ita2569/O17/o17_ตัวอย่าง_ชองทางแจ้งเรื่องร้องเรียนการทุจริตและประพฤติมิชอบ.pdf",
+        title: "– ช่องทางการแจ้งเรื่องการทุจริตและประพฤติมิชอบ",
+        href: "https://test.rtrda.or.th/ช่องทางการแจ้งเรื่องกา",
       },
       {
         title: "– ช่องทางแจ้งร้องเรียนฯ สำนักงาน ป.ป.ช.",
@@ -364,6 +385,20 @@ describe("applyItaHeadingsOverride", () => {
       {
         title: "– ช่องทางแจ้งร้องเรียนฯ สำนักงาน ป.ป.ท.",
         href: "https://www.pacc.go.th/e-service/index.html",
+      },
+    ]);
+    expect(linksFor("O20")).toEqual([
+      {
+        title: "– หนังสือประกาศเจตนารมณ์ No Gift Policy ฉบับภาษาไทย",
+        href: "/ita-assets/2569/O20/no-gift-policy-th.pdf",
+      },
+      {
+        title: "– รายงานผลการดำเนินงานตามนโยบาย No Gift Policy 2568",
+        href: "/ita-assets/2569/O20/no-gift-policy-report-2568.pdf",
+      },
+      {
+        title: "– หลักเกณฑ์การรับทรัพย์สิน มาตรา 128",
+        href: "/ita-assets/2569/O20/asset-criteria-section-128.jpg",
       },
     ]);
     expect(linksFor("O18")).toEqual([

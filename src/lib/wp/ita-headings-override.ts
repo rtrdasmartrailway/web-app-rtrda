@@ -5,6 +5,7 @@ import type { WpContentRecord } from "./types";
 const THAI_ITA_PAGE_ID = "th-page-4837";
 
 export const ITA_HEADING_REPLACEMENTS: ReadonlyArray<[string, string]> = [
+  ["O1 โครงสร้างและอำนาจหน้าที่", "O1 หน้าที่และอำนาจ"],
   [
     "O3 ข้อมูลการติดต่อ",
     "O3 แบบวัดการเปิดเผยข้อมูลสาธารณะ (MOPH Open Data Integrity & Transparency Assessment: MOIT) ประจำปีงบประมาณ พ.ศ. 2569",
@@ -93,6 +94,7 @@ const ITA_O16_UPLOAD_DIR = "/wp-content/uploads/ita2569/O16";
 const ITA_O18_UPLOAD_DIR = "/wp-content/uploads/ita2569/O18";
 const ITA_O25_UPLOAD_DIR = "/wp-content/uploads/ita2569/O25";
 const ITA_O26_UPLOAD_DIR = "/wp-content/uploads/ita2569/O26";
+const ITA_2569_ASSET_DIR = "/ita-assets/2569";
 
 const ITA_O4_NEWS_HREF =
   "/สทร-เดินหน้ายกระดับองค์กรโปร่งใส-จัดโครงการพัฒนาและเพิ่มประสิทธิภาพการประเมิน-ITA-ประจำปี-2569";
@@ -101,6 +103,24 @@ const ITA_LINK_OVERRIDES: ReadonlyArray<{
   marker: string;
   links: ReadonlyArray<{ title: string; href: string }>;
 }> = [
+  {
+    marker: "O1",
+    links: [
+      {
+        title: "โครงสร้าง",
+        href: "/เกี่ยวกับ-สทร/โครงสร้างองค์กร",
+      },
+      {
+        title: "หน้าที่และอำนาจ",
+        href: "/วัตถุประสงค์การจัดตั้ง",
+      },
+      {
+        title:
+          "พระราชกฤษฎีการจัดตั้งสถาบันวิจัยและพัฒนาเทคโนโลยีระบบราง (องค์การมหาชน) พ.ศ.2564",
+        href: "/wp-content/uploads/2023/04/พระราชกฤษฎีการจัดตั้งสถาบันวิจัยและพัฒนาเทคโนโลยีระบบราง-องค์การมหาชน-พ.ศ.2564.pdf",
+      },
+    ],
+  },
   {
     marker: "O3",
     links: [
@@ -151,6 +171,10 @@ const ITA_LINK_OVERRIDES: ReadonlyArray<{
       {
         title: "คู่มือการให้บริการข้อมูลข่าวสารของ สทร. (ฉบับปรับปรุง)",
         href: `${ITA_O9_UPLOAD_DIR}/09คู่มือการให้บริการข้อมูลข่าวสารของ_สทร._.pdf`,
+      },
+      {
+        title: "คู่มือการขอเข้าศึกษาดูงานสถาบันฯ",
+        href: `${ITA_2569_ASSET_DIR}/O9/study-visit-guide.png`,
       },
     ],
   },
@@ -381,8 +405,8 @@ const ITA_LINK_OVERRIDES: ReadonlyArray<{
     marker: "O17",
     links: [
       {
-        title: "ตัวอย่าง ช่องทางแจ้งเรื่องร้องเรียนการทุจริตและประพฤติมิชอบ",
-        href: "/wp-content/uploads/ita2569/O17/o17_ตัวอย่าง_ชองทางแจ้งเรื่องร้องเรียนการทุจริตและประพฤติมิชอบ.pdf",
+        title: "ช่องทางการแจ้งเรื่องการทุจริตและประพฤติมิชอบ",
+        href: "https://test.rtrda.or.th/ช่องทางการแจ้งเรื่องกา",
       },
       {
         title: "ช่องทางแจ้งร้องเรียนฯ สำนักงาน ป.ป.ช.",
@@ -441,6 +465,23 @@ const ITA_LINK_OVERRIDES: ReadonlyArray<{
       {
         title: "เอกสารประกอบที่ 6 รายงานการจัดทำประชาพิจารณ์",
         href: sdcDownloadHref("ita2569-o19-07"),
+      },
+    ],
+  },
+  {
+    marker: "O20",
+    links: [
+      {
+        title: "หนังสือประกาศเจตนารมณ์ No Gift Policy ฉบับภาษาไทย",
+        href: `${ITA_2569_ASSET_DIR}/O20/no-gift-policy-th.pdf`,
+      },
+      {
+        title: "รายงานผลการดำเนินงานตามนโยบาย No Gift Policy 2568",
+        href: `${ITA_2569_ASSET_DIR}/O20/no-gift-policy-report-2568.pdf`,
+      },
+      {
+        title: "หลักเกณฑ์การรับทรัพย์สิน มาตรา 128",
+        href: `${ITA_2569_ASSET_DIR}/O20/asset-criteria-section-128.jpg`,
       },
     ],
   },
