@@ -283,7 +283,7 @@ describe("applyItaHeadingsOverride", () => {
       },
       {
         title: "– คู่มือการขอเข้าศึกษาดูงานสถาบันฯ",
-        href: "/ita-assets/2569/O9/study-visit-guide.png",
+        href: "/sdc_download/ita2569-o9-03?inline=1",
       },
     ]);
     expect(section2024).not.toContain("Mobile-Lab-v7-Final");
@@ -375,8 +375,8 @@ describe("applyItaHeadingsOverride", () => {
     ]);
     expect(linksFor("O17")).toEqual([
       {
-        title: "– ช่องทางการแจ้งเรื่องการทุจริตและประพฤติมิชอบ",
-        href: "https://test.rtrda.or.th/ช่องทางการแจ้งเรื่องกา",
+        title: "– ตัวอย่าง ช่องทางแจ้งเรื่องร้องเรียนการทุจริตและประพฤติมิชอบ",
+        href: "https://test.rtrda.or.th/%E0%B8%8A%E0%B9%88%E0%B8%AD%E0%B8%87%E0%B8%97%E0%B8%B2%E0%B8%87%E0%B8%81%E0%B8%B2%E0%B8%A3%E0%B9%81%E0%B8%88%E0%B9%89%E0%B8%87%E0%B9%80%E0%B8%A3%E0%B8%B7%E0%B9%88%E0%B8%AD%E0%B8%87%E0%B8%81%E0%B8%B2",
       },
       {
         title: "– ช่องทางแจ้งร้องเรียนฯ สำนักงาน ป.ป.ช.",
@@ -390,15 +390,15 @@ describe("applyItaHeadingsOverride", () => {
     expect(linksFor("O20")).toEqual([
       {
         title: "– หนังสือประกาศเจตนารมณ์ No Gift Policy ฉบับภาษาไทย",
-        href: "/ita-assets/2569/O20/no-gift-policy-th.pdf",
+        href: "/sdc_download/ita2569-o20-01?inline=1",
       },
       {
         title: "– รายงานผลการดำเนินงานตามนโยบาย No Gift Policy 2568",
-        href: "/ita-assets/2569/O20/no-gift-policy-report-2568.pdf",
+        href: "/sdc_download/ita2569-o20-02?inline=1",
       },
       {
         title: "– หลักเกณฑ์การรับทรัพย์สิน มาตรา 128",
-        href: "/ita-assets/2569/O20/asset-criteria-section-128.jpg",
+        href: "/sdc_download/ita2569-o20-03?inline=1",
       },
     ]);
     expect(linksFor("O18")).toEqual([

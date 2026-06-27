@@ -27,7 +27,11 @@ public/wp-content/uploads/2026/*
 !public/wp-content/uploads/2026/06/
 public/wp-content/uploads/2026/06/*
 !public/wp-content/uploads/2026/06/อินโฟภายนอก-11-2-1024x1024.png
-public/sdc-downloads/
+public/sdc-downloads/*
+!public/sdc-downloads/ita2569-o9-03.png
+!public/sdc-downloads/ita2569-o20-01.pdf
+!public/sdc-downloads/ita2569-o20-02.pdf
+!public/sdc-downloads/ita2569-o20-03.jpg
 src/data/wp-content.json
 
 # production

@@ -94,7 +94,6 @@ const ITA_O16_UPLOAD_DIR = "/wp-content/uploads/ita2569/O16";
 const ITA_O18_UPLOAD_DIR = "/wp-content/uploads/ita2569/O18";
 const ITA_O25_UPLOAD_DIR = "/wp-content/uploads/ita2569/O25";
 const ITA_O26_UPLOAD_DIR = "/wp-content/uploads/ita2569/O26";
-const ITA_2569_ASSET_DIR = "/ita-assets/2569";
 
 const ITA_O4_NEWS_HREF =
   "/สทร-เดินหน้ายกระดับองค์กรโปร่งใส-จัดโครงการพัฒนาและเพิ่มประสิทธิภาพการประเมิน-ITA-ประจำปี-2569";
@@ -174,7 +173,7 @@ const ITA_LINK_OVERRIDES: ReadonlyArray<{
       },
       {
         title: "คู่มือการขอเข้าศึกษาดูงานสถาบันฯ",
-        href: `${ITA_2569_ASSET_DIR}/O9/study-visit-guide.png`,
+        href: sdcDownloadInlineHref("ita2569-o9-03"),
       },
     ],
   },
@@ -405,8 +404,8 @@ const ITA_LINK_OVERRIDES: ReadonlyArray<{
     marker: "O17",
     links: [
       {
-        title: "ช่องทางการแจ้งเรื่องการทุจริตและประพฤติมิชอบ",
-        href: "https://test.rtrda.or.th/ช่องทางการแจ้งเรื่องกา",
+        title: "ตัวอย่าง ช่องทางแจ้งเรื่องร้องเรียนการทุจริตและประพฤติมิชอบ",
+        href: "https://test.rtrda.or.th/%E0%B8%8A%E0%B9%88%E0%B8%AD%E0%B8%87%E0%B8%97%E0%B8%B2%E0%B8%87%E0%B8%81%E0%B8%B2%E0%B8%A3%E0%B9%81%E0%B8%88%E0%B9%89%E0%B8%87%E0%B9%80%E0%B8%A3%E0%B8%B7%E0%B9%88%E0%B8%AD%E0%B8%87%E0%B8%81%E0%B8%B2",
       },
       {
         title: "ช่องทางแจ้งร้องเรียนฯ สำนักงาน ป.ป.ช.",
@@ -473,15 +472,15 @@ const ITA_LINK_OVERRIDES: ReadonlyArray<{
     links: [
       {
         title: "หนังสือประกาศเจตนารมณ์ No Gift Policy ฉบับภาษาไทย",
-        href: `${ITA_2569_ASSET_DIR}/O20/no-gift-policy-th.pdf`,
+        href: sdcDownloadInlineHref("ita2569-o20-01"),
       },
       {
         title: "รายงานผลการดำเนินงานตามนโยบาย No Gift Policy 2568",
-        href: `${ITA_2569_ASSET_DIR}/O20/no-gift-policy-report-2568.pdf`,
+        href: sdcDownloadInlineHref("ita2569-o20-02"),
       },
       {
         title: "หลักเกณฑ์การรับทรัพย์สิน มาตรา 128",
-        href: `${ITA_2569_ASSET_DIR}/O20/asset-criteria-section-128.jpg`,
+        href: sdcDownloadInlineHref("ita2569-o20-03"),
       },
     ],
   },
@@ -527,6 +526,10 @@ const ITA_2024_ANCHOR = "การประเมิน ITA ปี 2569";
 
 function sdcDownloadHref(id: string): string {
   return `/sdc_download/${id}`;
+}
+
+function sdcDownloadInlineHref(id: string): string {
+  return `${sdcDownloadHref(id)}?inline=1`;
 }
 
 function itaO12Href(fileName: string): string {

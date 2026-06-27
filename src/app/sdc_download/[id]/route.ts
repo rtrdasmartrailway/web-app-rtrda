@@ -15,8 +15,55 @@ type RouteContext = {
   params: Promise<{ id: string }>;
 };
 
+const STATIC_DOWNLOAD_OVERRIDES: Record<string, WpDownloadAsset> = {
+  "ita2569-o9-03": {
+    id: "ita2569-o9-03",
+    sourceUrl: "",
+    localPath: "/sdc-downloads/ita2569-o9-03.png",
+    fileName: "คู่มือการขอเข้าศึกษาดูงานสถาบันฯ.png",
+    mimeType: "image/png",
+    sizeBytes: 5_198_518,
+    title: "คู่มือการขอเข้าศึกษาดูงานสถาบันฯ",
+    group: "ita2569",
+    sourcePages: ["th-page-4837"],
+  },
+  "ita2569-o20-01": {
+    id: "ita2569-o20-01",
+    sourceUrl: "",
+    localPath: "/sdc-downloads/ita2569-o20-01.pdf",
+    fileName: "หนังสือประกาศเจตนารมณ์ No Gift Policy ฉบับภาษาไทย.pdf",
+    mimeType: "application/pdf",
+    sizeBytes: 532_412,
+    title: "หนังสือประกาศเจตนารมณ์ No Gift Policy ฉบับภาษาไทย",
+    group: "ita2569",
+    sourcePages: ["th-page-4837"],
+  },
+  "ita2569-o20-02": {
+    id: "ita2569-o20-02",
+    sourceUrl: "",
+    localPath: "/sdc-downloads/ita2569-o20-02.pdf",
+    fileName: "รายงานผลการดำเนินงานตามนโยบาย No Gift Policy 2568.pdf",
+    mimeType: "application/pdf",
+    sizeBytes: 3_295_473,
+    title: "รายงานผลการดำเนินงานตามนโยบาย No Gift Policy 2568",
+    group: "ita2569",
+    sourcePages: ["th-page-4837"],
+  },
+  "ita2569-o20-03": {
+    id: "ita2569-o20-03",
+    sourceUrl: "",
+    localPath: "/sdc-downloads/ita2569-o20-03.jpg",
+    fileName: "หลักเกณฑ์การรับทรัพย์สิน มาตรา 128.jpg",
+    mimeType: "image/jpeg",
+    sizeBytes: 974_352,
+    title: "หลักเกณฑ์การรับทรัพย์สิน มาตรา 128",
+    group: "ita2569",
+    sourcePages: ["th-page-4837"],
+  },
+};
+
 async function findDownload(id: string): Promise<WpDownloadAsset | null> {
-  return getDownloadById(id);
+  return (await getDownloadById(id)) ?? STATIC_DOWNLOAD_OVERRIDES[id] ?? null;
 }
 
 async function responseForDownload(
