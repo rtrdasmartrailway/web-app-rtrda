@@ -60,6 +60,17 @@ const STATIC_DOWNLOAD_OVERRIDES: Record<string, WpDownloadAsset> = {
     group: "ita2569",
     sourcePages: ["th-page-4837"],
   },
+  "ita2569-o22-01": {
+    id: "ita2569-o22-01",
+    sourceUrl: "",
+    localPath: "/sdc-downloads/ita2569-o22-01.pdf",
+    fileName: "รายงานผลการดำเนินงานตามแผนบริหารจัดการค.pdf",
+    mimeType: "application/pdf",
+    sizeBytes: 642_714,
+    title: "รายงานผลการดำเนินงานตามแผนบริหารจัดการค",
+    group: "ita2569",
+    sourcePages: ["th-page-4837"],
+  },
 };
 
 async function findDownload(id: string): Promise<WpDownloadAsset | null> {

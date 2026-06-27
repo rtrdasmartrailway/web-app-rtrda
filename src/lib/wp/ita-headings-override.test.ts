@@ -375,7 +375,7 @@ describe("applyItaHeadingsOverride", () => {
     ]);
     expect(linksFor("O17")).toEqual([
       {
-        title: "– ตัวอย่าง ช่องทางแจ้งเรื่องร้องเรียนการทุจริตและประพฤติมิชอบ",
+        title: "– ช่องทางแจ้งเรื่องร้องเรียนการทุจริตและประพฤติมิชอบ",
         href: "https://test.rtrda.or.th/%E0%B8%8A%E0%B9%88%E0%B8%AD%E0%B8%87%E0%B8%97%E0%B8%B2%E0%B8%87%E0%B8%81%E0%B8%B2%E0%B8%A3%E0%B9%81%E0%B8%88%E0%B9%89%E0%B8%87%E0%B9%80%E0%B8%A3%E0%B8%B7%E0%B9%88%E0%B8%AD%E0%B8%87%E0%B8%81%E0%B8%B2",
       },
       {
@@ -388,6 +388,11 @@ describe("applyItaHeadingsOverride", () => {
       },
     ]);
     expect(linksFor("O20")).toEqual([
+      {
+        title:
+          "– สทร.ร่วมประกาศเจตนารมณ์การต่อต้านการทุจริตคอร์รัปชันในองค์กร การไม่รับของขวัญ (No Gift Policy)",
+        href: "https://test.rtrda.or.th/%E0%B8%AA%E0%B8%97%E0%B8%A3-%E0%B8%A3%E0%B9%88%E0%B8%A7%E0%B8%A1%E0%B8%9B%E0%B8%A3%E0%B8%B0%E0%B8%81%E0%B8%B2%E0%B8%A8%E0%B9%80%E0%B8%88%E0%B8%95%E0%B8%99%E0%B8%B2%E0%B8%A3%E0%B8%A1%E0%B8%93%E0%B9%8C-no-gift-policy-2569",
+      },
       {
         title: "– หนังสือประกาศเจตนารมณ์ No Gift Policy ฉบับภาษาไทย",
         href: "/sdc_download/ita2569-o20-01?inline=1",

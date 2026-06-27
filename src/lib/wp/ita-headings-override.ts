@@ -5,7 +5,7 @@ import type { WpContentRecord } from "./types";
 const THAI_ITA_PAGE_ID = "th-page-4837";
 
 export const ITA_HEADING_REPLACEMENTS: ReadonlyArray<[string, string]> = [
-  ["O1 โครงสร้างและอำนาจหน้าที่", "O1 หน้าที่และอำนาจ"],
+  ["O1 โครงสร้างและอำนาจหน้าที่", "O1 โครงสร้าง หน้าที่และอำนาจ"],
   [
     "O3 ข้อมูลการติดต่อ",
     "O3 แบบวัดการเปิดเผยข้อมูลสาธารณะ (MOPH Open Data Integrity & Transparency Assessment: MOIT) ประจำปีงบประมาณ พ.ศ. 2569",
@@ -404,7 +404,7 @@ const ITA_LINK_OVERRIDES: ReadonlyArray<{
     marker: "O17",
     links: [
       {
-        title: "ตัวอย่าง ช่องทางแจ้งเรื่องร้องเรียนการทุจริตและประพฤติมิชอบ",
+        title: "ช่องทางแจ้งเรื่องร้องเรียนการทุจริตและประพฤติมิชอบ",
         href: "https://test.rtrda.or.th/%E0%B8%8A%E0%B9%88%E0%B8%AD%E0%B8%87%E0%B8%97%E0%B8%B2%E0%B8%87%E0%B8%81%E0%B8%B2%E0%B8%A3%E0%B9%81%E0%B8%88%E0%B9%89%E0%B8%87%E0%B9%80%E0%B8%A3%E0%B8%B7%E0%B9%88%E0%B8%AD%E0%B8%87%E0%B8%81%E0%B8%B2",
       },
       {
@@ -470,6 +470,11 @@ const ITA_LINK_OVERRIDES: ReadonlyArray<{
   {
     marker: "O20",
     links: [
+      {
+        title:
+          "สทร.ร่วมประกาศเจตนารมณ์การต่อต้านการทุจริตคอร์รัปชันในองค์กร การไม่รับของขวัญ (No Gift Policy)",
+        href: "https://test.rtrda.or.th/%E0%B8%AA%E0%B8%97%E0%B8%A3-%E0%B8%A3%E0%B9%88%E0%B8%A7%E0%B8%A1%E0%B8%9B%E0%B8%A3%E0%B8%B0%E0%B8%81%E0%B8%B2%E0%B8%A8%E0%B9%80%E0%B8%88%E0%B8%95%E0%B8%99%E0%B8%B2%E0%B8%A3%E0%B8%A1%E0%B8%93%E0%B9%8C-no-gift-policy-2569",
+      },
       {
         title: "หนังสือประกาศเจตนารมณ์ No Gift Policy ฉบับภาษาไทย",
         href: sdcDownloadInlineHref("ita2569-o20-01"),
