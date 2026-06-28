@@ -69,7 +69,15 @@ describe("buildSidebarItems", () => {
 
   it("prefers children when present", () => {
     const items = buildSidebarItems(current, [child], [sibling, current]);
-    expect(items).toEqual([{ label: "ลูก", path: "/parent/me/ลูก", active: false }]);
+    expect(items).toEqual([
+      {
+        label: "ลูก",
+        href: "/parent/me/ลูก",
+        path: "/parent/me/ลูก",
+        external: false,
+        active: false,
+      },
+    ]);
   });
 
   it("falls back to siblings and keeps the current page active when useful", () => {
@@ -78,8 +86,20 @@ describe("buildSidebarItems", () => {
     // to make the active sidebar state visible.
     const items = buildSidebarItems(current, [], [sibling, current]);
     expect(items).toEqual([
-      { label: "อื่น", path: "/parent/อื่น", active: false },
-      { label: "หน้า", path: "/parent/me", active: true },
+      {
+        label: "อื่น",
+        href: "/parent/อื่น",
+        path: "/parent/อื่น",
+        external: false,
+        active: false,
+      },
+      {
+        label: "หน้า",
+        href: "/parent/me",
+        path: "/parent/me",
+        external: false,
+        active: true,
+      },
     ]);
   });
 
@@ -96,12 +116,24 @@ describe("buildSidebarItems", () => {
     ];
 
     expect(buildSidebarItems(current, [child], [current, sibling], navItems)).toEqual([
-      { label: "Second in DB", path: "/parent/อื่น", active: false },
-      { label: "Current", path: "/parent/me", active: true },
+      {
+        label: "Second in DB",
+        href: "/parent/อื่น",
+        path: "/parent/อื่น",
+        external: false,
+        active: false,
+      },
+      {
+        label: "Current",
+        href: "/parent/me",
+        path: "/parent/me",
+        external: false,
+        active: true,
+      },
     ]);
   });
 
-  it("flattens internal nested navbar entries in menu order", () => {
+  it("flattens nested navbar entries in menu order", () => {
     const navItems = [
       navItem({
         label: "News",
@@ -125,8 +157,69 @@ describe("buildSidebarItems", () => {
     const nestedCurrent = record({ path: "/news/jobs/apply", parentPath: "/news/jobs" });
 
     expect(buildSidebarItems(nestedCurrent, [], [nestedCurrent], navItems)).toEqual([
-      { label: "Category", path: "/news/category", active: false },
-      { label: "Apply", path: "/news/jobs/apply", active: true },
+      {
+        label: "Category",
+        href: "/news/category",
+        path: "/news/category",
+        external: false,
+        active: false,
+      },
+      {
+        label: "Apply",
+        href: "/news/jobs/apply",
+        path: "/news/jobs/apply",
+        external: false,
+        active: true,
+      },
+      {
+        label: "External",
+        href: "https://example.com",
+        path: null,
+        external: true,
+        active: false,
+      },
+    ]);
+  });
+
+  it("keeps external navbar entries in sidebars", () => {
+    const navItems = [
+      navItem({
+        label: "ติดต่อเรา",
+        active: true,
+        children: [
+          navItem({
+            label: "ช่องทางการติดต่อ",
+            path: "/ติดต่อเรา/ช่องทางการติดต่อ",
+            href: "/ติดต่อเรา/ช่องทางการติดต่อ",
+          }),
+          navItem({
+            label: "ช่องทางแจ้งเรื่องร้องเรียนฯ สำนักงาน ป.ป.ช.",
+            href: "https://www.nacc.go.th/allcomplaint?csrt=930900954617268973",
+            external: true,
+          }),
+        ],
+      }),
+    ];
+    const contactPage = record({
+      path: "/ติดต่อเรา/ช่องทางการติดต่อ",
+      parentPath: "/ติดต่อเรา",
+    });
+
+    expect(buildSidebarItems(contactPage, [], [contactPage], navItems)).toEqual([
+      {
+        label: "ช่องทางการติดต่อ",
+        href: "/ติดต่อเรา/ช่องทางการติดต่อ",
+        path: "/ติดต่อเรา/ช่องทางการติดต่อ",
+        external: false,
+        active: true,
+      },
+      {
+        label: "ช่องทางแจ้งเรื่องร้องเรียนฯ สำนักงาน ป.ป.ช.",
+        href: "https://www.nacc.go.th/allcomplaint?csrt=930900954617268973",
+        path: null,
+        external: true,
+        active: false,
+      },
     ]);
   });
 

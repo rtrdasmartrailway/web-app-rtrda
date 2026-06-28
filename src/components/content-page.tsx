@@ -31,17 +31,34 @@ function SideNavigation({
     <aside className="page-sidebar" aria-label={title}>
       <h2>{title}</h2>
       <nav>
-        {items.map((item) => (
-          <Link
-            key={item.path}
-            href={item.path}
-            className={item.active ? "active" : undefined}
-            aria-current={item.active ? "page" : undefined}
-          >
-            <span>{item.label}</span>
-            <span aria-hidden="true" className="sidebar-arrow" />
-          </Link>
-        ))}
+        {items.map((item) => {
+          const content = (
+            <>
+              <span>{item.label}</span>
+              <span aria-hidden="true" className="sidebar-arrow" />
+            </>
+          );
+
+          return item.external ? (
+            <a
+              key={`${item.href}-${item.label}`}
+              href={item.href}
+              rel="noreferrer"
+              target="_blank"
+            >
+              {content}
+            </a>
+          ) : (
+            <Link
+              key={item.path ?? item.href}
+              href={item.href}
+              className={item.active ? "active" : undefined}
+              aria-current={item.active ? "page" : undefined}
+            >
+              {content}
+            </Link>
+          );
+        })}
       </nav>
     </aside>
   );

@@ -18,7 +18,9 @@ export interface PresentationNavItem {
 
 export interface PresentationSidebarItem {
   label: string;
-  path: string;
+  href: string;
+  path: string | null;
+  external: boolean;
   active: boolean;
 }
 
@@ -176,7 +178,9 @@ export function getSidebarItems(
 
   return source.map((item) => ({
     label: item.title,
+    href: item.path,
     path: item.path,
+    external: false,
     active: normalizeRoutePath(item.path) === normalizeRoutePath(record.path),
   }));
 }

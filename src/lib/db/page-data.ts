@@ -146,7 +146,9 @@ export function buildSidebarItems(
       : source.filter((item) => normalizeRoutePath(item.path) !== selfPath);
   return filtered.map((item) => ({
     label: item.title,
+    href: item.path,
     path: item.path,
+    external: false,
     active: isSidebarPathActive(item.path, record.path),
   }));
 }
@@ -176,15 +178,17 @@ function flattenSidebarNavItems(
 ): PresentationSidebarItem[] {
   return items.flatMap((item) => {
     const children = flattenSidebarNavItems(item.children, currentPath);
-    if (!item.path || item.external) {
+    if (!item.path && !item.external) {
       return children;
     }
 
     return [
       {
         label: item.label,
+        href: item.href,
         path: item.path,
-        active: isSidebarPathActive(item.path, currentPath),
+        external: item.external,
+        active: item.path ? isSidebarPathActive(item.path, currentPath) : false,
       },
       ...children,
     ];
