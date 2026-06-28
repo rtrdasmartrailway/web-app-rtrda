@@ -265,6 +265,10 @@ describe("applyItaHeadingsOverride", () => {
         title: "– ช่องทางการติดต่อ",
         href: "/ติดต่อเรา/ช่องทางการติดต่อ",
       },
+      {
+        title: "– ข้อมูลการติดต่อ",
+        href: "https://maps.app.goo.gl/b93srh7fEFdN5viQ9",
+      },
     ]);
     expect(linksFor("O8")).toEqual([
       {
