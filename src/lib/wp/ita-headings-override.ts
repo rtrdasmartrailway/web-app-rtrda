@@ -493,7 +493,7 @@ const ITA_LINK_OVERRIDES: ReadonlyArray<{
     marker: "O21",
     links: [
       {
-        title: "การประเมินความเสี่ยงทุจริต_5_ขั้นตอน_ตามคู",
+        title: "การประเมินความเสี่ยงทุจริต_5_ขั้นตอน",
         href: sdcDownloadHref("ita2569-o21-01"),
       },
     ],
@@ -502,7 +502,8 @@ const ITA_LINK_OVERRIDES: ReadonlyArray<{
     marker: "O22",
     links: [
       {
-        title: "ด้านที่ 2 .รายงานผลด้านการใช้อำนาจตำแหน่งห",
+        title:
+          "ด้านที่ 2 .รายงานผลด้านการใช้ตำแหน่งหน้าที่ราชการเพื่อช่วยเหลืออำนวยความสะดวก",
         href: sdcDownloadHref("ita2569-o22-01"),
       },
       {
@@ -516,7 +517,7 @@ const ITA_LINK_OVERRIDES: ReadonlyArray<{
     links: [
       {
         title: "นำผลการประเมิน ITA ไปสู่การพัฒนาองค์กร",
-        href: `${ITA_O25_UPLOAD_DIR}/นำผลการประเมิน_ITA_ไปสู่การพัฒนาองค์กร.pdf`,
+        href: `${ITA_O25_UPLOAD_DIR}/นำผลการประเมิน ITA ไปสู่การพัมนาองค์กร..pdf`,
       },
     ],
   },
@@ -524,8 +525,8 @@ const ITA_LINK_OVERRIDES: ReadonlyArray<{
     marker: "O26",
     links: [
       {
-        title: "o26 (ปรับ) 25.6.69",
-        href: `${ITA_O26_UPLOAD_DIR}/o26.pdf`,
+        title: "รายงานผลการดำเนินการเพื่อส่งเสริมคุณธรรม",
+        href: `${ITA_O26_UPLOAD_DIR}/รายงานผลการดำเนินการเพื่อส่งเสริมคุณธรรม.pdf`,
       },
     ],
   },

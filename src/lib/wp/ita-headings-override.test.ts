@@ -185,8 +185,10 @@ describe("applyItaHeadingsOverride", () => {
 
     expect(section2024).toContain("o15 ประมวลจริยธรรม");
     expect(section2024).toContain("รายงานข้อมูลสถิติเรื่องร้องเรียนการทุจร (Excel)");
-    expect(section2024).toContain("การประเมินความเสี่ยงทุจริต_5_ขั้นตอน_ตามคู");
-    expect(section2024).toContain("ด้านที่ 2 .รายงานผลด้านการใช้อำนาจตำแหน่งห");
+    expect(section2024).toContain("การประเมินความเสี่ยงทุจริต_5_ขั้นตอน");
+    expect(section2024).toContain(
+      "ด้านที่ 2 .รายงานผลด้านการใช้ตำแหน่งหน้าที่ราชการเพื่อช่วยเหลืออำนวยความสะดวก",
+    );
     expect(section2024).toContain("ด้านที่ 4.รายงานผล งานบุคคล ปี 2568");
     expect(section2024).toContain(
       "สทร. จัดประชุมเทคนิคพิจารณ์ ร่าง มาตรฐานหมอนคอนกรีตและอุปกรณ์ยึดเหนี่ยวราง ครั้งที่ 1/2568 มุ่งยกระดับคุณภาพและความปลอดภัยของระบบรางไทยสู่ระดับสากล",
@@ -419,7 +421,8 @@ describe("applyItaHeadingsOverride", () => {
     ]);
     expect(linksFor("O22")).toEqual([
       {
-        title: "– ด้านที่ 2 .รายงานผลด้านการใช้อำนาจตำแหน่งห",
+        title:
+          "– ด้านที่ 2 .รายงานผลด้านการใช้ตำแหน่งหน้าที่ราชการเพื่อช่วยเหลืออำนวยความสะดวก",
         href: "/sdc_download/ita2569-o22-01",
       },
       {
@@ -430,13 +433,13 @@ describe("applyItaHeadingsOverride", () => {
     expect(linksFor("O25")).toEqual([
       {
         title: "– นำผลการประเมิน ITA ไปสู่การพัฒนาองค์กร",
-        href: "/wp-content/uploads/ita2569/O25/นำผลการประเมิน_ITA_ไปสู่การพัฒนาองค์กร.pdf",
+        href: "/wp-content/uploads/ita2569/O25/นำผลการประเมิน ITA ไปสู่การพัมนาองค์กร..pdf",
       },
     ]);
     expect(linksFor("O26")).toEqual([
       {
-        title: "– o26 (ปรับ) 25.6.69",
-        href: "/wp-content/uploads/ita2569/O26/o26.pdf",
+        title: "– รายงานผลการดำเนินการเพื่อส่งเสริมคุณธรรม",
+        href: "/wp-content/uploads/ita2569/O26/รายงานผลการดำเนินการเพื่อส่งเสริมคุณธรรม.pdf",
       },
     ]);
     const o10StatsLink = section2024Node

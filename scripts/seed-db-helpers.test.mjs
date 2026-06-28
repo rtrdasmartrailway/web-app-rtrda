@@ -168,7 +168,7 @@ describe("manifestToRows", () => {
         expect.objectContaining({
           id: "ita2569-o21-01",
           localPath: "/sdc-downloads/ita2569-o21-01.pdf",
-          fileName: "การประเมินความเสี่ยงทุจริต_5_ขั้นตอน_ตามคู.pdf",
+          fileName: "การประเมินความเสี่ยงทุจริต_5_ขั้นตอน.pdf",
           mimeType: "application/pdf",
           group: "O21",
           sourcePages: ["/การประเมินคุณธรรมและคว"],

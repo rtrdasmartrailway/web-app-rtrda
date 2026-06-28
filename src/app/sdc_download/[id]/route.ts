@@ -64,10 +64,12 @@ const STATIC_DOWNLOAD_OVERRIDES: Record<string, WpDownloadAsset> = {
     id: "ita2569-o22-01",
     sourceUrl: "",
     localPath: "/sdc-downloads/ita2569-o22-01.pdf",
-    fileName: "ด้านที่ 2 .รายงานผลด้านการใช้อำนาจตำแหน่งห.pdf",
+    fileName:
+      "ด้านที่ 2 .รายงานผลด้านการใช้ตำแหน่งหน้าที่ราชการเพื่อช่วยเหลืออำนวยความสะดวก.pdf",
     mimeType: "application/pdf",
     sizeBytes: 148_833,
-    title: "ด้านที่ 2 .รายงานผลด้านการใช้อำนาจตำแหน่งห",
+    title:
+      "ด้านที่ 2 .รายงานผลด้านการใช้ตำแหน่งหน้าที่ราชการเพื่อช่วยเหลืออำนวยความสะดวก",
     group: "ita2569",
     sourcePages: ["th-page-4837"],
   },
