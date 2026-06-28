@@ -126,7 +126,7 @@ const ITA_LINK_OVERRIDES: ReadonlyArray<{
       },
       {
         title: "ข้อมูลการติดต่อ",
-        href: "https://maps.app.goo.gl/b93srh7fEFdN5viQ9",
+        href: "https://maps.app.goo.gl/w61dRrWtu8ut8688A",
       },
     ],
   },
