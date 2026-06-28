@@ -28,12 +28,17 @@ public/wp-content/uploads/2026/*
 public/wp-content/uploads/2026/06/*
 !public/wp-content/uploads/2026/06/อินโฟภายนอก-11-2-1024x1024.png
 public/sdc-downloads/*
+!public/sdc-downloads/ita2569-o8-02.pdf
 !public/sdc-downloads/ita2569-o9-03.png
 !public/sdc-downloads/ita2569-o20-01.pdf
 !public/sdc-downloads/ita2569-o20-02.pdf
 !public/sdc-downloads/ita2569-o20-03.jpg
+!public/sdc-downloads/ita2569-o21-01.pdf
+!public/sdc-downloads/ita2569-o21-02.pdf
 !public/sdc-downloads/ita2569-o22-01.pdf
 !public/sdc-downloads/ita2569-o22-02.pdf
+!public/sdc-downloads/ita2569-o22-03.pdf
+!public/sdc-downloads/ita2569-o24-01.pdf
 src/data/wp-content.json
 
 # production

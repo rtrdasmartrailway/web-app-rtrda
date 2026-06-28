@@ -97,7 +97,9 @@ describe("applyItaHeadingsOverride", () => {
       // old one. The MOPH MOIT 2569 strings are disjoint from the old
       // headings, so a plain substring check is sufficient.
       expect(section2024.text()).toContain(newHeading);
-      expect(section2024.text()).not.toContain(oldHeading);
+      if (!newHeading.includes(oldHeading)) {
+        expect(section2024.text()).not.toContain(oldHeading);
+      }
 
       // 2568 section: must still contain the old heading, and must NOT
       // contain the new heading.
@@ -155,7 +157,9 @@ describe("applyItaHeadingsOverride", () => {
       "O22 รายงานการรับทรัพย์สินหรือประโยชน์อื่นใดโดยธรรมจรรยา",
     ]);
     for (const [oldHeading, newHeading] of ITA_HEADING_REPLACEMENTS) {
-      expect(section2024).not.toContain(oldHeading);
+      if (!newHeading.includes(oldHeading)) {
+        expect(section2024).not.toContain(oldHeading);
+      }
       expect(section2024).toContain(newHeading);
       expect(section2023).not.toContain(newHeading);
       if (sharedBetween2569And2568.has(oldHeading)) {
@@ -185,11 +189,17 @@ describe("applyItaHeadingsOverride", () => {
 
     expect(section2024).toContain("o15 ประมวลจริยธรรม");
     expect(section2024).toContain("รายงานข้อมูลสถิติเรื่องร้องเรียนการทุจร (Excel)");
-    expect(section2024).toContain("การประเมินความเสี่ยงทุจริต_5_ขั้นตอน");
     expect(section2024).toContain(
-      "ด้านที่ 2 .รายงานผลด้านการใช้ตำแหน่งหน้าที่ราชการเพื่อช่วยเหลืออำนวยความสะดวก",
+      "การประเมินความเสี่ยงการทุจริตในหน่วยงานภาครัฐ ประจำปีงบประมาณ พ.ศ. 2569",
     );
-    expect(section2024).toContain("ด้านที่ 4.รายงานผล งานบุคคล ปี 2568");
+    expect(section2024).toContain(
+      "ประเมินความเสี่ยงด้านการทุจริตฯ ด้านการเบิกจ่ายเงินงบประมาณ",
+    );
+    expect(section2024).toContain("รายงานผลด้านการใช้อำนาจตำแหน่งหน้าที่");
+    expect(section2024).toContain("รายงานผลด้านการบริหารงานบุคคล");
+    expect(section2024).toContain(
+      "รายงานผลตามแผนบริหารความเสี่ยงการทุจริต ประจำปีงบประมาณ พ.ศ. 2568",
+    );
     expect(section2024).toContain(
       "สทร. จัดประชุมเทคนิคพิจารณ์ ร่าง มาตรฐานหมอนคอนกรีตและอุปกรณ์ยึดเหนี่ยวราง ครั้งที่ 1/2568 มุ่งยกระดับคุณภาพและความปลอดภัยของระบบรางไทยสู่ระดับสากล",
     );
@@ -231,9 +241,8 @@ describe("applyItaHeadingsOverride", () => {
 
     expect(linksFor("O4")).toEqual([
       {
-        title:
-          "– สทร. เดินหน้ายกระดับองค์กรโปร่งใส จัดโครงการพัฒนาและเพิ่มประสิทธิภาพการประเมิน ITA ประจำปี 2569",
-        href: "/สทร-เดินหน้ายกระดับองค์กรโปร่งใส-จัดโครงการพัฒนาและเพิ่มประสิทธิภาพการประเมิน-ITA-ประจำปี-2569",
+        title: "– ข่าวประชาสัมพันธ์",
+        href: "https://test.rtrda.or.th/category/%E0%B8%82%E0%B9%88%E0%B8%B2%E0%B8%A7%E0%B9%81%E0%B8%A5%E0%B8%B0%E0%B8%81%E0%B8%B4%E0%B8%88%E0%B8%81%E0%B8%A3%E0%B8%A3%E0%B8%A1",
       },
     ]);
     expect(linksFor("O1")).toEqual([
@@ -264,7 +273,7 @@ describe("applyItaHeadingsOverride", () => {
       },
       {
         title: "– คู่มือ การจัดการเรื่องร้องเรียนการทุจริตและประพฤติมิชอบ",
-        href: "/wp-content/uploads/ita2569/O8/คู่มือ_จนท._เรื่องการจัดการเรื่องร้องเรีย.pdf",
+        href: "/sdc_download/ita2569-o8-02",
       },
       {
         title: "– คู่มือ การจัดการเรื่องร้องเรียนแจ้งเบาะแส",
@@ -397,7 +406,7 @@ describe("applyItaHeadingsOverride", () => {
         href: "https://test.rtrda.or.th/%E0%B8%AA%E0%B8%97%E0%B8%A3-%E0%B8%A3%E0%B9%88%E0%B8%A7%E0%B8%A1%E0%B8%9B%E0%B8%A3%E0%B8%B0%E0%B8%81%E0%B8%B2%E0%B8%A8%E0%B9%80%E0%B8%88%E0%B8%95%E0%B8%99%E0%B8%B2%E0%B8%A3%E0%B8%A1%E0%B8%93%E0%B9%8C-no-gift-policy-2569",
       },
       {
-        title: "– หนังสือประกาศเจตนารมณ์ No Gift Policy ฉบับภาษาไทย",
+        title: '– หนังสือประกาศเจตนารมณ์ No Gift Policy "ฉบับภาษาไทยและภาษาอังกฤษ"',
         href: "/sdc_download/ita2569-o20-01?inline=1",
       },
       {
@@ -419,15 +428,35 @@ describe("applyItaHeadingsOverride", () => {
         href: "/wp-content/uploads/ita2569/O18/รายงานข้อมูลสถิติเรื่องร้องเรียนการทุจร.xlsx",
       },
     ]);
-    expect(linksFor("O22")).toEqual([
+    expect(linksFor("O21")).toEqual([
       {
         title:
-          "– ด้านที่ 2 .รายงานผลด้านการใช้ตำแหน่งหน้าที่ราชการเพื่อช่วยเหลืออำนวยความสะดวก",
+          "– การประเมินความเสี่ยงการทุจริตในหน่วยงานภาครัฐ ประจำปีงบประมาณ พ.ศ. 2569",
+        href: "/sdc_download/ita2569-o21-01",
+      },
+      {
+        title: "– ประเมินความเสี่ยงด้านการทุจริตฯ ด้านการเบิกจ่ายเงินงบประมาณ",
+        href: "/sdc_download/ita2569-o21-02",
+      },
+    ]);
+    expect(linksFor("O22")).toEqual([
+      {
+        title: "– รายงานผลด้านการใช้อำนาจตำแหน่งหน้าที่",
         href: "/sdc_download/ita2569-o22-01",
       },
       {
-        title: "– ด้านที่ 4.รายงานผล งานบุคคล ปี 2568",
+        title: "– รายงานผลด้านการบริหารงานบุคคล",
         href: "/sdc_download/ita2569-o22-02",
+      },
+      {
+        title: "– รายงานผลตามแผนบริหารความเสี่ยงการทุจริต ประจำปีงบประมาณ พ.ศ. 2568",
+        href: "/sdc_download/ita2569-o22-03",
+      },
+    ]);
+    expect(linksFor("O24")).toEqual([
+      {
+        title: "– 024รายงานผลการดำเนินการป้องกันการทุจริต ปีงบประมาณ 2568",
+        href: "/sdc_download/ita2569-o24-01",
       },
     ]);
     expect(linksFor("O25")).toEqual([
@@ -516,8 +545,11 @@ describe("applyItaHeadingsOverride", () => {
       "/wp-content/uploads/ita2569/O18/รายงานข้อมูลสถิติเรื่องร้องเรียนการทุจร.xlsx",
     );
     expect(section2024Html).toContain("/sdc_download/ita2569-o21-01");
+    expect(section2024Html).toContain("/sdc_download/ita2569-o21-02");
     expect(section2024Html).toContain("/sdc_download/ita2569-o22-01");
     expect(section2024Html).toContain("/sdc_download/ita2569-o22-02");
+    expect(section2024Html).toContain("/sdc_download/ita2569-o22-03");
+    expect(section2024Html).toContain("/sdc_download/ita2569-o24-01");
     expect(section2024Html).not.toContain("https://www.rtrda.or.th/en/");
   });
 });

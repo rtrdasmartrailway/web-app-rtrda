@@ -6,10 +6,7 @@ const THAI_ITA_PAGE_ID = "th-page-4837";
 
 export const ITA_HEADING_REPLACEMENTS: ReadonlyArray<[string, string]> = [
   ["O1 โครงสร้างและอำนาจหน้าที่", "O1 โครงสร้าง หน้าที่และอำนาจ"],
-  [
-    "O3 ข้อมูลการติดต่อ",
-    "O3 แบบวัดการเปิดเผยข้อมูลสาธารณะ (MOPH Open Data Integrity & Transparency Assessment: MOIT) ประจำปีงบประมาณ พ.ศ. 2569",
-  ],
+  ["O3 ข้อมูลการติดต่อ", "O3 ข้อมูลการติดต่อและช่องทางการสอบถาม"],
   ["O10 E–Service", "O10 ระบบการให้บริการผ่านช่องทางออนไลน์ (E-SERVICE)"],
   [
     "O11 ข้อมูลสถิติการให้บริการ",
@@ -96,7 +93,7 @@ const ITA_O25_UPLOAD_DIR = "/wp-content/uploads/ita2569/O25";
 const ITA_O26_UPLOAD_DIR = "/wp-content/uploads/ita2569/O26";
 
 const ITA_O4_NEWS_HREF =
-  "/สทร-เดินหน้ายกระดับองค์กรโปร่งใส-จัดโครงการพัฒนาและเพิ่มประสิทธิภาพการประเมิน-ITA-ประจำปี-2569";
+  "https://test.rtrda.or.th/category/%E0%B8%82%E0%B9%88%E0%B8%B2%E0%B8%A7%E0%B9%81%E0%B8%A5%E0%B8%B0%E0%B8%81%E0%B8%B4%E0%B8%88%E0%B8%81%E0%B8%A3%E0%B8%A3%E0%B8%A1";
 
 const ITA_LINK_OVERRIDES: ReadonlyArray<{
   marker: string;
@@ -133,8 +130,7 @@ const ITA_LINK_OVERRIDES: ReadonlyArray<{
     marker: "O4",
     links: [
       {
-        title:
-          "สทร. เดินหน้ายกระดับองค์กรโปร่งใส จัดโครงการพัฒนาและเพิ่มประสิทธิภาพการประเมิน ITA ประจำปี 2569",
+        title: "ข่าวประชาสัมพันธ์",
         href: ITA_O4_NEWS_HREF,
       },
     ],
@@ -148,7 +144,7 @@ const ITA_LINK_OVERRIDES: ReadonlyArray<{
       },
       {
         title: "คู่มือ การจัดการเรื่องร้องเรียนการทุจริตและประพฤติมิชอบ",
-        href: `${ITA_O8_UPLOAD_DIR}/คู่มือ_จนท._เรื่องการจัดการเรื่องร้องเรีย.pdf`,
+        href: sdcDownloadHref("ita2569-o8-02"),
       },
       {
         title: "คู่มือ การจัดการเรื่องร้องเรียนแจ้งเบาะแส",
@@ -476,7 +472,7 @@ const ITA_LINK_OVERRIDES: ReadonlyArray<{
         href: "https://test.rtrda.or.th/%E0%B8%AA%E0%B8%97%E0%B8%A3-%E0%B8%A3%E0%B9%88%E0%B8%A7%E0%B8%A1%E0%B8%9B%E0%B8%A3%E0%B8%B0%E0%B8%81%E0%B8%B2%E0%B8%A8%E0%B9%80%E0%B8%88%E0%B8%95%E0%B8%99%E0%B8%B2%E0%B8%A3%E0%B8%A1%E0%B8%93%E0%B9%8C-no-gift-policy-2569",
       },
       {
-        title: "หนังสือประกาศเจตนารมณ์ No Gift Policy ฉบับภาษาไทย",
+        title: 'หนังสือประกาศเจตนารมณ์ No Gift Policy "ฉบับภาษาไทยและภาษาอังกฤษ"',
         href: sdcDownloadInlineHref("ita2569-o20-01"),
       },
       {
@@ -493,8 +489,12 @@ const ITA_LINK_OVERRIDES: ReadonlyArray<{
     marker: "O21",
     links: [
       {
-        title: "การประเมินความเสี่ยงทุจริต_5_ขั้นตอน",
+        title: "การประเมินความเสี่ยงการทุจริตในหน่วยงานภาครัฐ ประจำปีงบประมาณ พ.ศ. 2569",
         href: sdcDownloadHref("ita2569-o21-01"),
+      },
+      {
+        title: "ประเมินความเสี่ยงด้านการทุจริตฯ ด้านการเบิกจ่ายเงินงบประมาณ",
+        href: sdcDownloadHref("ita2569-o21-02"),
       },
     ],
   },
@@ -502,13 +502,25 @@ const ITA_LINK_OVERRIDES: ReadonlyArray<{
     marker: "O22",
     links: [
       {
-        title:
-          "ด้านที่ 2 .รายงานผลด้านการใช้ตำแหน่งหน้าที่ราชการเพื่อช่วยเหลืออำนวยความสะดวก",
+        title: "รายงานผลด้านการใช้อำนาจตำแหน่งหน้าที่",
         href: sdcDownloadHref("ita2569-o22-01"),
       },
       {
-        title: "ด้านที่ 4.รายงานผล งานบุคคล ปี 2568",
+        title: "รายงานผลด้านการบริหารงานบุคคล",
         href: sdcDownloadHref("ita2569-o22-02"),
+      },
+      {
+        title: "รายงานผลตามแผนบริหารความเสี่ยงการทุจริต ประจำปีงบประมาณ พ.ศ. 2568",
+        href: sdcDownloadHref("ita2569-o22-03"),
+      },
+    ],
+  },
+  {
+    marker: "O24",
+    links: [
+      {
+        title: "024รายงานผลการดำเนินการป้องกันการทุจริต ปีงบประมาณ 2568",
+        href: sdcDownloadHref("ita2569-o24-01"),
       },
     ],
   },
