@@ -20,26 +20,39 @@ concurrency:
   group: web-app-rtrda-production
   cancel-in-progress: false
 
+env:
+  RTRDA_MAC_FALLBACK_DIR: /Users/jokertheripper/RTRDA-test-dgt-fallback-prodsource
+  COMPOSE_PROJECT_NAME: rtrda-test-dgt-fallback
+
 jobs:
   deploy-staging:
-    name: Deploy same SHA to test.rtrda.or.th first
+    name: Deploy same SHA to Mac fallback test.rtrda.or.th first
+    # Temporary DGT outage route: validate and deploy test.rtrda.or.th from
+    # Joker's Mac before promoting the same SHA to rtrda02 production.
+    # Required self-hosted runner labels: self-hosted, macOS, ARM64,
+    # rtrda-mac-test-fallback.
     runs-on:
       - self-hosted
-      - linux
-      - x64
-      - rtrda-web-test
+      - macOS
+      - ARM64
+      - rtrda-mac-test-fallback
 
     outputs:
       deploy_sha: ${{ steps.resolve.outputs.deploy_sha }}
 
     steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          clean: false
+
       - name: Resolve deploy SHA from main
         id: resolve
         env:
           INPUT_REF: ${{ github.event.inputs.ref || '' }}
         run: |
           set -euo pipefail
-          cd /srv/workspace/web-app-rtrda
           git fetch origin main --prune
           if [ -n "$INPUT_REF" ]; then
             DEPLOY_SHA="$(git rev-parse "$INPUT_REF")"
@@ -47,77 +60,80 @@ jobs:
             DEPLOY_SHA="$(git rev-parse origin/main)"
           fi
           git merge-base --is-ancestor "$DEPLOY_SHA" origin/main
+          git checkout --detach "$DEPLOY_SHA"
           echo "deploy_sha=$DEPLOY_SHA" >> "$GITHUB_OUTPUT"
           echo "Deploy SHA: $DEPLOY_SHA"
 
-      - name: Refuse dirty staging worktree
+      - name: Prepare Mac fallback env
+        env:
+          RTRDA_TEST_MAC_POSTGRES_PASSWORD: ${{ secrets.RTRDA_TEST_MAC_POSTGRES_PASSWORD || '' }}
         run: |
           set -euo pipefail
-          cd /srv/workspace/web-app-rtrda
-          if [ -n "$(git status --porcelain)" ]; then
-            echo "::error::/srv/workspace/web-app-rtrda has uncommitted or untracked files; refusing deploy."
-            git status --short
+          if [ -n "$RTRDA_TEST_MAC_POSTGRES_PASSWORD" ]; then
+            umask 077
+            printf 'POSTGRES_PASSWORD=%s\n' "$RTRDA_TEST_MAC_POSTGRES_PASSWORD" > .env
+          elif [ -f "$RTRDA_MAC_FALLBACK_DIR/.env" ]; then
+            cp "$RTRDA_MAC_FALLBACK_DIR/.env" .env
+          else
+            echo "::error::Missing .env. Set secret RTRDA_TEST_MAC_POSTGRES_PASSWORD or keep $RTRDA_MAC_FALLBACK_DIR/.env on the Mac runner."
             exit 1
           fi
+          grep -q '^POSTGRES_PASSWORD=' .env
+          python3 - <<'PY'
+          from pathlib import Path
+          from urllib.parse import quote
+          env_path = Path('.env')
+          lines = env_path.read_text().splitlines()
+          values = dict(line.split('=', 1) for line in lines if '=' in line and not line.startswith('#'))
+          password = values['POSTGRES_PASSWORD']
+          encoded = quote(password, safe='')
+          lines = [line for line in lines if not line.startswith(('DATABASE_URL=', 'DATABASE_URL_DOCKER='))]
+          lines.append('DATABASE_URL=' + 'postgresql://rtrda:' + encoded + '@127.0.0.1:5435/rtrda')
+          lines.append('DATABASE_URL_DOCKER=' + 'postgresql://rtrda:' + encoded + '@db-test-mac:5432/rtrda')
+          env_path.write_text('\n'.join(lines) + '\n')
+          PY
 
-      - name: Update staging checkout to exact SHA
-        env:
-          DEPLOY_SHA: ${{ steps.resolve.outputs.deploy_sha }}
-        run: |
-          set -euo pipefail
-          cd /srv/workspace/web-app-rtrda
-          git fetch origin main --prune
-          git checkout -B main "$DEPLOY_SHA"
-          git status -sb
-          git log --oneline -1
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
 
       - name: Install dependencies
-        run: |
-          set -euo pipefail
-          cd /srv/workspace/web-app-rtrda
-          npm ci
+        run: npm ci
 
       - name: Generate Prisma client
-        run: |
-          set -euo pipefail
-          cd /srv/workspace/web-app-rtrda
-          npx prisma generate
+        run: npx prisma generate
 
-      - name: Start staging database and apply migrations
+      - name: Start Mac fallback database and apply migrations
         run: |
           set -euo pipefail
-          cd /srv/workspace/web-app-rtrda
-          docker compose up -d db
+          docker compose -f docker-compose.mac-test.yml up -d db-test-mac
           for attempt in $(seq 1 30); do
-            if docker compose exec -T db pg_isready -U rtrda -d rtrda >/dev/null 2>&1; then
+            if docker compose -f docker-compose.mac-test.yml exec -T db-test-mac pg_isready -U rtrda -d rtrda >/dev/null 2>&1; then
               break
             fi
             sleep 2
           done
           npm run db:migrate
 
-      - name: Seed staging database from content manifest
-        run: |
-          set -euo pipefail
-          cd /srv/workspace/web-app-rtrda
-          npm run db:seed
+      - name: Seed Mac fallback database from content manifest
+        run: npm run db:seed
 
       - name: Run validation gates
         run: |
           set -euo pipefail
-          cd /srv/workspace/web-app-rtrda
           npm test
           npm run lint
           npm run typecheck
           npm run format:check
 
-      - name: Build and restart staging Docker Compose service
+      - name: Build and restart Mac fallback Docker Compose service
         run: |
           set -euo pipefail
-          cd /srv/workspace/web-app-rtrda
-          docker compose up -d --build web-app-rtrda-test
+          docker compose -f docker-compose.mac-test.yml up -d --build web-app-rtrda-test-mac
 
-      - name: Wait for staging health checks
+      - name: Wait for Mac fallback staging health checks
         run: |
           set -euo pipefail
           for attempt in $(seq 1 40); do
@@ -128,18 +144,31 @@ jobs:
           done
           curl -fsS https://test.rtrda.or.th/healthz
 
-      - name: Sync mirrored assets to rtrda02 production host
+      - name: Refresh stable fallback source copy for manual hotfixes
         run: |
           set -euo pipefail
-          cd /srv/workspace/web-app-rtrda
-          rsync -az --info=stats2 \
-            -e "ssh -i ~/.ssh/rtrda02_prod_preview_sync_ed25519 -o StrictHostKeyChecking=accept-new" \
-            public/wp-content/uploads/ \
-            rtrda@100.91.174.121:/srv/apps/web-app-rtrda/public/wp-content/uploads/
-          rsync -az --info=stats2 \
-            -e "ssh -i ~/.ssh/rtrda02_prod_preview_sync_ed25519 -o StrictHostKeyChecking=accept-new" \
-            public/sdc-downloads/ \
-            rtrda@100.91.174.121:/srv/apps/web-app-rtrda/public/sdc-downloads/
+          mkdir -p "$RTRDA_MAC_FALLBACK_DIR"
+          rsync -a --delete             --exclude='.git/'             --exclude='node_modules/'             --exclude='.next/'             --exclude='.env'             --exclude='.env.*'             --exclude='cloudflared-launchagent.*.log'             --exclude='public/wp-content/uploads/'             --exclude='public/sdc-downloads/'             ./ "$RTRDA_MAC_FALLBACK_DIR/"
+
+      - name: Best-effort sync committed public assets to rtrda02 production host
+        continue-on-error: true
+        run: |
+          set -euo pipefail
+          if [ ! -d public/wp-content/uploads ] && [ ! -d public/sdc-downloads ]; then
+            echo "No committed public asset directories found; skipping asset sync."
+            exit 0
+          fi
+          SSH_KEY="$HOME/.ssh/valent_rtrda02_ed25519"
+          if [ ! -f "$SSH_KEY" ]; then
+            echo "::warning::Missing $SSH_KEY; skipping rtrda02 asset sync."
+            exit 0
+          fi
+          if [ -d public/wp-content/uploads ]; then
+            rsync -az --info=stats2               -e "ssh -i $SSH_KEY -o StrictHostKeyChecking=accept-new"               public/wp-content/uploads/               rtrda@100.91.174.121:/srv/apps/web-app-rtrda/public/wp-content/uploads/
+          fi
+          if [ -d public/sdc-downloads ]; then
+            rsync -az --info=stats2               -e "ssh -i $SSH_KEY -o StrictHostKeyChecking=accept-new"               public/sdc-downloads/               rtrda@100.91.174.121:/srv/apps/web-app-rtrda/public/sdc-downloads/
+          fi
 
   deploy-production:
     name: Deploy rtrda.or.th on rtrda02
