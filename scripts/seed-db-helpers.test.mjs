@@ -237,7 +237,11 @@ describe("manifestToRows", () => {
       "2026-06-18T09:00:00",
       "2026-06-13T09:00:00",
     ]);
-    expect(restoredNews[0].contentHtml).toContain("ดูโพสต์ต้นทางบน Facebook");
+    expect(restoredNews[0].contentHtml).toContain("การพัฒนารถไฟท่องเที่ยว Siamese Train");
+    expect(restoredNews[0].contentHtml).not.toContain("ดูโพสต์ต้นทางบน Facebook");
+    expect(
+      restoredNews.find((record) => record.id === "th-post-91006")?.contentHtml,
+    ).toContain("Workshop ประเมินศักยภาพองค์กร");
 
     const restoredMedia = rows.media.filter((asset) =>
       asset.localPath.includes("/wp-content/uploads/news-2569/fb-"),
