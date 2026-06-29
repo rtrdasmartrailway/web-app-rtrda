@@ -181,16 +181,16 @@ const ITA_LINK_OVERRIDES: ReadonlyArray<{
     marker: "O10",
     links: [
       {
-        title: "ข้อมูลสถิติการขอรับบริการผ่านช่องทางออนไลน์(E-service)",
-        href: ITA_O10_E_SERVICE_STATS_HREF,
+        title: "E-Service",
+        href: "/e-services",
       },
       {
         title: "คู่มือการให้บริการ-E-Service",
         href: "/wp-content/uploads/ita2569/O10/o10-คู่มือการให้บริการ-E-Service.pdf",
       },
       {
-        title: "E-Service",
-        href: "/e-services",
+        title: "ข้อมูลสถิติการขอรับบริการผ่านช่องทางออนไลน์(E-service)",
+        href: ITA_O10_E_SERVICE_STATS_HREF,
       },
     ],
   },

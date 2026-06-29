@@ -303,6 +303,20 @@ describe("applyItaHeadingsOverride", () => {
       },
     ]);
     expect(section2024).not.toContain("Mobile-Lab-v7-Final");
+    expect(linksFor("O10")).toEqual([
+      {
+        title: "– E-Service",
+        href: "/e-services",
+      },
+      {
+        title: "– คู่มือการให้บริการ-E-Service",
+        href: "/wp-content/uploads/ita2569/O10/o10-คู่มือการให้บริการ-E-Service.pdf",
+      },
+      {
+        title: "– ข้อมูลสถิติการขอรับบริการผ่านช่องทางออนไลน์(E-service)",
+        href: "/wp-content/uploads/ita2569/O10/ข้อมูลสถิติการขอรับบริการผ่านช่องทางออนไลน์(E-service).pdf",
+      },
+    ]);
     expect(linksFor("O11")).toEqual([
       {
         title: "– O11 ไตรมาสที่ 1",
