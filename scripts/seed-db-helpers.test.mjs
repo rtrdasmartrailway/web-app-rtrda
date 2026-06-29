@@ -105,7 +105,7 @@ describe("manifestToRows", () => {
   const rows = manifestToRows(manifest);
 
   it("maps records, coercing wpId to string and defaulting optional fields", () => {
-    expect(rows.records).toHaveLength(3);
+    expect(rows.records).toHaveLength(11);
     const [page, post] = rows.records;
     expect(page).toMatchObject({
       id: "th-page-1",
@@ -215,7 +215,38 @@ describe("manifestToRows", () => {
     });
   });
 
-  it("adds the No Gift Policy news link to the news category listing", () => {
+  it("adds the restored Facebook news records and media", () => {
+    const restoredNews = rows.records.filter((record) =>
+      record.id.startsWith("th-post-910"),
+    );
+    expect(restoredNews).toHaveLength(8);
+    expect(restoredNews.map((record) => record.title)).toEqual(
+      expect.arrayContaining([
+        expect.stringContaining("Siamese Train"),
+        expect.stringContaining("Incubation Team"),
+        expect.stringContaining("IIT"),
+      ]),
+    );
+    expect(restoredNews.map((record) => record.date)).toEqual([
+      "2026-06-24T09:00:00",
+      "2026-06-23T13:00:00",
+      "2026-06-23T10:30:00",
+      "2026-06-22T10:00:00",
+      "2026-06-20T09:00:00",
+      "2026-06-19T09:00:00",
+      "2026-06-18T09:00:00",
+      "2026-06-13T09:00:00",
+    ]);
+    expect(restoredNews[0].contentHtml).toContain("ดูโพสต์ต้นทางบน Facebook");
+
+    const restoredMedia = rows.media.filter((asset) =>
+      asset.localPath.includes("/wp-content/uploads/news-2569/fb-"),
+    );
+    expect(restoredMedia).toHaveLength(8);
+    expect(restoredMedia[0]).toMatchObject({ mimeType: "image/jpeg" });
+  });
+
+  it("adds the No Gift Policy and restored Facebook news links to the news category listing", () => {
     const rowsWithCategory = manifestToRows({
       ...manifest,
       records: [
@@ -266,7 +297,9 @@ describe("manifestToRows", () => {
       rowsWithCategory.categories.find(
         (category) => category.id === 7 && category.language === "th",
       )?.count,
-    ).toBe(2);
+    ).toBe(10);
+    expect(category?.contentHtml).toContain("Siamese Train");
+    expect(category?.contentHtml).toContain("Incubation Team");
   });
 
   it("does not duplicate supplemental ITA 2569 downloads from the manifest", () => {
