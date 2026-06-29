@@ -355,6 +355,15 @@ export const getPageData = cache(async (path: string): Promise<PageData | null> 
  * featuredMediaId. Each <li> is `<a href=path>title<time/><p>excerpt</p></a>`.
  */
 async function fetchCategoryNewsCards(record: WpContentRecord): Promise<Card[]> {
+  const categoryMatch = record.path.match(/^\/category\/([^/]+)(?:\/page\/(\d+))?$/);
+  if (categoryMatch) {
+    const slug = decodeURIComponent(categoryMatch[1]);
+    const category = await getCategoryBySlug(slug);
+    if (category) {
+      return fetchCards(await getPostsByCategory(category.id, record.language, 10));
+    }
+  }
+
   const liMatches = [...record.contentHtml.matchAll(/<li>([\s\S]*?)<\/li>/g)];
   if (liMatches.length === 0) return [];
 
