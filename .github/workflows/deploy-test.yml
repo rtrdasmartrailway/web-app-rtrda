@@ -10,21 +10,27 @@ concurrency:
   group: web-app-rtrda-test
   cancel-in-progress: true
 
+env:
+  RTRDA_MAC_FALLBACK_DIR: /Users/jokertheripper/RTRDA-test-dgt-fallback-prodsource
+  COMPOSE_PROJECT_NAME: rtrda-test-dgt-fallback
+
 jobs:
   deploy:
-    name: Build and deploy test site
+    name: Build and deploy test site on Mac fallback
+    # Temporary DGT outage route: deploy test.rtrda.or.th from Joker's Mac.
+    # Required self-hosted runner labels: self-hosted, macOS, ARM64,
+    # rtrda-mac-test-fallback.
     runs-on:
       - self-hosted
-      - linux
-      - x64
-      - rtrda-web-test
+      - macOS
+      - ARM64
+      - rtrda-mac-test-fallback
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          # Keep mirrored uploads between runs so the WordPress import is
-          # incremental instead of re-downloading ~4 GB every deploy.
+          # Keep the local runner workspace warm for faster emergency deploys.
           clean: false
 
       - name: Set up Node.js
@@ -33,53 +39,86 @@ jobs:
           node-version: 22
           cache: npm
 
+      - name: Prepare Mac fallback env
+        env:
+          RTRDA_TEST_MAC_POSTGRES_PASSWORD: ${{ secrets.RTRDA_TEST_MAC_POSTGRES_PASSWORD || '' }}
+        run: |
+          set -euo pipefail
+          if [ -n "$RTRDA_TEST_MAC_POSTGRES_PASSWORD" ]; then
+            umask 077
+            printf 'POSTGRES_PASSWORD=%s\n' "$RTRDA_TEST_MAC_POSTGRES_PASSWORD" > .env
+          elif [ -f "$RTRDA_MAC_FALLBACK_DIR/.env" ]; then
+            cp "$RTRDA_MAC_FALLBACK_DIR/.env" .env
+          else
+            echo "::error::Missing .env. Set secret RTRDA_TEST_MAC_POSTGRES_PASSWORD or keep $RTRDA_MAC_FALLBACK_DIR/.env on the Mac runner."
+            exit 1
+          fi
+          grep -q '^POSTGRES_PASSWORD=' .env
+          python3 - <<'PY'
+          from pathlib import Path
+          from urllib.parse import quote
+          env_path = Path('.env')
+          lines = env_path.read_text().splitlines()
+          values = dict(line.split('=', 1) for line in lines if '=' in line and not line.startswith('#'))
+          password = values['POSTGRES_PASSWORD']
+          encoded = quote(password, safe='')
+          lines = [line for line in lines if not line.startswith(('DATABASE_URL=', 'DATABASE_URL_DOCKER='))]
+          lines.append('DATABASE_URL=' + 'postgresql://rtrda:' + encoded + '@127.0.0.1:5435/rtrda')
+          lines.append('DATABASE_URL_DOCKER=' + 'postgresql://rtrda:' + encoded + '@db-test-mac:5432/rtrda')
+          env_path.write_text('\n'.join(lines) + '\n')
+          PY
+
       - name: Install dependencies
         run: npm ci
 
       - name: Generate Prisma client
         run: npx prisma generate
 
-      - name: Start database and apply migrations
+      - name: Start Mac fallback database and apply migrations
         run: |
-          docker compose up -d db
-          # Wait for Postgres to accept connections before migrating.
+          set -euo pipefail
+          docker compose -f docker-compose.mac-test.yml up -d db-test-mac
           for attempt in $(seq 1 30); do
-            if docker compose exec -T db pg_isready -U rtrda -d rtrda >/dev/null 2>&1; then
+            if docker compose -f docker-compose.mac-test.yml exec -T db-test-mac pg_isready -U rtrda -d rtrda >/dev/null 2>&1; then
               break
             fi
             sleep 2
           done
           npm run db:migrate
 
-      - name: Seed database from content manifest
+      - name: Seed Mac fallback database from content manifest
         run: npm run db:seed
 
-      - name: Run unit tests
-        run: npm test
-
-      - name: Run lint
-        run: npm run lint
-
-      - name: Run typecheck
-        run: npm run typecheck
-
-      - name: Check formatting
-        run: npm run format:check
-
-      - name: Build and restart Docker Compose service
-        run: docker compose up -d --build web-app-rtrda-test
-
-      - name: Wait for local health check
+      - name: Run validation gates
         run: |
-          for attempt in $(seq 1 30); do
-            if curl -fsS http://127.0.0.1:3020 >/dev/null; then
-              exit 0
+          set -euo pipefail
+          npm test
+          npm run lint
+          npm run typecheck
+          npm run format:check
+
+      - name: Build and restart Mac fallback Docker Compose service
+        run: |
+          set -euo pipefail
+          docker compose -f docker-compose.mac-test.yml up -d --build web-app-rtrda-test-mac
+
+      - name: Wait for local and public health checks
+        run: |
+          set -euo pipefail
+          for attempt in $(seq 1 40); do
+            if curl -fsS http://127.0.0.1:3020/healthz; then
+              break
             fi
             sleep 3
           done
-          docker compose ps
-          docker compose logs --tail=120 web-app-rtrda-test
-          exit 1
+          curl -fsS https://test.rtrda.or.th/healthz
+          curl -fsSI https://test.rtrda.or.th/ | sed -n '1,20p'
+
+      - name: Refresh stable fallback source copy for manual hotfixes
+        run: |
+          set -euo pipefail
+          mkdir -p "$RTRDA_MAC_FALLBACK_DIR"
+          rsync -a --delete             --exclude='.git/'             --exclude='node_modules/'             --exclude='.next/'             --exclude='.env'             --exclude='.env.*'             --exclude='cloudflared-launchagent.*.log'             --exclude='public/wp-content/uploads/'             --exclude='public/sdc-downloads/'             ./ "$RTRDA_MAC_FALLBACK_DIR/"
 
       - name: Purge Cloudflare edge cache (optional)
         if: ${{ always() }}
@@ -87,20 +126,12 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ZONE_ID: ${{ secrets.CLOUDFLARE_ZONE_ID }}
         run: |
-          # Without these secrets the deploy relies on the s-maxage we set
-          # in next.config.ts (60s edge TTL, 300s SWR). With them we issue
-          # a "purge everything" so the deploy is visible immediately.
+          # Without these secrets the deploy relies on the app's configured edge TTL.
           if [ -z "$CLOUDFLARE_API_TOKEN" ] || [ -z "$CLOUDFLARE_ZONE_ID" ]; then
-            echo "::notice::No CLOUDFLARE_API_TOKEN/ZONE_ID secrets set; relying on TTL (deploys visible within ~5 min)."
+            echo "::notice::No CLOUDFLARE_API_TOKEN/ZONE_ID secrets set; relying on TTL."
             exit 0
           fi
-          echo "Purging Cloudflare cache for zone $CLOUDFLARE_ZONE_ID"
-          curl -fsS -X POST \
-            "https://api.cloudflare.com/client/v4/zones/${CLOUDFLARE_ZONE_ID}/purge_cache" \
-            -H "Authorization: Bearer ${CLOUDFLARE_API_TOKEN}" \
-            -H "Content-Type: application/json" \
-            --data '{"purge_everything":true}' \
-            | tee /tmp/cf-purge.json
+          curl -fsS -X POST             "https://api.cloudflare.com/client/v4/zones/${CLOUDFLARE_ZONE_ID}/purge_cache"             -H "Authorization: Bearer ${CLOUDFLARE_API_TOKEN}"             -H "Content-Type: application/json"             --data '{"purge_everything":true}'             | tee /tmp/cf-purge.json
           grep -q '"success":\s*true' /tmp/cf-purge.json || {
-            echo "::warning::Cloudflare purge did not report success; deploy will be visible once the edge TTL expires."
+            echo "::warning::Cloudflare purge did not report success; deploy will be visible once edge TTL expires."
           }
