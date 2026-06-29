@@ -85,6 +85,11 @@ const ITA_O9_UPLOAD_DIR = "/wp-content/uploads/ita2569/O9";
 const ITA_O11_UPLOAD_DIR = "/wp-content/uploads/ita2569/O11";
 const ITA_O12_UPLOAD_DIR = "/wp-content/uploads/ita2569/O12";
 const ITA_O13_UPLOAD_DIR = "/wp-content/uploads/ita2569/O13";
+const ITA_O19_SECOND_GROUP_TITLE =
+  "รายงานผลการเปิดโอกาสให้บุคคลภายนอกได้มีส่วนร่วมในการดำเนินงานตามภารกิจปีงบประมาณ 2569";
+const ITA_O24_TITLE = "024รายงานผลการดำเนินการป้องกันการทุจริต ปี";
+const ITA_O26_TITLE =
+  "รายงานผลการดำเนินการเพื่อส่งเสริมคุณธรรมและความโปร่งใสภายในหน่วยงานปีงบประมาณ พ.ศ. 2568";
 const ITA_O14_UPLOAD_DIR = "/wp-content/uploads/ita2569/O14";
 const ITA_O15_UPLOAD_DIR = "/wp-content/uploads/ita2569/O15";
 const ITA_O16_UPLOAD_DIR = "/wp-content/uploads/ita2569/O16";
@@ -95,9 +100,15 @@ const ITA_O26_UPLOAD_DIR = "/wp-content/uploads/ita2569/O26";
 const ITA_O4_NEWS_HREF =
   "https://test.rtrda.or.th/category/%E0%B8%82%E0%B9%88%E0%B8%B2%E0%B8%A7%E0%B9%81%E0%B8%A5%E0%B8%B0%E0%B8%81%E0%B8%B4%E0%B8%88%E0%B8%81%E0%B8%A3%E0%B8%A3%E0%B8%A1";
 
+type ItaLinkOverrideItem = {
+  title: string;
+  href?: string;
+  children?: ReadonlyArray<{ title: string; href: string }>;
+};
+
 const ITA_LINK_OVERRIDES: ReadonlyArray<{
   marker: string;
-  links: ReadonlyArray<{ title: string; href: string }>;
+  links: ReadonlyArray<ItaLinkOverrideItem>;
 }> = [
   {
     marker: "O1",
@@ -191,6 +202,11 @@ const ITA_LINK_OVERRIDES: ReadonlyArray<{
       {
         title: "ข้อมูลสถิติการขอรับบริการผ่านช่องทางออนไลน์(E-service)",
         href: ITA_O10_E_SERVICE_STATS_HREF,
+      },
+      {
+        title:
+          "สทร. เดินหน้ายกระดับองค์กรโปร่งใส จัดโครงการพัฒนาและเพิ่มประสิทธิภาพการประเมิน ITA ประจำปี 2569",
+        href: "https://www.rtrda.or.th/%E0%B8%AA%E0%B8%97%E0%B8%A3-%E0%B9%80%E0%B8%94%E0%B8%B4%E0%B8%99%E0%B8%AB%E0%B8%99%E0%B9%89%E0%B8%B2%E0%B8%A2%E0%B8%81%E0%B8%A3%E0%B8%B0%E0%B8%94%E0%B8%B1%E0%B8%9A%E0%B8%AD%E0%B8%87%E0%B8%84%E0%B9%8C%E0%B8%81%E0%B8%A3%E0%B9%82%E0%B8%9B%E0%B8%A3%E0%B9%88%E0%B8%87%E0%B9%83%E0%B8%AA-%E0%B8%88%E0%B8%B1%E0%B8%94%E0%B9%82%E0%B8%84%E0%B8%A3%E0%B8%87%E0%B8%81%E0%B8%B2%E0%B8%A3%E0%B8%9E%E0%B8%B1%E0%B8%92%E0%B8%99%E0%B8%B2%E0%B9%81%E0%B8%A5%E0%B8%B0%E0%B9%80%E0%B8%9E%E0%B8%B4%E0%B9%88%E0%B8%A1%E0%B8%9B%E0%B8%A3%E0%B8%B0%E0%B8%AA%E0%B8%B4%E0%B8%97%E0%B8%98%E0%B8%B4%E0%B8%A0%E0%B8%B2%E0%B8%9E%E0%B8%81%E0%B8%B2%E0%B8%A3%E0%B8%9B%E0%B8%A3%E0%B8%B0%E0%B9%80%E0%B8%A1%E0%B8%B4%E0%B8%99-ITA-%E0%B8%9B%E0%B8%A3%E0%B8%B0%E0%B8%88%E0%B8%B3%E0%B8%9B%E0%B8%B5-2569",
       },
     ],
   },
@@ -324,12 +340,12 @@ const ITA_LINK_OVERRIDES: ReadonlyArray<{
     marker: "O13",
     links: [
       {
-        title: "ข้อบังคับว่าด้วยการบริหารงานบุคคล",
-        href: `${ITA_O13_UPLOAD_DIR}/o13_ข้อบังคับว่าด้วยการบริหารงานบุคคล.pdf`,
+        title: "หลักเกณฑ์สรรหา บรรจุ แต่งตั้ง",
+        href: `${ITA_O13_UPLOAD_DIR}/1_หลักเกณฑ์สรรหา_บรรจุ_แต่งตั้ง.pdf`,
       },
       {
-        title: "หลักเกณฑ์สรรหา บรรจุ แต่งตั้ง",
-        href: `${ITA_O13_UPLOAD_DIR}/o13_หลักเกณฑ์สรรหา_บรรจุ_แต่งตั้ง.pdf`,
+        title: "ข้อบังคับว่าด้วยการบริหารงานบุคคล",
+        href: `${ITA_O13_UPLOAD_DIR}/o13_ข้อบังคับว่าด้วยการบริหารงานบุคคล.pdf`,
       },
       {
         title: "แผนบริหารทรัพยากรบุคคล ปี 2569",
@@ -338,6 +354,18 @@ const ITA_LINK_OVERRIDES: ReadonlyArray<{
       {
         title: "แผนพัฒนาทรัพยากรบุคคล ปี 2569",
         href: `${ITA_O13_UPLOAD_DIR}/o13_แผนพัฒนาทรัพยากรบุคคล_ปี_2569.pdf`,
+      },
+      {
+        title: "หลักเกณฑ์การเข้าสู่ตำแหน่ง ปรับระดับตำแหน่ง",
+        href: `${ITA_O13_UPLOAD_DIR}/o13_2_หลักเกณฑ์การเข้าสู่ตำแหน่ง_ปรับระดับตำแหน่ง.pdf`,
+      },
+      {
+        title: "หลักเกณฑ์และวิธีการประเมินผลการปฏิบัติงาน",
+        href: `${ITA_O13_UPLOAD_DIR}/o13_3_หลักเกณฑ์และวิธีการประเมินผลการปฏิบัติงาน.pdf`,
+      },
+      {
+        title: "หลักเกณฑ์การปรับวุฒิและปรับอัตราค่าจ้างตามคุณวุฒิ",
+        href: `${ITA_O13_UPLOAD_DIR}/o13_4_หลักเกณฑ์การปรับวุฒิและปรับอัตราค่าจ้างตามคุณวุฒิ.pdf`,
       },
     ],
   },
@@ -436,34 +464,40 @@ const ITA_LINK_OVERRIDES: ReadonlyArray<{
       {
         title: ITA_O19_NEWS_TITLE,
         href: "https://test.rtrda.or.th/สทร-จัดประชุมเทคนิคพิจ-3/",
+        children: [
+          {
+            title: "แบบฟอร์มการมีส่วนร่วมo19_v3",
+            href: sdcDownloadHref("ita2569-o19-01"),
+          },
+          {
+            title: "เอกสารประกอบที่ 1 คำสั่งสทรที่52-2568",
+            href: sdcDownloadHref("ita2569-o19-02"),
+          },
+          {
+            title: "เอกสารประกอบที่ 2 รายงานประชุม ครั้งที่ 4-2568",
+            href: sdcDownloadHref("ita2569-o19-03"),
+          },
+          {
+            title: "เอกสารประกอบที่ 3 สรุปการประชุมTechnical Hearing",
+            href: sdcDownloadHref("ita2569-o19-04"),
+          },
+          {
+            title: "เอกสารประกอบที่ 4 รายงานประชุม ครั้งที่ 10-2568",
+            href: sdcDownloadHref("ita2569-o19-05"),
+          },
+          {
+            title: "เอกสารประกอบที่ 5 รายงานการประชุม ครั้งที่ 26(4)-2568",
+            href: sdcDownloadHref("ita2569-o19-06"),
+          },
+          {
+            title: "เอกสารประกอบที่ 6 รายงานการจัดทำประชาพิจารณ์",
+            href: sdcDownloadHref("ita2569-o19-07"),
+          },
+        ],
       },
       {
-        title: "แบบฟอร์มการมีส่วนร่วมo19_v3",
-        href: sdcDownloadHref("ita2569-o19-01"),
-      },
-      {
-        title: "เอกสารประกอบที่ 1 คำสั่งสทรที่52-2568",
-        href: sdcDownloadHref("ita2569-o19-02"),
-      },
-      {
-        title: "เอกสารประกอบที่ 2 รายงานประชุม ครั้งที่ 4-2568",
-        href: sdcDownloadHref("ita2569-o19-03"),
-      },
-      {
-        title: "เอกสารประกอบที่ 3 สรุปการประชุมTechnical Hearing",
-        href: sdcDownloadHref("ita2569-o19-04"),
-      },
-      {
-        title: "เอกสารประกอบที่ 4 รายงานประชุม ครั้งที่ 10-2568",
-        href: sdcDownloadHref("ita2569-o19-05"),
-      },
-      {
-        title: "เอกสารประกอบที่ 5 รายงานการประชุม ครั้งที่ 26(4)-2568",
-        href: sdcDownloadHref("ita2569-o19-06"),
-      },
-      {
-        title: "เอกสารประกอบที่ 6 รายงานการจัดทำประชาพิจารณ์",
-        href: sdcDownloadHref("ita2569-o19-07"),
+        title: ITA_O19_SECOND_GROUP_TITLE,
+        href: sdcDownloadHref("ita2569-o19-08"),
       },
     ],
   },
@@ -523,7 +557,7 @@ const ITA_LINK_OVERRIDES: ReadonlyArray<{
     marker: "O24",
     links: [
       {
-        title: "024รายงานผลการดำเนินการป้องกันการทุจริต ปีงบประมาณ 2568",
+        title: ITA_O24_TITLE,
         href: sdcDownloadHref("ita2569-o24-01"),
       },
     ],
@@ -541,7 +575,7 @@ const ITA_LINK_OVERRIDES: ReadonlyArray<{
     marker: "O26",
     links: [
       {
-        title: "รายงานผลการดำเนินการเพื่อส่งเสริมคุณธรรม",
+        title: ITA_O26_TITLE,
         href: `${ITA_O26_UPLOAD_DIR}/รายงานผลการดำเนินการเพื่อส่งเสริมคุณธรรม.pdf`,
       },
     ],
@@ -621,11 +655,26 @@ function isItaHeadingParagraph($: cheerio.CheerioAPI, element: AnyNode): boolean
   return /^O\d+\b/.test($(element).text().trim());
 }
 
-function linkParagraph($: cheerio.CheerioAPI, title: string, href: string): string {
+function linkParagraph($: cheerio.CheerioAPI, item: ItaLinkOverrideItem): string {
   const paragraph = $("<p></p>");
   const link = $("<a></a>");
-  link.attr("href", href);
-  link.text(`– ${title}`);
+  if (item.href) {
+    link.attr("href", item.href);
+  }
+  link.text(`– ${item.title}`);
+  paragraph.append(link);
+  return $.html(paragraph);
+}
+
+function childLinkParagraph(
+  $: cheerio.CheerioAPI,
+  child: { title: string; href: string },
+): string {
+  const paragraph = $("<p></p>");
+  paragraph.addClass("ita-sub-link");
+  const link = $("<a></a>");
+  link.attr("href", child.href);
+  link.text(`• ${child.title}`);
   paragraph.append(link);
   return $.html(paragraph);
 }
@@ -668,10 +717,16 @@ function applyLinkOverridesToSubtree(
       scan = scan.next();
     }
 
-    const expectedLinks = override.links.map((link) => ({
-      title: `– ${link.title}`,
-      href: link.href,
-    }));
+    const expectedLinks = override.links.flatMap((link) => [
+      {
+        title: `– ${link.title}`,
+        href: link.href,
+      },
+      ...(link.children ?? []).map((child) => ({
+        title: `• ${child.title}`,
+        href: child.href,
+      })),
+    ]);
     const linksAlreadyMatch =
       existingLinks.length === expectedLinks.length &&
       existingLinks.every(
@@ -699,9 +754,13 @@ function applyLinkOverridesToSubtree(
       current.remove();
     }
 
-    $heading.after(
-      override.links.map((link) => linkParagraph($, link.title, link.href)).join("\n"),
-    );
+    const newLinksHtml = override.links
+      .flatMap((link) => [
+        linkParagraph($, link),
+        ...(link.children ?? []).map((child) => childLinkParagraph($, child)),
+      ])
+      .join("\n");
+    $heading.after(newLinksHtml);
     didChange = true;
   }
 

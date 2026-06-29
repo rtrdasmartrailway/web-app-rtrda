@@ -5,6 +5,7 @@ import type {
   BoardExecutivePresentation,
 } from "@/lib/wp/board-executives";
 import type { WpLanguage } from "@/lib/wp/types";
+import { ExecutiveDetailButton } from "./executive-detail-button";
 import { ManagerSubUnitsButton } from "./manager-sub-units-button";
 import styles from "./board-executive-org-chart.module.css";
 
@@ -75,6 +76,11 @@ function PersonCard({
             </dd>
           </div>
         </dl>
+      ) : null}
+      {!person.vacant ? (
+        <div className={styles.detailButtonWrap}>
+          <ExecutiveDetailButton name={person.name} />
+        </div>
       ) : null}
       {showSubUnitsButton && !person.vacant ? (
         <div className={styles.subUnitsButtonWrap}>

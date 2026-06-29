@@ -201,6 +201,120 @@
   text-underline-offset: 3px;
 }
 
+.detailButtonWrap {
+  display: flex;
+  justify-content: center;
+  margin-top: auto;
+  padding-top: 8px;
+}
+
+.detailButton {
+  align-items: center;
+  background: linear-gradient(135deg, var(--accent), var(--accent-deep));
+  border: 0;
+  border-radius: 999px;
+  box-shadow: 0 10px 24px rgba(0, 78, 143, 0.18);
+  color: #fff;
+  cursor: pointer;
+  display: inline-flex;
+  font-size: calc(13px * var(--reader-scale));
+  font-weight: 800;
+  justify-content: center;
+  min-height: 36px;
+  padding: 8px 18px;
+}
+
+.detailButton:hover,
+.detailButton:focus-visible {
+  filter: brightness(1.05);
+  outline: 3px solid rgba(37, 99, 235, 0.2);
+  outline-offset: 2px;
+}
+
+.detailOverlay {
+  align-items: center;
+  background: rgba(15, 23, 42, 0.56);
+  display: flex;
+  inset: 0;
+  justify-content: center;
+  padding: 20px;
+  position: fixed;
+  z-index: 90;
+}
+
+.detailDialog {
+  background: #fff;
+  border-radius: 22px;
+  box-shadow: 0 28px 80px rgba(2, 6, 23, 0.32);
+  color: var(--navy-900);
+  max-height: min(86vh, 720px);
+  max-width: min(92vw, 760px);
+  overflow: hidden;
+  text-align: left;
+  width: 100%;
+}
+
+.detailHeader {
+  align-items: center;
+  background: linear-gradient(135deg, #eff6ff, #fff);
+  border-bottom: 1px solid rgba(148, 163, 184, 0.24);
+  display: flex;
+  gap: 16px;
+  justify-content: space-between;
+  padding: 20px 24px;
+}
+
+.detailHeader h3 {
+  color: var(--navy-900);
+  font-size: calc(22px * var(--reader-scale));
+  font-weight: 850;
+  line-height: 1.35;
+  margin: 0;
+}
+
+.detailClose {
+  align-items: center;
+  background: #fff;
+  border: 1px solid rgba(148, 163, 184, 0.4);
+  border-radius: 999px;
+  color: var(--navy-900);
+  cursor: pointer;
+  display: inline-flex;
+  font-size: 28px;
+  font-weight: 700;
+  height: 42px;
+  justify-content: center;
+  line-height: 1;
+  width: 42px;
+}
+
+.detailBody {
+  display: grid;
+  gap: 18px;
+  max-height: calc(min(86vh, 720px) - 86px);
+  overflow: auto;
+  padding: 22px 28px 28px;
+}
+
+.detailBody h4 {
+  color: var(--accent-deep);
+  font-size: calc(17px * var(--reader-scale));
+  font-weight: 850;
+  margin: 0 0 8px;
+}
+
+.detailBody ul {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding-left: 1.2rem;
+}
+
+.detailBody li {
+  font-size: calc(15px * var(--reader-scale));
+  line-height: 1.7;
+}
+
 .subUnitsButtonWrap {
   display: flex;
   justify-content: center;

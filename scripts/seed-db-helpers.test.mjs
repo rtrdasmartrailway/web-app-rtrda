@@ -153,6 +153,7 @@ describe("manifestToRows", () => {
       "ita2569-o19-05",
       "ita2569-o19-06",
       "ita2569-o19-07",
+      "ita2569-o19-08",
     ]);
     expect(o19Downloads[0]).toMatchObject({
       localPath: "/sdc-downloads/ita2569-o19-01.pdf",
