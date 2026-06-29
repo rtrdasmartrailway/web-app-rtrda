@@ -136,6 +136,18 @@ jobs:
           grep -q '^DATABASE_URL=' .env.production
           cp .env.production .env
 
+      - name: Sync committed upload assets to production bind mount
+        run: |
+          set -euo pipefail
+          cd /srv/apps/web-app-rtrda-production
+          if [ -d public/wp-content/uploads/news-2569 ]; then
+            mkdir -p /srv/apps/web-app-rtrda/public/wp-content/uploads/news-2569
+            rsync -a public/wp-content/uploads/news-2569/ /srv/apps/web-app-rtrda/public/wp-content/uploads/news-2569/
+            chmod -R a+rX /srv/apps/web-app-rtrda/public/wp-content/uploads/news-2569
+          else
+            echo "No committed news-2569 upload assets to sync."
+          fi
+
       - name: Install dependencies
         run: |
           set -euo pipefail

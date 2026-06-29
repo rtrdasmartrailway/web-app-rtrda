@@ -99,10 +99,20 @@ jobs:
           npm run typecheck
           npm run format:check
 
+      - name: Sync committed upload assets into Mac fallback volume
+        run: |
+          set -euo pipefail
+          if [ -d public/wp-content/uploads/news-2569 ]; then
+            tar -C public/wp-content/uploads -cf - news-2569 | docker run --rm -i               -v rtrda-test-mac-uploads:/dest               --entrypoint sh postgres:17-alpine               -lc 'cd /dest && tar -xf - && chmod -R a+rX news-2569'
+          else
+            echo "No committed news-2569 upload assets to sync."
+          fi
+
       - name: Build and restart Mac fallback Docker Compose service
         run: |
           set -euo pipefail
           docker compose -f docker-compose.mac-test.yml up -d --build web-app-rtrda-test-mac
+          docker exec -u root web-app-rtrda-test-mac sh -lc 'rm -rf /app/.next/server/app/wp-content/uploads/news-2569/fb-* 2>/dev/null || true'
 
       - name: Wait for local and public health checks
         run: |
