@@ -35,6 +35,9 @@ jobs:
       - ARM64
       - rtrda-mac-test-fallback
 
+    env:
+      COMPOSE_PROJECT_NAME: rtrda-test-dgt-fallback
+
     outputs:
       deploy_sha: ${{ steps.resolve.outputs.deploy_sha }}
 
