@@ -2,6 +2,7 @@ import { cache } from "react";
 import type {
   WpContentRecord,
   WpLanguage,
+  WpDownloadAsset,
   WpMediaAsset,
   WpNavigationItem,
 } from "@/lib/wp/types";
@@ -88,6 +89,24 @@ export interface CategoryPagination {
   pageSize: number;
   /** Base path of the category (no /page/N suffix). */
   basePath: string;
+}
+
+const STATIC_PDF_READER_DOWNLOADS: Record<string, WpDownloadAsset> = {
+  "ita2569-o24-01": {
+    id: "ita2569-o24-01",
+    sourceUrl: "",
+    localPath: "/sdc-downloads/ita2569-o24-01.pdf",
+    fileName: "024รายงานผลการดำเนินการป้องกันการทุจริต ปี.pdf",
+    mimeType: "application/pdf",
+    sizeBytes: 8_088_910,
+    title: "024รายงานผลการดำเนินการป้องกันการทุจริต ปี",
+    group: "ita2569",
+    sourcePages: ["th-page-4837"],
+  },
+};
+
+async function resolvePdfReaderDownload(id: string): Promise<WpDownloadAsset | null> {
+  return (await getDownloadById(id)) ?? STATIC_PDF_READER_DOWNLOADS[id] ?? null;
 }
 
 export interface PageData {
@@ -295,7 +314,7 @@ export const getPageData = cache(async (path: string): Promise<PageData | null> 
     buildShellData(path),
     isHome ? buildHomeData(recordWithOverrides) : Promise.resolve(null),
     buildPdfReaderTargets(recordWithOverrides.contentHtml, {
-      resolveDownload: getDownloadById,
+      resolveDownload: resolvePdfReaderDownload,
       resolveFlipbookPdf: async (flipbookPath) => {
         const flipbook = await getRecordByPath(flipbookPath);
         const pdfPath = flipbook ? extractIframePdfSource(flipbook.contentHtml) : null;
