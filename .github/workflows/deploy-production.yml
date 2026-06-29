@@ -25,19 +25,15 @@ env:
 
 jobs:
   deploy-staging:
-    name: Deploy same SHA to Mac fallback test.rtrda.or.th first
-    # Temporary DGT outage route: validate and deploy test.rtrda.or.th from
-    # Joker's Mac before promoting the same SHA to rtrda02 production.
-    # Required self-hosted runner labels: self-hosted, macOS, ARM64,
-    # rtrda-mac-test-fallback.
+    name: Validate production SHA on Mac without changing public test
+    # Temporary DGT outage route: the Mac runner validates the production SHA,
+    # but it must not restart test.rtrda.or.th. The public test site is owned
+    # by the test branch workflow and should not be overwritten by production.
     runs-on:
       - self-hosted
       - macOS
       - ARM64
       - rtrda-mac-test-fallback
-
-    env:
-      COMPOSE_PROJECT_NAME: rtrda-test-dgt-fallback
 
     outputs:
       deploy_sha: ${{ steps.resolve.outputs.deploy_sha }}
@@ -66,35 +62,6 @@ jobs:
           echo "deploy_sha=$DEPLOY_SHA" >> "$GITHUB_OUTPUT"
           echo "Deploy SHA: $DEPLOY_SHA"
 
-      - name: Prepare Mac fallback env
-        env:
-          RTRDA_TEST_MAC_POSTGRES_PASSWORD: ${{ secrets.RTRDA_TEST_MAC_POSTGRES_PASSWORD || '' }}
-        run: |
-          set -euo pipefail
-          if [ -n "$RTRDA_TEST_MAC_POSTGRES_PASSWORD" ]; then
-            umask 077
-            printf 'POSTGRES_PASSWORD=%s\n' "$RTRDA_TEST_MAC_POSTGRES_PASSWORD" > .env
-          elif [ -f "$RTRDA_MAC_FALLBACK_DIR/.env" ]; then
-            cp "$RTRDA_MAC_FALLBACK_DIR/.env" .env
-          else
-            echo "::error::Missing .env. Set secret RTRDA_TEST_MAC_POSTGRES_PASSWORD or keep $RTRDA_MAC_FALLBACK_DIR/.env on the Mac runner."
-            exit 1
-          fi
-          grep -q '^POSTGRES_PASSWORD=' .env
-          python3 - <<'PY'
-          from pathlib import Path
-          from urllib.parse import quote
-          env_path = Path('.env')
-          lines = env_path.read_text().splitlines()
-          values = dict(line.split('=', 1) for line in lines if '=' in line and not line.startswith('#'))
-          password = values['POSTGRES_PASSWORD']
-          encoded = quote(password, safe='')
-          lines = [line for line in lines if not line.startswith(('DATABASE_URL=', 'DATABASE_URL_DOCKER='))]
-          lines.append('DATABASE_URL=' + 'postgresql://rtrda:' + encoded + '@127.0.0.1:5435/rtrda')
-          lines.append('DATABASE_URL_DOCKER=' + 'postgresql://rtrda:' + encoded + '@db-test-mac:5432/rtrda')
-          env_path.write_text('\n'.join(lines) + '\n')
-          PY
-
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
@@ -107,21 +74,6 @@ jobs:
       - name: Generate Prisma client
         run: npx prisma generate
 
-      - name: Start Mac fallback database and apply migrations
-        run: |
-          set -euo pipefail
-          docker compose -f docker-compose.mac-test.yml up -d db-test-mac
-          for attempt in $(seq 1 30); do
-            if docker compose -f docker-compose.mac-test.yml exec -T db-test-mac pg_isready -U rtrda -d rtrda >/dev/null 2>&1; then
-              break
-            fi
-            sleep 2
-          done
-          npm run db:migrate
-
-      - name: Seed Mac fallback database from content manifest
-        run: npm run db:seed
-
       - name: Run validation gates
         run: |
           set -euo pipefail
@@ -130,47 +82,10 @@ jobs:
           npm run typecheck
           npm run format:check
 
-      - name: Build and restart Mac fallback Docker Compose service
+      - name: Verify public test remains healthy
         run: |
           set -euo pipefail
-          docker compose -f docker-compose.mac-test.yml up -d --build web-app-rtrda-test-mac
-
-      - name: Wait for Mac fallback staging health checks
-        run: |
-          set -euo pipefail
-          for attempt in $(seq 1 40); do
-            if curl -fsS http://127.0.0.1:3020/healthz; then
-              break
-            fi
-            sleep 3
-          done
           curl -fsS https://test.rtrda.or.th/healthz
-
-      - name: Refresh stable fallback source copy for manual hotfixes
-        run: |
-          set -euo pipefail
-          mkdir -p "$RTRDA_MAC_FALLBACK_DIR"
-          rsync -a --delete             --exclude='.git/'             --exclude='node_modules/'             --exclude='.next/'             --exclude='.env'             --exclude='.env.*'             --exclude='cloudflared-launchagent.*.log'             --exclude='public/wp-content/uploads/'             --exclude='public/sdc-downloads/'             ./ "$RTRDA_MAC_FALLBACK_DIR/"
-
-      - name: Best-effort sync committed public assets to rtrda02 production host
-        continue-on-error: true
-        run: |
-          set -euo pipefail
-          if [ ! -d public/wp-content/uploads ] && [ ! -d public/sdc-downloads ]; then
-            echo "No committed public asset directories found; skipping asset sync."
-            exit 0
-          fi
-          SSH_KEY="$HOME/.ssh/valent_rtrda02_ed25519"
-          if [ ! -f "$SSH_KEY" ]; then
-            echo "::warning::Missing $SSH_KEY; skipping rtrda02 asset sync."
-            exit 0
-          fi
-          if [ -d public/wp-content/uploads ]; then
-            rsync -az --info=stats2               -e "ssh -i $SSH_KEY -o StrictHostKeyChecking=accept-new"               public/wp-content/uploads/               rtrda@100.91.174.121:/srv/apps/web-app-rtrda/public/wp-content/uploads/
-          fi
-          if [ -d public/sdc-downloads ]; then
-            rsync -az --info=stats2               -e "ssh -i $SSH_KEY -o StrictHostKeyChecking=accept-new"               public/sdc-downloads/               rtrda@100.91.174.121:/srv/apps/web-app-rtrda/public/sdc-downloads/
-          fi
 
   deploy-production:
     name: Deploy rtrda.or.th on rtrda02
