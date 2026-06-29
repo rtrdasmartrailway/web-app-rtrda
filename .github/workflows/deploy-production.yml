@@ -22,7 +22,6 @@ concurrency:
 
 env:
   RTRDA_MAC_FALLBACK_DIR: /Users/jokertheripper/RTRDA-test-dgt-fallback-prodsource
-  COMPOSE_PROJECT_NAME: rtrda-test-dgt-fallback
 
 jobs:
   deploy-staging:
@@ -36,6 +35,9 @@ jobs:
       - macOS
       - ARM64
       - rtrda-mac-test-fallback
+
+    env:
+      COMPOSE_PROJECT_NAME: rtrda-test-dgt-fallback
 
     outputs:
       deploy_sha: ${{ steps.resolve.outputs.deploy_sha }}
