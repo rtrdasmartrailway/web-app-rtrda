@@ -33,6 +33,7 @@ import { applyBoardExecutiveOverride } from "@/lib/wp/board-executive-override";
 import { applyContactMapOverride } from "@/lib/wp/contact-map";
 import { applyItaHeadingsOverride } from "@/lib/wp/ita-headings-override";
 import { getStaticDownloadOverride } from "@/lib/wp/static-download-overrides";
+import { getSupplementalKnowledgePage } from "@/lib/wp/knowledge-supplemental-documents";
 import { applyProcurementPlanOverride } from "@/lib/wp/procurement-plan";
 import { applyProcurementWinnerOverride } from "@/lib/wp/procurement-winner";
 import { normalizeRoutePath } from "@/lib/wp/url";
@@ -264,7 +265,46 @@ export const buildShellData = cache(async (path: string): Promise<ShellData> => 
 export const getPageData = cache(async (path: string): Promise<PageData | null> => {
   const importedRecord = await getRecordByPath(path);
   if (!importedRecord) {
-    return null;
+    const supplementalPage = getSupplementalKnowledgePage(path);
+    if (!supplementalPage) {
+      return null;
+    }
+
+    const shell = await buildShellData(path);
+    const now = new Date().toISOString();
+    const record: WpContentRecord = {
+      id: `supplemental-knowledge-${supplementalPage.slug}`,
+      wpId: `supplemental-knowledge-${supplementalPage.slug}`,
+      language: "th",
+      kind: "page",
+      path: supplementalPage.path,
+      sourceUrl: `https://test.rtrda.or.th${supplementalPage.path}`,
+      title: supplementalPage.title,
+      excerpt: supplementalPage.title,
+      contentHtml: "",
+      searchText: supplementalPage.title,
+      modified: now,
+      date: now,
+      parentPath: "/",
+      categoryIds: [],
+      featuredMediaId: null,
+      authorId: null,
+    };
+
+    return {
+      record,
+      children: [],
+      latest: [],
+      newsCards: [],
+      categoryPagination: null,
+      home: null,
+      knowledgeDocuments: [supplementalPage.group],
+      boardExecutivePresentation: null,
+      pdfReaderTargets: [],
+      sidebarItems: [],
+      parentTitle: "บริการและข้อมูลสำคัญ",
+      shell,
+    };
   }
   const record = applyItaHeadingsOverride(
     applyBoardExecutiveOverride(

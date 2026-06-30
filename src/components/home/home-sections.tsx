@@ -1,6 +1,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import type { HomeData } from "@/lib/db/page-data";
+import { supplementalKnowledgePages } from "@/lib/wp/knowledge-supplemental-documents";
 import type { WpLanguage } from "@/lib/wp/types";
 import { ArticleCard } from "../article-card";
 import { EventsCalendar } from "./events-calendar";
@@ -117,6 +118,29 @@ function HomeServiceBannerMockup({ language }: { language: WpLanguage }) {
             <span className="service-banner-arrow" aria-hidden="true" />
           </a>
         ))}
+      </div>
+
+      <div className="home-service-documents" aria-label="เอกสารบริการและข้อมูลสำคัญ">
+        <p className="home-service-documents-eyebrow">เอกสารบริการและข้อมูลสำคัญ</p>
+        <div className="service-banner-grid service-banner-grid-documents">
+          {supplementalKnowledgePages.map((page, index) => (
+            <a
+              aria-label={`เปิดเอกสาร: ${page.title}`}
+              className={`service-banner-card service-banner-card-${index % 2 === 0 ? "dark" : "slate"}`}
+              href={page.path}
+              key={page.slug}
+            >
+              <span className="service-banner-icon service-banner-icon-pdf" aria-hidden="true">
+                PDF
+              </span>
+              <span className="service-banner-copy">
+                <strong>{page.title}</strong>
+                <small>{page.group.documents.length} ไฟล์ • จัดรูปแบบแสดงผลแบบคลังความรู้</small>
+              </span>
+              <span className="service-banner-arrow" aria-hidden="true" />
+            </a>
+          ))}
+        </div>
       </div>
     </section>
   );

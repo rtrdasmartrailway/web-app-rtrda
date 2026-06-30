@@ -4868,6 +4868,46 @@ a.calendar-cell.has-posts:hover {
     repeating-linear-gradient(0deg, transparent 0 12px, rgba(100, 116, 139, 0.12) 12px 13px);
 }
 
+.home-service-documents {
+  border-top: 1px solid rgba(148, 163, 184, 0.22);
+  margin-top: 24px;
+  padding-top: 22px;
+}
+
+.home-service-documents-eyebrow {
+  color: var(--accent-deep);
+  font-size: 13px;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  margin: 0 0 14px;
+}
+
+.service-banner-grid-documents .service-banner-card {
+  height: 118px;
+  min-height: 118px;
+}
+
+.service-banner-grid-documents .service-banner-copy strong,
+.service-banner-grid-documents .service-banner-copy small {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+}
+
+.service-banner-grid-documents .service-banner-copy strong {
+  -webkit-line-clamp: 2;
+}
+
+.service-banner-grid-documents .service-banner-copy small {
+  -webkit-line-clamp: 1;
+}
+
+.service-banner-icon-pdf {
+  font-size: 17px;
+  font-weight: 950;
+  letter-spacing: -0.08em;
+}
+
 /* Partner logo strip */
 .partners-strip {
   display: grid;
