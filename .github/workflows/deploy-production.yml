@@ -20,37 +20,26 @@ concurrency:
   group: web-app-rtrda-production
   cancel-in-progress: false
 
-env:
-  RTRDA_MAC_FALLBACK_DIR: /Users/jokertheripper/RTRDA-test-dgt-fallback-prodsource
-
 jobs:
   deploy-staging:
-    name: Validate production SHA on Mac without changing public test
-    # Temporary DGT outage route: the Mac runner validates the production SHA,
-    # but it must not restart test.rtrda.or.th. The public test site is owned
-    # by the test branch workflow and should not be overwritten by production.
+    name: Deploy same SHA to test.rtrda.or.th first
     runs-on:
       - self-hosted
-      - macOS
-      - ARM64
-      - rtrda-mac-test-fallback
+      - linux
+      - x64
+      - rtrda-web-test
 
     outputs:
       deploy_sha: ${{ steps.resolve.outputs.deploy_sha }}
 
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-          clean: false
-
       - name: Resolve deploy SHA from main
         id: resolve
         env:
           INPUT_REF: ${{ github.event.inputs.ref || '' }}
         run: |
           set -euo pipefail
+          cd /srv/workspace/web-app-rtrda
           git fetch origin main --prune
           if [ -n "$INPUT_REF" ]; then
             DEPLOY_SHA="$(git rev-parse "$INPUT_REF")"
@@ -58,34 +47,99 @@ jobs:
             DEPLOY_SHA="$(git rev-parse origin/main)"
           fi
           git merge-base --is-ancestor "$DEPLOY_SHA" origin/main
-          git checkout --detach "$DEPLOY_SHA"
           echo "deploy_sha=$DEPLOY_SHA" >> "$GITHUB_OUTPUT"
           echo "Deploy SHA: $DEPLOY_SHA"
 
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: npm
+      - name: Refuse dirty staging worktree
+        run: |
+          set -euo pipefail
+          cd /srv/workspace/web-app-rtrda
+          if [ -n "$(git status --porcelain)" ]; then
+            echo "::error::/srv/workspace/web-app-rtrda has uncommitted or untracked files; refusing deploy."
+            git status --short
+            exit 1
+          fi
+
+      - name: Update staging checkout to exact SHA
+        env:
+          DEPLOY_SHA: ${{ steps.resolve.outputs.deploy_sha }}
+        run: |
+          set -euo pipefail
+          cd /srv/workspace/web-app-rtrda
+          git fetch origin main --prune
+          git checkout -B main "$DEPLOY_SHA"
+          git status -sb
+          git log --oneline -1
 
       - name: Install dependencies
-        run: npm ci
+        run: |
+          set -euo pipefail
+          cd /srv/workspace/web-app-rtrda
+          npm ci
 
       - name: Generate Prisma client
-        run: npx prisma generate
+        run: |
+          set -euo pipefail
+          cd /srv/workspace/web-app-rtrda
+          npx prisma generate
+
+      - name: Start staging database and apply migrations
+        run: |
+          set -euo pipefail
+          cd /srv/workspace/web-app-rtrda
+          docker compose up -d db
+          for attempt in $(seq 1 30); do
+            if docker compose exec -T db pg_isready -U rtrda -d rtrda >/dev/null 2>&1; then
+              break
+            fi
+            sleep 2
+          done
+          npm run db:migrate
+
+      - name: Seed staging database from content manifest
+        run: |
+          set -euo pipefail
+          cd /srv/workspace/web-app-rtrda
+          npm run db:seed
 
       - name: Run validation gates
         run: |
           set -euo pipefail
+          cd /srv/workspace/web-app-rtrda
           npm test
           npm run lint
           npm run typecheck
           npm run format:check
 
-      - name: Verify public test remains healthy
+      - name: Build and restart staging Docker Compose service
         run: |
           set -euo pipefail
+          cd /srv/workspace/web-app-rtrda
+          docker compose up -d --build web-app-rtrda-test
+
+      - name: Wait for staging health checks
+        run: |
+          set -euo pipefail
+          for attempt in $(seq 1 40); do
+            if curl -fsS http://127.0.0.1:3020/healthz; then
+              break
+            fi
+            sleep 3
+          done
           curl -fsS https://test.rtrda.or.th/healthz
+
+      - name: Sync mirrored assets to rtrda02 production host
+        run: |
+          set -euo pipefail
+          cd /srv/workspace/web-app-rtrda
+          rsync -az --info=stats2 \
+            -e "ssh -i ~/.ssh/rtrda02_prod_preview_sync_ed25519 -o StrictHostKeyChecking=accept-new" \
+            public/wp-content/uploads/ \
+            rtrda@100.91.174.121:/srv/apps/web-app-rtrda/public/wp-content/uploads/
+          rsync -az --info=stats2 \
+            -e "ssh -i ~/.ssh/rtrda02_prod_preview_sync_ed25519 -o StrictHostKeyChecking=accept-new" \
+            public/sdc-downloads/ \
+            rtrda@100.91.174.121:/srv/apps/web-app-rtrda/public/sdc-downloads/
 
   deploy-production:
     name: Deploy rtrda.or.th on rtrda02
@@ -132,25 +186,6 @@ jobs:
           grep -q '^POSTGRES_PASSWORD=' .env.production
           grep -q '^DATABASE_URL=' .env.production
           cp .env.production .env
-
-      - name: Sync committed public assets to production bind mounts
-        run: |
-          set -euo pipefail
-          cd /srv/apps/web-app-rtrda-production
-          if [ -d public/wp-content/uploads ]; then
-            mkdir -p /srv/apps/web-app-rtrda/public/wp-content/uploads
-            rsync -a public/wp-content/uploads/ /srv/apps/web-app-rtrda/public/wp-content/uploads/
-            chmod -R a+rX /srv/apps/web-app-rtrda/public/wp-content/uploads
-          else
-            echo "No committed upload assets to sync."
-          fi
-          if [ -d public/sdc-downloads ]; then
-            mkdir -p /srv/apps/web-app-rtrda/public/sdc-downloads
-            rsync -a public/sdc-downloads/ /srv/apps/web-app-rtrda/public/sdc-downloads/
-            chmod -R a+rX /srv/apps/web-app-rtrda/public/sdc-downloads
-          else
-            echo "No committed SDC downloads to sync."
-          fi
 
       - name: Install dependencies
         run: |

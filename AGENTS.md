@@ -69,3 +69,13 @@ If a human asks for production from inside Paperclip, prepare a handoff note onl
 - Verify `https://test.rtrda.or.th/healthz` returns 200.
 - For content/UI changes, verify the real test URL/page, not only the database or source file.
 - Never print secret values from `.env`; mention key names only.
+
+## RTRDA DGT Test Branch Team Policy
+
+This DGT workspace is the team test workspace for `test.rtrda.or.th`.
+
+- Default branch for team/opencode/Paperclip work: `test`.
+- Team agents may edit, commit, build, seed, restart, and verify the test environment on DGT.
+- Do not push or deploy `main`/production from this workspace unless พี่ J explicitly says to push production.
+- When production is approved, merge/promote validated `test` changes into `main` through Valent's production flow, then run the GitHub Actions production workflow and verify public production.
+- Do not expose secrets, tokens, passwords, private keys, or auth stores.
