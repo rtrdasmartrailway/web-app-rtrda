@@ -1,13 +1,30 @@
 "use client";
 
 import Image from "next/image";
+import Link from "next/link";
 import { useEffect, useState } from "react";
 
 const SLIDES = [
-  "/stitch-assets/home-hero-slides/slide-1.png",
-  "/stitch-assets/home-hero-slides/slide-2.png",
-  "/stitch-assets/home-hero-slides/slide-3.png",
-  "/stitch-assets/home-hero-slides/slide-4.jpg",
+  {
+    src: "/stitch-assets/home-hero-slides/slide-1.png",
+    href: "/ติดต่อเรา/ช่องทางการติดต่อ",
+    label: "แจ้งรับ-ส่งหนังสือราชการและติดต่อสอบถามข้อมูล",
+  },
+  {
+    src: "/stitch-assets/home-hero-slides/slide-2.png",
+    href: "/สทร-ร่วมประกาศเจตนารมณ์-no-gift-policy-2569",
+    label: "นโยบาย No Gift Policy",
+  },
+  {
+    src: "/stitch-assets/home-hero-slides/slide-3.png",
+    href: "/สทร-ศึกษาดูงานศูนย์ข้อม",
+    label: "ศูนย์ข้อมูลข่าวสาร สทร.",
+  },
+  {
+    src: "/stitch-assets/home-hero-slides/slide-4.jpg",
+    href: "/ช่องทางการแจ้งเรื่องกา",
+    label: "ช่องทางแจ้งเรื่องร้องเรียนการทุจริตและประพฤติมิชอบ",
+  },
 ] as const;
 
 const AUTOPLAY_DELAY_MS = 5000;
@@ -55,18 +72,25 @@ export function HomeHeroSlider() {
       onFocus={() => setPaused(true)}
       onBlur={() => setPaused(false)}
     >
-      <div className="home-hero-slides" aria-hidden="true">
-        {SLIDES.map((src, index) => (
-          <Image
-            key={src}
-            src={src}
-            alt=""
-            className={`home-hero-slide ${index === activeIndex ? "is-active" : ""}`}
-            fill
-            priority={index === 0}
-            sizes="100vw"
-            unoptimized
-          />
+      <div className="home-hero-slides">
+        {SLIDES.map((slide, index) => (
+          <Link
+            aria-label={`เปิดเรื่อง: ${slide.label}`}
+            className={`home-hero-slide-link ${index === activeIndex ? "is-active" : ""}`}
+            href={slide.href}
+            key={slide.src}
+            tabIndex={index === activeIndex ? 0 : -1}
+          >
+            <Image
+              src={slide.src}
+              alt={slide.label}
+              className="home-hero-slide"
+              fill
+              priority={index === 0}
+              sizes="100vw"
+              unoptimized
+            />
+          </Link>
         ))}
       </div>
       <button

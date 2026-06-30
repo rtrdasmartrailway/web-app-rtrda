@@ -607,19 +607,42 @@ a.language-toggle-item:hover {
   display: none;
 }
 
-.home-hero-slide {
-  object-fit: contain;
+.home-hero-slide-link {
+  cursor: pointer;
+  inset: 0;
   opacity: 0;
+  pointer-events: none;
+  position: absolute;
   transform: translateX(3%);
   transition:
     opacity 900ms ease,
     transform 1200ms ease;
+  z-index: 1;
 }
 
-.home-hero-slide.is-active {
+.home-hero-slide-link.is-active {
   opacity: 1;
+  pointer-events: auto;
   transform: translateX(0);
 }
+
+.home-hero-slide-link:focus-visible {
+  outline: 4px solid rgba(37, 99, 235, 0.7);
+  outline-offset: -8px;
+}
+
+.home-hero-slide {
+  object-fit: contain;
+}
+
+.home-hero-slide-link:hover .home-hero-slide {
+  filter: brightness(1.02);
+}
+
+.home-hero-slide-link:active .home-hero-slide {
+  transform: scale(0.998);
+}
+
 
 .home-hero-nav {
   align-items: center;
