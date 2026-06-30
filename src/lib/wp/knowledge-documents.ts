@@ -29,8 +29,8 @@ export function isKnowledgeDocumentPath(path: string): boolean {
 
 const downloadPathPattern = /^\/(?:en\/)?sdc_download\/([^/]+)\/?$/;
 const flipbookPathPattern = /^\/(?:en\/)?3d-flip-book\/[^/]+\/?$/;
-const documentAssetPattern = /\.(?:pdf|png|jpe?g|webp|gif|avif)$/i;
-const downloadableAssetPattern = /\.(?:pdf|png|jpe?g|webp|gif|avif)$/i;
+const documentAssetPattern = /\.(?:pdf|xlsx|png|jpe?g|webp|gif|avif)$/i;
+const downloadableAssetPattern = /\.(?:pdf|xlsx|png|jpe?g|webp|gif|avif)$/i;
 
 function compactText(value: string): string {
   return value.replace(/\s+/g, " ").trim();

@@ -61,6 +61,17 @@ function DocumentAction({
   );
 }
 
+function fileTypeLabel(document: KnowledgeDocument): string {
+  const href = document.downloadHref ?? document.previewHref ?? "";
+  if (/\.xlsx$/i.test(href)) {
+    return "XLSX";
+  }
+  if (/\.pdf$/i.test(href)) {
+    return "PDF";
+  }
+  return "FILE";
+}
+
 function KnowledgeDocumentCard({
   document,
   language,
@@ -83,8 +94,8 @@ function KnowledgeDocumentCard({
             unoptimized
           />
         ) : (
-          <div className={styles.coverFallback} aria-label="PDF">
-            PDF
+          <div className={styles.coverFallback} aria-label={fileTypeLabel(document)}>
+            {fileTypeLabel(document)}
           </div>
         )}
       </div>
