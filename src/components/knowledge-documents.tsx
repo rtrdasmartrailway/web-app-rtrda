@@ -83,7 +83,9 @@ function KnowledgeDocumentCard({
             unoptimized
           />
         ) : (
-          <div className={styles.coverFallback} aria-hidden="true" />
+          <div className={styles.coverFallback} aria-label="PDF">
+            PDF
+          </div>
         )}
       </div>
 

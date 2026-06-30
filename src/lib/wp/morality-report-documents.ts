@@ -12,8 +12,9 @@ export const moralityReportGroups: KnowledgeDocumentGroup[] = [
       {
         title: "การประเมินความเสี่ยงการทุจริตในหน่วยงานภาครัฐ ประจำปีงบประมาณ พ.ศ. 2569",
         description: "เอกสารรายงานประเมินคุณธรรมฯ รูปแบบ PDF",
-        coverImage: null,
-        coverAlt: "",
+        coverImage:
+          "/wp-content/uploads/pdf-covers/morality-report-evaluation/19cb51c7b561750a.png",
+        coverAlt: "หน้าแรกของ PDF",
         previewHref:
           "/wp-content/uploads/morality-report-evaluation/budget-risk-assessment-01-การประเมินความเสี่ยงการทุจริตในหน่วยงานภาครัฐ-ประจำปีงบประมาณ-พ.ศ.-2569.pdf",
         downloadHref:
@@ -23,8 +24,9 @@ export const moralityReportGroups: KnowledgeDocumentGroup[] = [
       {
         title: "ประเมินความเสี่ยงด้านการทุจริตฯ ด้านการเบิกจ่ายเงินงบประมาณ",
         description: "เอกสารรายงานประเมินคุณธรรมฯ รูปแบบ PDF",
-        coverImage: null,
-        coverAlt: "",
+        coverImage:
+          "/wp-content/uploads/pdf-covers/morality-report-evaluation/6c254808c52e64b7.png",
+        coverAlt: "หน้าแรกของ PDF",
         previewHref:
           "/wp-content/uploads/morality-report-evaluation/budget-risk-assessment-02-ประเมินความเสี่ยงด้านการทุจริตฯ-ด้านการเบิกจ่ายเงินงบประมาณ.pdf",
         downloadHref:
@@ -40,8 +42,9 @@ export const moralityReportGroups: KnowledgeDocumentGroup[] = [
       {
         title: "o23 แผนปฏิบัติการป้องกันการทุจริต ปี 2569",
         description: "เอกสารรายงานประเมินคุณธรรมฯ รูปแบบ PDF",
-        coverImage: null,
-        coverAlt: "",
+        coverImage:
+          "/wp-content/uploads/pdf-covers/morality-report-evaluation/d14363bcb5139a2d.png",
+        coverAlt: "หน้าแรกของ PDF",
         previewHref:
           "/wp-content/uploads/morality-report-evaluation/anti-corruption-plan-2569-01-o23-แผนปฏิบัติการป้องกันการทุจริต-ปี-2569.pdf",
         downloadHref:
@@ -57,8 +60,9 @@ export const moralityReportGroups: KnowledgeDocumentGroup[] = [
       {
         title: "นำผลการประเมิน ITA ไปสู่การพัมนาองค์กร.",
         description: "เอกสารรายงานประเมินคุณธรรมฯ รูปแบบ PDF",
-        coverImage: null,
-        coverAlt: "",
+        coverImage:
+          "/wp-content/uploads/pdf-covers/morality-report-evaluation/737d1fedd73b510f.png",
+        coverAlt: "หน้าแรกของ PDF",
         previewHref:
           "/wp-content/uploads/morality-report-evaluation/ita-development-results-01-นำผลการประเมิน-ITA-ไปสู่การพัมนาองค์กร..pdf",
         downloadHref:
@@ -74,8 +78,9 @@ export const moralityReportGroups: KnowledgeDocumentGroup[] = [
       {
         title: "รายงานผลการดำเนินการเพื่อส่งเสริมคุณธรรมฯ",
         description: "เอกสารรายงานประเมินคุณธรรมฯ รูปแบบ PDF",
-        coverImage: null,
-        coverAlt: "",
+        coverImage:
+          "/wp-content/uploads/pdf-covers/morality-report-evaluation/3d1a0f902ca02056.png",
+        coverAlt: "หน้าแรกของ PDF",
         previewHref:
           "/wp-content/uploads/morality-report-evaluation/integrity-transparency-2568-01-รายงานผลการดำเนินการเพื่อส่งเสริมคุณธรรมฯ.pdf",
         downloadHref:
