@@ -89,11 +89,7 @@ const DOCUMENT_BANNER_PAGES = [
 ] as const;
 
 function getDocumentCount(page: (typeof DOCUMENT_BANNER_PAGES)[number]): number {
-  if ("groups" in page) {
-    return page.groups.reduce((sum, group) => sum + group.documents.length, 0);
-  }
-
-  return page.group.documents.length;
+  return page.groups.reduce((sum, group) => sum + group.documents.length, 0);
 }
 
 function SectionHeading({ id, children }: { id: string; children: React.ReactNode }) {

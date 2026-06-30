@@ -279,7 +279,7 @@ export const getPageData = cache(async (path: string): Promise<PageData | null> 
           slug: supplementalPage.slug,
           path: supplementalPage.path,
           title: supplementalPage.title,
-          groups: [supplementalPage.group],
+          groups: supplementalPage.groups,
           contentHtml: "",
           parentTitle: "บริการและข้อมูลสำคัญ",
           parentPath: "/บริการและข้อมูลสำคัญ",

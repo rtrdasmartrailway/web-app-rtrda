@@ -5,14 +5,15 @@ export interface SupplementalKnowledgePage {
   slug: string;
   path: string;
   title: string;
-  group: KnowledgeDocumentGroup;
+  groups: KnowledgeDocumentGroup[];
 }
 
 const basePath = "/บริการและข้อมูลสำคัญ";
 
 const supplementalKnowledgeGroups: Array<{
   slug: string;
-  group: KnowledgeDocumentGroup;
+  group?: KnowledgeDocumentGroup;
+  groups?: KnowledgeDocumentGroup[];
 }> = [
   {
     slug: "ethics-code",
@@ -290,356 +291,369 @@ const supplementalKnowledgeGroups: Array<{
   },
   {
     slug: "procurement-summary",
-    group: {
-      title: "สรุปจัดซื้อจัดจ้าง",
-      open: true,
-      documents: [
-        {
-          title: "O11 ไตรมาสที่ 1",
-          description: "เอกสารสรุปข้อมูลจัดซื้อจัดจ้างรูปแบบ PDF",
-          coverImage:
-            "/wp-content/uploads/pdf-covers/knowledge-ethics-2569/7f6e21d84ae3e008.png",
-          coverAlt: "หน้าแรกของ PDF",
-          previewHref:
-            "/wp-content/uploads/knowledge-ethics-2569/procurement-summary-01-O11-ไตรมาสที่-1.pdf",
-          downloadHref:
-            "/wp-content/uploads/knowledge-ethics-2569/procurement-summary-01-O11-ไตรมาสที่-1.pdf",
-          hasUsableTarget: true,
-        },
-        {
-          title: "O11 ไตรมาสที่ 2",
-          description: "เอกสารสรุปข้อมูลจัดซื้อจัดจ้างรูปแบบ PDF",
-          coverImage:
-            "/wp-content/uploads/pdf-covers/knowledge-ethics-2569/6fff542c10bb96a2.png",
-          coverAlt: "หน้าแรกของ PDF",
-          previewHref:
-            "/wp-content/uploads/knowledge-ethics-2569/procurement-summary-02-O11-ไตรมาสที่-2.pdf",
-          downloadHref:
-            "/wp-content/uploads/knowledge-ethics-2569/procurement-summary-02-O11-ไตรมาสที่-2.pdf",
-          hasUsableTarget: true,
-        },
-        {
-          title: "1.สขร.เดือน ตุลาคม 2567",
-          description: "เอกสารสรุปข้อมูลจัดซื้อจัดจ้างรูปแบบ PDF",
-          coverImage:
-            "/wp-content/uploads/pdf-covers/knowledge-ethics-2569/6f84e1f0201f35a3.png",
-          coverAlt: "หน้าแรกของ PDF",
-          previewHref:
-            "/wp-content/uploads/knowledge-ethics-2569/procurement-summary-03-1.สขร.เดือน-ตุลาคม-2567.pdf",
-          downloadHref:
-            "/wp-content/uploads/knowledge-ethics-2569/procurement-summary-03-1.สขร.เดือน-ตุลาคม-2567.pdf",
-          hasUsableTarget: true,
-        },
-        {
-          title: "10.สขร เดือน กรกฎาคม 2568",
-          description: "เอกสารสรุปข้อมูลจัดซื้อจัดจ้างรูปแบบ PDF",
-          coverImage:
-            "/wp-content/uploads/pdf-covers/knowledge-ethics-2569/04186c2af34acffd.png",
-          coverAlt: "หน้าแรกของ PDF",
-          previewHref:
-            "/wp-content/uploads/knowledge-ethics-2569/procurement-summary-04-10.สขร-เดือน-กรกฎาคม-2568.pdf",
-          downloadHref:
-            "/wp-content/uploads/knowledge-ethics-2569/procurement-summary-04-10.สขร-เดือน-กรกฎาคม-2568.pdf",
-          hasUsableTarget: true,
-        },
-        {
-          title: "11.สขร เดือน สิงหาคม 2568",
-          description: "เอกสารสรุปข้อมูลจัดซื้อจัดจ้างรูปแบบ PDF",
-          coverImage:
-            "/wp-content/uploads/pdf-covers/knowledge-ethics-2569/45a41bd85604f8f5.png",
-          coverAlt: "หน้าแรกของ PDF",
-          previewHref:
-            "/wp-content/uploads/knowledge-ethics-2569/procurement-summary-05-11.สขร-เดือน-สิงหาคม-2568.pdf",
-          downloadHref:
-            "/wp-content/uploads/knowledge-ethics-2569/procurement-summary-05-11.สขร-เดือน-สิงหาคม-2568.pdf",
-          hasUsableTarget: true,
-        },
-        {
-          title: "12.สขร.เดือน กันยายน 2568",
-          description: "เอกสารสรุปข้อมูลจัดซื้อจัดจ้างรูปแบบ PDF",
-          coverImage:
-            "/wp-content/uploads/pdf-covers/knowledge-ethics-2569/550413f08ebe5fdf.png",
-          coverAlt: "หน้าแรกของ PDF",
-          previewHref:
-            "/wp-content/uploads/knowledge-ethics-2569/procurement-summary-06-12.สขร.เดือน-กันยายน-2568.pdf",
-          downloadHref:
-            "/wp-content/uploads/knowledge-ethics-2569/procurement-summary-06-12.สขร.เดือน-กันยายน-2568.pdf",
-          hasUsableTarget: true,
-        },
-        {
-          title: "2..สขร.เดือน พฤศจิกายน 2567",
-          description: "เอกสารสรุปข้อมูลจัดซื้อจัดจ้างรูปแบบ PDF",
-          coverImage:
-            "/wp-content/uploads/pdf-covers/knowledge-ethics-2569/5f412f5d64d81cd1.png",
-          coverAlt: "หน้าแรกของ PDF",
-          previewHref:
-            "/wp-content/uploads/knowledge-ethics-2569/procurement-summary-07-2..สขร.เดือน-พฤศจิกายน-2567.pdf",
-          downloadHref:
-            "/wp-content/uploads/knowledge-ethics-2569/procurement-summary-07-2..สขร.เดือน-พฤศจิกายน-2567.pdf",
-          hasUsableTarget: true,
-        },
-        {
-          title: "3.สขร. เดือน ธันวาคม2567",
-          description: "เอกสารสรุปข้อมูลจัดซื้อจัดจ้างรูปแบบ PDF",
-          coverImage:
-            "/wp-content/uploads/pdf-covers/knowledge-ethics-2569/3b734060f126d5cc.png",
-          coverAlt: "หน้าแรกของ PDF",
-          previewHref:
-            "/wp-content/uploads/knowledge-ethics-2569/procurement-summary-08-3.สขร.-เดือน-ธันวาคม2567.pdf",
-          downloadHref:
-            "/wp-content/uploads/knowledge-ethics-2569/procurement-summary-08-3.สขร.-เดือน-ธันวาคม2567.pdf",
-          hasUsableTarget: true,
-        },
-        {
-          title: "4.สขร.เดือน มกราคม 2568",
-          description: "เอกสารสรุปข้อมูลจัดซื้อจัดจ้างรูปแบบ PDF",
-          coverImage:
-            "/wp-content/uploads/pdf-covers/knowledge-ethics-2569/dc4a2fd8656faa63.png",
-          coverAlt: "หน้าแรกของ PDF",
-          previewHref:
-            "/wp-content/uploads/knowledge-ethics-2569/procurement-summary-09-4.สขร.เดือน-มกราคม-2568.pdf",
-          downloadHref:
-            "/wp-content/uploads/knowledge-ethics-2569/procurement-summary-09-4.สขร.เดือน-มกราคม-2568.pdf",
-          hasUsableTarget: true,
-        },
-        {
-          title: "5.สขร.เดือน กุมภาพันธ์ 2568",
-          description: "เอกสารสรุปข้อมูลจัดซื้อจัดจ้างรูปแบบ PDF",
-          coverImage:
-            "/wp-content/uploads/pdf-covers/knowledge-ethics-2569/cabbdb5d8e2e252d.png",
-          coverAlt: "หน้าแรกของ PDF",
-          previewHref:
-            "/wp-content/uploads/knowledge-ethics-2569/procurement-summary-10-5.สขร.เดือน-กุมภาพันธ์-2568.pdf",
-          downloadHref:
-            "/wp-content/uploads/knowledge-ethics-2569/procurement-summary-10-5.สขร.เดือน-กุมภาพันธ์-2568.pdf",
-          hasUsableTarget: true,
-        },
-        {
-          title: "6.สขร เดือน มีนาคม 2568",
-          description: "เอกสารสรุปข้อมูลจัดซื้อจัดจ้างรูปแบบ PDF",
-          coverImage:
-            "/wp-content/uploads/pdf-covers/knowledge-ethics-2569/c047b4413c1be50e.png",
-          coverAlt: "หน้าแรกของ PDF",
-          previewHref:
-            "/wp-content/uploads/knowledge-ethics-2569/procurement-summary-11-6.สขร-เดือน-มีนาคม-2568.pdf",
-          downloadHref:
-            "/wp-content/uploads/knowledge-ethics-2569/procurement-summary-11-6.สขร-เดือน-มีนาคม-2568.pdf",
-          hasUsableTarget: true,
-        },
-        {
-          title: "7.สขร เดือน เมษายน 2568",
-          description: "เอกสารสรุปข้อมูลจัดซื้อจัดจ้างรูปแบบ PDF",
-          coverImage:
-            "/wp-content/uploads/pdf-covers/knowledge-ethics-2569/1c27347be82546e2.png",
-          coverAlt: "หน้าแรกของ PDF",
-          previewHref:
-            "/wp-content/uploads/knowledge-ethics-2569/procurement-summary-12-7.สขร-เดือน-เมษายน-2568.pdf",
-          downloadHref:
-            "/wp-content/uploads/knowledge-ethics-2569/procurement-summary-12-7.สขร-เดือน-เมษายน-2568.pdf",
-          hasUsableTarget: true,
-        },
-        {
-          title: "8.สขร เดือน พฤษภาคม 2568",
-          description: "เอกสารสรุปข้อมูลจัดซื้อจัดจ้างรูปแบบ PDF",
-          coverImage:
-            "/wp-content/uploads/pdf-covers/knowledge-ethics-2569/e6ae700e5e496913.png",
-          coverAlt: "หน้าแรกของ PDF",
-          previewHref:
-            "/wp-content/uploads/knowledge-ethics-2569/procurement-summary-13-8.สขร-เดือน-พฤษภาคม-2568.pdf",
-          downloadHref:
-            "/wp-content/uploads/knowledge-ethics-2569/procurement-summary-13-8.สขร-เดือน-พฤษภาคม-2568.pdf",
-          hasUsableTarget: true,
-        },
-        {
-          title: "9.สขร เดือน มิถุนายน 2568",
-          description: "เอกสารสรุปข้อมูลจัดซื้อจัดจ้างรูปแบบ PDF",
-          coverImage:
-            "/wp-content/uploads/pdf-covers/knowledge-ethics-2569/ffdbcddfeff02d43.png",
-          coverAlt: "หน้าแรกของ PDF",
-          previewHref:
-            "/wp-content/uploads/knowledge-ethics-2569/procurement-summary-14-9.สขร-เดือน-มิถุนายน-2568.pdf",
-          downloadHref:
-            "/wp-content/uploads/knowledge-ethics-2569/procurement-summary-14-9.สขร-เดือน-มิถุนายน-2568.pdf",
-          hasUsableTarget: true,
-        },
-        {
-          title: "แบบสรุปผลการจัดซื้อจัดจ้าง ประจำปีงบประมาณ พ.ศ.2568",
-          description: "เอกสารสรุปข้อมูลจัดซื้อจัดจ้างรูปแบบ PDF",
-          coverImage:
-            "/wp-content/uploads/pdf-covers/knowledge-ethics-2569/c0f9863b46cfff4f.png",
-          coverAlt: "หน้าแรกของ PDF",
-          previewHref:
-            "/wp-content/uploads/knowledge-ethics-2569/procurement-summary-15-แบบสรุปผลการจัดซื้อจัดจ้าง-ประจำปีงบประมาณ-พ.ศ.2568.pdf",
-          downloadHref:
-            "/wp-content/uploads/knowledge-ethics-2569/procurement-summary-15-แบบสรุปผลการจัดซื้อจัดจ้าง-ประจำปีงบประมาณ-พ.ศ.2568.pdf",
-          hasUsableTarget: true,
-        },
-        {
-          title: "O11 ไตรมาสที่ 1 (XLSX)",
-          description: "ไฟล์ตารางสรุปข้อมูลจัดซื้อจัดจ้างรูปแบบ XLSX",
-          coverImage: null,
-          coverAlt: "ไฟล์ XLSX",
-          previewHref:
-            "/wp-content/uploads/knowledge-ethics-2569/procurement-summary-xlsx-01-O11-ไตรมาสที่-1.xlsx",
-          downloadHref:
-            "/wp-content/uploads/knowledge-ethics-2569/procurement-summary-xlsx-01-O11-ไตรมาสที่-1.xlsx",
-          hasUsableTarget: true,
-        },
-        {
-          title: "O11 ไตรมาสที่ 2 (XLSX)",
-          description: "ไฟล์ตารางสรุปข้อมูลจัดซื้อจัดจ้างรูปแบบ XLSX",
-          coverImage: null,
-          coverAlt: "ไฟล์ XLSX",
-          previewHref:
-            "/wp-content/uploads/knowledge-ethics-2569/procurement-summary-xlsx-02-O11-ไตรมาสที่-2.xlsx",
-          downloadHref:
-            "/wp-content/uploads/knowledge-ethics-2569/procurement-summary-xlsx-02-O11-ไตรมาสที่-2.xlsx",
-          hasUsableTarget: true,
-        },
-        {
-          title: "1.สขร.เดือน ตุลาคม 2567 (XLSX)",
-          description: "ไฟล์ตารางสรุปข้อมูลจัดซื้อจัดจ้างรูปแบบ XLSX",
-          coverImage: null,
-          coverAlt: "ไฟล์ XLSX",
-          previewHref:
-            "/wp-content/uploads/knowledge-ethics-2569/procurement-summary-xlsx-03-1.สขร.เดือน-ตุลาคม-2567.xlsx",
-          downloadHref:
-            "/wp-content/uploads/knowledge-ethics-2569/procurement-summary-xlsx-03-1.สขร.เดือน-ตุลาคม-2567.xlsx",
-          hasUsableTarget: true,
-        },
-        {
-          title: "10.สขร เดือน กรกฎาคม 2568 (XLSX)",
-          description: "ไฟล์ตารางสรุปข้อมูลจัดซื้อจัดจ้างรูปแบบ XLSX",
-          coverImage: null,
-          coverAlt: "ไฟล์ XLSX",
-          previewHref:
-            "/wp-content/uploads/knowledge-ethics-2569/procurement-summary-xlsx-04-10.สขร-เดือน-กรกฎาคม-2568.xlsx",
-          downloadHref:
-            "/wp-content/uploads/knowledge-ethics-2569/procurement-summary-xlsx-04-10.สขร-เดือน-กรกฎาคม-2568.xlsx",
-          hasUsableTarget: true,
-        },
-        {
-          title: "11.สขร เดือน สิงหาคม 2568 (XLSX)",
-          description: "ไฟล์ตารางสรุปข้อมูลจัดซื้อจัดจ้างรูปแบบ XLSX",
-          coverImage: null,
-          coverAlt: "ไฟล์ XLSX",
-          previewHref:
-            "/wp-content/uploads/knowledge-ethics-2569/procurement-summary-xlsx-05-11.สขร-เดือน-สิงหาคม-2568.xlsx",
-          downloadHref:
-            "/wp-content/uploads/knowledge-ethics-2569/procurement-summary-xlsx-05-11.สขร-เดือน-สิงหาคม-2568.xlsx",
-          hasUsableTarget: true,
-        },
-        {
-          title: "12.สขร. เดือน กันยายน 2568 (XLSX)",
-          description: "ไฟล์ตารางสรุปข้อมูลจัดซื้อจัดจ้างรูปแบบ XLSX",
-          coverImage: null,
-          coverAlt: "ไฟล์ XLSX",
-          previewHref:
-            "/wp-content/uploads/knowledge-ethics-2569/procurement-summary-xlsx-06-12.สขร.-เดือน-กันยายน2568.xlsx",
-          downloadHref:
-            "/wp-content/uploads/knowledge-ethics-2569/procurement-summary-xlsx-06-12.สขร.-เดือน-กันยายน2568.xlsx",
-          hasUsableTarget: true,
-        },
-        {
-          title: "2.สขร.เดือน พฤศจิกายน 2567 (XLSX)",
-          description: "ไฟล์ตารางสรุปข้อมูลจัดซื้อจัดจ้างรูปแบบ XLSX",
-          coverImage: null,
-          coverAlt: "ไฟล์ XLSX",
-          previewHref:
-            "/wp-content/uploads/knowledge-ethics-2569/procurement-summary-xlsx-07-2.สขร.เดือน-พฤศจิกายน-2567.xlsx",
-          downloadHref:
-            "/wp-content/uploads/knowledge-ethics-2569/procurement-summary-xlsx-07-2.สขร.เดือน-พฤศจิกายน-2567.xlsx",
-          hasUsableTarget: true,
-        },
-        {
-          title: "3.สขร.เดือน ธันวาคม 2567 (XLSX)",
-          description: "ไฟล์ตารางสรุปข้อมูลจัดซื้อจัดจ้างรูปแบบ XLSX",
-          coverImage: null,
-          coverAlt: "ไฟล์ XLSX",
-          previewHref:
-            "/wp-content/uploads/knowledge-ethics-2569/procurement-summary-xlsx-08-3.สขร.เดือน-ธันวาคม-2567.xlsx",
-          downloadHref:
-            "/wp-content/uploads/knowledge-ethics-2569/procurement-summary-xlsx-08-3.สขร.เดือน-ธันวาคม-2567.xlsx",
-          hasUsableTarget: true,
-        },
-        {
-          title: "4.สขร.เดือน มกราคม 2568 (XLSX)",
-          description: "ไฟล์ตารางสรุปข้อมูลจัดซื้อจัดจ้างรูปแบบ XLSX",
-          coverImage: null,
-          coverAlt: "ไฟล์ XLSX",
-          previewHref:
-            "/wp-content/uploads/knowledge-ethics-2569/procurement-summary-xlsx-09-4.สขร.เดือน-มกราคม-2568.xlsx",
-          downloadHref:
-            "/wp-content/uploads/knowledge-ethics-2569/procurement-summary-xlsx-09-4.สขร.เดือน-มกราคม-2568.xlsx",
-          hasUsableTarget: true,
-        },
-        {
-          title: "5.สขร.เดือน กุมภาพันธ์ 2568 (XLSX)",
-          description: "ไฟล์ตารางสรุปข้อมูลจัดซื้อจัดจ้างรูปแบบ XLSX",
-          coverImage: null,
-          coverAlt: "ไฟล์ XLSX",
-          previewHref:
-            "/wp-content/uploads/knowledge-ethics-2569/procurement-summary-xlsx-10-5.-สขร.เดือน-กุมภาพันธ์-2568.xlsx",
-          downloadHref:
-            "/wp-content/uploads/knowledge-ethics-2569/procurement-summary-xlsx-10-5.-สขร.เดือน-กุมภาพันธ์-2568.xlsx",
-          hasUsableTarget: true,
-        },
-        {
-          title: "6.สขร เดือน มีนาคม 2568 (XLSX)",
-          description: "ไฟล์ตารางสรุปข้อมูลจัดซื้อจัดจ้างรูปแบบ XLSX",
-          coverImage: null,
-          coverAlt: "ไฟล์ XLSX",
-          previewHref:
-            "/wp-content/uploads/knowledge-ethics-2569/procurement-summary-xlsx-11-6.สขร-เดือน-มีนาคม-2568.xlsx",
-          downloadHref:
-            "/wp-content/uploads/knowledge-ethics-2569/procurement-summary-xlsx-11-6.สขร-เดือน-มีนาคม-2568.xlsx",
-          hasUsableTarget: true,
-        },
-        {
-          title: "7.สขร เดือน เมษายน 2568 (XLSX)",
-          description: "ไฟล์ตารางสรุปข้อมูลจัดซื้อจัดจ้างรูปแบบ XLSX",
-          coverImage: null,
-          coverAlt: "ไฟล์ XLSX",
-          previewHref:
-            "/wp-content/uploads/knowledge-ethics-2569/procurement-summary-xlsx-12-7.-สขร.เดือน-เมษายน-2568.xlsx",
-          downloadHref:
-            "/wp-content/uploads/knowledge-ethics-2569/procurement-summary-xlsx-12-7.-สขร.เดือน-เมษายน-2568.xlsx",
-          hasUsableTarget: true,
-        },
-        {
-          title: "8.สขร เดือน พฤษภาคม 2568 (XLSX)",
-          description: "ไฟล์ตารางสรุปข้อมูลจัดซื้อจัดจ้างรูปแบบ XLSX",
-          coverImage: null,
-          coverAlt: "ไฟล์ XLSX",
-          previewHref:
-            "/wp-content/uploads/knowledge-ethics-2569/procurement-summary-xlsx-13-8.สขร-เดือน-พฤษภาคม-2568.xlsx",
-          downloadHref:
-            "/wp-content/uploads/knowledge-ethics-2569/procurement-summary-xlsx-13-8.สขร-เดือน-พฤษภาคม-2568.xlsx",
-          hasUsableTarget: true,
-        },
-        {
-          title: "9.สขร เดือน มิถุนายน 2568 (XLSX)",
-          description: "ไฟล์ตารางสรุปข้อมูลจัดซื้อจัดจ้างรูปแบบ XLSX",
-          coverImage: null,
-          coverAlt: "ไฟล์ XLSX",
-          previewHref:
-            "/wp-content/uploads/knowledge-ethics-2569/procurement-summary-xlsx-14-9.สขร-เดือน-มิถุนายน-2568.xlsx",
-          downloadHref:
-            "/wp-content/uploads/knowledge-ethics-2569/procurement-summary-xlsx-14-9.สขร-เดือน-มิถุนายน-2568.xlsx",
-          hasUsableTarget: true,
-        },
-      ],
-    },
+    groups: [
+      {
+        title: "สรุปจัดซื้อจัดจ้าง O11 ไตรมาสที่ 1–2",
+        open: true,
+        documents: [
+          {
+            title: "O11 ไตรมาสที่ 1",
+            description: "เอกสารสรุปข้อมูลจัดซื้อจัดจ้างรูปแบบ PDF",
+            coverImage:
+              "/wp-content/uploads/pdf-covers/knowledge-ethics-2569/7f6e21d84ae3e008.png",
+            coverAlt: "หน้าแรกของ PDF",
+            previewHref:
+              "/wp-content/uploads/knowledge-ethics-2569/procurement-summary-01-O11-ไตรมาสที่-1.pdf",
+            downloadHref:
+              "/wp-content/uploads/knowledge-ethics-2569/procurement-summary-01-O11-ไตรมาสที่-1.pdf",
+            hasUsableTarget: true,
+          },
+          {
+            title: "O11 ไตรมาสที่ 2",
+            description: "เอกสารสรุปข้อมูลจัดซื้อจัดจ้างรูปแบบ PDF",
+            coverImage:
+              "/wp-content/uploads/pdf-covers/knowledge-ethics-2569/6fff542c10bb96a2.png",
+            coverAlt: "หน้าแรกของ PDF",
+            previewHref:
+              "/wp-content/uploads/knowledge-ethics-2569/procurement-summary-02-O11-ไตรมาสที่-2.pdf",
+            downloadHref:
+              "/wp-content/uploads/knowledge-ethics-2569/procurement-summary-02-O11-ไตรมาสที่-2.pdf",
+            hasUsableTarget: true,
+          },
+          {
+            title: "O11 ไตรมาสที่ 1 (XLSX)",
+            description: "ไฟล์ตารางสรุปข้อมูลจัดซื้อจัดจ้างรูปแบบ XLSX",
+            coverImage: null,
+            coverAlt: "ไฟล์ XLSX",
+            previewHref:
+              "/wp-content/uploads/knowledge-ethics-2569/procurement-summary-xlsx-01-O11-ไตรมาสที่-1.xlsx",
+            downloadHref:
+              "/wp-content/uploads/knowledge-ethics-2569/procurement-summary-xlsx-01-O11-ไตรมาสที่-1.xlsx",
+            hasUsableTarget: true,
+          },
+          {
+            title: "O11 ไตรมาสที่ 2 (XLSX)",
+            description: "ไฟล์ตารางสรุปข้อมูลจัดซื้อจัดจ้างรูปแบบ XLSX",
+            coverImage: null,
+            coverAlt: "ไฟล์ XLSX",
+            previewHref:
+              "/wp-content/uploads/knowledge-ethics-2569/procurement-summary-xlsx-02-O11-ไตรมาสที่-2.xlsx",
+            downloadHref:
+              "/wp-content/uploads/knowledge-ethics-2569/procurement-summary-xlsx-02-O11-ไตรมาสที่-2.xlsx",
+            hasUsableTarget: true,
+          },
+        ],
+      },
+      {
+        title: "สรุปจัดซื้อจัดจ้าง สขร. รายเดือนและประจำปีงบประมาณ 2568",
+        open: true,
+        documents: [
+          {
+            title: "1.สขร.เดือน ตุลาคม 2567",
+            description: "เอกสารสรุปข้อมูลจัดซื้อจัดจ้างรูปแบบ PDF",
+            coverImage:
+              "/wp-content/uploads/pdf-covers/knowledge-ethics-2569/6f84e1f0201f35a3.png",
+            coverAlt: "หน้าแรกของ PDF",
+            previewHref:
+              "/wp-content/uploads/knowledge-ethics-2569/procurement-summary-03-1.สขร.เดือน-ตุลาคม-2567.pdf",
+            downloadHref:
+              "/wp-content/uploads/knowledge-ethics-2569/procurement-summary-03-1.สขร.เดือน-ตุลาคม-2567.pdf",
+            hasUsableTarget: true,
+          },
+          {
+            title: "10.สขร เดือน กรกฎาคม 2568",
+            description: "เอกสารสรุปข้อมูลจัดซื้อจัดจ้างรูปแบบ PDF",
+            coverImage:
+              "/wp-content/uploads/pdf-covers/knowledge-ethics-2569/04186c2af34acffd.png",
+            coverAlt: "หน้าแรกของ PDF",
+            previewHref:
+              "/wp-content/uploads/knowledge-ethics-2569/procurement-summary-04-10.สขร-เดือน-กรกฎาคม-2568.pdf",
+            downloadHref:
+              "/wp-content/uploads/knowledge-ethics-2569/procurement-summary-04-10.สขร-เดือน-กรกฎาคม-2568.pdf",
+            hasUsableTarget: true,
+          },
+          {
+            title: "11.สขร เดือน สิงหาคม 2568",
+            description: "เอกสารสรุปข้อมูลจัดซื้อจัดจ้างรูปแบบ PDF",
+            coverImage:
+              "/wp-content/uploads/pdf-covers/knowledge-ethics-2569/45a41bd85604f8f5.png",
+            coverAlt: "หน้าแรกของ PDF",
+            previewHref:
+              "/wp-content/uploads/knowledge-ethics-2569/procurement-summary-05-11.สขร-เดือน-สิงหาคม-2568.pdf",
+            downloadHref:
+              "/wp-content/uploads/knowledge-ethics-2569/procurement-summary-05-11.สขร-เดือน-สิงหาคม-2568.pdf",
+            hasUsableTarget: true,
+          },
+          {
+            title: "12.สขร.เดือน กันยายน 2568",
+            description: "เอกสารสรุปข้อมูลจัดซื้อจัดจ้างรูปแบบ PDF",
+            coverImage:
+              "/wp-content/uploads/pdf-covers/knowledge-ethics-2569/550413f08ebe5fdf.png",
+            coverAlt: "หน้าแรกของ PDF",
+            previewHref:
+              "/wp-content/uploads/knowledge-ethics-2569/procurement-summary-06-12.สขร.เดือน-กันยายน-2568.pdf",
+            downloadHref:
+              "/wp-content/uploads/knowledge-ethics-2569/procurement-summary-06-12.สขร.เดือน-กันยายน-2568.pdf",
+            hasUsableTarget: true,
+          },
+          {
+            title: "2..สขร.เดือน พฤศจิกายน 2567",
+            description: "เอกสารสรุปข้อมูลจัดซื้อจัดจ้างรูปแบบ PDF",
+            coverImage:
+              "/wp-content/uploads/pdf-covers/knowledge-ethics-2569/5f412f5d64d81cd1.png",
+            coverAlt: "หน้าแรกของ PDF",
+            previewHref:
+              "/wp-content/uploads/knowledge-ethics-2569/procurement-summary-07-2..สขร.เดือน-พฤศจิกายน-2567.pdf",
+            downloadHref:
+              "/wp-content/uploads/knowledge-ethics-2569/procurement-summary-07-2..สขร.เดือน-พฤศจิกายน-2567.pdf",
+            hasUsableTarget: true,
+          },
+          {
+            title: "3.สขร. เดือน ธันวาคม2567",
+            description: "เอกสารสรุปข้อมูลจัดซื้อจัดจ้างรูปแบบ PDF",
+            coverImage:
+              "/wp-content/uploads/pdf-covers/knowledge-ethics-2569/3b734060f126d5cc.png",
+            coverAlt: "หน้าแรกของ PDF",
+            previewHref:
+              "/wp-content/uploads/knowledge-ethics-2569/procurement-summary-08-3.สขร.-เดือน-ธันวาคม2567.pdf",
+            downloadHref:
+              "/wp-content/uploads/knowledge-ethics-2569/procurement-summary-08-3.สขร.-เดือน-ธันวาคม2567.pdf",
+            hasUsableTarget: true,
+          },
+          {
+            title: "4.สขร.เดือน มกราคม 2568",
+            description: "เอกสารสรุปข้อมูลจัดซื้อจัดจ้างรูปแบบ PDF",
+            coverImage:
+              "/wp-content/uploads/pdf-covers/knowledge-ethics-2569/dc4a2fd8656faa63.png",
+            coverAlt: "หน้าแรกของ PDF",
+            previewHref:
+              "/wp-content/uploads/knowledge-ethics-2569/procurement-summary-09-4.สขร.เดือน-มกราคม-2568.pdf",
+            downloadHref:
+              "/wp-content/uploads/knowledge-ethics-2569/procurement-summary-09-4.สขร.เดือน-มกราคม-2568.pdf",
+            hasUsableTarget: true,
+          },
+          {
+            title: "5.สขร.เดือน กุมภาพันธ์ 2568",
+            description: "เอกสารสรุปข้อมูลจัดซื้อจัดจ้างรูปแบบ PDF",
+            coverImage:
+              "/wp-content/uploads/pdf-covers/knowledge-ethics-2569/cabbdb5d8e2e252d.png",
+            coverAlt: "หน้าแรกของ PDF",
+            previewHref:
+              "/wp-content/uploads/knowledge-ethics-2569/procurement-summary-10-5.สขร.เดือน-กุมภาพันธ์-2568.pdf",
+            downloadHref:
+              "/wp-content/uploads/knowledge-ethics-2569/procurement-summary-10-5.สขร.เดือน-กุมภาพันธ์-2568.pdf",
+            hasUsableTarget: true,
+          },
+          {
+            title: "6.สขร เดือน มีนาคม 2568",
+            description: "เอกสารสรุปข้อมูลจัดซื้อจัดจ้างรูปแบบ PDF",
+            coverImage:
+              "/wp-content/uploads/pdf-covers/knowledge-ethics-2569/c047b4413c1be50e.png",
+            coverAlt: "หน้าแรกของ PDF",
+            previewHref:
+              "/wp-content/uploads/knowledge-ethics-2569/procurement-summary-11-6.สขร-เดือน-มีนาคม-2568.pdf",
+            downloadHref:
+              "/wp-content/uploads/knowledge-ethics-2569/procurement-summary-11-6.สขร-เดือน-มีนาคม-2568.pdf",
+            hasUsableTarget: true,
+          },
+          {
+            title: "7.สขร เดือน เมษายน 2568",
+            description: "เอกสารสรุปข้อมูลจัดซื้อจัดจ้างรูปแบบ PDF",
+            coverImage:
+              "/wp-content/uploads/pdf-covers/knowledge-ethics-2569/1c27347be82546e2.png",
+            coverAlt: "หน้าแรกของ PDF",
+            previewHref:
+              "/wp-content/uploads/knowledge-ethics-2569/procurement-summary-12-7.สขร-เดือน-เมษายน-2568.pdf",
+            downloadHref:
+              "/wp-content/uploads/knowledge-ethics-2569/procurement-summary-12-7.สขร-เดือน-เมษายน-2568.pdf",
+            hasUsableTarget: true,
+          },
+          {
+            title: "8.สขร เดือน พฤษภาคม 2568",
+            description: "เอกสารสรุปข้อมูลจัดซื้อจัดจ้างรูปแบบ PDF",
+            coverImage:
+              "/wp-content/uploads/pdf-covers/knowledge-ethics-2569/e6ae700e5e496913.png",
+            coverAlt: "หน้าแรกของ PDF",
+            previewHref:
+              "/wp-content/uploads/knowledge-ethics-2569/procurement-summary-13-8.สขร-เดือน-พฤษภาคม-2568.pdf",
+            downloadHref:
+              "/wp-content/uploads/knowledge-ethics-2569/procurement-summary-13-8.สขร-เดือน-พฤษภาคม-2568.pdf",
+            hasUsableTarget: true,
+          },
+          {
+            title: "9.สขร เดือน มิถุนายน 2568",
+            description: "เอกสารสรุปข้อมูลจัดซื้อจัดจ้างรูปแบบ PDF",
+            coverImage:
+              "/wp-content/uploads/pdf-covers/knowledge-ethics-2569/ffdbcddfeff02d43.png",
+            coverAlt: "หน้าแรกของ PDF",
+            previewHref:
+              "/wp-content/uploads/knowledge-ethics-2569/procurement-summary-14-9.สขร-เดือน-มิถุนายน-2568.pdf",
+            downloadHref:
+              "/wp-content/uploads/knowledge-ethics-2569/procurement-summary-14-9.สขร-เดือน-มิถุนายน-2568.pdf",
+            hasUsableTarget: true,
+          },
+          {
+            title: "แบบสรุปผลการจัดซื้อจัดจ้าง ประจำปีงบประมาณ พ.ศ.2568",
+            description: "เอกสารสรุปข้อมูลจัดซื้อจัดจ้างรูปแบบ PDF",
+            coverImage:
+              "/wp-content/uploads/pdf-covers/knowledge-ethics-2569/c0f9863b46cfff4f.png",
+            coverAlt: "หน้าแรกของ PDF",
+            previewHref:
+              "/wp-content/uploads/knowledge-ethics-2569/procurement-summary-15-แบบสรุปผลการจัดซื้อจัดจ้าง-ประจำปีงบประมาณ-พ.ศ.2568.pdf",
+            downloadHref:
+              "/wp-content/uploads/knowledge-ethics-2569/procurement-summary-15-แบบสรุปผลการจัดซื้อจัดจ้าง-ประจำปีงบประมาณ-พ.ศ.2568.pdf",
+            hasUsableTarget: true,
+          },
+          {
+            title: "1.สขร.เดือน ตุลาคม 2567 (XLSX)",
+            description: "ไฟล์ตารางสรุปข้อมูลจัดซื้อจัดจ้างรูปแบบ XLSX",
+            coverImage: null,
+            coverAlt: "ไฟล์ XLSX",
+            previewHref:
+              "/wp-content/uploads/knowledge-ethics-2569/procurement-summary-xlsx-03-1.สขร.เดือน-ตุลาคม-2567.xlsx",
+            downloadHref:
+              "/wp-content/uploads/knowledge-ethics-2569/procurement-summary-xlsx-03-1.สขร.เดือน-ตุลาคม-2567.xlsx",
+            hasUsableTarget: true,
+          },
+          {
+            title: "10.สขร เดือน กรกฎาคม 2568 (XLSX)",
+            description: "ไฟล์ตารางสรุปข้อมูลจัดซื้อจัดจ้างรูปแบบ XLSX",
+            coverImage: null,
+            coverAlt: "ไฟล์ XLSX",
+            previewHref:
+              "/wp-content/uploads/knowledge-ethics-2569/procurement-summary-xlsx-04-10.สขร-เดือน-กรกฎาคม-2568.xlsx",
+            downloadHref:
+              "/wp-content/uploads/knowledge-ethics-2569/procurement-summary-xlsx-04-10.สขร-เดือน-กรกฎาคม-2568.xlsx",
+            hasUsableTarget: true,
+          },
+          {
+            title: "11.สขร เดือน สิงหาคม 2568 (XLSX)",
+            description: "ไฟล์ตารางสรุปข้อมูลจัดซื้อจัดจ้างรูปแบบ XLSX",
+            coverImage: null,
+            coverAlt: "ไฟล์ XLSX",
+            previewHref:
+              "/wp-content/uploads/knowledge-ethics-2569/procurement-summary-xlsx-05-11.สขร-เดือน-สิงหาคม-2568.xlsx",
+            downloadHref:
+              "/wp-content/uploads/knowledge-ethics-2569/procurement-summary-xlsx-05-11.สขร-เดือน-สิงหาคม-2568.xlsx",
+            hasUsableTarget: true,
+          },
+          {
+            title: "12.สขร. เดือน กันยายน 2568 (XLSX)",
+            description: "ไฟล์ตารางสรุปข้อมูลจัดซื้อจัดจ้างรูปแบบ XLSX",
+            coverImage: null,
+            coverAlt: "ไฟล์ XLSX",
+            previewHref:
+              "/wp-content/uploads/knowledge-ethics-2569/procurement-summary-xlsx-06-12.สขร.-เดือน-กันยายน2568.xlsx",
+            downloadHref:
+              "/wp-content/uploads/knowledge-ethics-2569/procurement-summary-xlsx-06-12.สขร.-เดือน-กันยายน2568.xlsx",
+            hasUsableTarget: true,
+          },
+          {
+            title: "2.สขร.เดือน พฤศจิกายน 2567 (XLSX)",
+            description: "ไฟล์ตารางสรุปข้อมูลจัดซื้อจัดจ้างรูปแบบ XLSX",
+            coverImage: null,
+            coverAlt: "ไฟล์ XLSX",
+            previewHref:
+              "/wp-content/uploads/knowledge-ethics-2569/procurement-summary-xlsx-07-2.สขร.เดือน-พฤศจิกายน-2567.xlsx",
+            downloadHref:
+              "/wp-content/uploads/knowledge-ethics-2569/procurement-summary-xlsx-07-2.สขร.เดือน-พฤศจิกายน-2567.xlsx",
+            hasUsableTarget: true,
+          },
+          {
+            title: "3.สขร.เดือน ธันวาคม 2567 (XLSX)",
+            description: "ไฟล์ตารางสรุปข้อมูลจัดซื้อจัดจ้างรูปแบบ XLSX",
+            coverImage: null,
+            coverAlt: "ไฟล์ XLSX",
+            previewHref:
+              "/wp-content/uploads/knowledge-ethics-2569/procurement-summary-xlsx-08-3.สขร.เดือน-ธันวาคม-2567.xlsx",
+            downloadHref:
+              "/wp-content/uploads/knowledge-ethics-2569/procurement-summary-xlsx-08-3.สขร.เดือน-ธันวาคม-2567.xlsx",
+            hasUsableTarget: true,
+          },
+          {
+            title: "4.สขร.เดือน มกราคม 2568 (XLSX)",
+            description: "ไฟล์ตารางสรุปข้อมูลจัดซื้อจัดจ้างรูปแบบ XLSX",
+            coverImage: null,
+            coverAlt: "ไฟล์ XLSX",
+            previewHref:
+              "/wp-content/uploads/knowledge-ethics-2569/procurement-summary-xlsx-09-4.สขร.เดือน-มกราคม-2568.xlsx",
+            downloadHref:
+              "/wp-content/uploads/knowledge-ethics-2569/procurement-summary-xlsx-09-4.สขร.เดือน-มกราคม-2568.xlsx",
+            hasUsableTarget: true,
+          },
+          {
+            title: "5.สขร.เดือน กุมภาพันธ์ 2568 (XLSX)",
+            description: "ไฟล์ตารางสรุปข้อมูลจัดซื้อจัดจ้างรูปแบบ XLSX",
+            coverImage: null,
+            coverAlt: "ไฟล์ XLSX",
+            previewHref:
+              "/wp-content/uploads/knowledge-ethics-2569/procurement-summary-xlsx-10-5.-สขร.เดือน-กุมภาพันธ์-2568.xlsx",
+            downloadHref:
+              "/wp-content/uploads/knowledge-ethics-2569/procurement-summary-xlsx-10-5.-สขร.เดือน-กุมภาพันธ์-2568.xlsx",
+            hasUsableTarget: true,
+          },
+          {
+            title: "6.สขร เดือน มีนาคม 2568 (XLSX)",
+            description: "ไฟล์ตารางสรุปข้อมูลจัดซื้อจัดจ้างรูปแบบ XLSX",
+            coverImage: null,
+            coverAlt: "ไฟล์ XLSX",
+            previewHref:
+              "/wp-content/uploads/knowledge-ethics-2569/procurement-summary-xlsx-11-6.สขร-เดือน-มีนาคม-2568.xlsx",
+            downloadHref:
+              "/wp-content/uploads/knowledge-ethics-2569/procurement-summary-xlsx-11-6.สขร-เดือน-มีนาคม-2568.xlsx",
+            hasUsableTarget: true,
+          },
+          {
+            title: "7.สขร เดือน เมษายน 2568 (XLSX)",
+            description: "ไฟล์ตารางสรุปข้อมูลจัดซื้อจัดจ้างรูปแบบ XLSX",
+            coverImage: null,
+            coverAlt: "ไฟล์ XLSX",
+            previewHref:
+              "/wp-content/uploads/knowledge-ethics-2569/procurement-summary-xlsx-12-7.-สขร.เดือน-เมษายน-2568.xlsx",
+            downloadHref:
+              "/wp-content/uploads/knowledge-ethics-2569/procurement-summary-xlsx-12-7.-สขร.เดือน-เมษายน-2568.xlsx",
+            hasUsableTarget: true,
+          },
+          {
+            title: "8.สขร เดือน พฤษภาคม 2568 (XLSX)",
+            description: "ไฟล์ตารางสรุปข้อมูลจัดซื้อจัดจ้างรูปแบบ XLSX",
+            coverImage: null,
+            coverAlt: "ไฟล์ XLSX",
+            previewHref:
+              "/wp-content/uploads/knowledge-ethics-2569/procurement-summary-xlsx-13-8.สขร-เดือน-พฤษภาคม-2568.xlsx",
+            downloadHref:
+              "/wp-content/uploads/knowledge-ethics-2569/procurement-summary-xlsx-13-8.สขร-เดือน-พฤษภาคม-2568.xlsx",
+            hasUsableTarget: true,
+          },
+          {
+            title: "9.สขร เดือน มิถุนายน 2568 (XLSX)",
+            description: "ไฟล์ตารางสรุปข้อมูลจัดซื้อจัดจ้างรูปแบบ XLSX",
+            coverImage: null,
+            coverAlt: "ไฟล์ XLSX",
+            previewHref:
+              "/wp-content/uploads/knowledge-ethics-2569/procurement-summary-xlsx-14-9.สขร-เดือน-มิถุนายน-2568.xlsx",
+            downloadHref:
+              "/wp-content/uploads/knowledge-ethics-2569/procurement-summary-xlsx-14-9.สขร-เดือน-มิถุนายน-2568.xlsx",
+            hasUsableTarget: true,
+          },
+        ],
+      },
+    ],
   },
 ];
 
 export const supplementalKnowledgePages: SupplementalKnowledgePage[] =
-  supplementalKnowledgeGroups.map(({ slug, group }) => ({
-    slug,
-    path: `${basePath}/${slug}`,
-    title: group.title,
-    group,
-  }));
+  supplementalKnowledgeGroups.map(({ slug, group, groups }) => {
+    const resolvedGroups = groups ?? (group ? [group] : []);
+    const title = resolvedGroups[0]?.title ?? slug;
+
+    return {
+      slug,
+      path: `${basePath}/${slug}`,
+      title: slug === "procurement-summary" ? "สรุปจัดซื้อจัดจ้าง" : title,
+      groups: resolvedGroups,
+    };
+  });
 
 export function getSupplementalKnowledgePage(
   path: string,
