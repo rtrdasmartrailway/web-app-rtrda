@@ -196,12 +196,12 @@ export const landingGuidePages: LandingGuidePage[] = [
         documents: [
           pdfDocument(
             "o14 รายงานผลการบริหารทรัพยากรบุคคล ประจำปีงบประมาณ2568(2)",
-            "/wp-content/uploads/landing-ita-guides-2569/manual-o14-01-o14-รายงานผลการบริหารทรัพยากรบุคคล-ประจำปีงบประมาณ2568(2).pdf",
+            "/wp-content/uploads/landing-ita-guides-2569/manual-o14-01-o14-รายงานผลการบริหารทรัพยากรบุคคล-ประจำปีงบประมาณ2568-v2.pdf",
             "/wp-content/uploads/pdf-covers/landing-ita-guides-2569/68230638b3dc1ba4.png",
           ),
           pdfDocument(
             "o14 รายงานผลการพัฒนาทรัพยากรบุคคล ประจำปีงบประมาณ2568(2)",
-            "/wp-content/uploads/landing-ita-guides-2569/manual-o14-02-o14-รายงานผลการพัฒนาทรัพยากรบุคคล-ประจำปีงบประมาณ2568(2).pdf",
+            "/wp-content/uploads/landing-ita-guides-2569/manual-o14-02-o14-รายงานผลการพัฒนาทรัพยากรบุคคล-ประจำปีงบประมาณ2568-v2.pdf",
             "/wp-content/uploads/pdf-covers/landing-ita-guides-2569/e8ec51355f355717.png",
           ),
         ],
