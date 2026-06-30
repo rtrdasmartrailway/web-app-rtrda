@@ -11,6 +11,7 @@ const TEXT = {
     newsAll: "ดูทั้งหมด",
     articles: "บทความล่าสุด",
     calendar: "ปฏิทินกิจกรรม",
+    serviceBanners: "บริการและข้อมูลสำคัญ",
     partners: "เครือข่ายพันธมิตร",
   },
   en: {
@@ -18,15 +19,106 @@ const TEXT = {
     newsAll: "View all",
     articles: "Recent Articles",
     calendar: "RTRDA Calendar",
+    serviceBanners: "Key Services and Information",
     partners: "Our Partners",
   },
 } as const satisfies Record<WpLanguage, Record<string, string>>;
+
+const SERVICE_BANNERS = [
+  {
+    icon: "↗",
+    titleTh: "ศูนย์รวมข้อมูลงานระบบราง",
+    titleEn: "Rail Knowledge Center",
+    subtitleTh: "ข้อมูลอ้างอิงและบริการกลางของ สทร.",
+    subtitleEn: "RTRDA reference information and services",
+    href: "https://nrail.rtrda.or.th/",
+    tone: "slate",
+  },
+  {
+    icon: "📄",
+    titleTh: "เอกสารเผยแพร่และรายงาน",
+    titleEn: "Public Reports",
+    subtitleTh: "รายงาน แผนงาน และเอกสารเปิดเผยต่อสาธารณะ",
+    subtitleEn: "Reports, plans, and public documents",
+    href: "https://test.rtrda.or.th/e-services",
+    tone: "silver",
+  },
+  {
+    icon: "⚖",
+    titleTh: "ธรรมาภิบาลและความโปร่งใส",
+    titleEn: "Governance & Transparency",
+    subtitleTh: "ข้อมูล ITA นโยบาย และมาตรการกำกับดูแล",
+    subtitleEn: "ITA, policy, and governance information",
+    href:
+      "https://test.rtrda.or.th/%E0%B8%81%E0%B8%B2%E0%B8%A3%E0%B8%9B%E0%B8%A3%E0%B8%B0%E0%B9%80%E0%B8%A1%E0%B8%B4%E0%B8%99%E0%B8%84%E0%B8%B8%E0%B8%93%E0%B8%98%E0%B8%A3%E0%B8%A3%E0%B8%A1%E0%B9%81%E0%B8%A5%E0%B8%B0%E0%B8%84%E0%B8%A7",
+    tone: "dark",
+  },
+  {
+    icon: "🚆",
+    titleTh: "โครงการวิจัยระบบราง",
+    titleEn: "Rail Research Projects",
+    subtitleTh: "โครงการเด่น งานวิจัย และการถ่ายทอดเทคโนโลยี",
+    subtitleEn: "Research, highlights, and technology transfer",
+    href:
+      "https://test.rtrda.or.th/%E0%B8%84%E0%B8%A5%E0%B8%B1%E0%B8%87%E0%B8%84%E0%B8%A7%E0%B8%B2%E0%B8%A1%E0%B8%A3%E0%B8%B9%E0%B9%89",
+    tone: "rail",
+  },
+  {
+    icon: "📢",
+    titleTh: "ข่าวประชาสัมพันธ์",
+    titleEn: "Public Relations",
+    subtitleTh: "ข่าวกิจกรรมและประกาศสำคัญจาก สทร.",
+    subtitleEn: "News, activities, and announcements",
+    href:
+      "https://test.rtrda.or.th/category/%E0%B8%82%E0%B9%88%E0%B8%B2%E0%B8%A7%E0%B9%81%E0%B8%A5%E0%B8%B0%E0%B8%81%E0%B8%B4%E0%B8%88%E0%B8%81%E0%B8%A3%E0%B8%A3%E0%B8%A1",
+    tone: "paper",
+  },
+  {
+    icon: "🔎",
+    titleTh: "จัดซื้อจัดจ้าง",
+    titleEn: "Procurement",
+    subtitleTh: "แผนประกาศ TOR และผลผู้ชนะการเสนอราคา",
+    subtitleEn: "Plans, TOR, and winner announcements",
+    href:
+      "https://test.rtrda.or.th/%E0%B8%88%E0%B8%B1%E0%B8%94%E0%B8%8B%E0%B8%B7%E0%B9%89%E0%B8%AD%E0%B8%88%E0%B8%B1%E0%B8%94%E0%B8%88%E0%B9%89%E0%B8%B2%E0%B8%87/%E0%B9%81%E0%B8%9C%E0%B8%99%E0%B8%81%E0%B8%B2%E0%B8%A3%E0%B8%88%E0%B8%B1%E0%B8%94%E0%B8%8B%E0%B8%B7%E0%B9%89%E0%B8%AD%E0%B8%88%E0%B8%B1%E0%B8%94%E0%B8%88%E0%B9%89%E0%B8%B2%E0%B8%87",
+    tone: "charcoal",
+  },
+] as const;
 
 function SectionHeading({ id, children }: { id: string; children: React.ReactNode }) {
   return (
     <div className="section-heading-row">
       <h2 id={id}>{children}</h2>
     </div>
+  );
+}
+
+function HomeServiceBannerMockup({ language }: { language: WpLanguage }) {
+  return (
+    <section className="home-section home-service-banners" aria-labelledby="home-service-banners-title">
+      <div className="section-heading-row section-heading-center home-service-banners-head">
+        <h2 id="home-service-banners-title">{TEXT[language].serviceBanners}</h2>
+      </div>
+      <div className="service-banner-grid" aria-label={TEXT[language].serviceBanners}>
+        {SERVICE_BANNERS.map((banner) => (
+          <a
+            aria-label={language === "th" ? banner.titleTh : banner.titleEn}
+            className={`service-banner-card service-banner-card-${banner.tone}`}
+            href={banner.href}
+            key={banner.titleTh}
+          >
+            <span className="service-banner-icon" aria-hidden="true">
+              {banner.icon}
+            </span>
+            <span className="service-banner-copy">
+              <strong>{language === "th" ? banner.titleTh : banner.titleEn}</strong>
+              <small>{language === "th" ? banner.subtitleTh : banner.subtitleEn}</small>
+            </span>
+            <span className="service-banner-arrow" aria-hidden="true" />
+          </a>
+        ))}
+      </div>
+    </section>
   );
 }
 
@@ -51,7 +143,7 @@ export function HomeSections({
           </Link>
         </div>
         <div className="related-grid">
-          {home.news.map((card) => (
+          {home.news.slice(0, 4).map((card) => (
             <ArticleCard key={card.record.id} card={card} />
           ))}
         </div>
@@ -72,6 +164,8 @@ export function HomeSections({
           <EventsCalendar days={home.calendarDays} language={language} />
         </section>
       </div>
+
+      <HomeServiceBannerMockup language={language} />
 
       {home.partners.length > 0 ? (
         <section className="home-section" aria-labelledby="home-partners-title">
