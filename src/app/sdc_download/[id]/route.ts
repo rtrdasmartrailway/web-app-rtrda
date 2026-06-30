@@ -38,6 +38,17 @@ const STATIC_DOWNLOAD_OVERRIDES: Record<string, WpDownloadAsset> = {
     group: "ita2569",
     sourcePages: ["th-page-4837"],
   },
+  "ita2569-o19-08": {
+    id: "ita2569-o19-08",
+    sourceUrl: "",
+    localPath: "/sdc-downloads/ita2569-o19-08.pdf",
+    fileName: "รายงานผลการเปิดโอกาสให้บุคคลภายนอกได้มีส่วนร่วม.pdf",
+    mimeType: "application/pdf",
+    sizeBytes: 1_299_939,
+    title: "รายงานผลการเปิดโอกาสให้บุคคลภายนอกได้มีส่วนร่วม",
+    group: "ita2569",
+    sourcePages: ["th-page-4837"],
+  },
   "ita2569-o20-01": {
     id: "ita2569-o20-01",
     sourceUrl: "",

@@ -97,7 +97,7 @@ const ITA_O4_NEWS_HREF =
 
 const ITA_LINK_OVERRIDES: ReadonlyArray<{
   marker: string;
-  links: ReadonlyArray<{ title: string; href: string }>;
+  links: ReadonlyArray<{ title: string; href: string; indent?: boolean }>;
 }> = [
   {
     marker: "O1",
@@ -452,30 +452,41 @@ const ITA_LINK_OVERRIDES: ReadonlyArray<{
       {
         title: "แบบฟอร์มการมีส่วนร่วมo19_v3",
         href: sdcDownloadHref("ita2569-o19-01"),
+        indent: true,
       },
       {
         title: "เอกสารประกอบที่ 1 คำสั่งสทรที่52-2568",
         href: sdcDownloadHref("ita2569-o19-02"),
+        indent: true,
       },
       {
         title: "เอกสารประกอบที่ 2 รายงานประชุม ครั้งที่ 4-2568",
         href: sdcDownloadHref("ita2569-o19-03"),
+        indent: true,
       },
       {
         title: "เอกสารประกอบที่ 3 สรุปการประชุมTechnical Hearing",
         href: sdcDownloadHref("ita2569-o19-04"),
+        indent: true,
       },
       {
         title: "เอกสารประกอบที่ 4 รายงานประชุม ครั้งที่ 10-2568",
         href: sdcDownloadHref("ita2569-o19-05"),
+        indent: true,
       },
       {
         title: "เอกสารประกอบที่ 5 รายงานการประชุม ครั้งที่ 26(4)-2568",
         href: sdcDownloadHref("ita2569-o19-06"),
+        indent: true,
       },
       {
         title: "เอกสารประกอบที่ 6 รายงานการจัดทำประชาพิจารณ์",
         href: sdcDownloadHref("ita2569-o19-07"),
+        indent: true,
+      },
+      {
+        title: "รายงานผลการเปิดโอกาสให้บุคคลภายนอกได้มีส่วนร่วม",
+        href: sdcDownloadHref("ita2569-o19-08"),
       },
     ],
   },
@@ -633,8 +644,16 @@ function isItaHeadingParagraph($: cheerio.CheerioAPI, element: AnyNode): boolean
   return /^O\d+\b/.test($(element).text().trim());
 }
 
-function linkParagraph($: cheerio.CheerioAPI, title: string, href: string): string {
+function linkParagraph(
+  $: cheerio.CheerioAPI,
+  title: string,
+  href: string,
+  options: { indent?: boolean } = {},
+): string {
   const paragraph = $("<p></p>");
+  if (options.indent) {
+    paragraph.attr("style", "margin-left: 1.5rem; padding-left: 1rem;");
+  }
   const link = $("<a></a>");
   link.attr("href", href);
   link.text(`– ${title}`);
@@ -712,7 +731,9 @@ function applyLinkOverridesToSubtree(
     }
 
     $heading.after(
-      override.links.map((link) => linkParagraph($, link.title, link.href)).join("\n"),
+      override.links
+        .map((link) => linkParagraph($, link.title, link.href, { indent: link.indent }))
+        .join("\n"),
     );
     didChange = true;
   }

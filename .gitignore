@@ -52,6 +52,7 @@ public/wp-content/uploads/news-2569/*
 !public/wp-content/uploads/news-2569/fb-*/
 !public/wp-content/uploads/news-2569/fb-*/*.jpg
 public/sdc-downloads/*
+!public/sdc-downloads/ita2569-o19-08.pdf
 !public/sdc-downloads/ita2569-o8-02.pdf
 !public/sdc-downloads/ita2569-o9-03.png
 !public/sdc-downloads/ita2569-o20-01.pdf
