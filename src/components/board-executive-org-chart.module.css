@@ -262,3 +262,194 @@
     max-width: 170px;
   }
 }
+.detailButtonWrap {
+  display: flex;
+  justify-content: center;
+  margin-top: auto;
+  padding-top: 10px;
+}
+
+.detailButton {
+  appearance: none;
+  background: linear-gradient(135deg, var(--accent-deep), #0f6fb8);
+  border: 0;
+  border-radius: 999px;
+  box-shadow: 0 10px 22px rgba(0, 52, 113, 0.18);
+  color: #ffffff;
+  cursor: pointer;
+  font: inherit;
+  font-size: calc(13px * var(--reader-scale));
+  font-weight: 800;
+  line-height: 1;
+  padding: 10px 18px;
+}
+
+.detailButton:hover,
+.detailButton:focus-visible {
+  background: linear-gradient(135deg, #003471, var(--accent-deep));
+  outline: 3px solid rgba(37, 99, 235, 0.22);
+  outline-offset: 2px;
+}
+
+.detailOverlay {
+  align-items: center;
+  background: rgba(2, 6, 23, 0.58);
+  display: flex;
+  inset: 0;
+  justify-content: center;
+  padding: 18px;
+  position: fixed;
+  z-index: 10000;
+}
+
+.detailModal {
+  background: #ffffff;
+  border-radius: 18px;
+  box-shadow: 0 28px 80px rgba(2, 6, 23, 0.35);
+  color: var(--navy-900);
+  max-height: min(86vh, 760px);
+  max-width: 860px;
+  overflow: auto;
+  padding: clamp(22px, 3vw, 34px);
+  position: relative;
+  width: min(100%, 860px);
+}
+
+.detailClose {
+  align-items: center;
+  appearance: none;
+  background: var(--navy-900);
+  border: 0;
+  border-radius: 999px;
+  color: #ffffff;
+  cursor: pointer;
+  display: inline-flex;
+  font-size: 26px;
+  font-weight: 700;
+  height: 38px;
+  justify-content: center;
+  line-height: 1;
+  position: sticky;
+  top: 0;
+  margin-left: auto;
+  width: 38px;
+  z-index: 1;
+}
+
+.detailBody {
+  display: grid;
+  gap: 14px;
+  text-align: left;
+}
+
+.detailBody h1,
+.detailBody h2,
+.detailBody h3,
+.detailBody h4,
+.detailBody h5,
+.detailBody h6 {
+  color: var(--navy-900);
+  line-height: 1.35;
+  margin: 0;
+}
+
+.detailBody h1,
+.detailBody h2,
+.detailBody h3 {
+  font-size: calc(22px * var(--reader-scale));
+}
+
+.detailBody p,
+.detailBody li {
+  font-size: calc(15px * var(--reader-scale));
+  line-height: 1.75;
+}
+
+.detailBody ul,
+.detailBody ol {
+  margin: 0;
+  padding-left: 1.35rem;
+}
+
+.detailBody img {
+  height: auto;
+  max-width: 100%;
+}
+
+/* Legacy WordPress-rendered board cards: make name badges readable. */
+:global(.content-board-executives .wp-content .wp-block-column h4.wp-block-heading) {
+  background: #ffffff;
+  border: 1px solid rgba(0, 52, 113, 0.18);
+  border-radius: 14px;
+  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.07);
+  color: #003471 !important;
+  display: block;
+  font-size: calc(16px * var(--reader-scale));
+  font-weight: 850;
+  line-height: 1.45;
+  margin: 14px auto 8px;
+  max-width: 260px;
+  overflow-wrap: anywhere;
+  padding: 10px 12px;
+  text-align: center;
+  white-space: normal;
+}
+
+:global(.content-board-executives .wp-content .wp-block-column h5.wp-block-heading) {
+  color: var(--accent-deep) !important;
+  font-size: calc(13.5px * var(--reader-scale));
+  font-weight: 750;
+  line-height: 1.5;
+  margin: 0 auto 10px;
+  max-width: 280px;
+  overflow-wrap: anywhere;
+  text-align: center;
+}
+
+:global(.content-board-executives .wp-content .wp-block-buttons) {
+  margin-top: 10px;
+}
+
+:global(.content-board-executives .wp-content .wp-block-button.detail-btn a),
+:global(
+  .content-board-executives .wp-content .wp-block-button.detail-btn .wp-block-button__link
+) {
+  background: linear-gradient(135deg, var(--accent-deep), #0f6fb8) !important;
+  border: 0 !important;
+  border-radius: 999px !important;
+  box-shadow: 0 8px 18px rgba(0, 52, 113, 0.16);
+  color: #ffffff !important;
+  cursor: pointer;
+  display: inline-flex;
+  font-size: calc(13px * var(--reader-scale));
+  font-weight: 800;
+  line-height: 1;
+  padding: 10px 18px;
+  text-decoration: none !important;
+}
+
+.detailButtonDisabled,
+:global(.content-board-executives .wp-content .wp-block-button.detail-btn-disabled a),
+:global(
+  .content-board-executives
+    .wp-content
+    .wp-block-button.detail-btn-disabled
+    .wp-block-button__link
+) {
+  appearance: none;
+  background: #e5e7eb !important;
+  border: 1px solid #cbd5e1 !important;
+  border-radius: 999px !important;
+  box-shadow: none !important;
+  color: #64748b !important;
+  cursor: not-allowed !important;
+  display: inline-flex;
+  font: inherit;
+  font-size: calc(13px * var(--reader-scale));
+  font-weight: 800;
+  line-height: 1;
+  opacity: 1;
+  padding: 10px 18px;
+  pointer-events: none;
+  text-decoration: none !important;
+}

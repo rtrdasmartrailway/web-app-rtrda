@@ -86,7 +86,21 @@ describe("applyProcurementWinnerOverride", () => {
 
     expect(firstRowLink.text().trim()).toBe("PDF");
     expect(firstRowLink.attr("href")).toBe(
-      "/wp-content/uploads/2026/06/ประกาศแผนแพร่แผนการจัดซื้อจัดจ้าง_0001.pdf",
+      "/wp-content/uploads/2026/06/ประกาศผู้ชนะการเสนอราคา_25_06_2569.pdf",
+    );
+  });
+
+  it("updates the 6 May 2569 consultant winner row to the supplied PDF", () => {
+    const updated = applyProcurementWinnerOverride(record({}));
+    const $ = cheerio.load(updated.contentHtml, null, false);
+    const consultantRow = $(".lightweight-accordion")
+      .first()
+      .find("tbody tr")
+      .filter((_, row) => $(row).text().includes("6 พฤษภาคม 2569"))
+      .first();
+
+    expect(consultantRow.find("a").attr("href")).toBe(
+      "/wp-content/uploads/2026/05/ประกาศผู้ชนะการเสนอราคา_12_05_2569.pdf",
     );
   });
 

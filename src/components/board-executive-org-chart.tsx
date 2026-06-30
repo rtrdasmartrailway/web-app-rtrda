@@ -5,6 +5,10 @@ import type {
   BoardExecutivePresentation,
 } from "@/lib/wp/board-executives";
 import type { WpLanguage } from "@/lib/wp/types";
+import {
+  BoardExecutiveDetailButton,
+  BoardExecutiveLegacyDetailsHydrator,
+} from "./board-executive-details";
 import { ManagerSubUnitsButton } from "./manager-sub-units-button";
 import styles from "./board-executive-org-chart.module.css";
 
@@ -75,6 +79,11 @@ function PersonCard({
             </dd>
           </div>
         </dl>
+      ) : null}
+      {!person.vacant ? (
+        <div className={styles.detailButtonWrap}>
+          <BoardExecutiveDetailButton name={person.name} />
+        </div>
       ) : null}
       {showSubUnitsButton && !person.vacant ? (
         <div className={styles.subUnitsButtonWrap}>
@@ -174,6 +183,7 @@ export function BoardExecutiveContent({
           />
         ),
       )}
+      <BoardExecutiveLegacyDetailsHydrator />
     </div>
   );
 }

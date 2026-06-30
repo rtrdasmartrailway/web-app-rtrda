@@ -115,7 +115,7 @@ describe("board executive parser", () => {
     expect(generalManagers.map((person) => person.name)).not.toContain("ชัชวาล พานวงษ์");
   });
 
-  it("renders the executive chart without detail buttons", async () => {
+  it("renders the executive chart with detail buttons only for people that have imported details", async () => {
     const record = await boardRecord();
     const presentation = buildBoardExecutivePresentation(record.path, record.contentHtml);
     expect(presentation).not.toBeNull();
@@ -134,7 +134,12 @@ describe("board executive parser", () => {
     expect(html).not.toContain("082 204 2998 / 02 248 2988");
     expect(html).toContain(">(ว่าง)</span>");
     expect(html).not.toContain(">?</span>");
-    expect(html).not.toContain("รายละเอียด");
+    const detailButtonMatches = html.match(/>รายละเอียด<\/button>/g) ?? [];
+    expect(detailButtonMatches).toHaveLength(4);
+    const disabledDetailButtonMatches =
+      html.match(/disabled="" type="button">รายละเอียด<\/button>/g) ?? [];
+    expect(disabledDetailButtonMatches).toHaveLength(3);
+    expect(html).toContain('aria-haspopup="dialog"');
   });
 
   it("renders vacant cards with the full card structure", async () => {
