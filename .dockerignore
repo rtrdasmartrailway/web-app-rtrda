@@ -9,6 +9,17 @@ npm-debug.log*
 .DS_Store
 coverage
 public/wp-content/uploads/*
+!public/wp-content/uploads/ita2569/
+public/wp-content/uploads/ita2569/*
+!public/wp-content/uploads/ita2569/O13/
+public/wp-content/uploads/ita2569/O13/*
+!public/wp-content/uploads/ita2569/O13/o13_ข้อบังคับว่าด้วยการบริหารงานบุคคล.pdf
+!public/wp-content/uploads/ita2569/O13/o13_หลักเกณฑ์สรรหา_บรรจุ_แต่งตั้ง.pdf
+!public/wp-content/uploads/ita2569/O13/o13_2_หลักเกณฑ์การเข้าสู่ตำแหน่ง_ปรับระดับตำแหน่ง.pdf
+!public/wp-content/uploads/ita2569/O13/o13_3_หลักเกณฑ์และวิธีการประเมินผลการปฏิบัติงาน.pdf
+!public/wp-content/uploads/ita2569/O13/o13_4_หลักเกณฑ์การปรับวุฒิและปรับอัตราค่าจ้างตามคุณวุฒิ.pdf
+!public/wp-content/uploads/ita2569/O13/o13_แผนบริหารทรัพยากรบุคคล_ปี_2569.pdf
+!public/wp-content/uploads/ita2569/O13/o13_แผนพัฒนาทรัพยากรบุคคล_ปี_2569.pdf
 !public/wp-content/uploads/2026/
 public/wp-content/uploads/2026/*
 !public/wp-content/uploads/2026/04/
