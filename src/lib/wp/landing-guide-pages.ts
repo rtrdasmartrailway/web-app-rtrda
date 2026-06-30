@@ -104,6 +104,110 @@ export const landingGuidePages: LandingGuidePage[] = [
       },
     ],
   },
+  {
+    slug: "manual-o20",
+    path: "/คู่มือO20",
+    title:
+      "การขับเคลื่อนนโยบาย NO GIFT POLICY จากการปฏิบัติหน้าที่และการเสริมสร้างความรู้เกี่ยวกับหลักเกณฑ์การรับทรัพย์สินหรือประโยชน์อื่นใดโดยธรรมจรรยาของเจ้าพนักงานของรัฐ",
+    kind: "knowledge",
+    groups: [
+      {
+        title:
+          "การขับเคลื่อนนโยบาย NO GIFT POLICY จากการปฏิบัติหน้าที่และการเสริมสร้างความรู้เกี่ยวกับหลักเกณฑ์การรับทรัพย์สินหรือประโยชน์อื่นใดโดยธรรมจรรยาของเจ้าพนักงานของรัฐ",
+        open: true,
+        documents: [
+          pdfDocument(
+            "o20หนังสือประกาศเจตนารมณ์ No Gift Policy ฉบับภาษาไทย",
+            "/wp-content/uploads/landing-ita-guides-2569/manual-o20-01-o20หนังสือประกาศเจตนารมณ์-No-Gift-Policy-ฉบับภาษาไทย.pdf",
+            "/wp-content/uploads/pdf-covers/landing-ita-guides-2569/fde23d3c42688ef9.png",
+          ),
+          pdfDocument(
+            "รายงานผลการดำเนินงานตามนโยบาย No Gift Policy 2568",
+            "/wp-content/uploads/landing-ita-guides-2569/manual-o20-02-รายงานผลการดำเนินงานตามนโยบาย-No-Gift-Policy-2568.pdf",
+            "/wp-content/uploads/pdf-covers/landing-ita-guides-2569/f438c2d307853fd5.png",
+          ),
+          pdfDocument(
+            "หลักเกณฑ์การรับทรัพย์สิน_ มาตรา 128",
+            "/wp-content/uploads/landing-ita-guides-2569/manual-o20-03-หลักเกณฑ์การรับทรัพย์สิน_-มาตรา-128.pdf",
+            "/wp-content/uploads/pdf-covers/landing-ita-guides-2569/9d3c468accec1871.png",
+          ),
+        ],
+      },
+    ],
+  },
+  {
+    slug: "manual-o13",
+    path: "/คู่มือO13",
+    title: "หลักเกณฑ์และแผนการบริหารและพัฒนาทรัพยากรบุคคล",
+    kind: "knowledge",
+    groups: [
+      {
+        title: "หลักเกณฑ์และแผนการบริหารและพัฒนาทรัพยากรบุคคล",
+        open: true,
+        documents: [
+          pdfDocument(
+            "1 หลักเกณฑ์สรรหา บรรจุ แต่งตั้ง",
+            "/wp-content/uploads/landing-ita-guides-2569/manual-o13-01-1-หลักเกณฑ์สรรหา-บรรจุ-แต่งตั้ง.pdf",
+            "/wp-content/uploads/pdf-covers/landing-ita-guides-2569/43a5d643a411675d.png",
+          ),
+          pdfDocument(
+            "o13 ข้อบังคับว่าด้วยการบริหารงานบุคคล",
+            "/wp-content/uploads/landing-ita-guides-2569/manual-o13-02-o13-ข้อบังคับว่าด้วยการบริหารงานบุคคล.pdf",
+            "/wp-content/uploads/pdf-covers/landing-ita-guides-2569/28fcbcc8ca0a2a63.png",
+          ),
+          pdfDocument(
+            "o13 แผนบริหารทรัพยากรบุคคล ปี 2569",
+            "/wp-content/uploads/landing-ita-guides-2569/manual-o13-03-o13-แผนบริหารทรัพยากรบุคคล-ปี-2569.pdf",
+            "/wp-content/uploads/pdf-covers/landing-ita-guides-2569/6ccfdca31f0eafe4.png",
+          ),
+          pdfDocument(
+            "o13 แผนพัฒนาทรัพยากรบุคคล ปี 2569",
+            "/wp-content/uploads/landing-ita-guides-2569/manual-o13-04-o13-แผนพัฒนาทรัพยากรบุคคล-ปี-2569.pdf",
+            "/wp-content/uploads/pdf-covers/landing-ita-guides-2569/369a26cbf2f47cb3.png",
+          ),
+          pdfDocument(
+            "o13_2 หลักเกณฑ์การเข้าสู่ตำแหน่ง ปรับระดับตำแหน่ง",
+            "/wp-content/uploads/landing-ita-guides-2569/manual-o13-05-o13_2-หลักเกณฑ์การเข้าสู่ตำแหน่ง-ปรับระดับตำแหน่ง.pdf",
+            "/wp-content/uploads/pdf-covers/landing-ita-guides-2569/eb5b78a1f690054a.png",
+          ),
+          pdfDocument(
+            "o13_3 หลักเกณฑ์และวิธีการประเมินผลการปฏิบัติงาน",
+            "/wp-content/uploads/landing-ita-guides-2569/manual-o13-06-o13_3-หลักเกณฑ์และวิธีการประเมินผลการปฏิบัติงาน.pdf",
+            "/wp-content/uploads/pdf-covers/landing-ita-guides-2569/0d40052b47f038cf.png",
+          ),
+          pdfDocument(
+            "o13_4 หลักเกณฑ์การปรับวุฒิและปรับอัตราค่าจ้างตามคุณวุฒิ",
+            "/wp-content/uploads/landing-ita-guides-2569/manual-o13-07-o13_4-หลักเกณฑ์การปรับวุฒิและปรับอัตราค่าจ้างตามคุณวุฒิ.pdf",
+            "/wp-content/uploads/pdf-covers/landing-ita-guides-2569/d793348aca696184.png",
+          ),
+        ],
+      },
+    ],
+  },
+  {
+    slug: "manual-o14",
+    path: "/คู่มือO14",
+    title: "รายงานผลการบริหารและพัฒนาทรัพยากรบุคคล",
+    kind: "knowledge",
+    groups: [
+      {
+        title: "รายงานผลการบริหารและพัฒนาทรัพยากรบุคคล",
+        open: true,
+        documents: [
+          pdfDocument(
+            "o14 รายงานผลการบริหารทรัพยากรบุคคล ประจำปีงบประมาณ2568(2)",
+            "/wp-content/uploads/landing-ita-guides-2569/manual-o14-01-o14-รายงานผลการบริหารทรัพยากรบุคคล-ประจำปีงบประมาณ2568(2).pdf",
+            "/wp-content/uploads/pdf-covers/landing-ita-guides-2569/68230638b3dc1ba4.png",
+          ),
+          pdfDocument(
+            "o14 รายงานผลการพัฒนาทรัพยากรบุคคล ประจำปีงบประมาณ2568(2)",
+            "/wp-content/uploads/landing-ita-guides-2569/manual-o14-02-o14-รายงานผลการพัฒนาทรัพยากรบุคคล-ประจำปีงบประมาณ2568(2).pdf",
+            "/wp-content/uploads/pdf-covers/landing-ita-guides-2569/e8ec51355f355717.png",
+          ),
+        ],
+      },
+    ],
+  },
 ];
 
 export function getLandingGuidePage(path: string): LandingGuidePage | null {
