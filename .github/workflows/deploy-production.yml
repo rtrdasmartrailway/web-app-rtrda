@@ -66,8 +66,8 @@ jobs:
         run: |
           set -euo pipefail
           cd /srv/workspace/web-app-rtrda
-          git fetch origin main --prune
-          git checkout -B main "$DEPLOY_SHA"
+          git fetch origin main test --prune
+          git checkout -B test "$DEPLOY_SHA"
           git status -sb
           git log --oneline -1
 
