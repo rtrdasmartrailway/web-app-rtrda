@@ -2,6 +2,7 @@ import Link from "next/link";
 import Image from "next/image";
 import type { HomeData } from "@/lib/db/page-data";
 import { supplementalKnowledgePages } from "@/lib/wp/knowledge-supplemental-documents";
+import { landingGuidePages } from "@/lib/wp/landing-guide-pages";
 import type { WpLanguage } from "@/lib/wp/types";
 import { ArticleCard } from "../article-card";
 import { EventsCalendar } from "./events-calendar";
@@ -82,6 +83,19 @@ const SERVICE_BANNERS = [
   },
 ] as const;
 
+const DOCUMENT_BANNER_PAGES = [
+  ...supplementalKnowledgePages,
+  ...landingGuidePages,
+] as const;
+
+function getDocumentCount(page: (typeof DOCUMENT_BANNER_PAGES)[number]): number {
+  if ("groups" in page) {
+    return page.groups.reduce((sum, group) => sum + group.documents.length, 0);
+  }
+
+  return page.group.documents.length;
+}
+
 function SectionHeading({ id, children }: { id: string; children: React.ReactNode }) {
   return (
     <div className="section-heading-row">
@@ -122,28 +136,30 @@ function HomeServiceBannerMockup({ language }: { language: WpLanguage }) {
       <div className="home-service-documents" aria-label="เอกสารบริการและข้อมูลสำคัญ">
         <p className="home-service-documents-eyebrow">เอกสารบริการและข้อมูลสำคัญ</p>
         <div className="service-banner-grid service-banner-grid-documents">
-          {supplementalKnowledgePages.map((page, index) => (
-            <a
-              aria-label={`เปิดเอกสาร: ${page.title}`}
-              className={`service-banner-card service-banner-card-${index % 2 === 0 ? "dark" : "slate"}`}
-              href={page.path}
-              key={page.slug}
-            >
-              <span
-                className="service-banner-icon service-banner-icon-pdf"
-                aria-hidden="true"
+          {DOCUMENT_BANNER_PAGES.map((page, index) => {
+            const documentCount = getDocumentCount(page);
+
+            return (
+              <a
+                aria-label={`เปิดเอกสาร: ${page.title}`}
+                className={`service-banner-card service-banner-card-${index % 2 === 0 ? "dark" : "slate"}`}
+                href={page.path}
+                key={page.slug}
               >
-                PDF
-              </span>
-              <span className="service-banner-copy">
-                <strong>{page.title}</strong>
-                <small>
-                  {page.group.documents.length} ไฟล์ • จัดรูปแบบแสดงผลแบบคลังความรู้
-                </small>
-              </span>
-              <span className="service-banner-arrow" aria-hidden="true" />
-            </a>
-          ))}
+                <span
+                  className="service-banner-icon service-banner-icon-pdf"
+                  aria-hidden="true"
+                >
+                  PDF
+                </span>
+                <span className="service-banner-copy">
+                  <strong>{page.title}</strong>
+                  <small>{documentCount} ไฟล์ • จัดรูปแบบแสดงผลแบบคลังความรู้</small>
+                </span>
+                <span className="service-banner-arrow" aria-hidden="true" />
+              </a>
+            );
+          })}
         </div>
       </div>
     </section>

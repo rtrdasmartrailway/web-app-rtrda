@@ -34,6 +34,7 @@ import { applyContactMapOverride } from "@/lib/wp/contact-map";
 import { applyItaHeadingsOverride } from "@/lib/wp/ita-headings-override";
 import { getStaticDownloadOverride } from "@/lib/wp/static-download-overrides";
 import { getSupplementalKnowledgePage } from "@/lib/wp/knowledge-supplemental-documents";
+import { getLandingGuidePage } from "@/lib/wp/landing-guide-pages";
 import { getMoralityReportPage } from "@/lib/wp/morality-report-documents";
 import { applyProcurementPlanOverride } from "@/lib/wp/procurement-plan";
 import { applyProcurementWinnerOverride } from "@/lib/wp/procurement-winner";
@@ -267,8 +268,9 @@ export const getPageData = cache(async (path: string): Promise<PageData | null> 
   const importedRecord = await getRecordByPath(path);
   if (!importedRecord) {
     const supplementalPage = getSupplementalKnowledgePage(path);
+    const landingGuidePage = getLandingGuidePage(path);
     const moralityReportPage = getMoralityReportPage(path);
-    if (!supplementalPage && !moralityReportPage) {
+    if (!supplementalPage && !landingGuidePage && !moralityReportPage) {
       return null;
     }
 
@@ -278,19 +280,36 @@ export const getPageData = cache(async (path: string): Promise<PageData | null> 
           path: supplementalPage.path,
           title: supplementalPage.title,
           groups: [supplementalPage.group],
+          contentHtml: "",
           parentTitle: "บริการและข้อมูลสำคัญ",
           parentPath: "/บริการและข้อมูลสำคัญ",
           idPrefix: "supplemental-knowledge",
         }
-      : {
-          slug: moralityReportPage!.slug,
-          path: moralityReportPage!.path,
-          title: moralityReportPage!.title,
-          groups: moralityReportPage!.groups,
-          parentTitle: "เอกสารเผยแพร่",
-          parentPath: "/เอกสารเผยแพร่",
-          idPrefix: "morality-report",
-        };
+      : landingGuidePage
+        ? {
+            slug: landingGuidePage.slug,
+            path: landingGuidePage.path,
+            title: landingGuidePage.title,
+            groups:
+              landingGuidePage.kind === "knowledge" ? landingGuidePage.groups : null,
+            contentHtml:
+              landingGuidePage.kind === "standalone-pdf" && landingGuidePage.pdfHref
+                ? `<div class="standalone-pdf-page"><p><a href="${landingGuidePage.pdfHref}" target="_blank" rel="noreferrer">เปิด PDF ในแท็บใหม่</a></p><iframe src="${landingGuidePage.pdfHref}#toolbar=1&navpanes=1&view=FitH" title="${landingGuidePage.title}" loading="lazy"></iframe></div>`
+                : "",
+            parentTitle: "บริการและข้อมูลสำคัญ",
+            parentPath: "/บริการและข้อมูลสำคัญ",
+            idPrefix: "landing-guide",
+          }
+        : {
+            slug: moralityReportPage!.slug,
+            path: moralityReportPage!.path,
+            title: moralityReportPage!.title,
+            groups: moralityReportPage!.groups,
+            contentHtml: "",
+            parentTitle: "เอกสารเผยแพร่",
+            parentPath: "/เอกสารเผยแพร่",
+            idPrefix: "morality-report",
+          };
 
     const shell = await buildShellData(path);
     const now = new Date().toISOString();
@@ -303,7 +322,7 @@ export const getPageData = cache(async (path: string): Promise<PageData | null> 
       sourceUrl: `https://test.rtrda.or.th${syntheticPage.path}`,
       title: syntheticPage.title,
       excerpt: syntheticPage.title,
-      contentHtml: "",
+      contentHtml: syntheticPage.contentHtml,
       searchText: syntheticPage.title,
       modified: now,
       date: now,
