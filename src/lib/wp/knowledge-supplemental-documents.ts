@@ -10,7 +10,10 @@ export interface SupplementalKnowledgePage {
 
 const basePath = "/บริการและข้อมูลสำคัญ";
 
-const supplementalKnowledgeGroups: Array<{ slug: string; group: KnowledgeDocumentGroup }> = [
+const supplementalKnowledgeGroups: Array<{
+  slug: string;
+  group: KnowledgeDocumentGroup;
+}> = [
   {
     slug: "ethics-code",
     group: {
@@ -22,8 +25,10 @@ const supplementalKnowledgeGroups: Array<{ slug: string; group: KnowledgeDocumen
           description: "เอกสารเผยแพร่รูปแบบ PDF",
           coverImage: null,
           coverAlt: "",
-          previewHref: "/wp-content/uploads/knowledge-ethics-2569/ethics-code-01-o15-การลงนามปฏิญญาคุณธรรม.pdf",
-          downloadHref: "/wp-content/uploads/knowledge-ethics-2569/ethics-code-01-o15-การลงนามปฏิญญาคุณธรรม.pdf",
+          previewHref:
+            "/wp-content/uploads/knowledge-ethics-2569/ethics-code-01-o15-การลงนามปฏิญญาคุณธรรม.pdf",
+          downloadHref:
+            "/wp-content/uploads/knowledge-ethics-2569/ethics-code-01-o15-การลงนามปฏิญญาคุณธรรม.pdf",
           hasUsableTarget: true,
         },
         {
@@ -31,8 +36,10 @@ const supplementalKnowledgeGroups: Array<{ slug: string; group: KnowledgeDocumen
           description: "เอกสารเผยแพร่รูปแบบ PDF",
           coverImage: null,
           coverAlt: "",
-          previewHref: "/wp-content/uploads/knowledge-ethics-2569/ethics-code-02-o15-กิจกรรมอบรมสอดแทรกสาระด้านจริยธรรมฯ.pdf",
-          downloadHref: "/wp-content/uploads/knowledge-ethics-2569/ethics-code-02-o15-กิจกรรมอบรมสอดแทรกสาระด้านจริยธรรมฯ.pdf",
+          previewHref:
+            "/wp-content/uploads/knowledge-ethics-2569/ethics-code-02-o15-กิจกรรมอบรมสอดแทรกสาระด้านจริยธรรมฯ.pdf",
+          downloadHref:
+            "/wp-content/uploads/knowledge-ethics-2569/ethics-code-02-o15-กิจกรรมอบรมสอดแทรกสาระด้านจริยธรรมฯ.pdf",
           hasUsableTarget: true,
         },
         {
@@ -40,8 +47,10 @@ const supplementalKnowledgeGroups: Array<{ slug: string; group: KnowledgeDocumen
           description: "เอกสารเผยแพร่รูปแบบ PDF",
           coverImage: null,
           coverAlt: "",
-          previewHref: "/wp-content/uploads/knowledge-ethics-2569/ethics-code-03-o15-ข้อบังคับ-คกก-สทร-ว่าด้วยประมวลจริยธรรมในการปฏิบัติงาน-2565.pdf",
-          downloadHref: "/wp-content/uploads/knowledge-ethics-2569/ethics-code-03-o15-ข้อบังคับ-คกก-สทร-ว่าด้วยประมวลจริยธรรมในการปฏิบัติงาน-2565.pdf",
+          previewHref:
+            "/wp-content/uploads/knowledge-ethics-2569/ethics-code-03-o15-ข้อบังคับ-คกก-สทร-ว่าด้วยประมวลจริยธรรมในการปฏิบัติงาน-2565.pdf",
+          downloadHref:
+            "/wp-content/uploads/knowledge-ethics-2569/ethics-code-03-o15-ข้อบังคับ-คกก-สทร-ว่าด้วยประมวลจริยธรรมในการปฏิบัติงาน-2565.pdf",
           hasUsableTarget: true,
         },
         {
@@ -49,8 +58,10 @@ const supplementalKnowledgeGroups: Array<{ slug: string; group: KnowledgeDocumen
           description: "เอกสารเผยแพร่รูปแบบ PDF",
           coverImage: null,
           coverAlt: "",
-          previewHref: "/wp-content/uploads/knowledge-ethics-2569/ethics-code-04-o15-คำสั่งแต่งตั้งคณะทำงานขับเคลื่อนจริยธรรม-2569.pdf",
-          downloadHref: "/wp-content/uploads/knowledge-ethics-2569/ethics-code-04-o15-คำสั่งแต่งตั้งคณะทำงานขับเคลื่อนจริยธรรม-2569.pdf",
+          previewHref:
+            "/wp-content/uploads/knowledge-ethics-2569/ethics-code-04-o15-คำสั่งแต่งตั้งคณะทำงานขับเคลื่อนจริยธรรม-2569.pdf",
+          downloadHref:
+            "/wp-content/uploads/knowledge-ethics-2569/ethics-code-04-o15-คำสั่งแต่งตั้งคณะทำงานขับเคลื่อนจริยธรรม-2569.pdf",
           hasUsableTarget: true,
         },
         {
@@ -58,8 +69,10 @@ const supplementalKnowledgeGroups: Array<{ slug: string; group: KnowledgeDocumen
           description: "เอกสารเผยแพร่รูปแบบ PDF",
           coverImage: null,
           coverAlt: "",
-          previewHref: "/wp-content/uploads/knowledge-ethics-2569/ethics-code-05-o15-สื่อ-DO-and-Dont-RTRDA.pdf",
-          downloadHref: "/wp-content/uploads/knowledge-ethics-2569/ethics-code-05-o15-สื่อ-DO-and-Dont-RTRDA.pdf",
+          previewHref:
+            "/wp-content/uploads/knowledge-ethics-2569/ethics-code-05-o15-สื่อ-DO-and-Dont-RTRDA.pdf",
+          downloadHref:
+            "/wp-content/uploads/knowledge-ethics-2569/ethics-code-05-o15-สื่อ-DO-and-Dont-RTRDA.pdf",
           hasUsableTarget: true,
         },
         {
@@ -67,8 +80,10 @@ const supplementalKnowledgeGroups: Array<{ slug: string; group: KnowledgeDocumen
           description: "เอกสารเผยแพร่รูปแบบ PDF",
           coverImage: null,
           coverAlt: "",
-          previewHref: "/wp-content/uploads/knowledge-ethics-2569/ethics-code-06-o15_ข้อกำหนดว่าด้วยกระบวนการรักษาจริยธรรม.pdf",
-          downloadHref: "/wp-content/uploads/knowledge-ethics-2569/ethics-code-06-o15_ข้อกำหนดว่าด้วยกระบวนการรักษาจริยธรรม.pdf",
+          previewHref:
+            "/wp-content/uploads/knowledge-ethics-2569/ethics-code-06-o15_ข้อกำหนดว่าด้วยกระบวนการรักษาจริยธรรม.pdf",
+          downloadHref:
+            "/wp-content/uploads/knowledge-ethics-2569/ethics-code-06-o15_ข้อกำหนดว่าด้วยกระบวนการรักษาจริยธรรม.pdf",
           hasUsableTarget: true,
         },
         {
@@ -76,8 +91,10 @@ const supplementalKnowledgeGroups: Array<{ slug: string; group: KnowledgeDocumen
           description: "เอกสารเผยแพร่รูปแบบ PDF",
           coverImage: null,
           coverAlt: "",
-          previewHref: "/wp-content/uploads/knowledge-ethics-2569/ethics-code-07-o15_ประมวลจริยธรรม.pdf",
-          downloadHref: "/wp-content/uploads/knowledge-ethics-2569/ethics-code-07-o15_ประมวลจริยธรรม.pdf",
+          previewHref:
+            "/wp-content/uploads/knowledge-ethics-2569/ethics-code-07-o15_ประมวลจริยธรรม.pdf",
+          downloadHref:
+            "/wp-content/uploads/knowledge-ethics-2569/ethics-code-07-o15_ประมวลจริยธรรม.pdf",
           hasUsableTarget: true,
         },
       ],
@@ -94,8 +111,10 @@ const supplementalKnowledgeGroups: Array<{ slug: string; group: KnowledgeDocumen
           description: "เอกสารเผยแพร่รูปแบบ PDF",
           coverImage: null,
           coverAlt: "",
-          previewHref: "/wp-content/uploads/knowledge-ethics-2569/complaint-practice-01-o-16-แนวทางปฏิบัติ-การจัดการเรื่องร้องเรียน.pdf",
-          downloadHref: "/wp-content/uploads/knowledge-ethics-2569/complaint-practice-01-o-16-แนวทางปฏิบัติ-การจัดการเรื่องร้องเรียน.pdf",
+          previewHref:
+            "/wp-content/uploads/knowledge-ethics-2569/complaint-practice-01-o-16-แนวทางปฏิบัติ-การจัดการเรื่องร้องเรียน.pdf",
+          downloadHref:
+            "/wp-content/uploads/knowledge-ethics-2569/complaint-practice-01-o-16-แนวทางปฏิบัติ-การจัดการเรื่องร้องเรียน.pdf",
           hasUsableTarget: true,
         },
       ],
@@ -112,8 +131,10 @@ const supplementalKnowledgeGroups: Array<{ slug: string; group: KnowledgeDocumen
           description: "เอกสารเผยแพร่รูปแบบ PDF",
           coverImage: null,
           coverAlt: "",
-          previewHref: "/wp-content/uploads/knowledge-ethics-2569/complaint-statistics-01-รายงานข้อมูลสถิติเรื่องร้องเรียนการทุจร.pdf",
-          downloadHref: "/wp-content/uploads/knowledge-ethics-2569/complaint-statistics-01-รายงานข้อมูลสถิติเรื่องร้องเรียนการทุจร.pdf",
+          previewHref:
+            "/wp-content/uploads/knowledge-ethics-2569/complaint-statistics-01-รายงานข้อมูลสถิติเรื่องร้องเรียนการทุจร.pdf",
+          downloadHref:
+            "/wp-content/uploads/knowledge-ethics-2569/complaint-statistics-01-รายงานข้อมูลสถิติเรื่องร้องเรียนการทุจร.pdf",
           hasUsableTarget: true,
         },
       ],
@@ -130,8 +151,10 @@ const supplementalKnowledgeGroups: Array<{ slug: string; group: KnowledgeDocumen
           description: "เอกสารประกอบและรายงานผลการมีส่วนร่วมรูปแบบ PDF",
           coverImage: null,
           coverAlt: "",
-          previewHref: "/wp-content/uploads/knowledge-ethics-2569/participation-results-01-เอกสารประกอบที่-1-คำสั่งสทรที่52-2568.pdf",
-          downloadHref: "/wp-content/uploads/knowledge-ethics-2569/participation-results-01-เอกสารประกอบที่-1-คำสั่งสทรที่52-2568.pdf",
+          previewHref:
+            "/wp-content/uploads/knowledge-ethics-2569/participation-results-01-เอกสารประกอบที่-1-คำสั่งสทรที่52-2568.pdf",
+          downloadHref:
+            "/wp-content/uploads/knowledge-ethics-2569/participation-results-01-เอกสารประกอบที่-1-คำสั่งสทรที่52-2568.pdf",
           hasUsableTarget: true,
         },
         {
@@ -139,8 +162,10 @@ const supplementalKnowledgeGroups: Array<{ slug: string; group: KnowledgeDocumen
           description: "เอกสารประกอบและรายงานผลการมีส่วนร่วมรูปแบบ PDF",
           coverImage: null,
           coverAlt: "",
-          previewHref: "/wp-content/uploads/knowledge-ethics-2569/participation-results-02-เอกสารประกอบที่-2-รายงานประชุม-ครั้งที่-4-2568.pdf",
-          downloadHref: "/wp-content/uploads/knowledge-ethics-2569/participation-results-02-เอกสารประกอบที่-2-รายงานประชุม-ครั้งที่-4-2568.pdf",
+          previewHref:
+            "/wp-content/uploads/knowledge-ethics-2569/participation-results-02-เอกสารประกอบที่-2-รายงานประชุม-ครั้งที่-4-2568.pdf",
+          downloadHref:
+            "/wp-content/uploads/knowledge-ethics-2569/participation-results-02-เอกสารประกอบที่-2-รายงานประชุม-ครั้งที่-4-2568.pdf",
           hasUsableTarget: true,
         },
         {
@@ -148,8 +173,10 @@ const supplementalKnowledgeGroups: Array<{ slug: string; group: KnowledgeDocumen
           description: "เอกสารประกอบและรายงานผลการมีส่วนร่วมรูปแบบ PDF",
           coverImage: null,
           coverAlt: "",
-          previewHref: "/wp-content/uploads/knowledge-ethics-2569/participation-results-03-เอกสารประกอบที่-3-สรุปการประชุมTechnical-Hearing.pdf",
-          downloadHref: "/wp-content/uploads/knowledge-ethics-2569/participation-results-03-เอกสารประกอบที่-3-สรุปการประชุมTechnical-Hearing.pdf",
+          previewHref:
+            "/wp-content/uploads/knowledge-ethics-2569/participation-results-03-เอกสารประกอบที่-3-สรุปการประชุมTechnical-Hearing.pdf",
+          downloadHref:
+            "/wp-content/uploads/knowledge-ethics-2569/participation-results-03-เอกสารประกอบที่-3-สรุปการประชุมTechnical-Hearing.pdf",
           hasUsableTarget: true,
         },
         {
@@ -157,8 +184,10 @@ const supplementalKnowledgeGroups: Array<{ slug: string; group: KnowledgeDocumen
           description: "เอกสารประกอบและรายงานผลการมีส่วนร่วมรูปแบบ PDF",
           coverImage: null,
           coverAlt: "",
-          previewHref: "/wp-content/uploads/knowledge-ethics-2569/participation-results-04-เอกสารประกอบที่-4-รายงานประชุม-ครั้งที่-10-2568.pdf",
-          downloadHref: "/wp-content/uploads/knowledge-ethics-2569/participation-results-04-เอกสารประกอบที่-4-รายงานประชุม-ครั้งที่-10-2568.pdf",
+          previewHref:
+            "/wp-content/uploads/knowledge-ethics-2569/participation-results-04-เอกสารประกอบที่-4-รายงานประชุม-ครั้งที่-10-2568.pdf",
+          downloadHref:
+            "/wp-content/uploads/knowledge-ethics-2569/participation-results-04-เอกสารประกอบที่-4-รายงานประชุม-ครั้งที่-10-2568.pdf",
           hasUsableTarget: true,
         },
         {
@@ -166,8 +195,10 @@ const supplementalKnowledgeGroups: Array<{ slug: string; group: KnowledgeDocumen
           description: "เอกสารประกอบและรายงานผลการมีส่วนร่วมรูปแบบ PDF",
           coverImage: null,
           coverAlt: "",
-          previewHref: "/wp-content/uploads/knowledge-ethics-2569/participation-results-05-เอกสารประกอบที่-5-รายงานการประชุม-ครั้งที่-26-4-2568.pdf",
-          downloadHref: "/wp-content/uploads/knowledge-ethics-2569/participation-results-05-เอกสารประกอบที่-5-รายงานการประชุม-ครั้งที่-26-4-2568.pdf",
+          previewHref:
+            "/wp-content/uploads/knowledge-ethics-2569/participation-results-05-เอกสารประกอบที่-5-รายงานการประชุม-ครั้งที่-26-4-2568.pdf",
+          downloadHref:
+            "/wp-content/uploads/knowledge-ethics-2569/participation-results-05-เอกสารประกอบที่-5-รายงานการประชุม-ครั้งที่-26-4-2568.pdf",
           hasUsableTarget: true,
         },
         {
@@ -175,8 +206,10 @@ const supplementalKnowledgeGroups: Array<{ slug: string; group: KnowledgeDocumen
           description: "เอกสารประกอบและรายงานผลการมีส่วนร่วมรูปแบบ PDF",
           coverImage: null,
           coverAlt: "",
-          previewHref: "/wp-content/uploads/knowledge-ethics-2569/participation-results-06-เอกสารประกอบที่-6-รายงานการจัดทำประชาพิจารณ์.pdf",
-          downloadHref: "/wp-content/uploads/knowledge-ethics-2569/participation-results-06-เอกสารประกอบที่-6-รายงานการจัดทำประชาพิจารณ์.pdf",
+          previewHref:
+            "/wp-content/uploads/knowledge-ethics-2569/participation-results-06-เอกสารประกอบที่-6-รายงานการจัดทำประชาพิจารณ์.pdf",
+          downloadHref:
+            "/wp-content/uploads/knowledge-ethics-2569/participation-results-06-เอกสารประกอบที่-6-รายงานการจัดทำประชาพิจารณ์.pdf",
           hasUsableTarget: true,
         },
         {
@@ -184,8 +217,10 @@ const supplementalKnowledgeGroups: Array<{ slug: string; group: KnowledgeDocumen
           description: "เอกสารประกอบและรายงานผลการมีส่วนร่วมรูปแบบ PDF",
           coverImage: null,
           coverAlt: "",
-          previewHref: "/wp-content/uploads/knowledge-ethics-2569/participation-results-07-แบบฟอร์มการมีส่วนร่วมo19_v3.pdf",
-          downloadHref: "/wp-content/uploads/knowledge-ethics-2569/participation-results-07-แบบฟอร์มการมีส่วนร่วมo19_v3.pdf",
+          previewHref:
+            "/wp-content/uploads/knowledge-ethics-2569/participation-results-07-แบบฟอร์มการมีส่วนร่วมo19_v3.pdf",
+          downloadHref:
+            "/wp-content/uploads/knowledge-ethics-2569/participation-results-07-แบบฟอร์มการมีส่วนร่วมo19_v3.pdf",
           hasUsableTarget: true,
         },
         {
@@ -193,8 +228,10 @@ const supplementalKnowledgeGroups: Array<{ slug: string; group: KnowledgeDocumen
           description: "เอกสารประกอบและรายงานผลการมีส่วนร่วมรูปแบบ PDF",
           coverImage: null,
           coverAlt: "",
-          previewHref: "/wp-content/uploads/knowledge-ethics-2569/participation-results-08-รายงานผลการเปิดโอกาสให้บุคคลภายนอกได้มีส่วนร่วม.pdf",
-          downloadHref: "/wp-content/uploads/knowledge-ethics-2569/participation-results-08-รายงานผลการเปิดโอกาสให้บุคคลภายนอกได้มีส่วนร่วม.pdf",
+          previewHref:
+            "/wp-content/uploads/knowledge-ethics-2569/participation-results-08-รายงานผลการเปิดโอกาสให้บุคคลภายนอกได้มีส่วนร่วม.pdf",
+          downloadHref:
+            "/wp-content/uploads/knowledge-ethics-2569/participation-results-08-รายงานผลการเปิดโอกาสให้บุคคลภายนอกได้มีส่วนร่วม.pdf",
           hasUsableTarget: true,
         },
       ],
@@ -203,7 +240,8 @@ const supplementalKnowledgeGroups: Array<{ slug: string; group: KnowledgeDocumen
   {
     slug: "no-gift-policy",
     group: {
-      title: "การขับเคลื่อนนโยบาย NO GIFT POLICY จากการปฏิบัติหน้าที่และการเสริมสร้างความรู้เกี่ยวกับหลักเกณฑ์การรับทรัพย์สินหรือประโยชน์อื่นใดโดยธรรมจรรยาของเจ้าพนักงานของรัฐ",
+      title:
+        "การขับเคลื่อนนโยบาย NO GIFT POLICY จากการปฏิบัติหน้าที่และการเสริมสร้างความรู้เกี่ยวกับหลักเกณฑ์การรับทรัพย์สินหรือประโยชน์อื่นใดโดยธรรมจรรยาของเจ้าพนักงานของรัฐ",
       open: true,
       documents: [
         {
@@ -211,8 +249,10 @@ const supplementalKnowledgeGroups: Array<{ slug: string; group: KnowledgeDocumen
           description: "เอกสารประกอบนโยบาย No Gift Policy รูปแบบ PDF",
           coverImage: null,
           coverAlt: "",
-          previewHref: "/wp-content/uploads/knowledge-ethics-2569/no-gift-policy-01-o20หนังสือประกาศเจตนารมณ์-No-Gift-Policy-ฉบับภาษาไทย.pdf",
-          downloadHref: "/wp-content/uploads/knowledge-ethics-2569/no-gift-policy-01-o20หนังสือประกาศเจตนารมณ์-No-Gift-Policy-ฉบับภาษาไทย.pdf",
+          previewHref:
+            "/wp-content/uploads/knowledge-ethics-2569/no-gift-policy-01-o20หนังสือประกาศเจตนารมณ์-No-Gift-Policy-ฉบับภาษาไทย.pdf",
+          downloadHref:
+            "/wp-content/uploads/knowledge-ethics-2569/no-gift-policy-01-o20หนังสือประกาศเจตนารมณ์-No-Gift-Policy-ฉบับภาษาไทย.pdf",
           hasUsableTarget: true,
         },
         {
@@ -220,8 +260,10 @@ const supplementalKnowledgeGroups: Array<{ slug: string; group: KnowledgeDocumen
           description: "เอกสารประกอบนโยบาย No Gift Policy รูปแบบ PDF",
           coverImage: null,
           coverAlt: "",
-          previewHref: "/wp-content/uploads/knowledge-ethics-2569/no-gift-policy-02-รายงานผลการดำเนินงานตามนโยบาย-No-Gift-Policy-2568.pdf",
-          downloadHref: "/wp-content/uploads/knowledge-ethics-2569/no-gift-policy-02-รายงานผลการดำเนินงานตามนโยบาย-No-Gift-Policy-2568.pdf",
+          previewHref:
+            "/wp-content/uploads/knowledge-ethics-2569/no-gift-policy-02-รายงานผลการดำเนินงานตามนโยบาย-No-Gift-Policy-2568.pdf",
+          downloadHref:
+            "/wp-content/uploads/knowledge-ethics-2569/no-gift-policy-02-รายงานผลการดำเนินงานตามนโยบาย-No-Gift-Policy-2568.pdf",
           hasUsableTarget: true,
         },
       ],
@@ -238,8 +280,10 @@ const supplementalKnowledgeGroups: Array<{ slug: string; group: KnowledgeDocumen
           description: "เอกสารสรุปข้อมูลจัดซื้อจัดจ้างรูปแบบ PDF",
           coverImage: null,
           coverAlt: "",
-          previewHref: "/wp-content/uploads/knowledge-ethics-2569/procurement-summary-01-O11-ไตรมาสที่-1.pdf",
-          downloadHref: "/wp-content/uploads/knowledge-ethics-2569/procurement-summary-01-O11-ไตรมาสที่-1.pdf",
+          previewHref:
+            "/wp-content/uploads/knowledge-ethics-2569/procurement-summary-01-O11-ไตรมาสที่-1.pdf",
+          downloadHref:
+            "/wp-content/uploads/knowledge-ethics-2569/procurement-summary-01-O11-ไตรมาสที่-1.pdf",
           hasUsableTarget: true,
         },
         {
@@ -247,8 +291,10 @@ const supplementalKnowledgeGroups: Array<{ slug: string; group: KnowledgeDocumen
           description: "เอกสารสรุปข้อมูลจัดซื้อจัดจ้างรูปแบบ PDF",
           coverImage: null,
           coverAlt: "",
-          previewHref: "/wp-content/uploads/knowledge-ethics-2569/procurement-summary-02-O11-ไตรมาสที่-2.pdf",
-          downloadHref: "/wp-content/uploads/knowledge-ethics-2569/procurement-summary-02-O11-ไตรมาสที่-2.pdf",
+          previewHref:
+            "/wp-content/uploads/knowledge-ethics-2569/procurement-summary-02-O11-ไตรมาสที่-2.pdf",
+          downloadHref:
+            "/wp-content/uploads/knowledge-ethics-2569/procurement-summary-02-O11-ไตรมาสที่-2.pdf",
           hasUsableTarget: true,
         },
         {
@@ -256,8 +302,10 @@ const supplementalKnowledgeGroups: Array<{ slug: string; group: KnowledgeDocumen
           description: "เอกสารสรุปข้อมูลจัดซื้อจัดจ้างรูปแบบ PDF",
           coverImage: null,
           coverAlt: "",
-          previewHref: "/wp-content/uploads/knowledge-ethics-2569/procurement-summary-03-1.สขร.เดือน-ตุลาคม-2567.pdf",
-          downloadHref: "/wp-content/uploads/knowledge-ethics-2569/procurement-summary-03-1.สขร.เดือน-ตุลาคม-2567.pdf",
+          previewHref:
+            "/wp-content/uploads/knowledge-ethics-2569/procurement-summary-03-1.สขร.เดือน-ตุลาคม-2567.pdf",
+          downloadHref:
+            "/wp-content/uploads/knowledge-ethics-2569/procurement-summary-03-1.สขร.เดือน-ตุลาคม-2567.pdf",
           hasUsableTarget: true,
         },
         {
@@ -265,8 +313,10 @@ const supplementalKnowledgeGroups: Array<{ slug: string; group: KnowledgeDocumen
           description: "เอกสารสรุปข้อมูลจัดซื้อจัดจ้างรูปแบบ PDF",
           coverImage: null,
           coverAlt: "",
-          previewHref: "/wp-content/uploads/knowledge-ethics-2569/procurement-summary-04-10.สขร-เดือน-กรกฎาคม-2568.pdf",
-          downloadHref: "/wp-content/uploads/knowledge-ethics-2569/procurement-summary-04-10.สขร-เดือน-กรกฎาคม-2568.pdf",
+          previewHref:
+            "/wp-content/uploads/knowledge-ethics-2569/procurement-summary-04-10.สขร-เดือน-กรกฎาคม-2568.pdf",
+          downloadHref:
+            "/wp-content/uploads/knowledge-ethics-2569/procurement-summary-04-10.สขร-เดือน-กรกฎาคม-2568.pdf",
           hasUsableTarget: true,
         },
         {
@@ -274,8 +324,10 @@ const supplementalKnowledgeGroups: Array<{ slug: string; group: KnowledgeDocumen
           description: "เอกสารสรุปข้อมูลจัดซื้อจัดจ้างรูปแบบ PDF",
           coverImage: null,
           coverAlt: "",
-          previewHref: "/wp-content/uploads/knowledge-ethics-2569/procurement-summary-05-11.สขร-เดือน-สิงหาคม-2568.pdf",
-          downloadHref: "/wp-content/uploads/knowledge-ethics-2569/procurement-summary-05-11.สขร-เดือน-สิงหาคม-2568.pdf",
+          previewHref:
+            "/wp-content/uploads/knowledge-ethics-2569/procurement-summary-05-11.สขร-เดือน-สิงหาคม-2568.pdf",
+          downloadHref:
+            "/wp-content/uploads/knowledge-ethics-2569/procurement-summary-05-11.สขร-เดือน-สิงหาคม-2568.pdf",
           hasUsableTarget: true,
         },
         {
@@ -283,8 +335,10 @@ const supplementalKnowledgeGroups: Array<{ slug: string; group: KnowledgeDocumen
           description: "เอกสารสรุปข้อมูลจัดซื้อจัดจ้างรูปแบบ PDF",
           coverImage: null,
           coverAlt: "",
-          previewHref: "/wp-content/uploads/knowledge-ethics-2569/procurement-summary-06-12.สขร.เดือน-กันยายน-2568.pdf",
-          downloadHref: "/wp-content/uploads/knowledge-ethics-2569/procurement-summary-06-12.สขร.เดือน-กันยายน-2568.pdf",
+          previewHref:
+            "/wp-content/uploads/knowledge-ethics-2569/procurement-summary-06-12.สขร.เดือน-กันยายน-2568.pdf",
+          downloadHref:
+            "/wp-content/uploads/knowledge-ethics-2569/procurement-summary-06-12.สขร.เดือน-กันยายน-2568.pdf",
           hasUsableTarget: true,
         },
         {
@@ -292,8 +346,10 @@ const supplementalKnowledgeGroups: Array<{ slug: string; group: KnowledgeDocumen
           description: "เอกสารสรุปข้อมูลจัดซื้อจัดจ้างรูปแบบ PDF",
           coverImage: null,
           coverAlt: "",
-          previewHref: "/wp-content/uploads/knowledge-ethics-2569/procurement-summary-07-2..สขร.เดือน-พฤศจิกายน-2567.pdf",
-          downloadHref: "/wp-content/uploads/knowledge-ethics-2569/procurement-summary-07-2..สขร.เดือน-พฤศจิกายน-2567.pdf",
+          previewHref:
+            "/wp-content/uploads/knowledge-ethics-2569/procurement-summary-07-2..สขร.เดือน-พฤศจิกายน-2567.pdf",
+          downloadHref:
+            "/wp-content/uploads/knowledge-ethics-2569/procurement-summary-07-2..สขร.เดือน-พฤศจิกายน-2567.pdf",
           hasUsableTarget: true,
         },
         {
@@ -301,8 +357,10 @@ const supplementalKnowledgeGroups: Array<{ slug: string; group: KnowledgeDocumen
           description: "เอกสารสรุปข้อมูลจัดซื้อจัดจ้างรูปแบบ PDF",
           coverImage: null,
           coverAlt: "",
-          previewHref: "/wp-content/uploads/knowledge-ethics-2569/procurement-summary-08-3.สขร.-เดือน-ธันวาคม2567.pdf",
-          downloadHref: "/wp-content/uploads/knowledge-ethics-2569/procurement-summary-08-3.สขร.-เดือน-ธันวาคม2567.pdf",
+          previewHref:
+            "/wp-content/uploads/knowledge-ethics-2569/procurement-summary-08-3.สขร.-เดือน-ธันวาคม2567.pdf",
+          downloadHref:
+            "/wp-content/uploads/knowledge-ethics-2569/procurement-summary-08-3.สขร.-เดือน-ธันวาคม2567.pdf",
           hasUsableTarget: true,
         },
         {
@@ -310,8 +368,10 @@ const supplementalKnowledgeGroups: Array<{ slug: string; group: KnowledgeDocumen
           description: "เอกสารสรุปข้อมูลจัดซื้อจัดจ้างรูปแบบ PDF",
           coverImage: null,
           coverAlt: "",
-          previewHref: "/wp-content/uploads/knowledge-ethics-2569/procurement-summary-09-4.สขร.เดือน-มกราคม-2568.pdf",
-          downloadHref: "/wp-content/uploads/knowledge-ethics-2569/procurement-summary-09-4.สขร.เดือน-มกราคม-2568.pdf",
+          previewHref:
+            "/wp-content/uploads/knowledge-ethics-2569/procurement-summary-09-4.สขร.เดือน-มกราคม-2568.pdf",
+          downloadHref:
+            "/wp-content/uploads/knowledge-ethics-2569/procurement-summary-09-4.สขร.เดือน-มกราคม-2568.pdf",
           hasUsableTarget: true,
         },
         {
@@ -319,8 +379,10 @@ const supplementalKnowledgeGroups: Array<{ slug: string; group: KnowledgeDocumen
           description: "เอกสารสรุปข้อมูลจัดซื้อจัดจ้างรูปแบบ PDF",
           coverImage: null,
           coverAlt: "",
-          previewHref: "/wp-content/uploads/knowledge-ethics-2569/procurement-summary-10-5.สขร.เดือน-กุมภาพันธ์-2568.pdf",
-          downloadHref: "/wp-content/uploads/knowledge-ethics-2569/procurement-summary-10-5.สขร.เดือน-กุมภาพันธ์-2568.pdf",
+          previewHref:
+            "/wp-content/uploads/knowledge-ethics-2569/procurement-summary-10-5.สขร.เดือน-กุมภาพันธ์-2568.pdf",
+          downloadHref:
+            "/wp-content/uploads/knowledge-ethics-2569/procurement-summary-10-5.สขร.เดือน-กุมภาพันธ์-2568.pdf",
           hasUsableTarget: true,
         },
         {
@@ -328,8 +390,10 @@ const supplementalKnowledgeGroups: Array<{ slug: string; group: KnowledgeDocumen
           description: "เอกสารสรุปข้อมูลจัดซื้อจัดจ้างรูปแบบ PDF",
           coverImage: null,
           coverAlt: "",
-          previewHref: "/wp-content/uploads/knowledge-ethics-2569/procurement-summary-11-6.สขร-เดือน-มีนาคม-2568.pdf",
-          downloadHref: "/wp-content/uploads/knowledge-ethics-2569/procurement-summary-11-6.สขร-เดือน-มีนาคม-2568.pdf",
+          previewHref:
+            "/wp-content/uploads/knowledge-ethics-2569/procurement-summary-11-6.สขร-เดือน-มีนาคม-2568.pdf",
+          downloadHref:
+            "/wp-content/uploads/knowledge-ethics-2569/procurement-summary-11-6.สขร-เดือน-มีนาคม-2568.pdf",
           hasUsableTarget: true,
         },
         {
@@ -337,8 +401,10 @@ const supplementalKnowledgeGroups: Array<{ slug: string; group: KnowledgeDocumen
           description: "เอกสารสรุปข้อมูลจัดซื้อจัดจ้างรูปแบบ PDF",
           coverImage: null,
           coverAlt: "",
-          previewHref: "/wp-content/uploads/knowledge-ethics-2569/procurement-summary-12-7.สขร-เดือน-เมษายน-2568.pdf",
-          downloadHref: "/wp-content/uploads/knowledge-ethics-2569/procurement-summary-12-7.สขร-เดือน-เมษายน-2568.pdf",
+          previewHref:
+            "/wp-content/uploads/knowledge-ethics-2569/procurement-summary-12-7.สขร-เดือน-เมษายน-2568.pdf",
+          downloadHref:
+            "/wp-content/uploads/knowledge-ethics-2569/procurement-summary-12-7.สขร-เดือน-เมษายน-2568.pdf",
           hasUsableTarget: true,
         },
         {
@@ -346,8 +412,10 @@ const supplementalKnowledgeGroups: Array<{ slug: string; group: KnowledgeDocumen
           description: "เอกสารสรุปข้อมูลจัดซื้อจัดจ้างรูปแบบ PDF",
           coverImage: null,
           coverAlt: "",
-          previewHref: "/wp-content/uploads/knowledge-ethics-2569/procurement-summary-13-8.สขร-เดือน-พฤษภาคม-2568.pdf",
-          downloadHref: "/wp-content/uploads/knowledge-ethics-2569/procurement-summary-13-8.สขร-เดือน-พฤษภาคม-2568.pdf",
+          previewHref:
+            "/wp-content/uploads/knowledge-ethics-2569/procurement-summary-13-8.สขร-เดือน-พฤษภาคม-2568.pdf",
+          downloadHref:
+            "/wp-content/uploads/knowledge-ethics-2569/procurement-summary-13-8.สขร-เดือน-พฤษภาคม-2568.pdf",
           hasUsableTarget: true,
         },
         {
@@ -355,8 +423,10 @@ const supplementalKnowledgeGroups: Array<{ slug: string; group: KnowledgeDocumen
           description: "เอกสารสรุปข้อมูลจัดซื้อจัดจ้างรูปแบบ PDF",
           coverImage: null,
           coverAlt: "",
-          previewHref: "/wp-content/uploads/knowledge-ethics-2569/procurement-summary-14-9.สขร-เดือน-มิถุนายน-2568.pdf",
-          downloadHref: "/wp-content/uploads/knowledge-ethics-2569/procurement-summary-14-9.สขร-เดือน-มิถุนายน-2568.pdf",
+          previewHref:
+            "/wp-content/uploads/knowledge-ethics-2569/procurement-summary-14-9.สขร-เดือน-มิถุนายน-2568.pdf",
+          downloadHref:
+            "/wp-content/uploads/knowledge-ethics-2569/procurement-summary-14-9.สขร-เดือน-มิถุนายน-2568.pdf",
           hasUsableTarget: true,
         },
         {
@@ -364,8 +434,10 @@ const supplementalKnowledgeGroups: Array<{ slug: string; group: KnowledgeDocumen
           description: "เอกสารสรุปข้อมูลจัดซื้อจัดจ้างรูปแบบ PDF",
           coverImage: null,
           coverAlt: "",
-          previewHref: "/wp-content/uploads/knowledge-ethics-2569/procurement-summary-15-แบบสรุปผลการจัดซื้อจัดจ้าง-ประจำปีงบประมาณ-พ.ศ.2568.pdf",
-          downloadHref: "/wp-content/uploads/knowledge-ethics-2569/procurement-summary-15-แบบสรุปผลการจัดซื้อจัดจ้าง-ประจำปีงบประมาณ-พ.ศ.2568.pdf",
+          previewHref:
+            "/wp-content/uploads/knowledge-ethics-2569/procurement-summary-15-แบบสรุปผลการจัดซื้อจัดจ้าง-ประจำปีงบประมาณ-พ.ศ.2568.pdf",
+          downloadHref:
+            "/wp-content/uploads/knowledge-ethics-2569/procurement-summary-15-แบบสรุปผลการจัดซื้อจัดจ้าง-ประจำปีงบประมาณ-พ.ศ.2568.pdf",
           hasUsableTarget: true,
         },
       ],
@@ -373,16 +445,17 @@ const supplementalKnowledgeGroups: Array<{ slug: string; group: KnowledgeDocumen
   },
 ];
 
-export const supplementalKnowledgePages: SupplementalKnowledgePage[] = supplementalKnowledgeGroups.map(
-  ({ slug, group }) => ({
+export const supplementalKnowledgePages: SupplementalKnowledgePage[] =
+  supplementalKnowledgeGroups.map(({ slug, group }) => ({
     slug,
     path: `${basePath}/${slug}`,
     title: group.title,
     group,
-  }),
-);
+  }));
 
-export function getSupplementalKnowledgePage(path: string): SupplementalKnowledgePage | null {
+export function getSupplementalKnowledgePage(
+  path: string,
+): SupplementalKnowledgePage | null {
   const normalized = normalizeRoutePath(path).normalize("NFC");
   return supplementalKnowledgePages.find((page) => page.path === normalized) ?? null;
 }

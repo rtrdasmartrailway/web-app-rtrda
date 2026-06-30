@@ -50,8 +50,7 @@ const SERVICE_BANNERS = [
     titleEn: "Governance & Transparency",
     subtitleTh: "ข้อมูล ITA นโยบาย และมาตรการกำกับดูแล",
     subtitleEn: "ITA, policy, and governance information",
-    href:
-      "https://test.rtrda.or.th/%E0%B8%81%E0%B8%B2%E0%B8%A3%E0%B8%9B%E0%B8%A3%E0%B8%B0%E0%B9%80%E0%B8%A1%E0%B8%B4%E0%B8%99%E0%B8%84%E0%B8%B8%E0%B8%93%E0%B8%98%E0%B8%A3%E0%B8%A3%E0%B8%A1%E0%B9%81%E0%B8%A5%E0%B8%B0%E0%B8%84%E0%B8%A7",
+    href: "https://test.rtrda.or.th/%E0%B8%81%E0%B8%B2%E0%B8%A3%E0%B8%9B%E0%B8%A3%E0%B8%B0%E0%B9%80%E0%B8%A1%E0%B8%B4%E0%B8%99%E0%B8%84%E0%B8%B8%E0%B8%93%E0%B8%98%E0%B8%A3%E0%B8%A3%E0%B8%A1%E0%B9%81%E0%B8%A5%E0%B8%B0%E0%B8%84%E0%B8%A7",
     tone: "dark",
   },
   {
@@ -60,8 +59,7 @@ const SERVICE_BANNERS = [
     titleEn: "Rail Research Projects",
     subtitleTh: "โครงการเด่น งานวิจัย และการถ่ายทอดเทคโนโลยี",
     subtitleEn: "Research, highlights, and technology transfer",
-    href:
-      "https://test.rtrda.or.th/%E0%B8%84%E0%B8%A5%E0%B8%B1%E0%B8%87%E0%B8%84%E0%B8%A7%E0%B8%B2%E0%B8%A1%E0%B8%A3%E0%B8%B9%E0%B9%89",
+    href: "https://test.rtrda.or.th/%E0%B8%84%E0%B8%A5%E0%B8%B1%E0%B8%87%E0%B8%84%E0%B8%A7%E0%B8%B2%E0%B8%A1%E0%B8%A3%E0%B8%B9%E0%B9%89",
     tone: "rail",
   },
   {
@@ -70,8 +68,7 @@ const SERVICE_BANNERS = [
     titleEn: "Public Relations",
     subtitleTh: "ข่าวกิจกรรมและประกาศสำคัญจาก สทร.",
     subtitleEn: "News, activities, and announcements",
-    href:
-      "https://test.rtrda.or.th/category/%E0%B8%82%E0%B9%88%E0%B8%B2%E0%B8%A7%E0%B9%81%E0%B8%A5%E0%B8%B0%E0%B8%81%E0%B8%B4%E0%B8%88%E0%B8%81%E0%B8%A3%E0%B8%A3%E0%B8%A1",
+    href: "https://test.rtrda.or.th/category/%E0%B8%82%E0%B9%88%E0%B8%B2%E0%B8%A7%E0%B9%81%E0%B8%A5%E0%B8%B0%E0%B8%81%E0%B8%B4%E0%B8%88%E0%B8%81%E0%B8%A3%E0%B8%A3%E0%B8%A1",
     tone: "paper",
   },
   {
@@ -80,8 +77,7 @@ const SERVICE_BANNERS = [
     titleEn: "Procurement",
     subtitleTh: "แผนประกาศ TOR และผลผู้ชนะการเสนอราคา",
     subtitleEn: "Plans, TOR, and winner announcements",
-    href:
-      "https://test.rtrda.or.th/%E0%B8%88%E0%B8%B1%E0%B8%94%E0%B8%8B%E0%B8%B7%E0%B9%89%E0%B8%AD%E0%B8%88%E0%B8%B1%E0%B8%94%E0%B8%88%E0%B9%89%E0%B8%B2%E0%B8%87/%E0%B9%81%E0%B8%9C%E0%B8%99%E0%B8%81%E0%B8%B2%E0%B8%A3%E0%B8%88%E0%B8%B1%E0%B8%94%E0%B8%8B%E0%B8%B7%E0%B9%89%E0%B8%AD%E0%B8%88%E0%B8%B1%E0%B8%94%E0%B8%88%E0%B9%89%E0%B8%B2%E0%B8%87",
+    href: "https://test.rtrda.or.th/%E0%B8%88%E0%B8%B1%E0%B8%94%E0%B8%8B%E0%B8%B7%E0%B9%89%E0%B8%AD%E0%B8%88%E0%B8%B1%E0%B8%94%E0%B8%88%E0%B9%89%E0%B8%B2%E0%B8%87/%E0%B9%81%E0%B8%9C%E0%B8%99%E0%B8%81%E0%B8%B2%E0%B8%A3%E0%B8%88%E0%B8%B1%E0%B8%94%E0%B8%8B%E0%B8%B7%E0%B9%89%E0%B8%AD%E0%B8%88%E0%B8%B1%E0%B8%94%E0%B8%88%E0%B9%89%E0%B8%B2%E0%B8%87",
     tone: "charcoal",
   },
 ] as const;
@@ -96,7 +92,10 @@ function SectionHeading({ id, children }: { id: string; children: React.ReactNod
 
 function HomeServiceBannerMockup({ language }: { language: WpLanguage }) {
   return (
-    <section className="home-section home-service-banners" aria-labelledby="home-service-banners-title">
+    <section
+      className="home-section home-service-banners"
+      aria-labelledby="home-service-banners-title"
+    >
       <div className="section-heading-row section-heading-center home-service-banners-head">
         <h2 id="home-service-banners-title">{TEXT[language].serviceBanners}</h2>
       </div>
@@ -130,12 +129,17 @@ function HomeServiceBannerMockup({ language }: { language: WpLanguage }) {
               href={page.path}
               key={page.slug}
             >
-              <span className="service-banner-icon service-banner-icon-pdf" aria-hidden="true">
+              <span
+                className="service-banner-icon service-banner-icon-pdf"
+                aria-hidden="true"
+              >
                 PDF
               </span>
               <span className="service-banner-copy">
                 <strong>{page.title}</strong>
-                <small>{page.group.documents.length} ไฟล์ • จัดรูปแบบแสดงผลแบบคลังความรู้</small>
+                <small>
+                  {page.group.documents.length} ไฟล์ • จัดรูปแบบแสดงผลแบบคลังความรู้
+                </small>
               </span>
               <span className="service-banner-arrow" aria-hidden="true" />
             </a>

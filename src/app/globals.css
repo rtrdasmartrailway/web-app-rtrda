@@ -643,7 +643,6 @@ a.language-toggle-item:hover {
   transform: scale(0.998);
 }
 
-
 .home-hero-nav {
   align-items: center;
   background: rgba(0, 52, 113, 0.44);
@@ -4859,13 +4858,22 @@ a.calendar-cell.has-posts:hover {
 .service-banner-card-rail {
   background:
     linear-gradient(135deg, rgba(219, 234, 254, 0.9), rgba(148, 163, 184, 0.55)),
-    linear-gradient(90deg, transparent 0 18%, rgba(37, 99, 235, 0.22) 18% 20%, transparent 20% 100%);
+    linear-gradient(
+      90deg,
+      transparent 0 18%,
+      rgba(37, 99, 235, 0.22) 18% 20%,
+      transparent 20% 100%
+    );
 }
 
 .service-banner-card-paper {
   background:
     linear-gradient(135deg, rgba(255, 255, 255, 0.92), rgba(226, 232, 240, 0.9)),
-    repeating-linear-gradient(0deg, transparent 0 12px, rgba(100, 116, 139, 0.12) 12px 13px);
+    repeating-linear-gradient(
+      0deg,
+      transparent 0 12px,
+      rgba(100, 116, 139, 0.12) 12px 13px
+    );
 }
 
 .home-service-documents {

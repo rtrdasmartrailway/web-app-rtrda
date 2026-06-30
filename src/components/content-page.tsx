@@ -157,7 +157,9 @@ export function ContentPage({ data }: { data: PageData }) {
             ) : (
               <div
                 className="wp-content"
-                dangerouslySetInnerHTML={{ __html: normalizeWpContentHtml(record.contentHtml) }}
+                dangerouslySetInnerHTML={{
+                  __html: normalizeWpContentHtml(record.contentHtml),
+                }}
               />
             )}
             <YutthLightbox />
