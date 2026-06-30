@@ -34,6 +34,7 @@ import { applyContactMapOverride } from "@/lib/wp/contact-map";
 import { applyItaHeadingsOverride } from "@/lib/wp/ita-headings-override";
 import { getStaticDownloadOverride } from "@/lib/wp/static-download-overrides";
 import { getSupplementalKnowledgePage } from "@/lib/wp/knowledge-supplemental-documents";
+import { getMoralityReportPage } from "@/lib/wp/morality-report-documents";
 import { applyProcurementPlanOverride } from "@/lib/wp/procurement-plan";
 import { applyProcurementWinnerOverride } from "@/lib/wp/procurement-winner";
 import { normalizeRoutePath } from "@/lib/wp/url";
@@ -266,26 +267,47 @@ export const getPageData = cache(async (path: string): Promise<PageData | null> 
   const importedRecord = await getRecordByPath(path);
   if (!importedRecord) {
     const supplementalPage = getSupplementalKnowledgePage(path);
-    if (!supplementalPage) {
+    const moralityReportPage = getMoralityReportPage(path);
+    if (!supplementalPage && !moralityReportPage) {
       return null;
     }
+
+    const syntheticPage = supplementalPage
+      ? {
+          slug: supplementalPage.slug,
+          path: supplementalPage.path,
+          title: supplementalPage.title,
+          groups: [supplementalPage.group],
+          parentTitle: "บริการและข้อมูลสำคัญ",
+          parentPath: "/บริการและข้อมูลสำคัญ",
+          idPrefix: "supplemental-knowledge",
+        }
+      : {
+          slug: moralityReportPage!.slug,
+          path: moralityReportPage!.path,
+          title: moralityReportPage!.title,
+          groups: moralityReportPage!.groups,
+          parentTitle: "เอกสารเผยแพร่",
+          parentPath: "/เอกสารเผยแพร่",
+          idPrefix: "morality-report",
+        };
 
     const shell = await buildShellData(path);
     const now = new Date().toISOString();
     const record: WpContentRecord = {
-      id: `supplemental-knowledge-${supplementalPage.slug}`,
-      wpId: `supplemental-knowledge-${supplementalPage.slug}`,
+      id: `${syntheticPage.idPrefix}-${syntheticPage.slug}`,
+      wpId: `${syntheticPage.idPrefix}-${syntheticPage.slug}`,
       language: "th",
       kind: "page",
-      path: supplementalPage.path,
-      sourceUrl: `https://test.rtrda.or.th${supplementalPage.path}`,
-      title: supplementalPage.title,
-      excerpt: supplementalPage.title,
+      path: syntheticPage.path,
+      sourceUrl: `https://test.rtrda.or.th${syntheticPage.path}`,
+      title: syntheticPage.title,
+      excerpt: syntheticPage.title,
       contentHtml: "",
-      searchText: supplementalPage.title,
+      searchText: syntheticPage.title,
       modified: now,
       date: now,
-      parentPath: "/",
+      parentPath: syntheticPage.parentPath,
       categoryIds: [],
       featuredMediaId: null,
       authorId: null,
@@ -298,11 +320,11 @@ export const getPageData = cache(async (path: string): Promise<PageData | null> 
       newsCards: [],
       categoryPagination: null,
       home: null,
-      knowledgeDocuments: [supplementalPage.group],
+      knowledgeDocuments: syntheticPage.groups,
       boardExecutivePresentation: null,
       pdfReaderTargets: [],
       sidebarItems: [],
-      parentTitle: "บริการและข้อมูลสำคัญ",
+      parentTitle: syntheticPage.parentTitle,
       shell,
     };
   }
