@@ -64,6 +64,13 @@ function SideNavigation({
   );
 }
 
+function normalizeWpContentHtml(html: string): string {
+  return html.replace(
+    /(banner-ช่องทางแจ้งเรื่องร้องเรียน-01-(?:1024x323|300x95|768x243|1536x485|2048x647|18x6)\.jpg)(?![?\w-])/g,
+    "$1?v=20260630",
+  );
+}
+
 export function contentRouteClass(path: string): string {
   const canonicalPath = path.replace(/^\/en(?=\/)/, "");
 
@@ -150,7 +157,7 @@ export function ContentPage({ data }: { data: PageData }) {
             ) : (
               <div
                 className="wp-content"
-                dangerouslySetInnerHTML={{ __html: record.contentHtml }}
+                dangerouslySetInnerHTML={{ __html: normalizeWpContentHtml(record.contentHtml) }}
               />
             )}
             <YutthLightbox />
