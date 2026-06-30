@@ -92,8 +92,9 @@ const ITA_O18_UPLOAD_DIR = "/wp-content/uploads/ita2569/O18";
 const ITA_O25_UPLOAD_DIR = "/wp-content/uploads/ita2569/O25";
 const ITA_O26_UPLOAD_DIR = "/wp-content/uploads/ita2569/O26";
 
-const ITA_O4_NEWS_HREF =
-  "https://test.rtrda.or.th/category/%E0%B8%82%E0%B9%88%E0%B8%B2%E0%B8%A7%E0%B9%81%E0%B8%A5%E0%B8%B0%E0%B8%81%E0%B8%B4%E0%B8%88%E0%B8%81%E0%B8%A3%E0%B8%A3%E0%B8%A1";
+const ITA_O4_NEWS_HREF = "/category/ข่าวและกิจกรรม";
+const ITA_O4_ITA_NEWS_HREF =
+  "/สทร-เดินหน้ายกระดับองค์กรโปร่งใส-จัดโครงการพัฒนาและเพิ่มประสิทธิภาพการประเมิน-ITA-ประจำปี-2569";
 
 const ITA_LINK_OVERRIDES: ReadonlyArray<{
   marker: string;
@@ -136,6 +137,11 @@ const ITA_LINK_OVERRIDES: ReadonlyArray<{
       {
         title: "ข่าวประชาสัมพันธ์",
         href: ITA_O4_NEWS_HREF,
+      },
+      {
+        title:
+          "สทร. เดินหน้ายกระดับองค์กรโปร่งใส จัดโครงการพัฒนาและเพิ่มประสิทธิภาพการประเมิน ITA ประจำปี 2569",
+        href: ITA_O4_ITA_NEWS_HREF,
       },
     ],
   },

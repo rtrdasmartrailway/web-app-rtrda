@@ -313,6 +313,8 @@ export const getPageData = cache(async (path: string): Promise<PageData | null> 
       authorId: null,
     };
 
+    const syntheticSidebarItems = buildSidebarItems(record, [], [], shell.navItems);
+
     return {
       record,
       children: [],
@@ -323,7 +325,7 @@ export const getPageData = cache(async (path: string): Promise<PageData | null> 
       knowledgeDocuments: syntheticPage.groups,
       boardExecutivePresentation: null,
       pdfReaderTargets: [],
-      sidebarItems: [],
+      sidebarItems: syntheticSidebarItems,
       parentTitle: syntheticPage.parentTitle,
       shell,
     };

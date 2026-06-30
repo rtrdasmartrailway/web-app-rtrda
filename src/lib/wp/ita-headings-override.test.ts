@@ -242,7 +242,12 @@ describe("applyItaHeadingsOverride", () => {
     expect(linksFor("O4")).toEqual([
       {
         title: "– ข่าวประชาสัมพันธ์",
-        href: "https://test.rtrda.or.th/category/%E0%B8%82%E0%B9%88%E0%B8%B2%E0%B8%A7%E0%B9%81%E0%B8%A5%E0%B8%B0%E0%B8%81%E0%B8%B4%E0%B8%88%E0%B8%81%E0%B8%A3%E0%B8%A3%E0%B8%A1",
+        href: "/category/ข่าวและกิจกรรม",
+      },
+      {
+        title:
+          "– สทร. เดินหน้ายกระดับองค์กรโปร่งใส จัดโครงการพัฒนาและเพิ่มประสิทธิภาพการประเมิน ITA ประจำปี 2569",
+        href: "/สทร-เดินหน้ายกระดับองค์กรโปร่งใส-จัดโครงการพัฒนาและเพิ่มประสิทธิภาพการประเมิน-ITA-ประจำปี-2569",
       },
     ]);
     expect(linksFor("O1")).toEqual([
