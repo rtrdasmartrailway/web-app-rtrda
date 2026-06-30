@@ -32,6 +32,7 @@ import {
 import { applyBoardExecutiveOverride } from "@/lib/wp/board-executive-override";
 import { applyContactMapOverride } from "@/lib/wp/contact-map";
 import { applyItaHeadingsOverride } from "@/lib/wp/ita-headings-override";
+import { getStaticDownloadOverride } from "@/lib/wp/static-download-overrides";
 import { applyProcurementPlanOverride } from "@/lib/wp/procurement-plan";
 import { applyProcurementWinnerOverride } from "@/lib/wp/procurement-winner";
 import { normalizeRoutePath } from "@/lib/wp/url";
@@ -295,7 +296,8 @@ export const getPageData = cache(async (path: string): Promise<PageData | null> 
     buildShellData(path),
     isHome ? buildHomeData(recordWithOverrides) : Promise.resolve(null),
     buildPdfReaderTargets(recordWithOverrides.contentHtml, {
-      resolveDownload: getDownloadById,
+      resolveDownload: async (id) =>
+        (await getDownloadById(id)) ?? getStaticDownloadOverride(id),
       resolveFlipbookPdf: async (flipbookPath) => {
         const flipbook = await getRecordByPath(flipbookPath);
         const pdfPath = flipbook ? extractIframePdfSource(flipbook.contentHtml) : null;
