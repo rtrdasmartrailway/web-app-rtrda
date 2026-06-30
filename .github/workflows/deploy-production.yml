@@ -137,12 +137,12 @@ jobs:
         run: |
           set -euo pipefail
           cd /srv/apps/web-app-rtrda-production
-          if [ -d public/wp-content/uploads/news-2569 ]; then
-            mkdir -p /srv/apps/web-app-rtrda/public/wp-content/uploads/news-2569
-            rsync -a public/wp-content/uploads/news-2569/ /srv/apps/web-app-rtrda/public/wp-content/uploads/news-2569/
-            chmod -R a+rX /srv/apps/web-app-rtrda/public/wp-content/uploads/news-2569
+          if [ -d public/wp-content/uploads ]; then
+            mkdir -p /srv/apps/web-app-rtrda/public/wp-content/uploads
+            rsync -a public/wp-content/uploads/ /srv/apps/web-app-rtrda/public/wp-content/uploads/
+            chmod -R a+rX /srv/apps/web-app-rtrda/public/wp-content/uploads
           else
-            echo "No committed news-2569 upload assets to sync."
+            echo "No committed upload assets to sync."
           fi
 
       - name: Install dependencies
