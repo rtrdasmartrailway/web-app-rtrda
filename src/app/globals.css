@@ -935,7 +935,8 @@ a.language-toggle-item:hover {
   border: 1px solid rgba(0, 52, 113, 0.16);
   border-radius: 18px;
   box-shadow: 0 18px 42px rgba(15, 23, 42, 0.12);
-  min-height: min(82vh, 960px);
+  height: clamp(1050px, 132vw, 1500px);
+  min-height: min(92vh, 1050px);
   width: 100%;
 }
 
