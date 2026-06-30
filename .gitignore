@@ -24,6 +24,10 @@ src/generated/
 public/wp-content/uploads/*
 !public/wp-content/uploads/2026/
 public/wp-content/uploads/2026/*
+!public/wp-content/uploads/2026/04/
+public/wp-content/uploads/2026/04/*
+!public/wp-content/uploads/2026/04/o6_รายงานผลการดำเนินงาน-ไตรมาสที่-2-ปีงบประม.pdf
+!public/wp-content/uploads/2026/04/o7_รายงานผลการดำเนินงาน-ไตรมาสที่-4-ปีงบประมa.pdf
 !public/wp-content/uploads/2026/06/
 public/wp-content/uploads/2026/06/*
 !public/wp-content/uploads/2026/06/อินโฟภายนอก-11-2-1024x1024.png
