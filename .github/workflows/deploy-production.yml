@@ -133,7 +133,7 @@ jobs:
           grep -q '^DATABASE_URL=' .env.production
           cp .env.production .env
 
-      - name: Sync committed upload assets to production bind mount
+      - name: Sync committed public assets to production bind mounts
         run: |
           set -euo pipefail
           cd /srv/apps/web-app-rtrda-production
@@ -143,6 +143,13 @@ jobs:
             chmod -R a+rX /srv/apps/web-app-rtrda/public/wp-content/uploads
           else
             echo "No committed upload assets to sync."
+          fi
+          if [ -d public/sdc-downloads ]; then
+            mkdir -p /srv/apps/web-app-rtrda/public/sdc-downloads
+            rsync -a public/sdc-downloads/ /srv/apps/web-app-rtrda/public/sdc-downloads/
+            chmod -R a+rX /srv/apps/web-app-rtrda/public/sdc-downloads
+          else
+            echo "No committed SDC downloads to sync."
           fi
 
       - name: Install dependencies
