@@ -131,6 +131,16 @@ export const landingGuidePages: LandingGuidePage[] = [
             "/wp-content/uploads/landing-ita-guides-2569/manual-o20-03-หลักเกณฑ์การรับทรัพย์สิน_-มาตรา-128.pdf",
             "/wp-content/uploads/pdf-covers/landing-ita-guides-2569/9d3c468accec1871.png",
           ),
+          {
+            title:
+              "สทร. ร่วมประกาศเจตนารมณ์การต่อต้านการทุจริตคอร์รัปชันในองค์กร การไม่รับของขวัญ (No Gift Policy)",
+            description: "ข่าวประชาสัมพันธ์ที่เกี่ยวข้องกับ No Gift Policy",
+            coverImage: "/stitch-assets/home-hero-slides/slide-2.png",
+            coverAlt: "นโยบาย No Gift Policy",
+            previewHref: "/สทร-ร่วมประกาศเจตนารมณ์-no-gift-policy-2569",
+            downloadHref: null,
+            hasUsableTarget: true,
+          },
         ],
       },
     ],

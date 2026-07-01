@@ -256,40 +256,6 @@ const supplementalKnowledgeGroups: Array<{
     },
   },
   {
-    slug: "no-gift-policy",
-    group: {
-      title:
-        "การขับเคลื่อนนโยบาย NO GIFT POLICY จากการปฏิบัติหน้าที่และการเสริมสร้างความรู้เกี่ยวกับหลักเกณฑ์การรับทรัพย์สินหรือประโยชน์อื่นใดโดยธรรมจรรยาของเจ้าพนักงานของรัฐ",
-      open: true,
-      documents: [
-        {
-          title: "o20หนังสือประกาศเจตนารมณ์ No Gift Policy ฉบับภาษาไทย",
-          description: "เอกสารประกอบนโยบาย No Gift Policy รูปแบบ PDF",
-          coverImage:
-            "/wp-content/uploads/pdf-covers/knowledge-ethics-2569/4a976111af906b04.png",
-          coverAlt: "หน้าแรกของ PDF",
-          previewHref:
-            "/wp-content/uploads/knowledge-ethics-2569/no-gift-policy-01-o20หนังสือประกาศเจตนารมณ์-No-Gift-Policy-ฉบับภาษาไทย.pdf",
-          downloadHref:
-            "/wp-content/uploads/knowledge-ethics-2569/no-gift-policy-01-o20หนังสือประกาศเจตนารมณ์-No-Gift-Policy-ฉบับภาษาไทย.pdf",
-          hasUsableTarget: true,
-        },
-        {
-          title: "รายงานผลการดำเนินงานตามนโยบาย No Gift Policy 2568",
-          description: "เอกสารประกอบนโยบาย No Gift Policy รูปแบบ PDF",
-          coverImage:
-            "/wp-content/uploads/pdf-covers/knowledge-ethics-2569/1b94722ae9c8d4fb.png",
-          coverAlt: "หน้าแรกของ PDF",
-          previewHref:
-            "/wp-content/uploads/knowledge-ethics-2569/no-gift-policy-02-รายงานผลการดำเนินงานตามนโยบาย-No-Gift-Policy-2568.pdf",
-          downloadHref:
-            "/wp-content/uploads/knowledge-ethics-2569/no-gift-policy-02-รายงานผลการดำเนินงานตามนโยบาย-No-Gift-Policy-2568.pdf",
-          hasUsableTarget: true,
-        },
-      ],
-    },
-  },
-  {
     slug: "procurement-summary",
     groups: [
       {
