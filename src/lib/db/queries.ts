@@ -92,10 +92,12 @@ export async function getPostsByCategory(
   categoryId: number,
   language: WpLanguage,
   limit = 6,
+  offset = 0,
 ): Promise<WpContentRecord[]> {
   const rows = await prisma.contentRecord.findMany({
     where: { language, kind: "post", categoryIds: { has: categoryId } },
     orderBy: { date: "desc" },
+    skip: offset,
     take: limit,
   });
   return rows.map(toRecord);

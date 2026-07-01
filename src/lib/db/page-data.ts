@@ -244,6 +244,26 @@ function hasImportedLatestPosts(record: WpContentRecord): boolean {
   return record.contentHtml.includes("wp-block-latest-posts");
 }
 
+interface CategoryRouteMatch {
+  slug: string;
+  page: number;
+  language: WpLanguage;
+}
+
+export function parseCategoryRoute(path: string): CategoryRouteMatch | null {
+  const normalized = normalizeRoutePath(path).normalize("NFC");
+  const match = normalized.match(/^\/(en\/)?category\/([^/]+)(?:\/page\/(\d+))?$/);
+  if (!match) {
+    return null;
+  }
+
+  return {
+    slug: decodeURIComponent(match[2]),
+    page: match[3] ? parseInt(match[3], 10) : 1,
+    language: match[1] ? "en" : "th",
+  };
+}
+
 async function fetchCards(records: WpContentRecord[]): Promise<Card[]> {
   const mediaIds = records
     .map((record) => record.featuredMediaId)
@@ -279,9 +299,50 @@ export const buildShellData = cache(async (path: string): Promise<ShellData> => 
   };
 });
 
+async function buildSyntheticCategoryRecord(
+  path: string,
+): Promise<WpContentRecord | null> {
+  const categoryRoute = parseCategoryRoute(path);
+  if (!categoryRoute || categoryRoute.page < 1) {
+    return null;
+  }
+
+  const category = await getCategoryBySlug(categoryRoute.slug);
+  if (!category) {
+    return null;
+  }
+
+  const now = new Date().toISOString();
+  const title =
+    categoryRoute.page > 1
+      ? `${category.name} – หน้า ${categoryRoute.page}`
+      : category.name;
+  return {
+    id: `${categoryRoute.language}-category-${category.id}-page-${categoryRoute.page}`,
+    wpId: `${categoryRoute.language}-category-${category.id}-page-${categoryRoute.page}`,
+    language: categoryRoute.language,
+    kind: "category",
+    path: normalizeRoutePath(path).normalize("NFC"),
+    sourceUrl: `https://test.rtrda.or.th${path}`,
+    title,
+    excerpt: title,
+    contentHtml: "",
+    searchText: title,
+    modified: now,
+    date: now,
+    parentPath: null,
+    categoryIds: [],
+    featuredMediaId: null,
+    authorId: null,
+  };
+}
+
 /** Everything a content page needs, in one cached call (shared by metadata + page). */
 export const getPageData = cache(async (path: string): Promise<PageData | null> => {
-  const importedRecord = await getRecordByPath(path);
+  let importedRecord = await getRecordByPath(path);
+  if (!importedRecord) {
+    importedRecord = await buildSyntheticCategoryRecord(path);
+  }
   if (!importedRecord) {
     const supplementalPage = getSupplementalKnowledgePage(path);
     const landingGuidePage = getLandingGuidePage(path);
@@ -462,12 +523,15 @@ export const getPageData = cache(async (path: string): Promise<PageData | null> 
  * featuredMediaId. Each <li> is `<a href=path>title<time/><p>excerpt</p></a>`.
  */
 async function fetchCategoryNewsCards(record: WpContentRecord): Promise<Card[]> {
-  const categoryMatch = record.path.match(/^\/category\/([^/]+)(?:\/page\/(\d+))?$/);
-  if (categoryMatch) {
-    const slug = decodeURIComponent(categoryMatch[1]);
-    const category = await getCategoryBySlug(slug);
+  const categoryRoute = parseCategoryRoute(record.path);
+  if (categoryRoute) {
+    const category = await getCategoryBySlug(categoryRoute.slug);
     if (category) {
-      return fetchCards(await getPostsByCategory(category.id, record.language, 10));
+      const pageSize = 10;
+      const offset = (categoryRoute.page - 1) * pageSize;
+      return fetchCards(
+        await getPostsByCategory(category.id, record.language, pageSize, offset),
+      );
     }
   }
 
@@ -504,13 +568,10 @@ export function sortCategoryNewsByDateDesc(
 async function fetchCategoryPagination(
   record: WpContentRecord,
 ): Promise<CategoryPagination | null> {
-  // record.path looks like /category/<slug> or /category/<slug>/page/<N>
-  const m = record.path.match(/^\/category\/([^/]+)(?:\/page\/(\d+))?$/);
-  if (!m) return null;
-  const slug = decodeURIComponent(m[1]);
-  const currentPage = m[2] ? parseInt(m[2], 10) : 1;
+  const categoryRoute = parseCategoryRoute(record.path);
+  if (!categoryRoute) return null;
 
-  const category = await getCategoryBySlug(slug);
+  const category = await getCategoryBySlug(categoryRoute.slug);
   if (!category) return null;
 
   const totalPosts = await countPostsByCategory(category.id, record.language);
@@ -518,11 +579,11 @@ async function fetchCategoryPagination(
   const totalPages = Math.max(1, Math.ceil(totalPosts / pageSize));
 
   return {
-    currentPage,
+    currentPage: categoryRoute.page,
     totalPages,
     totalPosts,
     pageSize,
-    basePath: `/category/${m[1]}`,
+    basePath: `${record.language === "en" ? "/en" : ""}/category/${encodeURIComponent(categoryRoute.slug)}`,
   };
 }
 

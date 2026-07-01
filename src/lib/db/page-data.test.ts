@@ -4,6 +4,7 @@ import type { WpContentRecord } from "@/lib/wp/types";
 import {
   buildSidebarItems,
   deriveCounterpartCandidate,
+  parseCategoryRoute,
   sortCategoryNewsByDateDesc,
   toCards,
 } from "./page-data";
@@ -49,6 +50,27 @@ describe("deriveCounterpartCandidate", () => {
   it("maps English paths back to Thai paths", () => {
     expect(deriveCounterpartCandidate("/en", "en")).toBe("/");
     expect(deriveCounterpartCandidate("/en/ข่าว", "en")).toBe("/ข่าว");
+  });
+});
+
+describe("parseCategoryRoute", () => {
+  it("parses Thai and English category pagination paths", () => {
+    expect(parseCategoryRoute("/category/ข่าวและกิจกรรม")).toEqual({
+      slug: "ข่าวและกิจกรรม",
+      page: 1,
+      language: "th",
+    });
+    expect(parseCategoryRoute("/category/ข่าวและกิจกรรม/page/25")).toEqual({
+      slug: "ข่าวและกิจกรรม",
+      page: 25,
+      language: "th",
+    });
+    expect(parseCategoryRoute("/en/category/ข่าวและกิจกรรม/page/2")).toEqual({
+      slug: "ข่าวและกิจกรรม",
+      page: 2,
+      language: "en",
+    });
+    expect(parseCategoryRoute("/ข่าวสาร-กิจกรรม")).toBeNull();
   });
 });
 
