@@ -176,6 +176,22 @@ function buildSidebarItemsFromNavigation(
   return flattenSidebarNavItems(activeTopLevel.children, record.path);
 }
 
+function getNavigationSidebarTitle(
+  record: WpContentRecord,
+  navItems: PresentationNavItem[],
+  fallback: string,
+): string {
+  const currentPath = normalizeRoutePath(record.path);
+  const activeTopLevel = navItems.find(
+    (item) =>
+      item.active ||
+      (item.path ? isSidebarPathActive(item.path, currentPath) : false) ||
+      item.children.some((child) => navItemContainsPath(child, currentPath)),
+  );
+
+  return activeTopLevel?.label ?? fallback;
+}
+
 function flattenSidebarNavItems(
   items: PresentationNavItem[],
   currentPath: string,
@@ -421,7 +437,7 @@ export const getPageData = cache(async (path: string): Promise<PageData | null> 
     ),
     pdfReaderTargets: pagePdfReaderTargets,
     sidebarItems:
-      recordWithOverrides.kind === "page"
+      recordWithOverrides.kind === "page" || isCategory
         ? buildSidebarItems(
             recordWithOverrides,
             childRecords,
@@ -429,7 +445,13 @@ export const getPageData = cache(async (path: string): Promise<PageData | null> 
             shell.navItems,
           )
         : [],
-    parentTitle: parentRecord?.title ?? recordWithOverrides.title,
+    parentTitle: isCategory
+      ? getNavigationSidebarTitle(
+          recordWithOverrides,
+          shell.navItems,
+          recordWithOverrides.title,
+        )
+      : (parentRecord?.title ?? recordWithOverrides.title),
     shell,
   };
 });

@@ -223,6 +223,51 @@ describe("buildSidebarItems", () => {
     ]);
   });
 
+  it("builds sidebars for category pages from the active top-level navigation", () => {
+    const category = record({
+      kind: "category",
+      path: "/category/ข่าวและกิจกรรม",
+      title: "ข่าวและกิจกรรม",
+      parentPath: null,
+    });
+    const navItems = [
+      navItem({
+        label: "ข่าวสาร/กิจกรรม",
+        path: "/ข่าวสาร-กิจกรรม",
+        href: "/ข่าวสาร-กิจกรรม",
+        children: [
+          navItem({
+            label: "ข่าวและกิจกรรม",
+            path: "/category/ข่าวและกิจกรรม",
+            href: "/category/ข่าวและกิจกรรม",
+          }),
+          navItem({
+            label: "อบรม/สัมมนา",
+            path: "/ข่าวสาร-กิจกรรม/อบรม-สัมมนา",
+            href: "/ข่าวสาร-กิจกรรม/อบรม-สัมมนา",
+          }),
+        ],
+      }),
+    ];
+
+    expect(buildSidebarItems(category, [], [], navItems)).toEqual([
+      {
+        label: "ข่าวและกิจกรรม",
+        href: "/category/ข่าวและกิจกรรม",
+        path: "/category/ข่าวและกิจกรรม",
+        external: false,
+        active: true,
+      },
+      {
+        label: "อบรม/สัมมนา",
+        href: "/ข่าวสาร-กิจกรรม/อบรม-สัมมนา",
+        path: "/ข่าวสาร-กิจกรรม/อบรม-สัมมนา",
+        external: false,
+        active: false,
+      },
+    ]);
+  });
+
   it("filters the current page itself when it is the only sibling", () => {
     // Real-world case: a page has no children, and its only sibling is itself.
     // The sidebar would be a single self-link, which is useless. Filter it out.
