@@ -170,7 +170,8 @@ export function HomeSections({
   language: WpLanguage;
 }) {
   const t = TEXT[language];
-  const newsPath = language === "th" ? "/ข่าวสาร-กิจกรรม" : "/en/ข่าวสาร-กิจกรรม";
+  const newsPath =
+    language === "th" ? "/category/ข่าวและกิจกรรม" : "/en/category/ข่าวและกิจกรรม";
 
   return (
     <div className="home-sections">
