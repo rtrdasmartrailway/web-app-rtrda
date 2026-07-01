@@ -13,7 +13,9 @@ describe("landing guide pages", () => {
       ),
     ).toBe(false);
 
-    expect(landingGuidePages.filter((page) => page.path === "/คู่มือO20")).toHaveLength(1);
+    expect(landingGuidePages.filter((page) => page.path === "/คู่มือO20")).toHaveLength(
+      1,
+    );
   });
 
   it("shows the No Gift Policy news link as a card on /คู่มือO20", () => {
