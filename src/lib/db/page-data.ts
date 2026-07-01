@@ -228,11 +228,6 @@ function hasImportedLatestPosts(record: WpContentRecord): boolean {
   return record.contentHtml.includes("wp-block-latest-posts");
 }
 
-export function isNewsHubPath(path: string): boolean {
-  const normalized = normalizeRoutePath(path).normalize("NFC");
-  return normalized === "/ข่าวสาร-กิจกรรม" || normalized === "/en/ข่าวสาร-กิจกรรม";
-}
-
 async function fetchCards(records: WpContentRecord[]): Promise<Card[]> {
   const mediaIds = records
     .map((record) => record.featuredMediaId)
@@ -363,7 +358,6 @@ export const getPageData = cache(async (path: string): Promise<PageData | null> 
 
   const isHome = recordWithOverrides.path === "/" || recordWithOverrides.path === "/en";
   const isCategory = recordWithOverrides.kind === "category";
-  const isNewsHub = isNewsHubPath(recordWithOverrides.path);
   const isKnowledgeDocuments = isKnowledgeDocumentPath(recordWithOverrides.path);
   const isRailStandards = isRailStandardsPath(recordWithOverrides.path);
   const [
@@ -379,11 +373,9 @@ export const getPageData = cache(async (path: string): Promise<PageData | null> 
     recordWithOverrides.parentPath
       ? getChildren(recordWithOverrides.parentPath, recordWithOverrides.language)
       : Promise.resolve([]),
-    isNewsHub
-      ? getPostsByCategory(CATEGORY_NEWS, recordWithOverrides.language, 10)
-      : isHome && !hasImportedLatestPosts(recordWithOverrides)
-        ? getLatestPosts(recordWithOverrides.language)
-        : Promise.resolve([]),
+    isHome && !hasImportedLatestPosts(recordWithOverrides)
+      ? getLatestPosts(recordWithOverrides.language)
+      : Promise.resolve([]),
     buildShellData(path),
     isHome ? buildHomeData(recordWithOverrides) : Promise.resolve(null),
     buildPdfReaderTargets(recordWithOverrides.contentHtml, {
@@ -404,9 +396,8 @@ export const getPageData = cache(async (path: string): Promise<PageData | null> 
   const parentRecord = recordWithOverrides.parentPath
     ? await getRecordByPath(recordWithOverrides.parentPath)
     : null;
-  const displayChildRecords = isNewsHub ? [] : childRecords;
   const [children, latest, newsCards, categoryPagination] = await Promise.all([
-    fetchCards(displayChildRecords),
+    fetchCards(childRecords),
     fetchCards(latestRecords),
     isCategory ? fetchCategoryNewsCards(recordWithOverrides) : Promise.resolve([]),
     isCategory ? fetchCategoryPagination(recordWithOverrides) : Promise.resolve(null),

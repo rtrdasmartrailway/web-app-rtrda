@@ -4,7 +4,6 @@ import type { WpContentRecord } from "@/lib/wp/types";
 import {
   buildSidebarItems,
   deriveCounterpartCandidate,
-  isNewsHubPath,
   sortCategoryNewsByDateDesc,
   toCards,
 } from "./page-data";
@@ -50,15 +49,6 @@ describe("deriveCounterpartCandidate", () => {
   it("maps English paths back to Thai paths", () => {
     expect(deriveCounterpartCandidate("/en", "en")).toBe("/");
     expect(deriveCounterpartCandidate("/en/ข่าว", "en")).toBe("/ข่าว");
-  });
-});
-
-describe("isNewsHubPath", () => {
-  it("matches the Thai and English news hub parent pages only", () => {
-    expect(isNewsHubPath("/ข่าวสาร-กิจกรรม")).toBe(true);
-    expect(isNewsHubPath("/en/ข่าวสาร-กิจกรรม")).toBe(true);
-    expect(isNewsHubPath("/category/ข่าวและกิจกรรม")).toBe(false);
-    expect(isNewsHubPath("/ข่าวสาร-กิจกรรม/ข่าว-กิจกรรม")).toBe(false);
   });
 });
 
