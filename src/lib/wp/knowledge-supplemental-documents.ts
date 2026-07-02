@@ -328,6 +328,18 @@ const supplementalKnowledgeGroups: Array<{
         open: true,
         documents: [
           {
+            title: "แบบสรุปผลการจัดซื้อจัดจ้าง ประจำปีงบประมาณ พ.ศ.2568",
+            description: "เอกสารสรุปข้อมูลจัดซื้อจัดจ้างรูปแบบ PDF",
+            coverImage:
+              "/wp-content/uploads/pdf-covers/knowledge-ethics-2569/c0f9863b46cfff4f.png",
+            coverAlt: "หน้าแรกของ PDF",
+            previewHref:
+              "/wp-content/uploads/knowledge-ethics-2569/procurement-summary-15-แบบสรุปผลการจัดซื้อจัดจ้าง-ประจำปีงบประมาณ-พ.ศ.2568.pdf",
+            downloadHref:
+              "/wp-content/uploads/knowledge-ethics-2569/procurement-summary-15-แบบสรุปผลการจัดซื้อจัดจ้าง-ประจำปีงบประมาณ-พ.ศ.2568.pdf",
+            hasUsableTarget: true,
+          },
+          {
             title: "1.สขร.เดือน ตุลาคม 2567",
             description: "เอกสารสรุปข้อมูลจัดซื้อจัดจ้างรูปแบบ PDF",
             coverImage:
@@ -601,18 +613,6 @@ const supplementalKnowledgeGroups: Array<{
               "/wp-content/uploads/knowledge-ethics-2569/procurement-summary-xlsx-06-12.สขร.-เดือน-กันยายน2568.xlsx",
             downloadHref:
               "/wp-content/uploads/knowledge-ethics-2569/procurement-summary-xlsx-06-12.สขร.-เดือน-กันยายน2568.xlsx",
-            hasUsableTarget: true,
-          },
-          {
-            title: "แบบสรุปผลการจัดซื้อจัดจ้าง ประจำปีงบประมาณ พ.ศ.2568",
-            description: "เอกสารสรุปข้อมูลจัดซื้อจัดจ้างรูปแบบ PDF",
-            coverImage:
-              "/wp-content/uploads/pdf-covers/knowledge-ethics-2569/c0f9863b46cfff4f.png",
-            coverAlt: "หน้าแรกของ PDF",
-            previewHref:
-              "/wp-content/uploads/knowledge-ethics-2569/procurement-summary-15-แบบสรุปผลการจัดซื้อจัดจ้าง-ประจำปีงบประมาณ-พ.ศ.2568.pdf",
-            downloadHref:
-              "/wp-content/uploads/knowledge-ethics-2569/procurement-summary-15-แบบสรุปผลการจัดซื้อจัดจ้าง-ประจำปีงบประมาณ-พ.ศ.2568.pdf",
             hasUsableTarget: true,
           },
         ],
