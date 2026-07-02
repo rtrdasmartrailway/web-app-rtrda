@@ -95,6 +95,18 @@ export const landingGuidePages: LandingGuidePage[] = [
             "/wp-content/uploads/landing-ita-guides-2569/manual-o9-03-borrow-government-property.pdf",
             "/wp-content/uploads/pdf-covers/landing-ita-guides-2569/aa870c449c3844d2.png",
           ),
+          {
+            title: "คู่มือการขอเข้าศึกษาดูงานสถาบันฯ",
+            description: "เอกสารเผยแพร่รูปแบบ PNG",
+            coverImage:
+              "/wp-content/uploads/landing-ita-guides-2569/manual-o9-02-study-visit-guide.png",
+            coverAlt: "คู่มือการขอเข้าศึกษาดูงานสถาบันฯ",
+            previewHref:
+              "/wp-content/uploads/landing-ita-guides-2569/manual-o9-02-study-visit-guide.png",
+            downloadHref:
+              "/wp-content/uploads/landing-ita-guides-2569/manual-o9-02-study-visit-guide.png",
+            hasUsableTarget: true,
+          },
           pdfDocument(
             "09คู่มือการให้บริการข้อมูลข่าวสารของ สทร.",
             "/wp-content/uploads/landing-ita-guides-2569/manual-o9-04-information-service-manual.pdf",
