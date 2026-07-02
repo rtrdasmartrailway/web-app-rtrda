@@ -91,11 +91,6 @@ export const landingGuidePages: LandingGuidePage[] = [
         open: true,
         documents: [
           pdfDocument(
-            "PM-RTRDA-300-01-01 การให้บริการ Mobile Lab",
-            "/wp-content/uploads/landing-ita-guides-2569/manual-o9-01-o9_03_PM-RTRDA-300-01-01-การให้บริการMobile-Lab-v7-Final.pdf",
-            "/wp-content/uploads/pdf-covers/landing-ita-guides-2569/cf0cdcae61154c7e.png",
-          ),
-          pdfDocument(
             "คู่มือการขอเข้าศึกษาดูงานสถาบันฯ",
             "/wp-content/uploads/landing-ita-guides-2569/manual-o9-02-คู่มือการขอเข้าศึกษาดูงานสถาบันฯ.pdf",
             "/wp-content/uploads/pdf-covers/landing-ita-guides-2569/9db563a88d744551.png",
