@@ -91,13 +91,8 @@ export const landingGuidePages: LandingGuidePage[] = [
         open: true,
         documents: [
           pdfDocument(
-            "คู่มือการขอเข้าศึกษาดูงานสถาบันฯ",
-            "/wp-content/uploads/landing-ita-guides-2569/manual-o9-02-คู่มือการขอเข้าศึกษาดูงานสถาบันฯ.pdf",
-            "/wp-content/uploads/pdf-covers/landing-ita-guides-2569/9db563a88d744551.png",
-          ),
-          pdfDocument(
-            "คู่มือการให้บริการการยืมครุภัณฑ์บุคคลภายนอก",
-            "/wp-content/uploads/landing-ita-guides-2569/manual-o9-03-borrow-equipment-service.pdf",
+            "09คู่มือ การยืมทรัพย์สินทางราชการ บุคคลภายนอก",
+            "/wp-content/uploads/landing-ita-guides-2569/manual-o9-03-borrow-government-property.pdf",
             "/wp-content/uploads/pdf-covers/landing-ita-guides-2569/aa870c449c3844d2.png",
           ),
           pdfDocument(
