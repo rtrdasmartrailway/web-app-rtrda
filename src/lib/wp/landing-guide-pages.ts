@@ -100,6 +100,16 @@ export const landingGuidePages: LandingGuidePage[] = [
             "/wp-content/uploads/landing-ita-guides-2569/manual-o9-02-คู่มือการขอเข้าศึกษาดูงานสถาบันฯ.pdf",
             "/wp-content/uploads/pdf-covers/landing-ita-guides-2569/9db563a88d744551.png",
           ),
+          pdfDocument(
+            "คู่มือการให้บริการการยืมครุภัณฑ์บุคคลภายนอก",
+            "/wp-content/uploads/landing-ita-guides-2569/manual-o9-03-borrow-equipment-service.pdf",
+            "/wp-content/uploads/pdf-covers/landing-ita-guides-2569/aa870c449c3844d2.png",
+          ),
+          pdfDocument(
+            "09คู่มือการให้บริการข้อมูลข่าวสารของ สทร.",
+            "/wp-content/uploads/landing-ita-guides-2569/manual-o9-04-information-service-manual.pdf",
+            "/wp-content/uploads/pdf-covers/landing-ita-guides-2569/9a480773972f2f1a.png",
+          ),
         ],
       },
     ],

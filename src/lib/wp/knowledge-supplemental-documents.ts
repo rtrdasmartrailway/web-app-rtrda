@@ -139,12 +139,23 @@ const supplementalKnowledgeGroups: Array<{
           title: "รายงานข้อมูลสถิติเรื่องร้องเรียนการทุจร",
           description: "เอกสารเผยแพร่รูปแบบ PDF",
           coverImage:
-            "/wp-content/uploads/pdf-covers/knowledge-ethics-2569/94eac80ea15533de.png",
+            "/wp-content/uploads/pdf-covers/knowledge-ethics-2569/5b9929a8bbf4fec1.png",
           coverAlt: "หน้าแรกของ PDF",
           previewHref:
             "/wp-content/uploads/knowledge-ethics-2569/complaint-statistics-01-รายงานข้อมูลสถิติเรื่องร้องเรียนการทุจร.pdf",
           downloadHref:
             "/wp-content/uploads/knowledge-ethics-2569/complaint-statistics-01-รายงานข้อมูลสถิติเรื่องร้องเรียนการทุจร.pdf",
+          hasUsableTarget: true,
+        },
+        {
+          title: "รายงานข้อมูลสถิติเรื่องร้องเรียนการทุจร (XLSX)",
+          description: "ไฟล์ตารางข้อมูลสถิติเรื่องร้องเรียนรูปแบบ XLSX",
+          coverImage: null,
+          coverAlt: "ไฟล์ XLSX",
+          previewHref:
+            "/wp-content/uploads/knowledge-ethics-2569/complaint-statistics-02-report.xlsx",
+          downloadHref:
+            "/wp-content/uploads/knowledge-ethics-2569/complaint-statistics-02-report.xlsx",
           hasUsableTarget: true,
         },
       ],
