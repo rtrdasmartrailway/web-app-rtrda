@@ -6,6 +6,7 @@ export type LandingGuidePageKind = "standalone-pdf" | "knowledge";
 export interface LandingGuidePage {
   slug: string;
   path: string;
+  aliases?: string[];
   title: string;
   kind: LandingGuidePageKind;
   groups: KnowledgeDocumentGroup[];
@@ -28,6 +29,7 @@ export const landingGuidePages: LandingGuidePage[] = [
   {
     slug: "manual-o5",
     path: "/คู่มือO5",
+    aliases: ["/�%  B8�ู�%  B9�ม�%  B8�อO5"],
     title: "แผนยุทธศาสตร์หรือแผนพัฒนาหน่วยงาน",
     kind: "standalone-pdf",
     pdfHref:
@@ -83,6 +85,7 @@ export const landingGuidePages: LandingGuidePage[] = [
   {
     slug: "manual-o9",
     path: "/คู่มือO9",
+    aliases: ["/คู่มือO9/procurement-summary"],
     title: "คู่มือหรือแนวทางการขอรับบริการสำหรับผู้รับบริการหรือผู้มาติดต่อ",
     kind: "knowledge",
     groups: [
@@ -119,6 +122,7 @@ export const landingGuidePages: LandingGuidePage[] = [
   {
     slug: "manual-o20",
     path: "/คู่มือO20",
+    aliases: ["/บริการและข้อมูลสำคัญ/no-gift-policy"],
     title:
       "การขับเคลื่อนนโยบาย NO GIFT POLICY จากการปฏิบัติหน้าที่และการเสริมสร้างความรู้เกี่ยวกับหลักเกณฑ์การรับทรัพย์สินหรือประโยชน์อื่นใดโดยธรรมจรรยาของเจ้าพนักงานของรัฐ",
     kind: "knowledge",
@@ -234,5 +238,13 @@ export const landingGuidePages: LandingGuidePage[] = [
 
 export function getLandingGuidePage(path: string): LandingGuidePage | null {
   const normalized = normalizeRoutePath(path).normalize("NFC");
-  return landingGuidePages.find((page) => page.path === normalized) ?? null;
+  return (
+    landingGuidePages.find(
+      (page) =>
+        page.path === normalized ||
+        page.aliases?.some(
+          (alias) => normalizeRoutePath(alias).normalize("NFC") === normalized,
+        ),
+    ) ?? null
+  );
 }
