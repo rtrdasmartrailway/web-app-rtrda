@@ -70,6 +70,40 @@ describe("applyContactMapOverride", () => {
     expect(updated.contentHtml).not.toContain("https://forms.gle/z7bMYh5qMdHBoG2HA");
   });
 
+  it("adds official RTRDA social media hrefs to the contact page icons", () => {
+    const updated = applyContactMapOverride(
+      record({
+        contentHtml:
+          '<div class="elementor-social-icons-wrapper">' +
+          '<a class="elementor-icon elementor-social-icon-facebook" target="_blank" href><span>Facebook</span></a>' +
+          '<a class="elementor-icon elementor-social-icon-twitter" target="_blank" href><span>Twitter</span></a>' +
+          '<a class="elementor-icon elementor-social-icon-youtube" target="_blank" href><span>YouTube</span></a>' +
+          '<a class="elementor-icon elementor-social-icon-linkedin" target="_blank" href><span>LinkedIn</span></a>' +
+          '<a class="elementor-icon elementor-social-icon-tiktok" target="_blank" href><span>TikTok</span></a>' +
+          "</div>",
+      }),
+    );
+    const $ = cheerio.load(updated.contentHtml, null, false);
+
+    expect($(".elementor-social-icon-facebook").attr("href")).toBe(
+      "https://www.facebook.com/rtrda.thailand/",
+    );
+    expect($(".elementor-social-icon-twitter").attr("href")).toBe(
+      "https://twitter.com/RtrdaT",
+    );
+    expect($(".elementor-social-icon-youtube").attr("href")).toBe(
+      "https://www.youtube.com/channel/UC_bEnCUi9VXjB6s7OvtLPzg",
+    );
+    expect($(".elementor-social-icon-linkedin").attr("href")).toBe(
+      "https://www.linkedin.com/company/rail-technology-research-and-development-agency/",
+    );
+    expect($(".elementor-social-icon-tiktok").attr("href")).toBe(
+      "https://www.tiktok.com/@rtrda.thailand",
+    );
+    expect($(".elementor-social-icon-facebook").attr("rel")).toBe("noreferrer");
+    expect($(".elementor-social-icon-facebook").attr("aria-label")).toBe("Facebook");
+  });
+
   it("uses an English label for the contact form CTA on English pages", () => {
     const updated = applyContactMapOverride(
       record({

@@ -23,6 +23,34 @@ const CONTACT_FORM_LINK_SELECTOR = 'a[href*="forms.gle/"]';
 const CONTACT_FORM_URL =
   "https://docs.google.com/forms/d/e/1FAIpQLSd8nY4Dt-vjvl6Ag4Jnwq_Ko5zEUT7FgKH8DB-wql74KAVe5w/viewform";
 
+const RTRDA_SOCIAL_LINKS = [
+  {
+    selector: ".elementor-social-icon-facebook",
+    href: "https://www.facebook.com/rtrda.thailand/",
+    label: "Facebook",
+  },
+  {
+    selector: ".elementor-social-icon-twitter",
+    href: "https://twitter.com/RtrdaT",
+    label: "Twitter",
+  },
+  {
+    selector: ".elementor-social-icon-youtube",
+    href: "https://www.youtube.com/channel/UC_bEnCUi9VXjB6s7OvtLPzg",
+    label: "YouTube",
+  },
+  {
+    selector: ".elementor-social-icon-linkedin",
+    href: "https://www.linkedin.com/company/rail-technology-research-and-development-agency/",
+    label: "LinkedIn",
+  },
+  {
+    selector: ".elementor-social-icon-tiktok",
+    href: "https://www.tiktok.com/@rtrda.thailand",
+    label: "TikTok",
+  },
+] as const;
+
 function isContactInformationPath(path: string): boolean {
   return normalizeRoutePath(path).replace(/^\/en(?=\/)/, "") === CONTACT_INFORMATION_PATH;
 }
@@ -35,6 +63,20 @@ export function applyContactMapOverride(record: WpContentRecord): WpContentRecor
   const $ = cheerio.load(record.contentHtml, null, false);
   const mapIframes = $('iframe[src*="google.com/maps"]');
   const contactFormLink = $(CONTACT_FORM_LINK_SELECTOR).first();
+  let changed = false;
+
+  for (const social of RTRDA_SOCIAL_LINKS) {
+    const anchors = $(social.selector);
+
+    anchors.each((_, element) => {
+      const anchor = $(element);
+      anchor.attr("href", social.href);
+      anchor.attr("target", "_blank");
+      anchor.attr("rel", "noreferrer");
+      anchor.attr("aria-label", social.label);
+      changed = true;
+    });
+  }
 
   if (mapIframes.length > 0) {
     mapIframes.attr("src", RTRDA_CONTACT_MAP_EMBED_URL);
@@ -42,6 +84,7 @@ export function applyContactMapOverride(record: WpContentRecord): WpContentRecor
       "title",
       record.language === "th" ? "แผนที่ตั้ง สทร." : "RTRDA location map",
     );
+    changed = true;
 
     if ($(".contact-map-place-card").length === 0) {
       const openMapLabel =
@@ -67,9 +110,10 @@ export function applyContactMapOverride(record: WpContentRecord): WpContentRecor
         `<a href="${CONTACT_FORM_URL}" target="_blank" rel="noreferrer">${label}</a>` +
         `</div>`,
     );
+    changed = true;
   }
 
-  if (mapIframes.length === 0 && contactFormLink.length === 0) {
+  if (!changed) {
     return record;
   }
 
