@@ -28,31 +28,53 @@ const RTRDA_SOCIAL_LINKS = [
     selector: ".elementor-social-icon-facebook",
     href: "https://www.facebook.com/rtrda.thailand/",
     label: "Facebook",
+    icon: "f",
+    className: "facebook",
   },
   {
     selector: ".elementor-social-icon-twitter",
     href: "https://twitter.com/RtrdaT",
     label: "Twitter",
+    icon: "𝕏",
+    className: "twitter",
   },
   {
     selector: ".elementor-social-icon-youtube",
     href: "https://www.youtube.com/channel/UC_bEnCUi9VXjB6s7OvtLPzg",
     label: "YouTube",
+    icon: "▶",
+    className: "youtube",
   },
   {
     selector: ".elementor-social-icon-linkedin",
     href: "https://www.linkedin.com/company/rail-technology-research-and-development-agency/",
     label: "LinkedIn",
+    icon: "in",
+    className: "linkedin",
   },
   {
     selector: ".elementor-social-icon-tiktok",
     href: "https://www.tiktok.com/@rtrda.thailand",
     label: "TikTok",
+    icon: "♪",
+    className: "tiktok",
   },
 ] as const;
 
 function isContactInformationPath(path: string): boolean {
   return normalizeRoutePath(path).replace(/^\/en(?=\/)/, "") === CONTACT_INFORMATION_PATH;
+}
+
+function buildSocialLinksHtml(): string {
+  const links = RTRDA_SOCIAL_LINKS.map(
+    (social) =>
+      `<a class="contact-social-card contact-social-card--${social.className}" href="${social.href}" target="_blank" rel="noreferrer" aria-label="${social.label}">` +
+      `<span class="contact-social-icon" aria-hidden="true">${social.icon}</span>` +
+      `<span class="contact-social-label">${social.label}</span>` +
+      `</a>`,
+  ).join("");
+
+  return `<div class="contact-social-links" aria-label="RTRDA social media">${links}</div>`;
 }
 
 export function applyContactMapOverride(record: WpContentRecord): WpContentRecord {
@@ -65,17 +87,15 @@ export function applyContactMapOverride(record: WpContentRecord): WpContentRecor
   const contactFormLink = $(CONTACT_FORM_LINK_SELECTOR).first();
   let changed = false;
 
-  for (const social of RTRDA_SOCIAL_LINKS) {
-    const anchors = $(social.selector);
+  $(".veu_socialSet").remove();
 
-    anchors.each((_, element) => {
-      const anchor = $(element);
-      anchor.attr("href", social.href);
-      anchor.attr("target", "_blank");
-      anchor.attr("rel", "noreferrer");
-      anchor.attr("aria-label", social.label);
-      changed = true;
-    });
+  const socialWrapper = $(".elementor-social-icons-wrapper").first();
+  if (socialWrapper.length > 0) {
+    socialWrapper.replaceWith(buildSocialLinksHtml());
+    changed = true;
+  } else if ($(".contact-social-links").length === 0) {
+    $.root().append(buildSocialLinksHtml());
+    changed = true;
   }
 
   if (mapIframes.length > 0) {
