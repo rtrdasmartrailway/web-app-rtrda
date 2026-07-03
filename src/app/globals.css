@@ -1005,7 +1005,7 @@ a.language-toggle-item:hover {
 
 .wp-content .contact-social-links {
   display: grid;
-  grid-template-columns: repeat(5, minmax(110px, 1fr));
+  grid-template-columns: repeat(4, minmax(130px, 1fr));
   gap: 14px;
   margin: 24px auto 18px;
   max-width: 820px;
@@ -1061,10 +1061,6 @@ a.language-toggle-item:hover {
   background: #1877f2;
   font-family: Arial, sans-serif;
   font-size: 30px;
-}
-
-.wp-content .contact-social-card--twitter .contact-social-icon {
-  background: #111827;
 }
 
 .wp-content .contact-social-card--youtube .contact-social-icon {

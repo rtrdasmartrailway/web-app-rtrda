@@ -32,13 +32,6 @@ const RTRDA_SOCIAL_LINKS = [
     className: "facebook",
   },
   {
-    selector: ".elementor-social-icon-twitter",
-    href: "https://twitter.com/RtrdaT",
-    label: "Twitter",
-    icon: "𝕏",
-    className: "twitter",
-  },
-  {
     selector: ".elementor-social-icon-youtube",
     href: "https://www.youtube.com/channel/UC_bEnCUi9VXjB6s7OvtLPzg",
     label: "YouTube",

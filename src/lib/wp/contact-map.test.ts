@@ -76,7 +76,6 @@ describe("applyContactMapOverride", () => {
         contentHtml:
           '<div class="elementor-social-icons-wrapper">' +
           '<a class="elementor-icon elementor-social-icon-facebook" target="_blank" href><span>Facebook</span></a>' +
-          '<a class="elementor-icon elementor-social-icon-twitter" target="_blank" href><span>Twitter</span></a>' +
           '<a class="elementor-icon elementor-social-icon-youtube" target="_blank" href><span>YouTube</span></a>' +
           '<a class="elementor-icon elementor-social-icon-linkedin" target="_blank" href><span>LinkedIn</span></a>' +
           '<a class="elementor-icon elementor-social-icon-tiktok" target="_blank" href><span>TikTok</span></a>' +
@@ -88,13 +87,11 @@ describe("applyContactMapOverride", () => {
     expect($(".elementor-social-icons-wrapper")).toHaveLength(0);
     expect($(".veu_socialSet")).toHaveLength(0);
     expect($(".contact-social-links")).toHaveLength(1);
-    expect($(".contact-social-card")).toHaveLength(5);
+    expect($(".contact-social-card")).toHaveLength(4);
     expect($(".contact-social-card--facebook").attr("href")).toBe(
       "https://www.facebook.com/rtrda.thailand/",
     );
-    expect($(".contact-social-card--twitter").attr("href")).toBe(
-      "https://twitter.com/RtrdaT",
-    );
+    expect($(".contact-social-card--twitter")).toHaveLength(0);
     expect($(".contact-social-card--youtube").attr("href")).toBe(
       "https://www.youtube.com/channel/UC_bEnCUi9VXjB6s7OvtLPzg",
     );
