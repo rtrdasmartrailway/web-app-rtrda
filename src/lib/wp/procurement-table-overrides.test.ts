@@ -51,7 +51,7 @@ function rows(html: string): string[][] {
 }
 
 describe("applyProcurementTableOverrides", () => {
-  it("adds the quarterly winner row, fixes the title, and orders quarters ascending", () => {
+  it("adds the quarterly winner row, fixes the title, and numbers bottom-up", () => {
     const source = record(
       "/จัดซื้อจัดจ้าง/ประกาศผลผู้ชนะการจัดซื",
       yearTableHtml(
@@ -61,12 +61,12 @@ describe("applyProcurementTableOverrides", () => {
     const updated = applyProcurementTableOverrides(source);
     const updatedRows = rows(updated.contentHtml);
 
-    expect(updatedRows.map((row) => row[0])).toEqual(["1", "2"]);
-    expect(updatedRows[0]?.[2]).toContain("ไตรมาสที่ 2");
-    expect(updatedRows[1]?.[1]).toBe("7 กรกฎาคม 2569");
-    expect(updatedRows[1]?.[2]).toContain("ประจำไตรมาสที่ 3");
-    expect(updatedRows[1]?.[2]).toContain("เดือน มิถุนายน 2569");
-    expect(updatedRows[1]?.[2]).not.toContain("เดือน มีนาคม 2569");
+    expect(updatedRows.map((row) => row[0])).toEqual(["2", "1"]);
+    expect(updatedRows[0]?.[1]).toBe("7 กรกฎาคม 2569");
+    expect(updatedRows[0]?.[2]).toContain("ประจำไตรมาสที่ 3");
+    expect(updatedRows[0]?.[2]).toContain("เดือน มิถุนายน 2569");
+    expect(updatedRows[0]?.[2]).not.toContain("เดือน มีนาคม 2569");
+    expect(updatedRows[1]?.[2]).toContain("ไตรมาสที่ 2");
     expect(updated.contentHtml).toContain(
       "/wp-content/uploads/2026/07/procurement-quarterly-winner-q3-2569.pdf",
     );

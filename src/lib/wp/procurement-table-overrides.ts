@@ -234,13 +234,13 @@ function quarterNumber($: cheerio.CheerioAPI, row: AnyNode): number {
   return match ? Number(match[1]) : Number.MAX_SAFE_INTEGER;
 }
 
-function sortQuarterlyRowsAscending(
+function sortQuarterlyRowsDescending(
   $: cheerio.CheerioAPI,
   tbody: Cheerio<AnyNode>,
 ): boolean {
   const originalRows = tbody.find("tr").toArray();
   const sortedRows = [...originalRows].sort(
-    (left, right) => quarterNumber($, left) - quarterNumber($, right),
+    (left, right) => quarterNumber($, right) - quarterNumber($, left),
   );
   const changed = sortedRows.some((row, index) => row !== originalRows[index]);
   if (changed) {
@@ -253,10 +253,11 @@ function applyQuarterlyWinnerRows(record: WpContentRecord): WpContentRecord {
   const $ = cheerio.load(record.contentHtml, null, false);
   const tbody = findYearTable($, YEAR_2569);
   let changed = upsertRows($, tbody, quarterlyRows);
-  changed = sortQuarterlyRowsAscending($, tbody) || changed;
-  tbody.find("tr").each((index, row) => {
+  changed = sortQuarterlyRowsDescending($, tbody) || changed;
+  const quarterlyRowsInDisplayOrder = tbody.find("tr").toArray();
+  quarterlyRowsInDisplayOrder.forEach((row, index) => {
     const first = $(row).find("td").first();
-    const nextNumber = String(index + 1);
+    const nextNumber = String(quarterlyRowsInDisplayOrder.length - index);
     if (first.text().trim() !== nextNumber) {
       first.text(nextNumber);
       changed = true;
