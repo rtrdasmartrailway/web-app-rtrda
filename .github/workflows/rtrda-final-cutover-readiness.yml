@@ -1,0 +1,77 @@
+name: RTRDA final cutover readiness check
+
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: "Exact ref/SHA to verify (blank = origin/test)"
+        required: false
+        type: string
+
+concurrency:
+  group: rtrda-final-cutover-readiness
+  cancel-in-progress: false
+
+jobs:
+  readiness:
+    name: Verify DGT -> cloud primary + rtrda02 fallback readiness
+    runs-on:
+      - self-hosted
+      - linux
+      - x64
+      - rtrda-web-test
+    steps:
+      - name: Resolve and verify DGT source
+        id: resolve
+        run: |
+          set -euo pipefail
+          cd /srv/workspace/web-app-rtrda
+          git fetch origin test main --prune
+          REF="${{ github.event.inputs.ref || '' }}"
+          if [ -z "$REF" ]; then REF=origin/test; fi
+          SHA="$(git rev-parse "$REF")"
+          echo "sha=$SHA" >> "$GITHUB_OUTPUT"
+          test -z "$(git status --porcelain)"
+          test "$(git rev-parse HEAD)" = "$SHA"
+          curl -fsS https://test.rtrda.or.th/healthz
+
+      - name: Verify redundant candidate parity and health
+        env:
+          SHA: ${{ steps.resolve.outputs.sha }}
+        run: |
+          set -euo pipefail
+          cloud_sha=$(ssh -i ~/.ssh/rtrda-cloud-preprod-sync_ed25519 -o BatchMode=yes ubuntu@100.77.64.92 'cd /home/ubuntu/rtrda-preprod/web-app-rtrda && git rev-parse HEAD && cat .deploy-state/preprod-release')
+          rtrda02_sha=$(ssh -i ~/.ssh/rtrda02_prod_preview_sync_ed25519 -o BatchMode=yes rtrda@100.91.174.121 'cd /srv/apps/web-app-rtrda-preprod-rtrda02 && git rev-parse HEAD && cat .deploy-state/preprod-release')
+          test "$(printf '%s\n' "$cloud_sha" | sort -u | wc -l)" -eq 1
+          test "$(printf '%s\n' "$rtrda02_sha" | sort -u | wc -l)" -eq 1
+          test "$(printf '%s\n' "$cloud_sha" | head -1)" = "$SHA"
+          test "$(printf '%s\n' "$rtrda02_sha" | head -1)" = "$SHA"
+          curl -fsS http://100.77.64.92:3021/healthz
+          curl -fsS http://100.91.174.121:3021/healthz
+          curl -fsS https://pre-prod.rtrda.or.th/healthz
+
+      - name: Verify rtrda02 backup/watchdog readiness
+        run: |
+          set -euo pipefail
+          ssh -i ~/.ssh/rtrda02_prod_preview_sync_ed25519 -o BatchMode=yes rtrda@100.91.174.121 '
+            set -euo pipefail
+            /home/rtrda/bin/rtrda-preprod-watchdog.py --status >/tmp/preprod-watchdog-status.json
+            /home/rtrda/bin/rtrda-production-watchdog.py --status >/tmp/production-watchdog-status.json
+            /home/rtrda/bin/rtrda-web-backup.sh --status
+            systemctl --user is-active rtrda-web-backup.timer
+            systemctl --user is-enabled rtrda-web-backup.timer
+            ! systemctl --user is-enabled rtrda-production-watchdog.timer >/dev/null 2>&1
+          '
+
+      - name: Verify cloud production connector is staged but disabled
+        run: |
+          set -euo pipefail
+          ssh -i ~/.ssh/rtrda-cloud-preprod-sync_ed25519 -o BatchMode=yes ubuntu@100.77.64.92 '
+            set -euo pipefail
+            test -s ~/.cloudflared-rtrda-production/connector_token
+            systemctl --user cat cloudflared-rtrda-production.service >/dev/null
+            ! systemctl --user is-enabled cloudflared-rtrda-production.service >/dev/null 2>&1
+            node -v
+            npm -v
+            sudo -n true
+          '
