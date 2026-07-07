@@ -18,8 +18,7 @@ const PROCUREMENT_SUMMARY_PATH = "/จัดซื้อจัดจ้าง/�
 const PROCUREMENT_WINNER_PATH = "/จัดซื้อจัดจ้าง/ประกาศผลผู้ชนะการเสนอร";
 const RAIL_STANDARDS_PATH = "/มาตรฐานระบบราง-สทร";
 
-const driveFile = (id: string) =>
-  `https://drive.google.com/file/d/${id}/view?usp=sharing`;
+const uploadFile = (path: string) => `/wp-content/uploads/${path}`;
 
 const quarterlyRows: TableRowSpec[] = [
   {
@@ -29,7 +28,7 @@ const quarterlyRows: TableRowSpec[] = [
       "ประกาศผลผู้ชนะการจัดซื้อจัดจ้างหรือผู้ได้รับการคัดเลือก ประจำไตรมาสที่ 3 (เดือนเมษายน 2569 ถึง เดือน มีนาคม 2569)",
       PUBLISHED_STATUS,
     ],
-    href: driveFile("1v73P5MMqr8AJ7DtF4qxJsQFUBWNaq2qF"),
+    href: uploadFile("2026/07/procurement-quarterly-winner-q3-2569.pdf"),
   },
 ];
 
@@ -41,7 +40,7 @@ const summaryRows: TableRowSpec[] = [
       "สรุปผลการดำเนินการจัดซื้อจัดจ้างในรอบเดือน มิถุนายน",
       PUBLISHED_STATUS,
     ],
-    href: driveFile("1kc6J9_3a_IA1DQXS245h5R32TecRDjAv"),
+    href: uploadFile("2026/07/procurement-summary-june-2569-20260703.pdf"),
   },
   {
     matchText: "11 มิถุนายน 2569 สรุปผลการดำเนินการจัดซื้อจัดจ้างในรอบเดือน มิถุนายน",
@@ -50,7 +49,7 @@ const summaryRows: TableRowSpec[] = [
       "สรุปผลการดำเนินการจัดซื้อจัดจ้างในรอบเดือน มิถุนายน",
       PUBLISHED_STATUS,
     ],
-    href: driveFile("19rhsPO3tpJueBhylgP7pp5uf6zMKuPx1"),
+    href: uploadFile("2026/07/procurement-summary-june-2569-20260611.pdf"),
   },
 ];
 
@@ -63,7 +62,7 @@ const winnerRows: TableRowSpec[] = [
       "342,400.00",
       "–",
     ],
-    href: driveFile("1jA1NXPjKbMVR2T1qYEr0Cuanl4xac1Q3"),
+    href: uploadFile("2026/07/procurement-winner-annual-report-design-print-2568.pdf"),
   },
   {
     matchText:
@@ -74,31 +73,43 @@ const winnerRows: TableRowSpec[] = [
       "11,354,305.00",
       "–",
     ],
-    href: driveFile("1oludIzLDYwph6rAtsVHtNWjd-zM6M0Zk"),
+    href: uploadFile(
+      "2026/07/procurement-winner-infrastructure-enhancement-consultant.pdf",
+    ),
   },
 ];
 
 const railComponentDocuments: Array<{ title: string; href: string }> = [
   {
     title: "สทร. CT-(2002-2005)-2569 ชุดมาตรฐานอุปกรณ์ยึดเหนี่ยวราง.pdf",
-    href: driveFile("1VJLz1OpKb9pwDzkSXEmrQ8UKzFoLety4"),
+    href: uploadFile(
+      "standards/rail-components/ct-2002-2005-2569-rail-fastening-components.pdf",
+    ),
   },
   {
     title: "สทร. CT-(2006-2010)-2569 ชุดมาตรฐานหมอนคอนกรีตและหมอนประแจคอนกรีต.pdf",
-    href: driveFile("1dbuyeXGw079pp4BiUVaAyj7zrbVT80_9"),
+    href: uploadFile(
+      "standards/rail-components/ct-2006-2010-2569-concrete-sleeper-turnout-sleeper.pdf",
+    ),
   },
   {
     title: "สทร. CT-(6005-6014)-2569 ชุดมาตรฐานการทดสอบอุปกรณ์ยึดเหนี่ยวราง.pdf",
-    href: driveFile("1DQx-KwXtAuClpG4IfUiPyh-ZMr_CZ0Jc"),
+    href: uploadFile(
+      "standards/rail-components/ct-6005-6014-2569-rail-fastening-test-standards.pdf",
+    ),
   },
   {
     title: "สทร. CT-1001-2569 มาตรฐานการออกแบบหมอนคอนกรีตและหมอนประแจคอนกรีต.pdf",
-    href: driveFile("1B99Ex18eG0ji4qhqmjZ2xNLq6iypPm3s"),
+    href: uploadFile(
+      "standards/rail-components/ct-1001-2569-concrete-sleeper-design.pdf",
+    ),
   },
   {
     title:
       "สทร. CT-8001-2569 มาตรฐานบทนิยามเกี่ยวกับหมอนรองรางและอุปกรณ์ยึดเหนี่ยวราง.pdf",
-    href: driveFile("1pWuvw5B7xi8Pm9xJfuJuy-kZQbO8bp_P"),
+    href: uploadFile(
+      "standards/rail-components/ct-8001-2569-rail-sleeper-fastening-definitions.pdf",
+    ),
   },
 ];
 
