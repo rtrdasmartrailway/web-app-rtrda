@@ -79,9 +79,15 @@ const winnerRows: TableRowSpec[] = [
   },
 ];
 
-const railComponentDocuments: Array<{ title: string; href: string; image: string }> = [
+const railComponentDocuments: Array<{
+  code: string;
+  title: string;
+  href: string;
+  image: string;
+}> = [
   {
-    title: "สทร. CT-(2002-2005)-2569 ชุดมาตรฐานอุปกรณ์ยึดเหนี่ยวราง.pdf",
+    code: "CT-(2002-2005)-2569",
+    title: "ชุดมาตรฐานอุปกรณ์ยึดเหนี่ยวราง",
     href: uploadFile(
       "standards/rail-components/ct-2002-2005-2569-rail-fastening-components.pdf",
     ),
@@ -90,7 +96,8 @@ const railComponentDocuments: Array<{ title: string; href: string; image: string
     ),
   },
   {
-    title: "สทร. CT-(2006-2010)-2569 ชุดมาตรฐานหมอนคอนกรีตและหมอนประแจคอนกรีต.pdf",
+    code: "CT-(2006-2010)-2569",
+    title: "ชุดมาตรฐานหมอนคอนกรีตและหมอนประแจคอนกรีต",
     href: uploadFile(
       "standards/rail-components/ct-2006-2010-2569-concrete-sleeper-turnout-sleeper.pdf",
     ),
@@ -99,7 +106,8 @@ const railComponentDocuments: Array<{ title: string; href: string; image: string
     ),
   },
   {
-    title: "สทร. CT-(6005-6014)-2569 ชุดมาตรฐานการทดสอบอุปกรณ์ยึดเหนี่ยวราง.pdf",
+    code: "CT-(6005-6014)-2569",
+    title: "ชุดมาตรฐานการทดสอบอุปกรณ์ยึดเหนี่ยวราง",
     href: uploadFile(
       "standards/rail-components/ct-6005-6014-2569-rail-fastening-test-standards.pdf",
     ),
@@ -108,7 +116,8 @@ const railComponentDocuments: Array<{ title: string; href: string; image: string
     ),
   },
   {
-    title: "สทร. CT-1001-2569 มาตรฐานการออกแบบหมอนคอนกรีตและหมอนประแจคอนกรีต.pdf",
+    code: "CT-1001-2569",
+    title: "มาตรฐานการออกแบบหมอนคอนกรีตและหมอนประแจคอนกรีต",
     href: uploadFile(
       "standards/rail-components/ct-1001-2569-concrete-sleeper-design.pdf",
     ),
@@ -117,8 +126,8 @@ const railComponentDocuments: Array<{ title: string; href: string; image: string
     ),
   },
   {
-    title:
-      "สทร. CT-8001-2569 มาตรฐานบทนิยามเกี่ยวกับหมอนรองรางและอุปกรณ์ยึดเหนี่ยวราง.pdf",
+    code: "CT-8001-2569",
+    title: "มาตรฐานบทนิยามเกี่ยวกับหมอนรองรางและอุปกรณ์ยึดเหนี่ยวราง",
     href: uploadFile(
       "standards/rail-components/ct-8001-2569-rail-sleeper-fastening-definitions.pdf",
     ),
@@ -268,7 +277,7 @@ function applyQuarterlyWinnerRows(record: WpContentRecord): WpContentRecord {
 
 function buildRailComponentCard(
   $: cheerio.CheerioAPI,
-  doc: { title: string; href: string; image: string },
+  doc: { code: string; title: string; href: string; image: string },
 ): Cheerio<AnyNode> {
   const column = $("<div></div>").addClass(
     "wp-block-column is-vertically-aligned-top is-layout-flow wp-block-column-is-layout-flow",
@@ -282,87 +291,58 @@ function buildRailComponentCard(
           $("<img>")
             .attr("loading", "lazy")
             .attr("decoding", "async")
-            .attr("width", "268")
-            .attr("height", "379")
+            .attr("width", "600")
+            .attr("height", "852")
             .attr("src", doc.image)
-            .attr("alt", doc.title.replace(/\.pdf$/i, ""))
-            .attr(
-              "style",
-              "aspect-ratio:0.7071240105540897;object-fit:cover;width:165px;height:auto",
-            ),
+            .attr("alt", `สทร. ${doc.code} ${doc.title}`),
         ),
     );
 
   const heading = $("<h6></h6>").addClass(
     "wp-block-heading has-text-align-center is-style-vk-heading-default",
   );
-  heading.append($("<strong></strong>").text(doc.title.replace(/\.pdf$/i, "")));
+  heading.append($("<strong></strong>").text(`สทร. ${doc.code}`));
+  heading.append($("<br>"));
+  heading.append($("<strong></strong>").text(doc.title));
 
   const readMore = $("<div></div>").addClass(
     "wp-block-buttons is-content-justification-center is-layout-flex wp-container-core-buttons-is-layout-16018d1d wp-block-buttons-is-layout-flex",
   );
   readMore.append(
     $("<div></div>")
-      .addClass("wp-block-button detail-btn rtr")
+      .addClass("wp-block-button detail-btn")
       .append(
         $("<a></a>")
           .addClass("wp-block-button__link wp-element-button")
           .attr("href", doc.href)
-          .attr("target", "_blank")
-          .attr("rel", "noreferrer noopener")
           .text("อ่านเพิ่มเติม"),
       ),
   );
 
-  const downloadColumns = $("<div></div>").addClass(
-    "wp-block-columns is-layout-flex wp-container-core-columns-is-layout-9d6595d7 wp-block-columns-is-layout-flex",
+  const download = $("<p></p>").addClass("simple-download-counter");
+  download.append(
+    $("<a></a>")
+      .addClass("simple-download-counter-link")
+      .attr("data-pdf-reader-ignore", "true")
+      .attr("download", "")
+      .attr("href", doc.href)
+      .text("ดาวน์โหลดไฟล์"),
   );
-  const downloadColumn = $("<div></div>").addClass(
-    "wp-block-column is-layout-flow wp-block-column-is-layout-flow",
-  );
-  downloadColumn.append($("<p></p>"));
-  downloadColumn.append(
-    $("<p></p>")
-      .addClass("simple-download-counter")
-      .append(
-        $("<a></a>")
-          .addClass("simple-download-counter-link")
-          .attr("href", doc.href)
-          .attr("target", "_blank")
-          .attr("rel", "noreferrer noopener")
-          .attr("title", "ดาวน์โหลดไฟล์")
-          .text("ดาวน์โหลดไฟล์"),
-      ),
-  );
-  downloadColumn.append($("<p></p>"));
-  downloadColumns.append(downloadColumn);
 
   column.append(image);
   column.append(heading);
   column.append(readMore);
-  column.append(downloadColumns);
+  column.append(download);
   return column;
 }
 
 function buildRailComponentFiles($: cheerio.CheerioAPI): Cheerio<AnyNode> {
   const group = $("<div></div>").addClass("rtrda-rail-component-standards-files");
-  group.append(
-    $("<div></div>")
-      .addClass("wp-block-spacer")
-      .attr("style", "height:29px")
-      .attr("aria-hidden", "true"),
+  const columns = $("<div></div>").addClass(
+    "wp-block-columns is-layout-flex wp-container-core-columns-is-layout-9d6595d7 wp-block-columns-is-layout-flex",
   );
-
-  for (let index = 0; index < railComponentDocuments.length; index += 3) {
-    const columns = $("<div></div>").addClass(
-      "wp-block-columns is-layout-flex wp-container-core-columns-is-layout-9d6595d7 wp-block-columns-is-layout-flex",
-    );
-    railComponentDocuments
-      .slice(index, index + 3)
-      .forEach((doc) => columns.append(buildRailComponentCard($, doc)));
-    group.append(columns);
-  }
-
+  railComponentDocuments.forEach((doc) => columns.append(buildRailComponentCard($, doc)));
+  group.append(columns);
   return group;
 }
 
