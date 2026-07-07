@@ -115,7 +115,7 @@ describe("applyProcurementTableOverrides", () => {
     expect(updated.contentHtml).not.toContain("drive.google.com");
   });
 
-  it("prepends the rail component standards file table", () => {
+  it("prepends rail component standards using the existing card/button format", () => {
     const source = record(
       "/มาตรฐานระบบราง-สทร",
       `<div class="lightweight-accordion"><details><summary class="lightweight-accordion-title"><strong>มาตรฐานชิ้นส่วนระบบราง</strong></summary><div class="lightweight-accordion-body"><p>เดิม</p></div></details></div>`,
@@ -123,10 +123,26 @@ describe("applyProcurementTableOverrides", () => {
     const updated = applyProcurementTableOverrides(source);
     const $ = cheerio.load(updated.contentHtml, null, false);
 
-    expect($(".rtrda-rail-component-standards-table tbody tr")).toHaveLength(5);
-    expect($(".rtrda-rail-component-standards-table tbody tr").first().text()).toContain(
-      "CT-(2002-2005)-2569",
+    expect($(".rtrda-rail-component-standards-table")).toHaveLength(0);
+    expect(
+      $(".rtrda-rail-component-standards-files .wp-block-column").filter((_, element) =>
+        $(element).find("h6").text().includes("CT-(2002-2005)-2569"),
+      ),
+    ).toHaveLength(1);
+    expect(
+      $(".rtrda-rail-component-standards-files .wp-block-button__link").first().text(),
+    ).toBe("อ่านเพิ่มเติม");
+    expect(
+      $(".rtrda-rail-component-standards-files .simple-download-counter-link")
+        .first()
+        .text(),
+    ).toBe("ดาวน์โหลดไฟล์");
+    const componentIndex = updated.contentHtml.indexOf(
+      "rtrda-rail-component-standards-files",
     );
+    const originalIndex = updated.contentHtml.indexOf("เดิม");
+    expect(componentIndex).toBeGreaterThan(-1);
+    expect(originalIndex).toBeGreaterThan(componentIndex);
     expect(updated.contentHtml).toContain(
       "/wp-content/uploads/standards/rail-components/ct-2002-2005-2569-rail-fastening-components.pdf",
     );

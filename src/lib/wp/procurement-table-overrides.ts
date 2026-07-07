@@ -207,38 +207,89 @@ function applyYearTableRows(
   return changed ? { ...record, contentHtml: $.html() } : record;
 }
 
-function buildRailComponentTable($: cheerio.CheerioAPI): Cheerio<AnyNode> {
-  const table = $("<figure></figure>").addClass(
-    "wp-block-table rtrda-rail-component-standards-table",
+function buildRailComponentCard(
+  $: cheerio.CheerioAPI,
+  doc: { title: string; href: string },
+): Cheerio<AnyNode> {
+  const column = $("<div></div>").addClass(
+    "wp-block-column is-vertically-aligned-top is-layout-flow wp-block-column-is-layout-flow",
   );
-  const tableEl = $("<table></table>");
-  const thead = $(
-    "<thead><tr><th>ลำดับ</th><th>รายการมาตรฐานชิ้นส่วนระบบราง</th><th>เอกสาร</th></tr></thead>",
+  const heading = $("<h6></h6>").addClass(
+    "wp-block-heading has-text-align-center is-style-vk-heading-default",
   );
-  const tbody = $("<tbody></tbody>");
-  railComponentDocuments.forEach((doc, index) => {
-    const tr = $("<tr></tr>");
-    tr.append(td($, String(index + 1)));
-    tr.append(td($, doc.title));
-    const linkCell = td($, "");
-    linkCell.append(
-      $("<a></a>")
-        .attr("href", doc.href)
-        .attr("target", "_blank")
-        .attr("rel", "noreferrer noopener")
-        .text("PDF"),
+  heading.append($("<strong></strong>").text(doc.title.replace(/\.pdf$/i, "")));
+
+  const readMore = $("<div></div>").addClass(
+    "wp-block-buttons is-content-justification-center is-layout-flex wp-container-core-buttons-is-layout-16018d1d wp-block-buttons-is-layout-flex",
+  );
+  readMore.append(
+    $("<div></div>")
+      .addClass("wp-block-button detail-btn rtr")
+      .append(
+        $("<a></a>")
+          .addClass("wp-block-button__link wp-element-button")
+          .attr("href", doc.href)
+          .attr("target", "_blank")
+          .attr("rel", "noreferrer noopener")
+          .text("อ่านเพิ่มเติม"),
+      ),
+  );
+
+  const downloadColumns = $("<div></div>").addClass(
+    "wp-block-columns is-layout-flex wp-container-core-columns-is-layout-9d6595d7 wp-block-columns-is-layout-flex",
+  );
+  const downloadColumn = $("<div></div>").addClass(
+    "wp-block-column is-layout-flow wp-block-column-is-layout-flow",
+  );
+  downloadColumn.append($("<p></p>"));
+  downloadColumn.append(
+    $("<p></p>")
+      .addClass("simple-download-counter")
+      .append(
+        $("<a></a>")
+          .addClass("simple-download-counter-link")
+          .attr("href", doc.href)
+          .attr("target", "_blank")
+          .attr("rel", "noreferrer noopener")
+          .attr("title", "ดาวน์โหลดไฟล์")
+          .text("ดาวน์โหลดไฟล์"),
+      ),
+  );
+  downloadColumn.append($("<p></p>"));
+  downloadColumns.append(downloadColumn);
+
+  column.append(heading);
+  column.append(readMore);
+  column.append(downloadColumns);
+  return column;
+}
+
+function buildRailComponentFiles($: cheerio.CheerioAPI): Cheerio<AnyNode> {
+  const group = $("<div></div>").addClass("rtrda-rail-component-standards-files");
+  group.append(
+    $("<div></div>")
+      .addClass("wp-block-spacer")
+      .attr("style", "height:29px")
+      .attr("aria-hidden", "true"),
+  );
+
+  for (let index = 0; index < railComponentDocuments.length; index += 3) {
+    const columns = $("<div></div>").addClass(
+      "wp-block-columns is-layout-flex wp-container-core-columns-is-layout-9d6595d7 wp-block-columns-is-layout-flex",
     );
-    tr.append(linkCell);
-    tbody.append(tr);
-  });
-  tableEl.append(thead).append(tbody);
-  table.append(tableEl);
-  return table;
+    railComponentDocuments
+      .slice(index, index + 3)
+      .forEach((doc) => columns.append(buildRailComponentCard($, doc)));
+    group.append(columns);
+  }
+
+  return group;
 }
 
 function applyRailComponentStandards(record: WpContentRecord): WpContentRecord {
   const $ = cheerio.load(record.contentHtml, null, false);
-  if ($(".rtrda-rail-component-standards-table").length > 0) return record;
+  if ($(".rtrda-rail-component-standards-files").length > 0) return record;
+  $(".rtrda-rail-component-standards-table").remove();
   const accordion = $(".lightweight-accordion")
     .filter((_, element) =>
       $(element)
@@ -252,7 +303,7 @@ function applyRailComponentStandards(record: WpContentRecord): WpContentRecord {
     .first();
   const body = accordion.find(".lightweight-accordion-body").first();
   if (body.length === 0) return record;
-  body.prepend(buildRailComponentTable($));
+  body.prepend(buildRailComponentFiles($));
   return { ...record, contentHtml: $.html() };
 }
 
