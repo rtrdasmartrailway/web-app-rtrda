@@ -124,12 +124,8 @@ function HomeSatisfactionSurveyQr({ language }: { language: WpLanguage }) {
         <p>{description}</p>
         <dl className="home-survey-qr-meta">
           <div>
-            <dt>{language === "th" ? "อ้างอิง" : "Reference"}</dt>
-            <dd>กค 0601/กภ 438 • 28 มิ.ย. 2569</dd>
-          </div>
-          <div>
             <dt>{language === "th" ? "ตอบแบบสำรวจภายใน" : "Open until"}</dt>
-            <dd>29 ก.ค. 2569</dd>
+            <dd>24 ก.ค. 2569</dd>
           </div>
         </dl>
         <Link className="home-survey-qr-button" href="/r/mot-5440?src=landing_page">
