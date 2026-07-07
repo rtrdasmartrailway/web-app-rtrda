@@ -279,14 +279,9 @@ function buildRailComponentCard(
   $: cheerio.CheerioAPI,
   doc: { code: string; title: string; href: string; image: string },
 ): Cheerio<AnyNode> {
-  const column = $("<article></article>")
-    .addClass(
-      "rtrda-rail-component-card wp-block-column is-vertically-aligned-top is-layout-flow wp-block-column-is-layout-flow",
-    )
-    .attr(
-      "style",
-      "background:#ffffff;border-radius:18px;box-shadow:0 12px 30px rgba(15,23,42,.10);padding:22px 18px 20px;display:flex;flex-direction:column;align-items:center;gap:14px;min-height:100%;",
-    );
+  const column = $("<div></div>").addClass(
+    "rtrda-rail-component-card wp-block-column is-vertically-aligned-top is-layout-flow wp-block-column-is-layout-flow",
+  );
   const image = $("<div></div>")
     .addClass("wp-block-image is-style-vk-image-shadow")
     .append(
