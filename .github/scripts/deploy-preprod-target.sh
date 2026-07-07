@@ -79,8 +79,22 @@ EOF
 chmod 600 .env.cicd-preprod
 cp .env.cicd-preprod .env
 
-npm ci
-npx prisma generate
+run_node() {
+  if command -v npm >/dev/null 2>&1; then
+    "$@"
+  else
+    docker run --rm --network host \
+      --user "$(id -u):$(id -g)" \
+      -e npm_config_cache=/tmp/npm-cache \
+      -v "$PWD:/app" \
+      -w /app \
+      node:22-bookworm-slim \
+      bash -lc "$*"
+  fi
+}
+
+run_node npm ci
+run_node npx prisma generate
 
 docker compose --env-file .env.cicd-preprod -f "$COMPOSE_FILE" up -d "$DB_SERVICE"
 for attempt in $(seq 1 40); do
@@ -94,8 +108,8 @@ for attempt in $(seq 1 40); do
   fi
 done
 
-npm run db:migrate
-npm run db:seed
+run_node npm run db:migrate
+run_node npm run db:seed
 
 docker compose --env-file .env.cicd-preprod -f "$COMPOSE_FILE" up -d --build "$APP_SERVICE"
 mkdir -p .deploy-state
