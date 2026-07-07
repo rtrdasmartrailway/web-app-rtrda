@@ -94,7 +94,9 @@ describe("applyProcurementTableOverrides", () => {
 
     expect(updatedRows.map((row) => row[0])).toEqual(["1", "2", "3"]);
     expect(updatedRows[0]?.[2]).toContain("จัดจ้างงานออกแบบและพิมพ์รายงานประจำปี 2568");
+    expect(updatedRows[0]?.[3]).toBe("342,400.00");
     expect(updatedRows[1]?.[2]).toContain("Infrastructure Enhancement");
+    expect(updatedRows[1]?.[3]).toBe("11,354,305.00");
     expect(updated.contentHtml).toContain("1jA1NXPjKbMVR2T1qYEr0Cuanl4xac1Q3");
     expect(updated.contentHtml).toContain("1oludIzLDYwph6rAtsVHtNWjd-zM6M0Zk");
   });
