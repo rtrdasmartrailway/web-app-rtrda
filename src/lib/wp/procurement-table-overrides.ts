@@ -25,7 +25,7 @@ const quarterlyRows: TableRowSpec[] = [
     matchText: "ประกาศผลผู้ชนะการจัดซื้อจัดจ้างหรือผู้ได้รับการคัดเลือก ประจำไตรมาสที่ 3",
     cells: [
       "7 กรกฎาคม 2569",
-      "ประกาศผลผู้ชนะการจัดซื้อจัดจ้างหรือผู้ได้รับการคัดเลือก ประจำไตรมาสที่ 3 (เดือนเมษายน 2569 ถึง เดือน มีนาคม 2569)",
+      "ประกาศผลผู้ชนะการจัดซื้อจัดจ้างหรือผู้ได้รับการคัดเลือก ประจำไตรมาสที่ 3 (เดือนเมษายน 2569 ถึง เดือน มิถุนายน 2569)",
       PUBLISHED_STATUS,
     ],
     href: uploadFile("2026/07/procurement-quarterly-winner-q3-2569.pdf"),
@@ -187,6 +187,13 @@ function upsertRows(
       .filter((_, row) => rowText($, row).includes(spec.matchText))
       .first();
     if (existing.length) {
+      spec.cells.forEach((text, index) => {
+        const cell = existing.find("td").eq(index + 1);
+        if (cell.length && cell.text().trim() !== text) {
+          cell.text(text);
+          changed = true;
+        }
+      });
       const link = existing.find("td").last().find("a").first();
       if (link.attr("href") !== spec.href) {
         link
@@ -219,6 +226,42 @@ function applyYearTableRows(
 ): WpContentRecord {
   const $ = cheerio.load(record.contentHtml, null, false);
   const changed = upsertRows($, findYearTable($, YEAR_2569), rows);
+  return changed ? { ...record, contentHtml: $.html() } : record;
+}
+
+function quarterNumber($: cheerio.CheerioAPI, row: AnyNode): number {
+  const match = rowText($, row).match(/ไตรมาสที่\s*(\d+)/);
+  return match ? Number(match[1]) : Number.MAX_SAFE_INTEGER;
+}
+
+function sortQuarterlyRowsAscending(
+  $: cheerio.CheerioAPI,
+  tbody: Cheerio<AnyNode>,
+): boolean {
+  const originalRows = tbody.find("tr").toArray();
+  const sortedRows = [...originalRows].sort(
+    (left, right) => quarterNumber($, left) - quarterNumber($, right),
+  );
+  const changed = sortedRows.some((row, index) => row !== originalRows[index]);
+  if (changed) {
+    sortedRows.forEach((row) => tbody.append(row));
+  }
+  return changed;
+}
+
+function applyQuarterlyWinnerRows(record: WpContentRecord): WpContentRecord {
+  const $ = cheerio.load(record.contentHtml, null, false);
+  const tbody = findYearTable($, YEAR_2569);
+  let changed = upsertRows($, tbody, quarterlyRows);
+  changed = sortQuarterlyRowsAscending($, tbody) || changed;
+  tbody.find("tr").each((index, row) => {
+    const first = $(row).find("td").first();
+    const nextNumber = String(index + 1);
+    if (first.text().trim() !== nextNumber) {
+      first.text(nextNumber);
+      changed = true;
+    }
+  });
   return changed ? { ...record, contentHtml: $.html() } : record;
 }
 
@@ -346,7 +389,7 @@ function applyRailComponentStandards(record: WpContentRecord): WpContentRecord {
 export function applyProcurementTableOverrides(record: WpContentRecord): WpContentRecord {
   const path = normalized(record.path);
   if (path === QUARTERLY_WINNER_PATH || path === `/en${QUARTERLY_WINNER_PATH}`) {
-    return applyYearTableRows(record, quarterlyRows);
+    return applyQuarterlyWinnerRows(record);
   }
   if (path === PROCUREMENT_SUMMARY_PATH || path === `/en${PROCUREMENT_SUMMARY_PATH}`) {
     return applyYearTableRows(record, summaryRows);
