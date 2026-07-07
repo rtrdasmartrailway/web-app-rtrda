@@ -279,9 +279,14 @@ function buildRailComponentCard(
   $: cheerio.CheerioAPI,
   doc: { code: string; title: string; href: string; image: string },
 ): Cheerio<AnyNode> {
-  const column = $("<div></div>").addClass(
-    "wp-block-column is-vertically-aligned-top is-layout-flow wp-block-column-is-layout-flow",
-  );
+  const column = $("<article></article>")
+    .addClass(
+      "rtrda-rail-component-card wp-block-column is-vertically-aligned-top is-layout-flow wp-block-column-is-layout-flow",
+    )
+    .attr(
+      "style",
+      "background:#ffffff;border-radius:18px;box-shadow:0 12px 30px rgba(15,23,42,.10);padding:22px 18px 20px;display:flex;flex-direction:column;align-items:center;gap:14px;min-height:100%;",
+    );
   const image = $("<div></div>")
     .addClass("wp-block-image is-style-vk-image-shadow")
     .append(
@@ -294,7 +299,8 @@ function buildRailComponentCard(
             .attr("width", "600")
             .attr("height", "852")
             .attr("src", doc.image)
-            .attr("alt", `สทร. ${doc.code} ${doc.title}`),
+            .attr("alt", `สทร. ${doc.code} ${doc.title}`)
+            .attr("style", "width:165px;height:auto;max-width:100%;border-radius:10px;"),
         ),
     );
 
@@ -338,11 +344,16 @@ function buildRailComponentCard(
 
 function buildRailComponentFiles($: cheerio.CheerioAPI): Cheerio<AnyNode> {
   const group = $("<div></div>").addClass("rtrda-rail-component-standards-files");
-  const columns = $("<div></div>").addClass(
-    "wp-block-columns is-layout-flex wp-container-core-columns-is-layout-9d6595d7 wp-block-columns-is-layout-flex",
-  );
-  railComponentDocuments.forEach((doc) => columns.append(buildRailComponentCard($, doc)));
-  group.append(columns);
+  const grid = $("<div></div>")
+    .addClass(
+      "rtrda-rail-component-card-grid wp-block-columns is-layout-flex wp-container-core-columns-is-layout-9d6595d7 wp-block-columns-is-layout-flex",
+    )
+    .attr(
+      "style",
+      "display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:24px;align-items:stretch;margin:24px 0;",
+    );
+  railComponentDocuments.forEach((doc) => grid.append(buildRailComponentCard($, doc)));
+  group.append(grid);
   return group;
 }
 

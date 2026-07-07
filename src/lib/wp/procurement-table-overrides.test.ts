@@ -132,12 +132,12 @@ describe("applyProcurementTableOverrides", () => {
         $(element).find("h6").text().includes("CT-(2002-2005)-2569"),
       ),
     ).toHaveLength(1);
-    expect($(".rtrda-rail-component-standards-files > .wp-block-columns")).toHaveLength(
-      1,
+    expect($(".rtrda-rail-component-card-grid")).toHaveLength(1);
+    expect($(".rtrda-rail-component-card")).toHaveLength(5);
+    expect($(".rtrda-rail-component-card-grid").attr("style")).toContain("display:grid");
+    expect($(".rtrda-rail-component-card").first().attr("style")).toContain(
+      "border-radius:18px",
     );
-    expect(
-      $(".rtrda-rail-component-standards-files > .wp-block-columns > .wp-block-column"),
-    ).toHaveLength(5);
     expect($(".rtrda-rail-component-standards-files > .wp-block-spacer")).toHaveLength(0);
     expect($(".rtrda-rail-component-standards-files img")).toHaveLength(5);
     expect($(".rtrda-rail-component-standards-files img").first().attr("src")).toContain(
