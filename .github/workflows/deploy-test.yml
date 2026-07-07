@@ -141,7 +141,8 @@ jobs:
           test "$(printf '%s\n' "$rtrda02_sha" | sort -u | wc -l)" -eq 1
           test "$(printf '%s\n' "$cloud_sha" | head -1)" = "${GITHUB_SHA}"
           test "$(printf '%s\n' "$rtrda02_sha" | head -1)" = "${GITHUB_SHA}"
-          curl -fsS https://pre-prod.rtrda.or.th/healthz
+          curl -fsS https://rtrda.or.th/healthz
+          curl -fsS https://www.rtrda.or.th/healthz
 
       - name: Purge Cloudflare edge cache (optional)
         if: ${{ always() }}
