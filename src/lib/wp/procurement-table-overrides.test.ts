@@ -135,7 +135,9 @@ describe("applyProcurementTableOverrides", () => {
     expect($(".rtrda-rail-component-card-grid")).toHaveLength(1);
     expect($(".rtrda-rail-component-card")).toHaveLength(5);
     expect($(".rtrda-rail-component-card-grid").attr("style")).toContain("display:grid");
-    expect($(".rtrda-rail-component-card").first().attr("style")).toBeUndefined();
+    expect($(".rtrda-rail-component-card").first().attr("style")).toContain(
+      "border-radius:18px",
+    );
     expect($(".rtrda-rail-component-standards-files > .wp-block-spacer")).toHaveLength(0);
     expect($(".rtrda-rail-component-standards-files img")).toHaveLength(5);
     expect($(".rtrda-rail-component-standards-files img").first().attr("src")).toContain(
