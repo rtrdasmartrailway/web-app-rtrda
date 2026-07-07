@@ -20,9 +20,9 @@ REMOTE_SCRIPT="/tmp/rtrda-deploy-preprod-remote-${TARGET_NAME}.sh"
 cd /srv/workspace/web-app-rtrda
 
 echo "== ${TARGET_NAME}: sync mirrored public assets =="
-rsync -az --delete --info=stats2 -e "ssh ${SSH_OPTS[*]}" \
+rsync -az --delete --chmod=Du=rwx,Dgo=rx,Fu=rw,Fgo=r --info=stats2 -e "ssh ${SSH_OPTS[*]}" \
   public/wp-content/uploads/ "${REMOTE}:${TARGET_PATH}/public/wp-content/uploads/"
-rsync -az --delete --info=stats2 -e "ssh ${SSH_OPTS[*]}" \
+rsync -az --delete --chmod=Du=rwx,Dgo=rx,Fu=rw,Fgo=r --info=stats2 -e "ssh ${SSH_OPTS[*]}" \
   public/sdc-downloads/ "${REMOTE}:${TARGET_PATH}/public/sdc-downloads/"
 
 echo "== ${TARGET_NAME}: deploy ${GITHUB_SHA} =="
