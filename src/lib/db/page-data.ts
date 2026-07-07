@@ -37,6 +37,7 @@ import { getSupplementalKnowledgePage } from "@/lib/wp/knowledge-supplemental-do
 import { getLandingGuidePage } from "@/lib/wp/landing-guide-pages";
 import { getMoralityReportPage } from "@/lib/wp/morality-report-documents";
 import { applyProcurementPlanOverride } from "@/lib/wp/procurement-plan";
+import { applyProcurementTableOverrides } from "@/lib/wp/procurement-table-overrides";
 import { applyProcurementWinnerOverride } from "@/lib/wp/procurement-winner";
 import { normalizeRoutePath } from "@/lib/wp/url";
 import { extractPartnerLogos } from "@/lib/wp/home";
@@ -431,7 +432,9 @@ export const getPageData = cache(async (path: string): Promise<PageData | null> 
       applyProcurementPlanOverride(applyContactMapOverride(importedRecord)),
     ),
   );
-  const recordWithOverrides = applyProcurementWinnerOverride(record);
+  const recordWithOverrides = applyProcurementTableOverrides(
+    applyProcurementWinnerOverride(record),
+  );
 
   const isHome = recordWithOverrides.path === "/" || recordWithOverrides.path === "/en";
   const isCategory = recordWithOverrides.kind === "category";
