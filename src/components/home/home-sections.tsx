@@ -100,7 +100,6 @@ function SectionHeading({ id, children }: { id: string; children: React.ReactNod
   );
 }
 
-
 function HomeSatisfactionSurveyQr({ language }: { language: WpLanguage }) {
   const title =
     language === "th"
@@ -140,7 +139,11 @@ function HomeSatisfactionSurveyQr({ language }: { language: WpLanguage }) {
       >
         <Image
           src="/qr/mot-5440.png"
-          alt={language === "th" ? "QR Code แบบสำรวจความพึงพอใจ ประจำปีงบประมาณ พ.ศ. 2569" : "Satisfaction survey QR Code"}
+          alt={
+            language === "th"
+              ? "QR Code แบบสำรวจความพึงพอใจ ประจำปีงบประมาณ พ.ศ. 2569"
+              : "Satisfaction survey QR Code"
+          }
           width={410}
           height={410}
           unoptimized

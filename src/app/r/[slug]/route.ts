@@ -30,7 +30,9 @@ function getPool(): Pool {
 
 async function ensureTable(): Promise<void> {
   if (!globalForRedirectTracking.redirectTrackingTableReady) {
-    globalForRedirectTracking.redirectTrackingTableReady = getPool().query(`
+    globalForRedirectTracking.redirectTrackingTableReady = getPool()
+      .query(
+        `
       CREATE TABLE IF NOT EXISTS redirect_clicks (
         id BIGSERIAL PRIMARY KEY,
         click_id UUID NOT NULL UNIQUE,
@@ -47,7 +49,9 @@ async function ensureTable(): Promise<void> {
       );
       CREATE INDEX IF NOT EXISTS redirect_clicks_campaign_clicked_at_idx
         ON redirect_clicks (campaign, clicked_at DESC);
-    `).then(() => undefined);
+    `,
+      )
+      .then(() => undefined);
   }
   return globalForRedirectTracking.redirectTrackingTableReady;
 }
@@ -66,7 +70,10 @@ function detectDevice(userAgent: string): string {
 
 function hashIp(ip: string | null): string | null {
   if (!ip) return null;
-  const salt = process.env.REDIRECT_TRACKING_SALT || process.env.SITE_ORIGIN || "rtrda-redirect-tracking";
+  const salt =
+    process.env.REDIRECT_TRACKING_SALT ||
+    process.env.SITE_ORIGIN ||
+    "rtrda-redirect-tracking";
   return createHash("sha256").update(`${salt}:${ip}`).digest("hex");
 }
 
@@ -81,7 +88,8 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
   const clickId = randomUUID();
   const source = request.nextUrl.searchParams.get("src") || "direct";
   const userAgent = request.headers.get("user-agent") || "";
-  const referrer = request.headers.get("referer") || request.headers.get("referrer") || "";
+  const referrer =
+    request.headers.get("referer") || request.headers.get("referrer") || "";
   const ip =
     firstHeaderValue(request.headers.get("cf-connecting-ip")) ||
     firstHeaderValue(request.headers.get("x-forwarded-for")) ||

@@ -23,12 +23,36 @@ export default function Mot5440QrPage() {
           color: "#0f172a",
         }}
       >
-        <p style={{ margin: 0, color: "#2563eb", fontWeight: 700, letterSpacing: "0.08em" }}>RTRDA</p>
-        <h1 style={{ margin: "12px 0 8px", fontSize: "clamp(28px, 5vw, 44px)", lineHeight: 1.15 }}>
+        <p
+          style={{
+            margin: 0,
+            color: "#2563eb",
+            fontWeight: 700,
+            letterSpacing: "0.08em",
+          }}
+        >
+          RTRDA
+        </p>
+        <h1
+          style={{
+            margin: "12px 0 8px",
+            fontSize: "clamp(28px, 5vw, 44px)",
+            lineHeight: 1.15,
+          }}
+        >
           {formTitle}
         </h1>
-        <p style={{ margin: "0 auto 28px", maxWidth: 560, color: "#475569", fontSize: 18, lineHeight: 1.7 }}>
-          สแกน QR Code หรือกดปุ่มด้านล่างเพื่อไปยัง Google Form ระบบจะบันทึกเฉพาะสถิติการเข้าชมแบบไม่ระบุตัวบุคคลก่อนส่งต่อไปยังแบบฟอร์ม
+        <p
+          style={{
+            margin: "0 auto 28px",
+            maxWidth: 560,
+            color: "#475569",
+            fontSize: 18,
+            lineHeight: 1.7,
+          }}
+        >
+          สแกน QR Code หรือกดปุ่มด้านล่างเพื่อไปยัง Google Form
+          ระบบจะบันทึกเฉพาะสถิติการเข้าชมแบบไม่ระบุตัวบุคคลก่อนส่งต่อไปยังแบบฟอร์ม
         </p>
 
         <div
@@ -67,8 +91,17 @@ export default function Mot5440QrPage() {
           </a>
         </div>
 
-        <p style={{ margin: "24px auto 0", maxWidth: 560, color: "#64748b", fontSize: 14, lineHeight: 1.7 }}>
-          ข้อมูลที่บันทึก: วันเวลา, แหล่งที่มา, ประเภทอุปกรณ์, user agent, referrer และ IP แบบ hash เพื่อใช้วิเคราะห์จำนวนการเข้าชมเท่านั้น
+        <p
+          style={{
+            margin: "24px auto 0",
+            maxWidth: 560,
+            color: "#64748b",
+            fontSize: 14,
+            lineHeight: 1.7,
+          }}
+        >
+          ข้อมูลที่บันทึก: วันเวลา, แหล่งที่มา, ประเภทอุปกรณ์, user agent, referrer และ IP
+          แบบ hash เพื่อใช้วิเคราะห์จำนวนการเข้าชมเท่านั้น
         </p>
       </section>
     </main>
