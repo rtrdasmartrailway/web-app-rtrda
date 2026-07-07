@@ -79,11 +79,14 @@ const winnerRows: TableRowSpec[] = [
   },
 ];
 
-const railComponentDocuments: Array<{ title: string; href: string }> = [
+const railComponentDocuments: Array<{ title: string; href: string; image: string }> = [
   {
     title: "สทร. CT-(2002-2005)-2569 ชุดมาตรฐานอุปกรณ์ยึดเหนี่ยวราง.pdf",
     href: uploadFile(
       "standards/rail-components/ct-2002-2005-2569-rail-fastening-components.pdf",
+    ),
+    image: uploadFile(
+      "standards/rail-components/ct-2002-2005-2569-rail-fastening-components.png",
     ),
   },
   {
@@ -91,11 +94,17 @@ const railComponentDocuments: Array<{ title: string; href: string }> = [
     href: uploadFile(
       "standards/rail-components/ct-2006-2010-2569-concrete-sleeper-turnout-sleeper.pdf",
     ),
+    image: uploadFile(
+      "standards/rail-components/ct-2006-2010-2569-concrete-sleeper-turnout-sleeper.png",
+    ),
   },
   {
     title: "สทร. CT-(6005-6014)-2569 ชุดมาตรฐานการทดสอบอุปกรณ์ยึดเหนี่ยวราง.pdf",
     href: uploadFile(
       "standards/rail-components/ct-6005-6014-2569-rail-fastening-test-standards.pdf",
+    ),
+    image: uploadFile(
+      "standards/rail-components/ct-6005-6014-2569-rail-fastening-test-standards.png",
     ),
   },
   {
@@ -103,12 +112,18 @@ const railComponentDocuments: Array<{ title: string; href: string }> = [
     href: uploadFile(
       "standards/rail-components/ct-1001-2569-concrete-sleeper-design.pdf",
     ),
+    image: uploadFile(
+      "standards/rail-components/ct-1001-2569-concrete-sleeper-design.png",
+    ),
   },
   {
     title:
       "สทร. CT-8001-2569 มาตรฐานบทนิยามเกี่ยวกับหมอนรองรางและอุปกรณ์ยึดเหนี่ยวราง.pdf",
     href: uploadFile(
       "standards/rail-components/ct-8001-2569-rail-sleeper-fastening-definitions.pdf",
+    ),
+    image: uploadFile(
+      "standards/rail-components/ct-8001-2569-rail-sleeper-fastening-definitions.png",
     ),
   },
 ];
@@ -209,11 +224,31 @@ function applyYearTableRows(
 
 function buildRailComponentCard(
   $: cheerio.CheerioAPI,
-  doc: { title: string; href: string },
+  doc: { title: string; href: string; image: string },
 ): Cheerio<AnyNode> {
   const column = $("<div></div>").addClass(
     "wp-block-column is-vertically-aligned-top is-layout-flow wp-block-column-is-layout-flow",
   );
+  const image = $("<div></div>")
+    .addClass("wp-block-image is-style-vk-image-shadow")
+    .append(
+      $("<figure></figure>")
+        .addClass("aligncenter size-full is-resized")
+        .append(
+          $("<img>")
+            .attr("loading", "lazy")
+            .attr("decoding", "async")
+            .attr("width", "268")
+            .attr("height", "379")
+            .attr("src", doc.image)
+            .attr("alt", doc.title.replace(/\.pdf$/i, ""))
+            .attr(
+              "style",
+              "aspect-ratio:0.7071240105540897;object-fit:cover;width:165px;height:auto",
+            ),
+        ),
+    );
+
   const heading = $("<h6></h6>").addClass(
     "wp-block-heading has-text-align-center is-style-vk-heading-default",
   );
@@ -258,6 +293,7 @@ function buildRailComponentCard(
   downloadColumn.append($("<p></p>"));
   downloadColumns.append(downloadColumn);
 
+  column.append(image);
   column.append(heading);
   column.append(readMore);
   column.append(downloadColumns);

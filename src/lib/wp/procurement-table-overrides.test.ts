@@ -129,6 +129,10 @@ describe("applyProcurementTableOverrides", () => {
         $(element).find("h6").text().includes("CT-(2002-2005)-2569"),
       ),
     ).toHaveLength(1);
+    expect($(".rtrda-rail-component-standards-files img")).toHaveLength(5);
+    expect($(".rtrda-rail-component-standards-files img").first().attr("src")).toContain(
+      "ct-2002-2005-2569-rail-fastening-components.png",
+    );
     expect(
       $(".rtrda-rail-component-standards-files .wp-block-button__link").first().text(),
     ).toBe("อ่านเพิ่มเติม");
