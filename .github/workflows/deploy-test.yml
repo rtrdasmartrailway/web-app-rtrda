@@ -103,7 +103,7 @@ jobs:
           curl -fsS https://test.rtrda.or.th/healthz
           curl -fsSI https://test.rtrda.or.th/ | sed -n '1,20p'
 
-      - name: Deploy exact test SHA to redundant pre-prod targets
+      - name: Deploy exact test SHA to cloud primary and rtrda02 production fallback
         run: |
           set -euo pipefail
           cd /srv/workspace/web-app-rtrda
