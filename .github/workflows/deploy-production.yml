@@ -66,6 +66,7 @@ jobs:
       - name: Install dependencies and generate Prisma client
         env:
           SOURCE_PATH: ${{ steps.resolve.outputs.source_path }}
+          DATABASE_URL: postgresql://rtrda:***@localhost:5432/build
         run: |
           set -euo pipefail
           cd "$SOURCE_PATH"
