@@ -103,7 +103,7 @@ function SectionHeading({ id, children }: { id: string; children: React.ReactNod
 function HomeSatisfactionSurveyQr({ language }: { language: WpLanguage }) {
   const title =
     language === "th"
-      ? "แบบสำรวจความพึงพอใจ ประจำปีงบประมาณ พ.ศ. 2569"
+      ? "แบบสำรวจความพึงพอใจของหน่วยงานในสังกัดกระทรวงคมนาคม ประจำปีงบประมาณ พ.ศ. 2569"
       : "Satisfaction Survey Fiscal Year 2026";
   const description =
     language === "th"
@@ -141,7 +141,7 @@ function HomeSatisfactionSurveyQr({ language }: { language: WpLanguage }) {
           src="/qr/mot-5440.png"
           alt={
             language === "th"
-              ? "QR Code แบบสำรวจความพึงพอใจ ประจำปีงบประมาณ พ.ศ. 2569"
+              ? "QR Code แบบสำรวจความพึงพอใจของหน่วยงานในสังกัดกระทรวงคมนาคม ประจำปีงบประมาณ พ.ศ. 2569"
               : "Satisfaction survey QR Code"
           }
           width={410}
