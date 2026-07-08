@@ -16,6 +16,7 @@ const PUBLISHED_STATUS = "เผยแพร่ขึ้นเว็บ";
 const QUARTERLY_WINNER_PATH = "/จัดซื้อจัดจ้าง/ประกาศผลผู้ชนะการจัดซื";
 const PROCUREMENT_SUMMARY_PATH = "/จัดซื้อจัดจ้าง/ประกาศจดซอจดจางตามแบบส";
 const PROCUREMENT_WINNER_PATH = "/จัดซื้อจัดจ้าง/ประกาศผลผู้ชนะการเสนอร";
+const PROCUREMENT_CANCEL_WINNER_PATH = "/จัดซื้อจัดจ้าง/ยกเลิกประกาศเชิญชวน-ผู้";
 const RAIL_STANDARDS_PATH = "/มาตรฐานระบบราง-สทร";
 
 const uploadFile = (path: string) => `/wp-content/uploads/${path}`;
@@ -50,6 +51,21 @@ const summaryRows: TableRowSpec[] = [
       PUBLISHED_STATUS,
     ],
     href: uploadFile("2026/07/procurement-summary-june-2569-20260611.pdf"),
+  },
+];
+
+const cancelWinnerRows: TableRowSpec[] = [
+  {
+    matchText:
+      "จ้างที่ปรึกษาศึกษารูปแบบและแนวทางการลงทุนภายใต้ขอบเขตหน้าที่และอำนาจทางกฎหมาย",
+    cells: [
+      "8 กรกฎาคม 2569",
+      "โครงการ ประกาศผู้ชนะการเสนอราคา จ้างที่ปรึกษาศึกษารูปแบบและแนวทางการลงทุนภายใต้ขอบเขตหน้าที่และอำนาจทางกฎหมาย รวมทั้งการบริหารจัดการทรัพย์สินทางปัญญาของสถาบัน โดยวิธีจ้างที่ปรึกษาโดยวิธีคัดเลือก",
+      PUBLISHED_STATUS,
+    ],
+    href: uploadFile(
+      "2026/07/procurement-cancel-winner-consultant-ip-management-25690708.pdf",
+    ),
   },
 ];
 
@@ -183,6 +199,20 @@ function findYearTable($: cheerio.CheerioAPI, year: string): Cheerio<AnyNode> {
   return accordion.find("tbody").first();
 }
 
+function ensureYearTable($: cheerio.CheerioAPI, year: string): Cheerio<AnyNode> {
+  const existing = findYearTable($, year);
+  if (existing.length > 0) return existing;
+
+  const firstAccordion = $(".lightweight-accordion").first();
+  if (firstAccordion.length === 0) return $([]);
+
+  const newAccordion = firstAccordion.clone();
+  newAccordion.find("summary").first().html(`<h1><strong>${year}</strong></h1>`);
+  newAccordion.find("tbody").first().empty();
+  firstAccordion.before(newAccordion);
+  return newAccordion.find("tbody").first();
+}
+
 function upsertRows(
   $: cheerio.CheerioAPI,
   tbody: Cheerio<AnyNode>,
@@ -232,9 +262,13 @@ function upsertRows(
 function applyYearTableRows(
   record: WpContentRecord,
   rows: TableRowSpec[],
+  options: { createYear?: boolean } = {},
 ): WpContentRecord {
   const $ = cheerio.load(record.contentHtml, null, false);
-  const changed = upsertRows($, findYearTable($, YEAR_2569), rows);
+  const tbody = options.createYear
+    ? ensureYearTable($, YEAR_2569)
+    : findYearTable($, YEAR_2569);
+  const changed = upsertRows($, tbody, rows);
   return changed ? { ...record, contentHtml: $.html() } : record;
 }
 
@@ -384,6 +418,12 @@ export function applyProcurementTableOverrides(record: WpContentRecord): WpConte
   }
   if (path === PROCUREMENT_WINNER_PATH || path === `/en${PROCUREMENT_WINNER_PATH}`) {
     return applyYearTableRows(record, winnerRows);
+  }
+  if (
+    path === PROCUREMENT_CANCEL_WINNER_PATH ||
+    path === `/en${PROCUREMENT_CANCEL_WINNER_PATH}`
+  ) {
+    return applyYearTableRows(record, cancelWinnerRows, { createYear: true });
   }
   if (path === RAIL_STANDARDS_PATH || path === `/en${RAIL_STANDARDS_PATH}`) {
     return applyRailComponentStandards(record);

@@ -172,4 +172,25 @@ describe("applyProcurementTableOverrides", () => {
     );
     expect(updated.contentHtml).not.toContain("drive.google.com");
   });
+
+  it("creates the 2569 cancellation/winner table when the page has only older years", () => {
+    const source = record(
+      "/จัดซื้อจัดจ้าง/ยกเลิกประกาศเชิญชวน-ผู้",
+      `<div class="lightweight-accordion"><details><summary><h1><strong>ปี 2568</strong></h1></summary><div class="lightweight-accordion-body"><figure class="wp-block-table"><table><thead><tr><th>ลำดับ</th><th>วันที่ประกาศ</th><th>โครงการ</th><th>สถานะ</th><th>เอกสาร</th></tr></thead><tbody><tr><td>1</td><td>13 สิงหาคม 2568</td><td>รายการเดิม</td><td>เผยแพร่ขึ้นเว็บ</td><td><a href="/old.pdf">PDF</a></td></tr></tbody></table></figure></div></details></div>`,
+    );
+    const updated = applyProcurementTableOverrides(source);
+    const $ = cheerio.load(updated.contentHtml, null, false);
+    const firstAccordion = $(".lightweight-accordion").first();
+
+    expect(firstAccordion.find("summary").text()).toContain("ปี 2569");
+    expect(firstAccordion.find("tbody tr")).toHaveLength(1);
+    expect(firstAccordion.find("tbody tr td").eq(0).text()).toBe("1");
+    expect(firstAccordion.find("tbody tr td").eq(1).text()).toBe("8 กรกฎาคม 2569");
+    expect(firstAccordion.find("tbody tr").text()).toContain(
+      "จ้างที่ปรึกษาศึกษารูปแบบและแนวทางการลงทุนภายใต้ขอบเขตหน้าที่และอำนาจทางกฎหมาย",
+    );
+    expect(firstAccordion.find("tbody tr a").attr("href")).toBe(
+      "/wp-content/uploads/2026/07/procurement-cancel-winner-consultant-ip-management-25690708.pdf",
+    );
+  });
 });
