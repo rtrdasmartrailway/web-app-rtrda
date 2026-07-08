@@ -21,9 +21,12 @@ SOURCE_PATH="${SOURCE_PATH:-/srv/workspace/web-app-rtrda}"
 cd "$SOURCE_PATH"
 
 echo "== ${TARGET_NAME}: sync mirrored public assets =="
-rsync -az --delete --chmod=Du=rwx,Dgo=rx,Fu=rw,Fgo=r --info=stats2 -e "ssh ${SSH_OPTS[*]}" \
+# Preserve legacy WordPress-mirrored files that are present in the host-mounted
+# production asset tree but intentionally ignored by Git. A clean CI checkout
+# must add/update files without deleting valid existing production images/PDFs.
+rsync -az --chmod=Du=rwx,Dgo=rx,Fu=rw,Fgo=r --info=stats2 -e "ssh ${SSH_OPTS[*]}" \
   public/wp-content/uploads/ "${REMOTE}:${TARGET_PATH}/public/wp-content/uploads/"
-rsync -az --delete --chmod=Du=rwx,Dgo=rx,Fu=rw,Fgo=r --info=stats2 -e "ssh ${SSH_OPTS[*]}" \
+rsync -az --chmod=Du=rwx,Dgo=rx,Fu=rw,Fgo=r --info=stats2 -e "ssh ${SSH_OPTS[*]}" \
   public/sdc-downloads/ "${REMOTE}:${TARGET_PATH}/public/sdc-downloads/"
 
 echo "== ${TARGET_NAME}: deploy ${GITHUB_SHA} =="

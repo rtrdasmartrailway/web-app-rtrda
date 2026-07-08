@@ -6,6 +6,10 @@ const workflow = readFileSync(
   join(process.cwd(), ".github/workflows/deploy-production.yml"),
   "utf8",
 );
+const deployTargetScript = readFileSync(
+  join(process.cwd(), ".github/scripts/deploy-preprod-target.sh"),
+  "utf8",
+);
 
 describe("Deploy rtrda.or.th production workflow", () => {
   it("deploys production only from main to cloud primary and rtrda02 fallback", () => {
@@ -22,5 +26,11 @@ describe("Deploy rtrda.or.th production workflow", () => {
     expect(workflow).not.toContain("rtrda-web-prod-preview");
     expect(workflow).not.toContain("/srv/apps/web-app-rtrda-production");
     expect(workflow).not.toContain("http://100.91.174.121:3030/healthz");
+  });
+
+  it("preserves legacy host-mounted public assets during production deploy", () => {
+    expect(deployTargetScript).toContain("public/wp-content/uploads/");
+    expect(deployTargetScript).toContain("public/sdc-downloads/");
+    expect(deployTargetScript).not.toContain("rsync -az --delete");
   });
 });
