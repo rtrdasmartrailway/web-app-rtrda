@@ -343,17 +343,13 @@ function buildRailComponentCard(
 }
 
 function buildRailComponentFiles($: cheerio.CheerioAPI): Cheerio<AnyNode> {
-  const group = $("<div></div>").addClass("rtrda-rail-component-standards-files");
-  const grid = $("<div></div>")
-    .addClass(
-      "rtrda-rail-component-card-grid wp-block-columns is-layout-flex wp-container-core-columns-is-layout-9d6595d7 wp-block-columns-is-layout-flex",
-    )
+  const group = $("<div></div>")
+    .addClass("rtrda-rail-component-standards-files")
     .attr(
       "style",
       "display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:24px;align-items:stretch;margin:24px 0;",
     );
-  railComponentDocuments.forEach((doc) => grid.append(buildRailComponentCard($, doc)));
-  group.append(grid);
+  railComponentDocuments.forEach((doc) => group.append(buildRailComponentCard($, doc)));
   return group;
 }
 
