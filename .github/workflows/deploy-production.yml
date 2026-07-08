@@ -1,262 +1,145 @@
 name: Deploy rtrda.or.th production
 
 on:
+  push:
+    branches:
+      - main
   workflow_dispatch:
     inputs:
       ref:
-        description: "Git ref/SHA to deploy (blank = latest origin/main)"
+        description: "Git ref/SHA to deploy (blank = pushed SHA / latest origin/main)"
         required: false
         type: string
-      verify_public:
-        description: "Verify https://rtrda.or.th after Cloudflare DNS/tunnel cutover"
-        required: false
-        default: "false"
-        type: choice
-        options:
-          - "false"
-          - "true"
 
 concurrency:
   group: web-app-rtrda-production
   cancel-in-progress: false
 
 jobs:
-  deploy-staging:
-    name: Deploy same SHA to test.rtrda.or.th first
+  deploy:
+    name: Deploy main SHA to cloud primary and rtrda02 fallback
     runs-on:
       - self-hosted
       - linux
       - x64
       - rtrda-web-test
 
-    outputs:
-      deploy_sha: ${{ steps.resolve.outputs.deploy_sha }}
-
     steps:
-      - name: Resolve deploy SHA from main
+      - name: Resolve production SHA from main
         id: resolve
         env:
           INPUT_REF: ${{ github.event.inputs.ref || '' }}
         run: |
           set -euo pipefail
-          cd /srv/workspace/web-app-rtrda
+          SOURCE_PATH=/srv/workspace/web-app-rtrda-production-source
+          if [ ! -d "$SOURCE_PATH/.git" ]; then
+            git clone https://github.com/rtrdasmartrailway/web-app-rtrda.git "$SOURCE_PATH"
+          fi
+          cd "$SOURCE_PATH"
           git fetch origin main --prune
           if [ -n "$INPUT_REF" ]; then
             DEPLOY_SHA="$(git rev-parse "$INPUT_REF")"
+          elif [ "${GITHUB_EVENT_NAME}" = "push" ]; then
+            DEPLOY_SHA="${GITHUB_SHA}"
           else
             DEPLOY_SHA="$(git rev-parse origin/main)"
           fi
           git merge-base --is-ancestor "$DEPLOY_SHA" origin/main
           echo "deploy_sha=$DEPLOY_SHA" >> "$GITHUB_OUTPUT"
+          echo "source_path=$SOURCE_PATH" >> "$GITHUB_OUTPUT"
           echo "Deploy SHA: $DEPLOY_SHA"
 
-      - name: Refuse dirty staging worktree
+      - name: Prepare clean production source checkout
+        env:
+          DEPLOY_SHA: ${{ steps.resolve.outputs.deploy_sha }}
+          SOURCE_PATH: ${{ steps.resolve.outputs.source_path }}
         run: |
           set -euo pipefail
-          cd /srv/workspace/web-app-rtrda
-          if [ -n "$(git status --porcelain)" ]; then
-            echo "::error::/srv/workspace/web-app-rtrda has uncommitted or untracked files; refusing deploy."
-            git status --short
-            exit 1
-          fi
+          cd "$SOURCE_PATH"
+          git fetch origin main test --prune
+          git checkout --detach "$DEPLOY_SHA"
+          git reset --hard "$DEPLOY_SHA"
+          git clean -fdx
+          git status -sb
+          git log --oneline -1
 
-      - name: Update staging checkout to exact SHA
+      - name: Install dependencies and generate Prisma client
+        env:
+          SOURCE_PATH: ${{ steps.resolve.outputs.source_path }}
+        run: |
+          set -euo pipefail
+          cd "$SOURCE_PATH"
+          npm ci
+          npx prisma generate
+
+      - name: Run validation gates
+        env:
+          SOURCE_PATH: ${{ steps.resolve.outputs.source_path }}
+        run: |
+          set -euo pipefail
+          cd "$SOURCE_PATH"
+          npm test
+          npm run lint
+          npm run typecheck
+          npm run format:check
+
+      - name: Deploy exact main SHA to cloud primary
+        env:
+          SOURCE_PATH: ${{ steps.resolve.outputs.source_path }}
+          GITHUB_SHA: ${{ steps.resolve.outputs.deploy_sha }}
+        run: |
+          set -euo pipefail
+          cd "$SOURCE_PATH"
+          chmod +x .github/scripts/deploy-preprod-target.sh
+          SOURCE_PATH="$SOURCE_PATH" \
+          TARGET_NAME=cloud \
+          TARGET_HOST=100.77.64.92 \
+          TARGET_USER=ubuntu \
+          TARGET_PATH=/home/ubuntu/rtrda-preprod/web-app-rtrda \
+          SSH_KEY=/home/rtrda-dgt/.ssh/rtrda-cloud-preprod-sync_ed25519 \
+          COMPOSE_FILE=docker-compose.preprod-cloud.yml \
+          APP_SERVICE=web-app-rtrda-preprod-cloud \
+          DB_SERVICE=db-preprod-cloud \
+          DB_HOST_PORT=5436 \
+          DIRECT_HEALTH_URL=http://100.77.64.92:3021/healthz \
+          .github/scripts/deploy-preprod-target.sh
+
+      - name: Deploy exact main SHA to rtrda02 fallback
+        env:
+          SOURCE_PATH: ${{ steps.resolve.outputs.source_path }}
+          GITHUB_SHA: ${{ steps.resolve.outputs.deploy_sha }}
+        run: |
+          set -euo pipefail
+          cd "$SOURCE_PATH"
+          chmod +x .github/scripts/deploy-preprod-target.sh
+          SOURCE_PATH="$SOURCE_PATH" \
+          TARGET_NAME=rtrda02 \
+          TARGET_HOST=100.91.174.121 \
+          TARGET_USER=rtrda \
+          TARGET_PATH=/srv/apps/web-app-rtrda-preprod-rtrda02 \
+          SSH_KEY=/home/rtrda-dgt/.ssh/rtrda02_prod_preview_sync_ed25519 \
+          COMPOSE_FILE=docker-compose.preprod-rtrda02.yml \
+          APP_SERVICE=web-app-rtrda-preprod-rtrda02 \
+          DB_SERVICE=db-preprod-rtrda02 \
+          DB_HOST_PORT=5437 \
+          DIRECT_HEALTH_URL=http://100.91.174.121:3021/healthz \
+          .github/scripts/deploy-preprod-target.sh
+
+      - name: Verify production parity and public health
         env:
           DEPLOY_SHA: ${{ steps.resolve.outputs.deploy_sha }}
         run: |
           set -euo pipefail
-          cd /srv/workspace/web-app-rtrda
-          git fetch origin main test --prune
-          git checkout -B test "$DEPLOY_SHA"
-          git status -sb
-          git log --oneline -1
-
-      - name: Install dependencies
-        run: |
-          set -euo pipefail
-          cd /srv/workspace/web-app-rtrda
-          npm ci
-
-      - name: Generate Prisma client
-        run: |
-          set -euo pipefail
-          cd /srv/workspace/web-app-rtrda
-          npx prisma generate
-
-      - name: Start staging database and apply migrations
-        run: |
-          set -euo pipefail
-          cd /srv/workspace/web-app-rtrda
-          docker compose up -d db
-          for attempt in $(seq 1 30); do
-            if docker compose exec -T db pg_isready -U rtrda -d rtrda >/dev/null 2>&1; then
-              break
-            fi
-            sleep 2
-          done
-          npm run db:migrate
-
-      - name: Seed staging database from content manifest
-        run: |
-          set -euo pipefail
-          cd /srv/workspace/web-app-rtrda
-          npm run db:seed
-
-      - name: Run validation gates
-        run: |
-          set -euo pipefail
-          cd /srv/workspace/web-app-rtrda
-          npm test
-          npm run lint
-          npm run typecheck
-          npm run format:check
-
-      - name: Build and restart staging Docker Compose service
-        run: |
-          set -euo pipefail
-          cd /srv/workspace/web-app-rtrda
-          docker compose up -d --build web-app-rtrda-test
-
-      - name: Wait for staging health checks
-        run: |
-          set -euo pipefail
-          for attempt in $(seq 1 40); do
-            if curl -fsS http://127.0.0.1:3020/healthz; then
-              break
-            fi
-            sleep 3
-          done
-          curl -fsS https://test.rtrda.or.th/healthz
-
-      - name: Sync mirrored assets to rtrda02 production host
-        run: |
-          set -euo pipefail
-          cd /srv/workspace/web-app-rtrda
-          rsync -az --info=stats2 \
-            -e "ssh -i ~/.ssh/rtrda02_prod_preview_sync_ed25519 -o StrictHostKeyChecking=accept-new" \
-            public/wp-content/uploads/ \
-            rtrda@100.91.174.121:/srv/apps/web-app-rtrda/public/wp-content/uploads/
-          rsync -az --info=stats2 \
-            -e "ssh -i ~/.ssh/rtrda02_prod_preview_sync_ed25519 -o StrictHostKeyChecking=accept-new" \
-            public/sdc-downloads/ \
-            rtrda@100.91.174.121:/srv/apps/web-app-rtrda/public/sdc-downloads/
-
-  deploy-production:
-    name: Deploy rtrda.or.th on rtrda02
-    needs: deploy-staging
-    environment: production
-    runs-on:
-      - self-hosted
-      - rtrda-web-prod-preview
-
-    steps:
-      - name: Prepare production checkout directory
-        run: |
-          set -euo pipefail
-          if [ ! -d /srv/apps/web-app-rtrda-production/.git ]; then
-            git clone https://github.com/rtrdasmartrailway/web-app-rtrda.git /srv/apps/web-app-rtrda-production
-          fi
-
-      - name: Refuse dirty production worktree
-        run: |
-          set -euo pipefail
-          cd /srv/apps/web-app-rtrda-production
-          if [ -n "$(git status --porcelain)" ]; then
-            echo "::error::/srv/apps/web-app-rtrda-production has uncommitted or untracked files; refusing deploy."
-            git status --short
-            exit 1
-          fi
-
-      - name: Update production checkout to exact SHA
-        env:
-          DEPLOY_SHA: ${{ needs.deploy-staging.outputs.deploy_sha }}
-        run: |
-          set -euo pipefail
-          cd /srv/apps/web-app-rtrda-production
-          git fetch origin main --prune
-          git checkout -B main "$DEPLOY_SHA"
-          git status -sb
-          git log --oneline -1
-
-      - name: Ensure production env exists
-        run: |
-          set -euo pipefail
-          cd /srv/apps/web-app-rtrda-production
-          test -f .env.production
-          grep -q '^POSTGRES_PASSWORD=' .env.production
-          grep -q '^DATABASE_URL=' .env.production
-          cp .env.production .env
-
-      - name: Install dependencies
-        run: |
-          set -euo pipefail
-          cd /srv/apps/web-app-rtrda-production
-          npm ci
-
-      - name: Generate Prisma client
-        run: |
-          set -euo pipefail
-          cd /srv/apps/web-app-rtrda-production
-          npx prisma generate
-
-      - name: Start production database and apply migrations
-        run: |
-          set -euo pipefail
-          cd /srv/apps/web-app-rtrda-production
-          docker compose --env-file .env.production -f docker-compose.production.yml up -d db-production
-          for attempt in $(seq 1 30); do
-            if docker compose --env-file .env.production -f docker-compose.production.yml exec -T db-production pg_isready -U rtrda -d rtrda >/dev/null 2>&1; then
-              break
-            fi
-            sleep 2
-          done
-          cp .env.production .env
-          npm run db:migrate
-
-      - name: Seed production database
-        run: |
-          set -euo pipefail
-          cd /srv/apps/web-app-rtrda-production
-          npm run db:seed
-
-      - name: Run validation gates
-        run: |
-          set -euo pipefail
-          cd /srv/apps/web-app-rtrda-production
-          npm test
-          npm run lint
-          npm run typecheck
-          npm run format:check
-
-      - name: Build and restart production Docker Compose service
-        env:
-          DEPLOY_SHA: ${{ needs.deploy-staging.outputs.deploy_sha }}
-        run: |
-          set -euo pipefail
-          cd /srv/apps/web-app-rtrda-production
-          export RTRDA_IMAGE="web-app-rtrda:production-${DEPLOY_SHA}"
-          docker compose --env-file .env.production -f docker-compose.production.yml up -d --build web-app-rtrda-production
-          mkdir -p /srv/apps/web-app-rtrda-production-deploy-state
-          echo "$DEPLOY_SHA" > /srv/apps/web-app-rtrda-production-deploy-state/release
-          printf '%s %s\n' "$(date -Is)" "$DEPLOY_SHA" >> /srv/apps/web-app-rtrda-production-deploy-state/releases.log
-
-      - name: Wait for local production health check
-        run: |
-          set -euo pipefail
-          for attempt in $(seq 1 40); do
-            if curl -fsS http://100.91.174.121:3030/healthz; then
-              exit 0
-            fi
-            sleep 3
-          done
-          cd /srv/apps/web-app-rtrda-production
-          docker compose --env-file .env.production -f docker-compose.production.yml ps
-          docker compose --env-file .env.production -f docker-compose.production.yml logs --tail=160 web-app-rtrda-production
-          exit 1
-
-      - name: Verify public production health after cutover
-        if: ${{ github.event.inputs.verify_public == 'true' }}
-        run: |
-          set -euo pipefail
+          cloud_sha=$(ssh -i ~/.ssh/rtrda-cloud-preprod-sync_ed25519 -o BatchMode=yes ubuntu@100.77.64.92 'cd /home/ubuntu/rtrda-preprod/web-app-rtrda && git rev-parse HEAD && cat .deploy-state/preprod-release')
+          rtrda02_sha=$(ssh -i ~/.ssh/rtrda02_prod_preview_sync_ed25519 -o BatchMode=yes rtrda@100.91.174.121 'cd /srv/apps/web-app-rtrda-preprod-rtrda02 && git rev-parse HEAD && cat .deploy-state/preprod-release')
+          printf 'cloud_sha=%s\n' "$cloud_sha"
+          printf 'rtrda02_sha=%s\n' "$rtrda02_sha"
+          test "$(printf '%s\n' "$cloud_sha" | sort -u | wc -l)" -eq 1
+          test "$(printf '%s\n' "$rtrda02_sha" | sort -u | wc -l)" -eq 1
+          test "$(printf '%s\n' "$cloud_sha" | head -1)" = "$DEPLOY_SHA"
+          test "$(printf '%s\n' "$rtrda02_sha" | head -1)" = "$DEPLOY_SHA"
+          curl -fsS http://100.77.64.92:3021/healthz
+          curl -fsS http://100.91.174.121:3021/healthz
           curl -fsS https://rtrda.or.th/healthz
-          curl -fsSI https://rtrda.or.th/ | sed -n '1,20p'
+          curl -fsS https://www.rtrda.or.th/healthz
+          ssh -i ~/.ssh/rtrda02_prod_preview_sync_ed25519 -o BatchMode=yes rtrda@100.91.174.121 '/home/rtrda/bin/rtrda-production-watchdog.py --status'

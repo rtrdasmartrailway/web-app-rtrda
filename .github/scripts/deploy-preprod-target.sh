@@ -17,7 +17,8 @@ SSH_OPTS=(-i "$SSH_KEY" -o BatchMode=yes -o StrictHostKeyChecking=accept-new -o 
 REMOTE="${TARGET_USER}@${TARGET_HOST}"
 REMOTE_SCRIPT="/tmp/rtrda-deploy-preprod-remote-${TARGET_NAME}.sh"
 
-cd /srv/workspace/web-app-rtrda
+SOURCE_PATH="${SOURCE_PATH:-/srv/workspace/web-app-rtrda}"
+cd "$SOURCE_PATH"
 
 echo "== ${TARGET_NAME}: sync mirrored public assets =="
 rsync -az --delete --chmod=Du=rwx,Dgo=rx,Fu=rw,Fgo=r --info=stats2 -e "ssh ${SSH_OPTS[*]}" \
