@@ -94,7 +94,7 @@ describe("applyProcurementTableOverrides", () => {
     );
   });
 
-  it("adds the two July winner rows to the winner price table", () => {
+  it("adds the July winner rows to the winner price table", () => {
     const source = record(
       "/จัดซื้อจัดจ้าง/ประกาศผลผู้ชนะการเสนอร",
       yearTableHtml(
@@ -104,11 +104,16 @@ describe("applyProcurementTableOverrides", () => {
     const updated = applyProcurementTableOverrides(source);
     const updatedRows = rows(updated.contentHtml);
 
-    expect(updatedRows.map((row) => row[0])).toEqual(["1", "2", "3"]);
-    expect(updatedRows[0]?.[2]).toContain("จัดจ้างงานออกแบบและพิมพ์รายงานประจำปี 2568");
-    expect(updatedRows[0]?.[3]).toBe("342,400.00");
-    expect(updatedRows[1]?.[2]).toContain("Infrastructure Enhancement");
-    expect(updatedRows[1]?.[3]).toBe("11,354,305.00");
+    expect(updatedRows.map((row) => row[0])).toEqual(["1", "2", "3", "4"]);
+    expect(updatedRows[0]?.[2]).toContain("National Rolling Stock Company");
+    expect(updatedRows[0]?.[3]).toBe("7,950,000.00");
+    expect(updatedRows[1]?.[2]).toContain("จัดจ้างงานออกแบบและพิมพ์รายงานประจำปี 2568");
+    expect(updatedRows[1]?.[3]).toBe("342,400.00");
+    expect(updatedRows[2]?.[2]).toContain("Infrastructure Enhancement");
+    expect(updatedRows[2]?.[3]).toBe("11,354,305.00");
+    expect(updated.contentHtml).toContain(
+      "/wp-content/uploads/2026/07/procurement-winner-national-rolling-stock-company-25690708.pdf",
+    );
     expect(updated.contentHtml).toContain(
       "/wp-content/uploads/2026/07/procurement-winner-annual-report-design-print-2568.pdf",
     );
@@ -191,6 +196,23 @@ describe("applyProcurementTableOverrides", () => {
     );
     expect(firstAccordion.find("tbody tr a").attr("href")).toBe(
       "/wp-content/uploads/2026/07/procurement-cancel-winner-consultant-ip-management-25690708.pdf",
+    );
+  });
+
+  it("adds the National Rolling Stock Company winner row for 2569", () => {
+    const source = record(
+      "/จัดซื้อจัดจ้าง/ประกาศผลผู้ชนะการเสนอร",
+      `<div class="lightweight-accordion"><details><summary><h1><strong>ปี 2569</strong></h1></summary><div class="lightweight-accordion-body"><figure class="wp-block-table"><table><thead><tr><th>ลำดับ</th><th>วันที่ประกาศ</th><th>โครงการ</th><th>งบประมาณ</th><th>สถานะ</th><th>เอกสาร</th></tr></thead><tbody></tbody></table></figure></div></details></div>`,
+    );
+    const updated = applyProcurementTableOverrides(source);
+    const $ = cheerio.load(updated.contentHtml, null, false);
+    const row = $("tbody tr").first();
+
+    expect(row.text()).toContain("8 กรกฎาคม 2569");
+    expect(row.text()).toContain("National Rolling Stock Company");
+    expect(row.text()).toContain("7,950,000.00");
+    expect(row.find("a").attr("href")).toBe(
+      "/wp-content/uploads/2026/07/procurement-winner-national-rolling-stock-company-25690708.pdf",
     );
   });
 });
