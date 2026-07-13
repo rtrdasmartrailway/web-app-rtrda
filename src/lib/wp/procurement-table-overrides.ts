@@ -54,22 +54,28 @@ const summaryRows: TableRowSpec[] = [
   },
 ];
 
-const cancelWinnerRows: TableRowSpec[] = [
+const winnerRows: TableRowSpec[] = [
   {
     matchText:
       "จ้างที่ปรึกษาศึกษารูปแบบและแนวทางการลงทุนภายใต้ขอบเขตหน้าที่และอำนาจทางกฎหมาย",
     cells: [
       "8 กรกฎาคม 2569",
-      "โครงการ ประกาศผู้ชนะการเสนอราคา จ้างที่ปรึกษาศึกษารูปแบบและแนวทางการลงทุนภายใต้ขอบเขตหน้าที่และอำนาจทางกฎหมาย รวมทั้งการบริหารจัดการทรัพย์สินทางปัญญาของสถาบัน โดยวิธีจ้างที่ปรึกษาโดยวิธีคัดเลือก",
-      PUBLISHED_STATUS,
+      "เรื่อง ประกาศผู้ชนะการเสนอราคา จ้างที่ปรึกษาศึกษารูปแบบและแนวทางการลงทุนภายใต้ขอบเขตหน้าที่และอำนาจทางกฎหมาย รวมทั้งการบริหารจัดการทรัพย์สินทางปัญญาของสถาบัน โดยวิธีจ้างที่ปรึกษาโดยวิธีคัดเลือก",
+      "4,300,000.00",
+      "–",
     ],
-    href: uploadFile(
-      "2026/07/procurement-cancel-winner-consultant-ip-management-25690708.pdf",
-    ),
+    href: uploadFile("2026/07/procurement-winner-consultant-ip-management-25690708.pdf"),
   },
-];
-
-const winnerRows: TableRowSpec[] = [
+  {
+    matchText: "จ้างออกแบบและจัดทำของที่ระลึกเพื่อใช้ในกิจกรรมของสถาบัน",
+    cells: [
+      "8 กรกฎาคม 2569",
+      "เรื่อง ประกาศผู้ชนะการเสนอราคา จ้างออกแบบและจัดทำของที่ระลึกเพื่อใช้ในกิจกรรมของสถาบันวิจัยและพัฒนาเทคโนโลยี ระบบราง (องค์การมหาชน) โดยวิธีเฉพาะเจาะจง",
+      "249,738.00",
+      "–",
+    ],
+    href: uploadFile("2026/07/procurement-winner-souvenir-design-25690708.pdf"),
+  },
   {
     matchText:
       "โครงการศึกษาการผลิตรถไฟภายในประเทศ และแนวทางการจัดตั้งบริษัทเพื่อผลิตรถไฟแห่งชาติ",
@@ -286,23 +292,46 @@ function upsertRows(
   return changed;
 }
 
-function moveMatchingRowsToTop(
+const thaiMonthNumbers: Record<string, number> = {
+  มกราคม: 1,
+  กุมภาพันธ์: 2,
+  มีนาคม: 3,
+  เมษายน: 4,
+  พฤษภาคม: 5,
+  มิถุนายน: 6,
+  กรกฎาคม: 7,
+  สิงหาคม: 8,
+  กันยายน: 9,
+  ตุลาคม: 10,
+  พฤศจิกายน: 11,
+  ธันวาคม: 12,
+};
+
+function thaiDateValue($: cheerio.CheerioAPI, row: AnyNode): number {
+  const match = $(row)
+    .find("td")
+    .eq(1)
+    .text()
+    .match(
+      /(\d{1,2})\s+(มกราคม|กุมภาพันธ์|มีนาคม|เมษายน|พฤษภาคม|มิถุนายน|กรกฎาคม|สิงหาคม|กันยายน|ตุลาคม|พฤศจิกายน|ธันวาคม)\s+(\d{4})/,
+    );
+  if (!match) return Number.MIN_SAFE_INTEGER;
+
+  const [, day, month, year] = match;
+  return Number(year) * 10_000 + thaiMonthNumbers[month] * 100 + Number(day);
+}
+
+function sortRowsByThaiDateDescending(
   $: cheerio.CheerioAPI,
   tbody: Cheerio<AnyNode>,
-  matchTexts: string[],
 ): boolean {
-  let changed = false;
-
-  for (const matchText of [...matchTexts].reverse()) {
-    const existing = tbody
-      .find("tr")
-      .filter((_, row) => rowText($, row).includes(matchText))
-      .first();
-    if (existing.length === 0) continue;
-    if (tbody.find("tr").first()[0] !== existing[0]) {
-      tbody.prepend(existing);
-      changed = true;
-    }
+  const originalRows = tbody.find("tr").toArray();
+  const sortedRows = [...originalRows].sort(
+    (left, right) => thaiDateValue($, right) - thaiDateValue($, left),
+  );
+  const changed = sortedRows.some((row, index) => row !== originalRows[index]);
+  if (changed) {
+    sortedRows.forEach((row) => tbody.append(row));
   }
 
   return changed;
@@ -319,6 +348,20 @@ function applyYearTableRows(
     : findYearTable($, YEAR_2569);
   const changed = upsertRows($, tbody, rows, options);
   return changed ? { ...record, contentHtml: $.html() } : record;
+}
+
+function applyEmptyCancelWinnerTable(record: WpContentRecord): WpContentRecord {
+  const $ = cheerio.load(record.contentHtml, null, false);
+  const hasYearTable = findYearTable($, YEAR_2569).length > 0;
+  const tbody = ensureYearTable($, YEAR_2569);
+  if (tbody.length === 0) return record;
+
+  const hasRows = tbody.find("tr").length > 0;
+  if (hasRows) {
+    tbody.empty();
+  }
+
+  return !hasYearTable || hasRows ? { ...record, contentHtml: $.html() } : record;
 }
 
 function quarterNumber($: cheerio.CheerioAPI, row: AnyNode): number {
@@ -363,9 +406,7 @@ function applyWinnerRows(record: WpContentRecord): WpContentRecord {
   const tbody = findYearTable($, YEAR_2569);
   let changed = upsertRows($, tbody, winnerRows, { numberBottomUp: true });
 
-  changed =
-    moveMatchingRowsToTop($, tbody, ["จ้างเหมาบริการจัดงานพิธีทำบุญวันสถาปนา"]) ||
-    changed;
+  changed = sortRowsByThaiDateDescending($, tbody) || changed;
   changed = renumberRows($, tbody, true) || changed;
 
   return changed ? { ...record, contentHtml: $.html() } : record;
@@ -485,7 +526,7 @@ export function applyProcurementTableOverrides(record: WpContentRecord): WpConte
     path === PROCUREMENT_CANCEL_WINNER_PATH ||
     path === `/en${PROCUREMENT_CANCEL_WINNER_PATH}`
   ) {
-    return applyYearTableRows(record, cancelWinnerRows, { createYear: true });
+    return applyEmptyCancelWinnerTable(record);
   }
   if (path === RAIL_STANDARDS_PATH || path === `/en${RAIL_STANDARDS_PATH}`) {
     return applyRailComponentStandards(record);
