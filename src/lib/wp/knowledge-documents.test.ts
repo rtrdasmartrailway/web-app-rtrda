@@ -74,6 +74,38 @@ describe("knowledge document parser", () => {
     });
   });
 
+  it("parses the BEMU station survey report in the project reports group", () => {
+    const groups = buildKnowledgeDocumentGroups(`
+      <div class="lightweight-accordion">
+        <details open>
+          <summary class="lightweight-accordion-title">รายงานผลงานโครงการ</summary>
+          <div class="lightweight-accordion-body">
+            <div class="wp-block-columns">
+              <div class="wp-block-column">
+                <figure><img src="/wp-content/uploads/2026/07/bemu-station-survey-report-cover.png" alt="รายงานการสำรวจพื้นที่สถานีเพื่อพิจารณาความเป็นไปได้ในการติดตั้งสถานีชาร์จรถไฟโดยสารพลังงานแบตเตอรี่ (สถานีบ้านแหลม และ สถานีแม่กลอง)"></figure>
+                <h6>รายงานการสำรวจพื้นที่สถานีเพื่อพิจารณาความเป็นไปได้ในการติดตั้งสถานีชาร์จรถไฟโดยสารพลังงานแบตเตอรี่ (สถานีบ้านแหลม และ สถานีแม่กลอง)</h6>
+                <p>โครงการวิจัยและพัฒนารถไฟโดยสารพลังงานไฟฟ้าจากแบตเตอรี่เพื่อลดมลพิษในการเดินรถเข้าสู่ชุมชน</p>
+                <div class="wp-block-button detail-btn"><a href="/wp-content/uploads/2026/07/bemu-station-survey-report-bl-mk.pdf">อ่านเพิ่มเติม</a></div>
+                <p class="simple-download-counter"><a class="simple-download-counter-link" href="/wp-content/uploads/2026/07/bemu-station-survey-report-bl-mk.pdf">ดาวน์โหลดไฟล์</a></p>
+              </div>
+            </div>
+          </div>
+        </details>
+      </div>
+    `);
+
+    expect(groups[0]).toMatchObject({ title: "รายงานผลงานโครงการ" });
+    expect(groups[0].documents[0]).toMatchObject({
+      title:
+        "รายงานการสำรวจพื้นที่สถานีเพื่อพิจารณาความเป็นไปได้ในการติดตั้งสถานีชาร์จรถไฟโดยสารพลังงานแบตเตอรี่ (สถานีบ้านแหลม และ สถานีแม่กลอง)",
+      description:
+        "โครงการวิจัยและพัฒนารถไฟโดยสารพลังงานไฟฟ้าจากแบตเตอรี่เพื่อลดมลพิษในการเดินรถเข้าสู่ชุมชน",
+      coverImage: "/wp-content/uploads/2026/07/bemu-station-survey-report-cover.png",
+      downloadHref: "/wp-content/uploads/2026/07/bemu-station-survey-report-bl-mk.pdf",
+      previewHref: "/wp-content/uploads/2026/07/bemu-station-survey-report-bl-mk.pdf",
+    });
+  });
+
   it("uses image-only infographic links as working preview and download actions", () => {
     const groups = buildKnowledgeDocumentGroups(
       `
