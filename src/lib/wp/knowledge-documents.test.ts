@@ -205,7 +205,7 @@ describe("knowledge document parser", () => {
     });
 
     expect(groups).toHaveLength(8);
-    expect(groups.flatMap((group) => group.documents)).toHaveLength(46);
+    expect(groups.flatMap((group) => group.documents)).toHaveLength(47);
     for (const document of groups.flatMap((group) => group.documents)) {
       expect(document.previewHref).not.toBe("");
       expect(document.downloadHref).not.toBe("");
