@@ -209,7 +209,6 @@ export function SiteShell({
                 ({isEn ? "counter not yet wired up" : "รอเชื่อมต่อระบบนับ"})
               </p>
             </div>
-
           </section>
 
           {/* Column 2: ส่วนราชการในสังกัดกระทรวงคมนาคม */}
