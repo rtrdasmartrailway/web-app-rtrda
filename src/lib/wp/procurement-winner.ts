@@ -11,15 +11,27 @@ const WINNER_DOCUMENT_HREF_25_JUNE_2569 =
   "/wp-content/uploads/2026/06/ประกาศผู้ชนะการเสนอราคา_25_06_2569.pdf";
 const WINNER_DOCUMENT_HREF_6_MAY_2569 =
   "/wp-content/uploads/2026/05/ประกาศผู้ชนะการเสนอราคา_12_05_2569.pdf";
+const WINNER_DOCUMENT_HREF_10_JULY_2569 =
+  "/wp-content/uploads/2026/07/procurement-winner-rtrda-5th-anniversary-25690710.pdf";
 
-const NEW_WINNER_ROW = {
-  date: "25 มิถุนายน 2569",
-  project:
-    "เรื่อง ประกาศผู้ชนะการเสนอราคา จัดซื้อซอฟต์แวร์การออกแบบใช้คอมพิวเตอร์ช่วย (CAD Computer Aided Design) ด้วยโปรแกรม CATIA พร้อมติดตั้ง โดยวิธีประกวดราคาอิเล็กทรอนิกส์ (e-bidding)",
-  budget: "1,342,927.58",
-  documentNo: "–",
-  documentHref: WINNER_DOCUMENT_HREF_25_JUNE_2569,
-};
+const NEW_WINNER_ROWS = [
+  {
+    date: "10 กรกฎาคม 2569",
+    project:
+      "เรื่อง ประกาศผู้ชนะการเสนอราคา จ้างเหมาบริการจัดงานพิธีทำบุญวันสถาปนา สถาบันวิจัยและพัฒนาเทคโนโลยีระบบราง (องค์การมหาชน) ครบรอบ 5 ปี โดยวิธีเฉพาะเจาะจง",
+    budget: "250,000.00",
+    documentNo: "–",
+    documentHref: WINNER_DOCUMENT_HREF_10_JULY_2569,
+  },
+  {
+    date: "25 มิถุนายน 2569",
+    project:
+      "เรื่อง ประกาศผู้ชนะการเสนอราคา จัดซื้อซอฟต์แวร์การออกแบบใช้คอมพิวเตอร์ช่วย (CAD Computer Aided Design) ด้วยโปรแกรม CATIA พร้อมติดตั้ง โดยวิธีประกวดราคาอิเล็กทรอนิกส์ (e-bidding)",
+    budget: "1,342,927.58",
+    documentNo: "–",
+    documentHref: WINNER_DOCUMENT_HREF_25_JUNE_2569,
+  },
+];
 
 function isProcurementWinnerPath(path: string): boolean {
   return normalizeRoutePath(path) === PROCUREMENT_WINNER_PATH;
@@ -32,28 +44,56 @@ function cell($: cheerio.CheerioAPI, text: string): Cheerio<AnyNode> {
     .text(text);
 }
 
-function buildWinnerRow($: cheerio.CheerioAPI): Cheerio<AnyNode> {
+function buildWinnerRow(
+  $: cheerio.CheerioAPI,
+  rowSpec: (typeof NEW_WINNER_ROWS)[number],
+): Cheerio<AnyNode> {
   const row = $("<tr></tr>");
   const documentCell = cell($, "");
-  const documentLink = $("<a></a>").attr("href", NEW_WINNER_ROW.documentHref).text("PDF");
+  const documentLink = $("<a></a>").attr("href", rowSpec.documentHref).text("PDF");
 
-  row.append(cell($, "1"));
-  row.append(cell($, NEW_WINNER_ROW.date));
-  row.append(cell($, NEW_WINNER_ROW.project));
-  row.append(cell($, NEW_WINNER_ROW.budget));
-  row.append(cell($, NEW_WINNER_ROW.documentNo));
+  row.append(cell($, ""));
+  row.append(cell($, rowSpec.date));
+  row.append(cell($, rowSpec.project));
+  row.append(cell($, rowSpec.budget));
+  row.append(cell($, rowSpec.documentNo));
   documentCell.append(documentLink);
   row.append(documentCell);
   return row;
 }
 
-function isAlreadyInserted($: cheerio.CheerioAPI, tbody: Cheerio<AnyNode>): boolean {
-  const firstRowText = tbody.find("tr").first().text();
-  return (
-    firstRowText.includes(NEW_WINNER_ROW.date) &&
-    firstRowText.includes(NEW_WINNER_ROW.project) &&
-    firstRowText.includes(NEW_WINNER_ROW.budget)
-  );
+function isAlreadyInserted(
+  $: cheerio.CheerioAPI,
+  tbody: Cheerio<AnyNode>,
+  rowSpec: (typeof NEW_WINNER_ROWS)[number],
+): boolean {
+  return tbody
+    .find("tr")
+    .toArray()
+    .some((row) => {
+      const text = $(row).text();
+      return (
+        text.includes(rowSpec.date) &&
+        text.includes(rowSpec.project) &&
+        text.includes(rowSpec.budget)
+      );
+    });
+}
+
+function renumberRowsBottomUp($: cheerio.CheerioAPI, tbody: Cheerio<AnyNode>): boolean {
+  let changed = false;
+  const rows = tbody.find("tr").toArray();
+
+  rows.forEach((row, index) => {
+    const nextNumber = String(rows.length - index);
+    const firstCell = $(row).find("td").first();
+    if (firstCell.text().trim() !== nextNumber) {
+      firstCell.text(nextNumber);
+      changed = true;
+    }
+  });
+
+  return changed;
 }
 
 function setRowDocumentHref(
@@ -115,17 +155,14 @@ export function applyProcurementWinnerOverride(record: WpContentRecord): WpConte
 
   let changed = false;
 
-  if (!isAlreadyInserted($, tbody)) {
-    tbody.prepend(buildWinnerRow($));
-    tbody.find("tr").each((index, row) => {
-      $(row)
-        .find("td")
-        .first()
-        .text(String(index + 1));
-    });
-    changed = true;
+  for (const rowSpec of [...NEW_WINNER_ROWS].reverse()) {
+    if (!isAlreadyInserted($, tbody, rowSpec)) {
+      tbody.prepend(buildWinnerRow($, rowSpec));
+      changed = true;
+    }
   }
 
+  changed = renumberRowsBottomUp($, tbody) || changed;
   changed = updateWinnerDocumentLinks($, tbody) || changed;
 
   if (!changed) {

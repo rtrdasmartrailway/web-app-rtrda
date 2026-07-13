@@ -197,6 +197,26 @@ function rowText($: cheerio.CheerioAPI, row: AnyNode): string {
   return $(row).text().replace(/\s+/g, " ").trim();
 }
 
+function renumberRows(
+  $: cheerio.CheerioAPI,
+  tbody: Cheerio<AnyNode>,
+  numberBottomUp = false,
+): boolean {
+  let changed = false;
+  const rows = tbody.find("tr").toArray();
+
+  rows.forEach((row, index) => {
+    const first = $(row).find("td").first();
+    const nextNumber = String(numberBottomUp ? rows.length - index : index + 1);
+    if (first.text().trim() !== nextNumber) {
+      first.text(nextNumber);
+      changed = true;
+    }
+  });
+
+  return changed;
+}
+
 function findYearTable($: cheerio.CheerioAPI, year: string): Cheerio<AnyNode> {
   const accordion = $(".lightweight-accordion")
     .filter((_, element) =>
@@ -230,6 +250,7 @@ function upsertRows(
   $: cheerio.CheerioAPI,
   tbody: Cheerio<AnyNode>,
   rows: TableRowSpec[],
+  options: { numberBottomUp?: boolean } = {},
 ): boolean {
   if (tbody.length === 0) return false;
   let changed = false;
@@ -260,14 +281,29 @@ function upsertRows(
     changed = true;
   }
 
-  tbody.find("tr").each((index, row) => {
-    const first = $(row).find("td").first();
-    const nextNumber = String(index + 1);
-    if (first.text().trim() !== nextNumber) {
-      first.text(nextNumber);
+  changed = renumberRows($, tbody, options.numberBottomUp) || changed;
+
+  return changed;
+}
+
+function moveMatchingRowsToTop(
+  $: cheerio.CheerioAPI,
+  tbody: Cheerio<AnyNode>,
+  matchTexts: string[],
+): boolean {
+  let changed = false;
+
+  for (const matchText of [...matchTexts].reverse()) {
+    const existing = tbody
+      .find("tr")
+      .filter((_, row) => rowText($, row).includes(matchText))
+      .first();
+    if (existing.length === 0) continue;
+    if (tbody.find("tr").first()[0] !== existing[0]) {
+      tbody.prepend(existing);
       changed = true;
     }
-  });
+  }
 
   return changed;
 }
@@ -275,13 +311,13 @@ function upsertRows(
 function applyYearTableRows(
   record: WpContentRecord,
   rows: TableRowSpec[],
-  options: { createYear?: boolean } = {},
+  options: { createYear?: boolean; numberBottomUp?: boolean } = {},
 ): WpContentRecord {
   const $ = cheerio.load(record.contentHtml, null, false);
   const tbody = options.createYear
     ? ensureYearTable($, YEAR_2569)
     : findYearTable($, YEAR_2569);
-  const changed = upsertRows($, tbody, rows);
+  const changed = upsertRows($, tbody, rows, options);
   return changed ? { ...record, contentHtml: $.html() } : record;
 }
 
@@ -319,6 +355,19 @@ function applyQuarterlyWinnerRows(record: WpContentRecord): WpContentRecord {
       changed = true;
     }
   });
+  return changed ? { ...record, contentHtml: $.html() } : record;
+}
+
+function applyWinnerRows(record: WpContentRecord): WpContentRecord {
+  const $ = cheerio.load(record.contentHtml, null, false);
+  const tbody = findYearTable($, YEAR_2569);
+  let changed = upsertRows($, tbody, winnerRows, { numberBottomUp: true });
+
+  changed =
+    moveMatchingRowsToTop($, tbody, ["จ้างเหมาบริการจัดงานพิธีทำบุญวันสถาปนา"]) ||
+    changed;
+  changed = renumberRows($, tbody, true) || changed;
+
   return changed ? { ...record, contentHtml: $.html() } : record;
 }
 
@@ -430,7 +479,7 @@ export function applyProcurementTableOverrides(record: WpContentRecord): WpConte
     return applyYearTableRows(record, summaryRows);
   }
   if (path === PROCUREMENT_WINNER_PATH || path === `/en${PROCUREMENT_WINNER_PATH}`) {
-    return applyYearTableRows(record, winnerRows);
+    return applyWinnerRows(record);
   }
   if (
     path === PROCUREMENT_CANCEL_WINNER_PATH ||

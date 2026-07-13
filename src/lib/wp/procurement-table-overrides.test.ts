@@ -94,7 +94,7 @@ describe("applyProcurementTableOverrides", () => {
     );
   });
 
-  it("adds the July winner rows to the winner price table", () => {
+  it("adds the July winner rows to the winner price table and numbers bottom-up", () => {
     const source = record(
       "/จัดซื้อจัดจ้าง/ประกาศผลผู้ชนะการเสนอร",
       yearTableHtml(
@@ -104,7 +104,7 @@ describe("applyProcurementTableOverrides", () => {
     const updated = applyProcurementTableOverrides(source);
     const updatedRows = rows(updated.contentHtml);
 
-    expect(updatedRows.map((row) => row[0])).toEqual(["1", "2", "3", "4"]);
+    expect(updatedRows.map((row) => row[0])).toEqual(["4", "3", "2", "1"]);
     expect(updatedRows[0]?.[2]).toContain("National Rolling Stock Company");
     expect(updatedRows[0]?.[3]).toBe("7,950,000.00");
     expect(updatedRows[1]?.[2]).toContain("จัดจ้างงานออกแบบและพิมพ์รายงานประจำปี 2568");
@@ -121,6 +121,21 @@ describe("applyProcurementTableOverrides", () => {
       "/wp-content/uploads/2026/07/procurement-winner-infrastructure-enhancement-consultant.pdf",
     );
     expect(updated.contentHtml).not.toContain("drive.google.com");
+  });
+
+  it("keeps the 10 July winner row above the older July winner rows", () => {
+    const source = record(
+      "/จัดซื้อจัดจ้าง/ประกาศผลผู้ชนะการเสนอร",
+      yearTableHtml(
+        `<tr><td>1</td><td>10 กรกฎาคม 2569</td><td>เรื่อง ประกาศผู้ชนะการเสนอราคา จ้างเหมาบริการจัดงานพิธีทำบุญวันสถาปนา สถาบันวิจัยและพัฒนาเทคโนโลยีระบบราง (องค์การมหาชน) ครบรอบ 5 ปี โดยวิธีเฉพาะเจาะจง</td><td>250,000.00</td><td>–</td><td><a href="/wp-content/uploads/2026/07/procurement-winner-rtrda-5th-anniversary-25690710.pdf">PDF</a></td></tr><tr><td>2</td><td>25 มิถุนายน 2569</td><td>รายการเดิม</td><td>1.00</td><td>–</td><td><a href="/old.pdf">PDF</a></td></tr>`,
+      ),
+    );
+    const updatedRows = rows(applyProcurementTableOverrides(source).contentHtml);
+
+    expect(updatedRows.map((row) => row[0])).toEqual(["5", "4", "3", "2", "1"]);
+    expect(updatedRows[0]?.[1]).toBe("10 กรกฎาคม 2569");
+    expect(updatedRows[0]?.[2]).toContain("จ้างเหมาบริการจัดงานพิธีทำบุญวันสถาปนา");
+    expect(updatedRows[1]?.[1]).toBe("8 กรกฎาคม 2569");
   });
 
   it("prepends rail component standards using the existing card/button format", () => {
@@ -208,6 +223,7 @@ describe("applyProcurementTableOverrides", () => {
     const $ = cheerio.load(updated.contentHtml, null, false);
     const row = $("tbody tr").first();
 
+    expect(row.find("td").first().text()).toBe("3");
     expect(row.text()).toContain("8 กรกฎาคม 2569");
     expect(row.text()).toContain("National Rolling Stock Company");
     expect(row.text()).toContain("7,950,000.00");
