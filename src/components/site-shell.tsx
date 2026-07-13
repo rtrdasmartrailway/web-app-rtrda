@@ -1,5 +1,4 @@
 import Link from "next/link";
-import { FooterUtility } from "./footer-utility";
 import { LandingPopup } from "./landing-popup";
 import { SafeImage } from "./safe-image";
 import { StickyFacebookButton } from "./sticky-facebook-button";
@@ -211,7 +210,6 @@ export function SiteShell({
               </p>
             </div>
 
-            <FooterUtility alternatePath={shell.alternatePath} language={language} />
           </section>
 
           {/* Column 2: ส่วนราชการในสังกัดกระทรวงคมนาคม */}
@@ -257,11 +255,6 @@ export function SiteShell({
                 >
                   {isEn ? "Privacy Policy" : "นโยบายการคุ้มครองข้อมูลส่วนบุคคล"}
                 </a>
-              </li>
-              <li>
-                <Link href={isEn ? "/en/แผนที่เว็บไซต์" : "/แผนที่เว็บไซต์"}>
-                  {isEn ? "Sitemap" : "แผนที่เว็บไซต์"}
-                </Link>
               </li>
               <li>
                 <Link href={isEn ? "/en/e-services" : "/e-services"}>e-Services</Link>

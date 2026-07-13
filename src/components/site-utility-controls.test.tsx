@@ -1,6 +1,5 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-import { FooterUtility } from "./footer-utility";
 import { LanguageToggle } from "./language-toggle";
 import { ReaderControls } from "./reader-controls";
 
@@ -37,17 +36,5 @@ describe("ReaderControls", () => {
     expect(html).toContain(">A</button>");
     expect(html).toContain(">AA</button>");
     expect(html).toContain(">AAA</button>");
-  });
-});
-
-describe("FooterUtility", () => {
-  it("renders font controls and the shared language toggle in the footer", () => {
-    const html = renderToStaticMarkup(
-      <FooterUtility alternatePath="/en/ติดต่อเรา" language="th" />,
-    );
-
-    expect(html).toContain('class="footer-utility"');
-    expect(html).toContain("ขนาดตัวอักษร");
-    expect(html).toContain('href="/en/ติดต่อเรา"');
   });
 });

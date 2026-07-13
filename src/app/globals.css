@@ -5438,72 +5438,6 @@ a.calendar-cell.has-posts:hover {
   font-style: italic;
 }
 
-.footer-utility {
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: var(--radius-md);
-  display: grid;
-  gap: 12px;
-  margin-top: 18px;
-  padding: 14px 16px;
-}
-
-.footer-utility .reader-controls,
-.footer-utility-links {
-  align-items: center;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px 12px;
-  white-space: normal;
-}
-
-.footer-utility .reader-controls {
-  color: rgba(226, 232, 240, 0.78);
-  font-size: 13px;
-}
-
-.footer-utility .reader-controls span {
-  color: var(--accent);
-  font-weight: 800;
-}
-
-.footer-utility .reader-controls button {
-  background: rgba(255, 255, 255, 0.08);
-  border: 1px solid rgba(255, 255, 255, 0.16);
-  border-radius: 999px;
-  color: rgba(226, 232, 240, 0.78);
-  min-height: 30px;
-  min-width: 34px;
-  padding: 4px 9px;
-}
-
-.footer-utility .reader-controls button[aria-pressed="true"] {
-  background: rgba(56, 189, 248, 0.18);
-  border-color: rgba(56, 189, 248, 0.45);
-  color: #fff;
-}
-
-.footer-utility-links > a {
-  color: rgba(226, 232, 240, 0.78);
-  font-size: 13px;
-  font-weight: 700;
-}
-
-.footer-utility .language-toggle {
-  background: rgba(56, 189, 248, 0.14);
-  border: 1px solid rgba(56, 189, 248, 0.28);
-}
-
-.footer-utility .language-toggle-item {
-  color: rgba(226, 232, 240, 0.78);
-  min-height: 30px;
-}
-
-.footer-utility .language-toggle-item[aria-current="true"] {
-  background: rgba(56, 189, 248, 0.28);
-  color: #fff;
-}
-
 .footer-visitor-counter {
   display: none;
 }
@@ -5836,21 +5770,6 @@ a.calendar-cell.has-posts:hover {
 
   .footer-contact {
     display: block;
-  }
-
-  .footer-utility {
-    padding: 14px;
-  }
-
-  .footer-utility .reader-controls,
-  .footer-utility-links {
-    align-items: flex-start;
-    flex-direction: column;
-  }
-
-  .footer-utility .reader-controls {
-    align-items: center;
-    flex-direction: row;
   }
 
   .footer-contact > span:first-child,
