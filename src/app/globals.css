@@ -3753,6 +3753,15 @@ body:has(.yutth-lightbox) {
   padding: 0;
 }
 
+/* Keep the development-plan section as a single document card, not a full-width tile. */
+.content-rail-standards
+  .wp-content
+  .lightweight-accordion-body
+  > .rtrda-rail-standards-files--single {
+  grid-template-columns: minmax(280px, 360px);
+  justify-content: center;
+}
+
 .content-rail-standards
   .wp-content
   .lightweight-accordion-body

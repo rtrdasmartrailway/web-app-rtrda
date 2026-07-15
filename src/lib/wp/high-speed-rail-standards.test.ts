@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   additionalHighSpeedRailStandardDocuments,
   buildHighSpeedRailPdfReaderTargets,
+  extractRailStandardsCards,
   highSpeedRailStandardDocuments,
   importedHighSpeedRailStandardDocuments,
   stripImportedHighSpeedRailSection,
@@ -52,5 +53,18 @@ describe("high-speed rail standards override", () => {
     expect(buildHighSpeedRailPdfReaderTargets()).toHaveLength(
       additionalHighSpeedRailStandardDocuments.length,
     );
+  });
+
+  it("extracts the new rail standard card accordions before the high-speed section", () => {
+    const { cardsHtml, restHtml } = extractRailStandardsCards(`
+      <div class="lightweight-accordion"><details><summary>มาตรฐานโครงการรถไฟความเร็วสูง</summary></details></div>
+      <div class="lightweight-accordion"><details><summary>แผนพัฒนามาตรฐานระบบขนส่งทางราง</summary><div class="lightweight-accordion-body"><div class="rtrda-rail-standards-files">card</div></div></details></div>
+      <div class="lightweight-accordion"><details><summary>ประมวลมาตรฐานระบบขนส่งทางราง</summary><div class="lightweight-accordion-body"><div class="rtrda-rail-standards-files">card</div></div></details></div>
+    `);
+
+    expect(cardsHtml).toContain("แผนพัฒนามาตรฐานระบบขนส่งทางราง");
+    expect(cardsHtml).toContain("ประมวลมาตรฐานระบบขนส่งทางราง");
+    expect(restHtml).toContain("มาตรฐานโครงการรถไฟความเร็วสูง");
+    expect(restHtml).not.toContain("แผนพัฒนามาตรฐานระบบขนส่งทางราง");
   });
 });

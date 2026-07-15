@@ -202,6 +202,60 @@ describe("applyProcurementTableOverrides", () => {
     expect(updated.contentHtml).not.toContain("drive.google.com");
   });
 
+  it("adds development plan and standards compilation cards before high-speed rail", () => {
+    const source = record(
+      "/มาตรฐานระบบราง-สทร",
+      `<div class="lightweight-accordion"><details><summary class="lightweight-accordion-title"><strong>มาตรฐานโครงการรถไฟความเร็วสูง</strong></summary><div class="lightweight-accordion-body"><p>เดิม</p></div></details></div>`,
+    );
+    const updated = applyProcurementTableOverrides(source);
+    const $ = cheerio.load(updated.contentHtml, null, false);
+    const accordions = $(".lightweight-accordion");
+    const developmentPlan = accordions.filter((_, element) =>
+      $(element).find("summary").text().includes("แผนพัฒนามาตรฐานระบบขนส่งทางราง"),
+    );
+    const compilation = accordions.filter((_, element) =>
+      $(element).find("summary").text().includes("ประมวลมาตรฐานระบบขนส่งทางราง"),
+    );
+
+    expect(
+      developmentPlan.find(".rtrda-rail-standards-files .wp-block-column"),
+    ).toHaveLength(1);
+    expect(developmentPlan.find(".rtrda-rail-standards-files--single")).toHaveLength(1);
+    expect(developmentPlan.find("h6").text()).toBe(
+      "แผนพัฒนามาตรฐานระบบขนส่งทางรางของ สทร.",
+    );
+    expect(compilation.find(".rtrda-rail-standards-files .wp-block-column")).toHaveLength(
+      6,
+    );
+    expect(compilation.find(".rtrda-rail-standards-files--single")).toHaveLength(0);
+    expect(
+      compilation
+        .find("h6")
+        .toArray()
+        .map((heading) => $(heading).text()),
+    ).toEqual([
+      "ประมวลมาตรฐานระบบขนส่งทางรางด้านระบบไฟฟ้า",
+      "ประมวลมาตรฐานระบบขนส่งทางรางด้านสิ่งแวดล้อมและพลังงาน",
+      "ประมวลมาตรฐานระบบขนส่งทางรางด้านระบบการเดินรถและซ่อมบำรุง",
+      "ประมวลมาตรฐานระบบขนส่งทางรางด้านระบบอาณัติสัญญาณและการสื่อสาร",
+      "ประมวลมาตรฐานระบบขนส่งทางรางด้านความปลอดภัยและความมั่นคง",
+      "ประมวลมาตรฐานระบบขนส่งทางรางด้านล้อเลื่อน",
+    ]);
+    expect(compilation.find("img").first().attr("src")).toBe(
+      "/wp-content/uploads/2026/07/rtrda-rail-standards-electrical-systems.png",
+    );
+    expect(updated.contentHtml).toContain(
+      "/wp-content/uploads/2026/07/rtrda-rail-standards-development-plan.pdf",
+    );
+    expect(updated.contentHtml).toContain(
+      "/wp-content/uploads/2026/07/rtrda-rail-standards-rolling-stock.pdf",
+    );
+    expect(updated.contentHtml).toContain("ดาวน์โหลดไฟล์");
+    expect(updated.contentHtml.indexOf("แผนพัฒนามาตรฐานระบบขนส่งทางราง")).toBeLessThan(
+      updated.contentHtml.indexOf("มาตรฐานโครงการรถไฟความเร็วสูง"),
+    );
+  });
+
   it("keeps the 2569 cancellation/winner table empty", () => {
     const source = record(
       "/จัดซื้อจัดจ้าง/ยกเลิกประกาศเชิญชวน-ผู้",

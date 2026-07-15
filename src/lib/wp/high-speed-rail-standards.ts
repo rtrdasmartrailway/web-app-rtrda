@@ -137,6 +137,20 @@ export function stripImportedHighSpeedRailSection(html: string): string {
   return $.root().html() ?? "";
 }
 
+export function extractRailStandardsCards(html: string): {
+  cardsHtml: string;
+  restHtml: string;
+} {
+  const $ = load(html, null, false);
+  const cardAccordions = $(".rtrda-rail-standards-files")
+    .closest(".lightweight-accordion")
+    .toArray();
+  const cardsHtml = cardAccordions.map((accordion) => $.html(accordion)).join("");
+  cardAccordions.forEach((accordion) => $(accordion).remove());
+
+  return { cardsHtml, restHtml: $.root().html() ?? "" };
+}
+
 export function buildHighSpeedRailPdfReaderTargets(): PdfReaderTarget[] {
   return additionalHighSpeedRailStandardDocuments.map((document) => ({
     sourceHref: document.previewHref,

@@ -172,6 +172,47 @@ const railComponentDocuments: Array<{
   },
 ];
 
+const railDevelopmentPlanDocuments = [
+  {
+    title: "แผนพัฒนามาตรฐานระบบขนส่งทางรางของ สทร.",
+    href: uploadFile("2026/07/rtrda-rail-standards-development-plan.pdf"),
+    image: uploadFile("2026/07/rtrda-rail-standards-development-plan.png"),
+  },
+];
+
+const railStandardsCompilationDocuments = [
+  {
+    title: "ประมวลมาตรฐานระบบขนส่งทางรางด้านระบบไฟฟ้า",
+    href: uploadFile("2026/07/rtrda-rail-standards-electrical-systems.pdf"),
+    image: uploadFile("2026/07/rtrda-rail-standards-electrical-systems.png"),
+  },
+  {
+    title: "ประมวลมาตรฐานระบบขนส่งทางรางด้านสิ่งแวดล้อมและพลังงาน",
+    href: uploadFile("2026/07/rtrda-rail-standards-environment-energy.pdf"),
+    image: uploadFile("2026/07/rtrda-rail-standards-environment-energy.png"),
+  },
+  {
+    title: "ประมวลมาตรฐานระบบขนส่งทางรางด้านระบบการเดินรถและซ่อมบำรุง",
+    href: uploadFile("2026/07/rtrda-rail-standards-operations.pdf"),
+    image: uploadFile("2026/07/rtrda-rail-standards-operations.png"),
+  },
+  {
+    title: "ประมวลมาตรฐานระบบขนส่งทางรางด้านระบบอาณัติสัญญาณและการสื่อสาร",
+    href: uploadFile("2026/07/rtrda-rail-standards-signaling.pdf"),
+    image: uploadFile("2026/07/rtrda-rail-standards-signaling.png"),
+  },
+  {
+    title: "ประมวลมาตรฐานระบบขนส่งทางรางด้านความปลอดภัยและความมั่นคง",
+    href: uploadFile("2026/07/rtrda-rail-standards-safety.pdf"),
+    image: uploadFile("2026/07/rtrda-rail-standards-safety.png"),
+  },
+  {
+    title: "ประมวลมาตรฐานระบบขนส่งทางรางด้านล้อเลื่อน",
+    href: uploadFile("2026/07/rtrda-rail-standards-rolling-stock.pdf"),
+    image: uploadFile("2026/07/rtrda-rail-standards-rolling-stock.png"),
+  },
+];
+
 function normalized(path: string): string {
   return normalizeRoutePath(path).normalize("NFC");
 }
@@ -511,6 +552,142 @@ function applyRailComponentStandards(record: WpContentRecord): WpContentRecord {
   return { ...record, contentHtml: $.html() };
 }
 
+function buildRailStandardsCard(
+  $: cheerio.CheerioAPI,
+  document: { title: string; href: string; image: string },
+): Cheerio<AnyNode> {
+  const column = $("<div></div>").addClass(
+    "wp-block-column is-vertically-aligned-top is-layout-flow wp-block-column-is-layout-flow",
+  );
+  const image = $("<div></div>")
+    .addClass("wp-block-image is-style-vk-image-shadow")
+    .append(
+      $("<figure></figure>")
+        .addClass("aligncenter size-full is-resized")
+        .append(
+          $("<img>")
+            .attr("loading", "lazy")
+            .attr("decoding", "async")
+            .attr("width", "600")
+            .attr("height", "848")
+            .attr("src", document.image)
+            .attr("alt", document.title)
+            .attr(
+              "style",
+              "aspect-ratio:0.7075471698113207;object-fit:cover;width:165px;height:auto",
+            ),
+        ),
+    );
+  const title = $("<h6></h6>")
+    .addClass("wp-block-heading has-text-align-center is-style-vk-heading-default")
+    .append($("<strong></strong>").text(document.title));
+  const readMore = $("<div></div>")
+    .addClass(
+      "wp-block-buttons is-content-justification-center is-layout-flex wp-container-core-buttons-is-layout-16018d1d wp-block-buttons-is-layout-flex",
+    )
+    .append(
+      $("<div></div>")
+        .addClass("wp-block-button detail-btn")
+        .append(
+          $("<a></a>")
+            .addClass("wp-block-button__link wp-element-button")
+            .attr("href", document.href)
+            .attr("target", "_blank")
+            .attr("rel", "noreferrer noopener")
+            .text("อ่านเพิ่มเติม"),
+        ),
+    );
+  const download = $("<p></p>")
+    .addClass("simple-download-counter")
+    .append(
+      $("<a></a>")
+        .addClass("simple-download-counter-link")
+        .attr("data-pdf-reader-ignore", "true")
+        .attr("download", "")
+        .attr("href", document.href)
+        .text("ดาวน์โหลดไฟล์"),
+    );
+
+  column.append(image, title, readMore, download);
+  return column;
+}
+
+function buildRailStandardsCards(
+  $: cheerio.CheerioAPI,
+  documents: Array<{ title: string; href: string; image: string }>,
+): Cheerio<AnyNode> {
+  const cards = $("<div></div>").addClass(
+    [
+      "rtrda-rail-standards-files",
+      documents.length === 1 ? "rtrda-rail-standards-files--single" : "",
+      "wp-block-columns",
+      "is-layout-flex",
+      "wp-block-columns-is-layout-flex",
+    ]
+      .filter(Boolean)
+      .join(" "),
+  );
+  documents.forEach((document) => cards.append(buildRailStandardsCard($, document)));
+  return cards;
+}
+
+function buildRailStandardsAccordion(
+  $: cheerio.CheerioAPI,
+  title: string,
+  documents: Array<{ title: string; href: string; image: string }>,
+): Cheerio<AnyNode> {
+  const accordion = $("<div></div>").addClass("lightweight-accordion");
+  const details = $("<details></details>");
+  details.append(
+    $("<summary></summary>")
+      .addClass("lightweight-accordion-title")
+      .append($("<strong></strong>").text(title)),
+  );
+  details.append(
+    $("<div></div>")
+      .addClass("lightweight-accordion-body")
+      .append(buildRailStandardsCards($, documents)),
+  );
+  accordion.append(details);
+  return accordion;
+}
+
+function applyRailStandardsTables(record: WpContentRecord): WpContentRecord {
+  const $ = cheerio.load(record.contentHtml, null, false);
+  if ($(".rtrda-rail-standards-files").length > 0) return record;
+
+  const tables = [
+    buildRailStandardsAccordion(
+      $,
+      "แผนพัฒนามาตรฐานระบบขนส่งทางราง",
+      railDevelopmentPlanDocuments,
+    ),
+    buildRailStandardsAccordion(
+      $,
+      "ประมวลมาตรฐานระบบขนส่งทางราง",
+      railStandardsCompilationDocuments,
+    ),
+  ];
+  const highSpeedRailAccordion = $(".lightweight-accordion")
+    .filter((_, element) =>
+      $(element)
+        .find("summary")
+        .first()
+        .text()
+        .replace(/\s+/g, " ")
+        .trim()
+        .includes("มาตรฐานโครงการรถไฟความเร็วสูง"),
+    )
+    .first();
+
+  if (highSpeedRailAccordion.length > 0) {
+    tables.forEach((table) => highSpeedRailAccordion.before(table));
+  } else {
+    tables.forEach((table) => $.root().append(table));
+  }
+  return { ...record, contentHtml: $.html() };
+}
+
 export function applyProcurementTableOverrides(record: WpContentRecord): WpContentRecord {
   const path = normalized(record.path);
   if (path === QUARTERLY_WINNER_PATH || path === `/en${QUARTERLY_WINNER_PATH}`) {
@@ -529,7 +706,7 @@ export function applyProcurementTableOverrides(record: WpContentRecord): WpConte
     return applyEmptyCancelWinnerTable(record);
   }
   if (path === RAIL_STANDARDS_PATH || path === `/en${RAIL_STANDARDS_PATH}`) {
-    return applyRailComponentStandards(record);
+    return applyRailStandardsTables(applyRailComponentStandards(record));
   }
   return record;
 }

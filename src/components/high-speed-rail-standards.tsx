@@ -1,5 +1,6 @@
 import Image from "next/image";
 import {
+  extractRailStandardsCards,
   highSpeedRailStandardDocuments,
   stripImportedHighSpeedRailSection,
 } from "@/lib/wp/high-speed-rail-standards";
@@ -73,12 +74,15 @@ function HighSpeedRailStandardsSection() {
 }
 
 export function HighSpeedRailStandardsContent({ html }: { html: string }) {
-  const restHtml = stripImportedHighSpeedRailSection(html);
+  const { cardsHtml, restHtml } = extractRailStandardsCards(html);
 
   return (
     <div className="wp-content">
+      {cardsHtml ? <div dangerouslySetInnerHTML={{ __html: cardsHtml }} /> : null}
       <HighSpeedRailStandardsSection />
-      <div dangerouslySetInnerHTML={{ __html: restHtml }} />
+      <div
+        dangerouslySetInnerHTML={{ __html: stripImportedHighSpeedRailSection(restHtml) }}
+      />
     </div>
   );
 }
