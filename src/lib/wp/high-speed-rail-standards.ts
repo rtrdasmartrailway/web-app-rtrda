@@ -4,6 +4,7 @@ import { normalizeRoutePath } from "./url";
 
 export interface HighSpeedRailStandardDocument {
   code?: string;
+  year?: string;
   title: string;
   coverImage: string;
   previewHref: string;
@@ -64,20 +65,6 @@ export const importedHighSpeedRailStandardDocuments: HighSpeedRailStandardDocume
     previewHref: "/3d-flip-book/สทร-hsr-ct-4010-2568",
     downloadHref: "/sdc_download/7187",
   },
-  {
-    title:
-      "มาตรฐานการก่อสร้างสำหรับงานติดตั้งเกอร์เดอร์รูปกล่องแบบชิ้นส่วนชนิดหล่อสำเร็จด้วยวิธีช่วงต่อช่วงโดยแกนทรีลำเลียงสำหรับโครงสร้างทางยกระดับในโครงการรถไฟความเร็วสูง",
-    coverImage: "/wp-content/uploads/2026/01/1-1.png",
-    previewHref: "/3d-flip-book/hsr-ct-3004-2569",
-    downloadHref: "/sdc_download/7161",
-  },
-  {
-    title:
-      "มาตรฐานการตรวจสอบ การทดสอบ และการประเมินผลสมรรถนะของแกนทรีลำเลียงสำหรับงานติดตั้งเกอร์เดอร์รูปกล่องแบบชิ้นส่วนชนิดหล่อสำเร็จสำหรับโครงสร้างทางยกระดับในโครงการรถไฟความเร็วสูง",
-    coverImage: "/wp-content/uploads/2026/01/2.png",
-    previewHref: "/3d-flip-book/hsr-ct-4013-2569",
-    downloadHref: "/sdc_download/8001",
-  },
 ];
 
 export const additionalHighSpeedRailStandardDocuments: HighSpeedRailStandardDocument[] = [
@@ -103,11 +90,46 @@ export const additionalHighSpeedRailStandardDocuments: HighSpeedRailStandardDocu
     downloadHref: `${assetBase}/hsr-ct-3001-2568.pdf`,
   },
   {
+    code: "HSR-CT-3002",
+    year: "2569",
+    title: "มาตรฐานการก่อสร้างฐานราก สำหรับโครงสร้างทางยกระดับในโครงการรถไฟความเร็วสูง",
+    coverImage: `${assetBase}/hsr-ct-3002-2569.png`,
+    previewHref: `${assetBase}/hsr-ct-3002-2569.pdf`,
+    downloadHref: `${assetBase}/hsr-ct-3002-2569.pdf`,
+  },
+  {
+    code: "HSR-CT-3003",
+    year: "2569",
+    title:
+      "มาตรฐานการก่อสร้างตอม่อและโครงพอทัลคอนกรีตเสริมเหล็ก สำหรับโครงสร้างทางยกระดับในโครงการรถไฟความเร็วสูง",
+    coverImage: `${assetBase}/hsr-ct-3003-2569.png`,
+    previewHref: `${assetBase}/hsr-ct-3003-2569.pdf`,
+    downloadHref: `${assetBase}/hsr-ct-3003-2569.pdf`,
+  },
+  {
+    code: "HSR-CT-3004",
+    year: "2569",
+    title:
+      "มาตรฐานการก่อสร้างสาหรับงานติดตั้งเกอร์เดอร์รูปกล่องแบบชิ้นส่วนชนิดหล่อสำเร็จด้วยวิธีช่วงต่อช่วงโดยแกนทรีลาเลียง สำหรับโครงสร้างทางยกระดับในโครงการรถไฟความเร็วสูง",
+    coverImage: `${assetBase}/hsr-ct-3004-2569.png`,
+    previewHref: `${assetBase}/hsr-ct-3004-2569.pdf`,
+    downloadHref: `${assetBase}/hsr-ct-3004-2569.pdf`,
+  },
+  {
     code: "HSR-CT-4012",
     title: "มาตรฐานงานตรวจวัด",
     coverImage: `${assetBase}/hsr-ct-4012-2568.png`,
     previewHref: `${assetBase}/hsr-ct-4012-2568.pdf`,
     downloadHref: `${assetBase}/hsr-ct-4012-2568.pdf`,
+  },
+  {
+    code: "HSR-CT-4013",
+    year: "2569",
+    title:
+      "มาตรฐานการตรวจสอบ การทดสอบ และการประเมินผลสมรรถนะของแกนทรีลาเลียงสาหรับงานติดตั้งเกอร์เดอร์รูปกล่องแบบชิ้นส่วนชนิดหล่อสาเร็จ สำหรับโครงสร้างทางยกระดับในโครงการรถไฟความเร็วสูง",
+    coverImage: `${assetBase}/hsr-ct-4013-2569.png`,
+    previewHref: `${assetBase}/hsr-ct-4013-2569.pdf`,
+    downloadHref: `${assetBase}/hsr-ct-4013-2569.pdf`,
   },
   {
     code: "HSR-CT-5001",
@@ -119,8 +141,13 @@ export const additionalHighSpeedRailStandardDocuments: HighSpeedRailStandardDocu
 ];
 
 export const highSpeedRailStandardDocuments: HighSpeedRailStandardDocument[] = [
+  ...additionalHighSpeedRailStandardDocuments.filter(
+    (document) => document.year === "2569",
+  ),
+  ...additionalHighSpeedRailStandardDocuments.filter(
+    (document) => document.year !== "2569",
+  ),
   ...importedHighSpeedRailStandardDocuments,
-  ...additionalHighSpeedRailStandardDocuments,
 ];
 
 export function stripImportedHighSpeedRailSection(html: string): string {
@@ -156,7 +183,7 @@ export function buildHighSpeedRailPdfReaderTargets(): PdfReaderTarget[] {
     sourceHref: document.previewHref,
     inlineHref: document.previewHref,
     downloadHref: document.downloadHref,
-    title: `สทร. ${document.code} 2568 ${document.title}`,
+    title: `สทร. ${document.code} ${document.year ?? "2568"} ${document.title}`,
     kind: "upload",
   }));
 }

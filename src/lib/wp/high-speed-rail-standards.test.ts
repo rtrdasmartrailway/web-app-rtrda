@@ -43,15 +43,33 @@ describe("high-speed rail standards override", () => {
     expect(cleaned).toContain("ยังต้องแสดงอยู่");
   });
 
-  it("keeps the original cards and appends the replacement cards", () => {
-    expect(importedHighSpeedRailStandardDocuments).toHaveLength(9);
-    expect(additionalHighSpeedRailStandardDocuments).toHaveLength(5);
-    expect(highSpeedRailStandardDocuments).toHaveLength(14);
+  it("replaces imported 3004 and 4013 cards with the supplied 2569 documents", () => {
+    expect(importedHighSpeedRailStandardDocuments).toHaveLength(7);
+    expect(additionalHighSpeedRailStandardDocuments).toHaveLength(9);
+    expect(highSpeedRailStandardDocuments).toHaveLength(16);
+    expect(
+      additionalHighSpeedRailStandardDocuments
+        .filter((document) => document.year === "2569")
+        .map((document) => document.code),
+    ).toEqual(["HSR-CT-3002", "HSR-CT-3003", "HSR-CT-3004", "HSR-CT-4013"]);
+    expect(
+      highSpeedRailStandardDocuments.slice(0, 4).map((document) => document.code),
+    ).toEqual(["HSR-CT-3002", "HSR-CT-3003", "HSR-CT-3004", "HSR-CT-4013"]);
+    expect(highSpeedRailStandardDocuments[0]?.title).toBe(
+      "มาตรฐานการก่อสร้างฐานราก สำหรับโครงสร้างทางยกระดับในโครงการรถไฟความเร็วสูง",
+    );
+    expect(highSpeedRailStandardDocuments[2]?.title).toContain("แกนทรีลาเลียง");
+    expect(highSpeedRailStandardDocuments[3]?.title).toContain("หล่อสาเร็จ");
   });
 
   it("adds one PDF reader target for each additional static PDF card", () => {
-    expect(buildHighSpeedRailPdfReaderTargets()).toHaveLength(
-      additionalHighSpeedRailStandardDocuments.length,
+    const targets = buildHighSpeedRailPdfReaderTargets();
+    expect(targets).toHaveLength(additionalHighSpeedRailStandardDocuments.length);
+    expect(targets).toContainEqual(
+      expect.objectContaining({
+        sourceHref: "/standards/high-speed-rail/hsr-ct-3002-2569.pdf",
+        title: expect.stringContaining("HSR-CT-3002 2569"),
+      }),
     );
   });
 

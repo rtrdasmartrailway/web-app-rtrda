@@ -24,7 +24,7 @@ function HighSpeedRailStandardsSection() {
                 <div className="wp-block-image is-style-vk-image-shadow">
                   <figure className="aligncenter size-full is-resized">
                     <Image
-                      alt={`สทร. ${document.code} 2568 ${document.title}`}
+                      alt={`สทร. ${document.code} ${document.year ?? "2568"} ${document.title}`}
                       src={document.coverImage}
                       width={600}
                       height={852}
@@ -36,7 +36,9 @@ function HighSpeedRailStandardsSection() {
                 <h6 className="wp-block-heading has-text-align-center is-style-vk-heading-default">
                   {document.code ? (
                     <>
-                      <strong>สทร. {document.code} 2568</strong>
+                      <strong>
+                        สทร. {document.code} {document.year ?? "2568"}
+                      </strong>
                       <br />
                     </>
                   ) : null}
