@@ -83,6 +83,7 @@ jobs:
           npm run lint
           npm run typecheck
           npm run format:check
+          npm run security:audit
 
       - name: Build and restart Docker Compose service
         run: |
@@ -102,3 +103,4 @@ jobs:
           done
           curl -fsS https://test.rtrda.or.th/healthz
           curl -fsSI https://test.rtrda.or.th/ | sed -n '1,20p'
+          node scripts/check-live-security.mjs https://test.rtrda.or.th

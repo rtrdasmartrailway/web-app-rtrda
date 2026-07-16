@@ -1,0 +1,4 @@
+Contact: mailto:info@rtrda.or.th
+Expires: 2027-07-16T05:09:32Z
+Preferred-Languages: th, en
+Canonical: https://rtrda.or.th/.well-known/security.txt

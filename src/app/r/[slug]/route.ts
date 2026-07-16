@@ -1,6 +1,10 @@
 import { createHash, randomUUID } from "node:crypto";
 import { Pool } from "pg";
 import { NextRequest, NextResponse } from "next/server";
+import {
+  createFixedWindowLimiter,
+  type FixedWindowLimiter,
+} from "@/lib/security/rate-limit";
 
 export const dynamic = "force-dynamic";
 
@@ -17,7 +21,19 @@ const targets: Record<string, { campaign: string; targetUrl: string }> = {
 const globalForRedirectTracking = globalThis as unknown as {
   redirectTrackingPool?: Pool;
   redirectTrackingTableReady?: Promise<void>;
+  redirectTrackingLimiter?: FixedWindowLimiter;
 };
+
+function getTrackingLimiter(): FixedWindowLimiter {
+  if (!globalForRedirectTracking.redirectTrackingLimiter) {
+    globalForRedirectTracking.redirectTrackingLimiter = createFixedWindowLimiter({
+      limit: 30,
+      windowMs: 60_000,
+      maxKeys: 10_000,
+    });
+  }
+  return globalForRedirectTracking.redirectTrackingLimiter;
+}
 
 function getPool(): Pool {
   if (!globalForRedirectTracking.redirectTrackingPool) {
@@ -95,6 +111,12 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     firstHeaderValue(request.headers.get("x-forwarded-for")) ||
     firstHeaderValue(request.headers.get("x-real-ip"));
 
+  const ipHash = hashIp(ip);
+  const trackingKey = `${target.campaign}:${ipHash ?? "unknown"}`;
+  if (!getTrackingLimiter().allow(trackingKey)) {
+    return NextResponse.redirect(target.targetUrl, { status: 302 });
+  }
+
   try {
     await ensureTable();
     await getPool().query(
@@ -106,7 +128,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
         target.campaign,
         source.slice(0, 120),
         target.targetUrl,
-        hashIp(ip),
+        ipHash,
         userAgent.slice(0, 1000),
         referrer.slice(0, 1000),
         detectDevice(userAgent),

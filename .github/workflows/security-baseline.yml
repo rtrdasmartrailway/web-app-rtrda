@@ -1,0 +1,65 @@
+name: Security baseline test.rtrda.or.th
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "17 3 * * 1"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: web-app-rtrda-security-baseline
+  cancel-in-progress: true
+
+jobs:
+  baseline:
+    name: Audit dependencies and run ZAP baseline against Test
+    runs-on:
+      - self-hosted
+      - linux
+      - x64
+      - rtrda-web-test
+    timeout-minutes: 25
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Audit production dependencies
+        run: |
+          set -euo pipefail
+          npm ci
+          npm run security:audit
+
+      - name: Run OWASP ZAP baseline against Test only
+        continue-on-error: true
+        run: |
+          set -euo pipefail
+          mkdir -p security-report
+          docker pull zaproxy/zap-stable
+          docker run --rm \
+            -v "$PWD/security-report:/zap/wrk/:rw" \
+            -t zaproxy/zap-stable \
+            zap-baseline.py \
+            -t https://test.rtrda.or.th \
+            -m 2 \
+            -T 10 \
+            -J zap-baseline.json \
+            -r zap-baseline.html \
+            -w zap-baseline.md \
+            -I
+
+      - name: Upload security reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: rtrda-security-baseline-${{ github.run_id }}
+          path: security-report/
+          if-no-files-found: warn
+          retention-days: 30

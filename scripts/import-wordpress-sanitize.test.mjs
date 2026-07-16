@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import * as cheerio from "cheerio";
 import { sanitizeAndRewrite, stripImportedChrome } from "./import-wordpress-sanitize.mjs";
 
 describe("stripImportedChrome", () => {
@@ -45,10 +46,12 @@ describe("sanitizeAndRewrite", () => {
     const out = sanitizeAndRewrite(
       '<table><colgroup><col style="width:60px"><col></colgroup><thead><tr><th>Header</th></tr></thead><tbody><tr><td>Cell</td></tr></tbody></table>',
     );
-    expect(out).toContain("<colgroup>");
-    expect(out).toContain('<col style="width:60px"');
-    expect(out).toContain("<col>");
-    expect(out).toContain("<th>Header</th>");
-    expect(out).toContain("<td>Cell</td>");
+    const $ = cheerio.load(out, null, false);
+    const cols = $("colgroup col");
+    expect($("colgroup")).toHaveLength(1);
+    expect(cols).toHaveLength(2);
+    expect(cols.first().attr("style")).toBe("width:60px");
+    expect($("th").text()).toBe("Header");
+    expect($("td").text()).toBe("Cell");
   });
 });

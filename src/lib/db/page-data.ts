@@ -1,4 +1,5 @@
 import { cache } from "react";
+import { sanitizeContentHtml } from "@/lib/security/sanitize-content";
 import type {
   WpContentRecord,
   WpLanguage,
@@ -432,9 +433,13 @@ export const getPageData = cache(async (path: string): Promise<PageData | null> 
       applyProcurementPlanOverride(applyContactMapOverride(importedRecord)),
     ),
   );
-  const recordWithOverrides = applyProcurementTableOverrides(
+  const overriddenRecord = applyProcurementTableOverrides(
     applyProcurementWinnerOverride(record),
   );
+  const recordWithOverrides = {
+    ...overriddenRecord,
+    contentHtml: sanitizeContentHtml(overriddenRecord.contentHtml),
+  };
 
   const isHome = recordWithOverrides.path === "/" || recordWithOverrides.path === "/en";
   const isCategory = recordWithOverrides.kind === "category";

@@ -83,6 +83,7 @@ jobs:
           npm run lint
           npm run typecheck
           npm run format:check
+          npm run security:audit
 
       - name: Deploy exact main SHA to cloud primary
         env:
@@ -129,6 +130,7 @@ jobs:
       - name: Verify production parity and public health
         env:
           DEPLOY_SHA: ${{ steps.resolve.outputs.deploy_sha }}
+          SOURCE_PATH: ${{ steps.resolve.outputs.source_path }}
         run: |
           set -euo pipefail
           cloud_sha=$(ssh -i ~/.ssh/rtrda-cloud-preprod-sync_ed25519 -o BatchMode=yes ubuntu@100.77.64.92 'cd /home/ubuntu/rtrda-preprod/web-app-rtrda && git rev-parse HEAD && cat .deploy-state/preprod-release')
@@ -143,4 +145,6 @@ jobs:
           curl -fsS http://100.91.174.121:3021/healthz
           curl -fsS https://rtrda.or.th/healthz
           curl -fsS https://www.rtrda.or.th/healthz
+          node "$SOURCE_PATH/scripts/check-live-security.mjs" https://rtrda.or.th
+          node "$SOURCE_PATH/scripts/check-live-security.mjs" https://www.rtrda.or.th
           ssh -i ~/.ssh/rtrda02_prod_preview_sync_ed25519 -o BatchMode=yes rtrda@100.91.174.121 '/home/rtrda/bin/rtrda-production-watchdog.py --status'

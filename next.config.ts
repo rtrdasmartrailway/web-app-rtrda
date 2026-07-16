@@ -1,8 +1,10 @@
 import type { NextConfig } from "next";
+import { SECURITY_HEADERS } from "./src/lib/security/headers";
 
 const nextConfig: NextConfig = {
   output: "standalone",
   reactCompiler: true,
+  poweredByHeader: false,
   experimental: {
     cpus: 4,
   },
@@ -43,6 +45,7 @@ const nextConfig: NextConfig = {
             key: "Cache-Control",
             value: "public, max-age=0, s-maxage=60, stale-while-revalidate=300",
           },
+          ...SECURITY_HEADERS,
         ],
       },
     ];
