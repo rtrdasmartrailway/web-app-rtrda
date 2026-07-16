@@ -191,7 +191,7 @@ export async function buildPdfReaderTargets(
     if (link.kind === "upload") {
       targets.push({
         sourceHref: link.href,
-        inlineHref: link.href,
+        inlineHref: `${link.href}?inline=1`,
         downloadHref: link.href,
         title: link.text || fallbackPdfTitle(link.href, "PDF"),
         kind: "upload",
@@ -212,7 +212,7 @@ export async function buildPdfReaderTargets(
 
     targets.push({
       sourceHref: link.href,
-      inlineHref: pdfPath,
+      inlineHref: `${pdfPath}?inline=1`,
       downloadHref: pdfPath,
       title: flipbookTitle || link.text || fallbackPdfTitle(pdfPath, "PDF"),
       kind: "flipbook",

@@ -66,7 +66,7 @@ describe("PDF reader helpers", () => {
     expect(targets).toEqual([
       {
         sourceHref: "/wp-content/uploads/2026/05/903_12  21.05.69.pdf",
-        inlineHref: "/wp-content/uploads/2026/05/903_12  21.05.69.pdf",
+        inlineHref: "/wp-content/uploads/2026/05/903_12  21.05.69.pdf?inline=1",
         downloadHref: "/wp-content/uploads/2026/05/903_12  21.05.69.pdf",
         title: "PDF",
         kind: "upload",
@@ -89,7 +89,7 @@ describe("PDF reader helpers", () => {
     expect(targets).toEqual([
       {
         sourceHref: "/3d-flip-book/6267",
-        inlineHref: "/wp-content/uploads/2025/07/6001-standard.pdf",
+        inlineHref: "/wp-content/uploads/2025/07/6001-standard.pdf?inline=1",
         downloadHref: "/wp-content/uploads/2025/07/6001-standard.pdf",
         title: "อ่านเพิ่มเติม",
         kind: "flipbook",
