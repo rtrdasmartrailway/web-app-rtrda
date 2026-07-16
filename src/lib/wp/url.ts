@@ -1,4 +1,4 @@
-const RTRDA_HOSTS = new Set(["www.rtrda.or.th", "rtrda.or.th"]);
+const RTRDA_HOSTS = new Set(["www.rtrda.or.th", "rtrda.or.th", "119.63.69.36"]);
 
 function decodeSegment(segment: string): string {
   try {

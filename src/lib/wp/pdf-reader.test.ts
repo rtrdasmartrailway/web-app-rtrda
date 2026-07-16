@@ -13,12 +13,14 @@ describe("PDF reader helpers", () => {
       <a href="/3d-flip-book/6267">อ่านเพิ่มเติม</a>
       <a href="/wp-content/uploads/2023/04/logo.zip">ZIP</a>
       <a href="https://example.com/file.pdf">external</a>
+      <a href="http://119.63.69.36/wp-content/uploads/2024/11/legacy.pdf">legacy RTRDA PDF</a>
     `);
 
     expect(links.map((link) => link.href)).toEqual([
       "/sdc_download/5540",
       "/wp-content/uploads/2026/05/file.pdf",
       "/3d-flip-book/6267",
+      "/wp-content/uploads/2024/11/legacy.pdf",
     ]);
   });
 

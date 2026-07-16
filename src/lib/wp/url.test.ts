@@ -25,6 +25,9 @@ describe("RTRDA URL helpers", () => {
     expect(isRtrdaInternalUrl("https://www.rtrda.or.th/wp-content/a.pdf")).toBe(true);
     expect(isRtrdaInternalUrl("https://forms.gle/example")).toBe(false);
     expect(rewriteRtrdaUrl("https://www.rtrda.or.th/en/contact/")).toBe("/en/contact");
+    expect(
+      rewriteRtrdaUrl("http://119.63.69.36/wp-content/uploads/2024/11/ประกาศผู้ชนะ.pdf"),
+    ).toBe("/wp-content/uploads/2024/11/ประกาศผู้ชนะ.pdf");
     expect(rewriteRtrdaUrl("https://forms.gle/example")).toBe(
       "https://forms.gle/example",
     );
