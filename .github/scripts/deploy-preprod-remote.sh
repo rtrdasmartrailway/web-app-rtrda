@@ -21,8 +21,21 @@ if [ ! -f "$COMPOSE_FILE" ]; then
   exit 1
 fi
 
+mkdir -p .deploy-state
+PREVIOUS_SHA=""
+PREVIOUS_COMPOSE="/tmp/rtrda-${TARGET_NAME}-previous-compose.yml"
+if [ -f .deploy-state/preprod-release ]; then
+  PREVIOUS_SHA="$(tr -d '[:space:]' < .deploy-state/preprod-release)"
+fi
+if [ -n "$PREVIOUS_SHA" ] && git cat-file -e "${PREVIOUS_SHA}^{commit}" 2>/dev/null; then
+  cp "$COMPOSE_FILE" "$PREVIOUS_COMPOSE"
+else
+  PREVIOUS_SHA=""
+  rm -f "$PREVIOUS_COMPOSE"
+fi
+
 git fetch origin test main --prune
-git checkout -B preprod "$DEPLOY_SHA"
+git checkout -f -B preprod "$DEPLOY_SHA"
 git reset --hard "$DEPLOY_SHA"
 
 python3 - <<'PY'
@@ -96,19 +109,55 @@ done
 run_node npm run db:migrate
 run_node npm run db:seed
 
-docker compose --env-file .env.cicd-preprod -f "$COMPOSE_FILE" up -d --build "$APP_SERVICE"
-mkdir -p .deploy-state
-echo "$DEPLOY_SHA" > .deploy-state/preprod-release
-printf '%s %s %s\n' "$(date -Is)" "$TARGET_NAME" "$DEPLOY_SHA" >> .deploy-state/preprod-releases.log
+wait_for_health() {
+  local attempts="${1:-50}"
+  for attempt in $(seq 1 "$attempts"); do
+    if curl -fsS "$DIRECT_HEALTH_URL"; then
+      echo
+      return 0
+    fi
+    sleep 3
+  done
+  return 1
+}
 
-for attempt in $(seq 1 50); do
-  if curl -fsS "$DIRECT_HEALTH_URL"; then
-    echo
-    exit 0
+rollback_previous_release() {
+  if [ -z "$PREVIOUS_SHA" ] || [ ! -f "$PREVIOUS_COMPOSE" ]; then
+    echo "::error::no previous release is available for rollback"
+    return 1
   fi
-  sleep 3
-done
+
+  echo "::warning::${TARGET_NAME}: rolling back to ${PREVIOUS_SHA}"
+  git checkout -f -B preprod "$PREVIOUS_SHA"
+  git reset --hard "$PREVIOUS_SHA"
+  cp "$PREVIOUS_COMPOSE" "$COMPOSE_FILE"
+  docker compose --env-file .env.cicd-preprod -f "$COMPOSE_FILE" up -d --no-build "$APP_SERVICE"
+  if wait_for_health 30; then
+    echo "::warning::${TARGET_NAME}: restored previous healthy release ${PREVIOUS_SHA}"
+    return 0
+  fi
+
+  echo "::error::${TARGET_NAME}: rollback health check failed"
+  return 1
+}
+
+# Build the immutable SHA-tagged image while the current container remains up.
+docker compose --env-file .env.cicd-preprod -f "$COMPOSE_FILE" build "$APP_SERVICE"
+# Replacement is now a short container swap; never rebuild while the old service is stopped.
+if ! docker compose --env-file .env.cicd-preprod -f "$COMPOSE_FILE" up -d --no-build "$APP_SERVICE"; then
+  echo "::error::${TARGET_NAME}: container replacement command failed"
+  rollback_previous_release || true
+  exit 1
+fi
+
+if wait_for_health 50; then
+  echo "$DEPLOY_SHA" > .deploy-state/preprod-release
+  printf '%s %s %s\n' "$(date -Is)" "$TARGET_NAME" "$DEPLOY_SHA" >> .deploy-state/preprod-releases.log
+  rm -f "$PREVIOUS_COMPOSE"
+  exit 0
+fi
 
 docker compose --env-file .env.cicd-preprod -f "$COMPOSE_FILE" ps
 docker compose --env-file .env.cicd-preprod -f "$COMPOSE_FILE" logs --tail=160 "$APP_SERVICE"
+rollback_previous_release || true
 exit 1
