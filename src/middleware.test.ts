@@ -39,6 +39,24 @@ describe("security middleware", () => {
     expect(response.headers.get("x-middleware-next")).toBe("1");
   });
 
+  it.each(["/healthz", "/api/health"])(
+    "does not redirect %s even when a watchdog sends the public Host header",
+    (path) => {
+      const response = middleware(
+        request(`http://100.77.64.92:3021${path}`, {
+          headers: {
+            host: "rtrda.or.th",
+            "x-forwarded-host": "rtrda.or.th",
+            "x-forwarded-proto": "http",
+          },
+        }),
+      );
+
+      expect(response.status).toBe(200);
+      expect(response.headers.get("x-middleware-next")).toBe("1");
+    },
+  );
+
   it.each(["POST", "PUT", "PATCH", "DELETE"])(
     "rejects unsupported %s requests",
     (method) => {

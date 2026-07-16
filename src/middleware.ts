@@ -12,6 +12,7 @@ const CANONICAL_O10_ESERVICE_PDF_PATH =
   "/wp-content/uploads/ita2569/O10/o10-%E0%B8%84%E0%B8%B9%E0%B9%88%E0%B8%A1%E0%B8%B7%E0%B8%AD%E0%B8%81%E0%B8%B2%E0%B8%A3%E0%B9%83%E0%B8%AB%E0%B9%89%E0%B8%9A%E0%B8%A3%E0%B8%B4%E0%B8%81%E0%B8%B2%E0%B8%A3-E-Service.pdf";
 
 const ALLOWED_METHODS = "GET, HEAD, OPTIONS";
+const HEALTH_PATHS = new Set(["/healthz", "/api/health"]);
 const PUBLIC_HOSTS = new Set(["rtrda.or.th", "www.rtrda.or.th", "test.rtrda.or.th"]);
 
 function firstForwardedValue(value: string | null): string {
@@ -19,6 +20,9 @@ function firstForwardedValue(value: string | null): string {
 }
 
 function httpsRedirect(request: NextRequest): NextResponse | null {
+  if (HEALTH_PATHS.has(new URL(request.url).pathname)) {
+    return null;
+  }
   if (firstForwardedValue(request.headers.get("x-forwarded-proto")) !== "http") {
     return null;
   }
