@@ -1,5 +1,5 @@
 import type { NextConfig } from "next";
-import { SECURITY_HEADERS } from "./src/lib/security/headers";
+import { INLINE_PDF_HEADERS, SECURITY_HEADERS } from "./src/lib/security/headers";
 
 const nextConfig: NextConfig = {
   output: "standalone",
@@ -47,6 +47,13 @@ const nextConfig: NextConfig = {
           },
           ...SECURITY_HEADERS,
         ],
+      },
+      // Inline download responses are framed only by the same RTRDA origin.
+      // This route-specific policy overrides the global clickjacking denial
+      // without allowing third-party sites to embed RTRDA documents.
+      {
+        source: "/sdc_download/:path*",
+        headers: [...INLINE_PDF_HEADERS],
       },
     ];
   },
