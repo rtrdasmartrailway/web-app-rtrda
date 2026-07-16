@@ -1,4 +1,4 @@
-export const CONTENT_SECURITY_POLICY_REPORT_ONLY = [
+const CSP_BASE_DIRECTIVES = [
   "default-src 'self'",
   "base-uri 'self'",
   "object-src 'none'",
@@ -7,14 +7,27 @@ export const CONTENT_SECURITY_POLICY_REPORT_ONLY = [
   "img-src 'self' data: blob: https:",
   "font-src 'self' data: https:",
   "style-src 'self' 'unsafe-inline' https:",
-  "script-src 'self'",
   "connect-src 'self'",
   "media-src 'self' blob: https:",
   "worker-src 'self' blob:",
   "frame-src 'self' https://www.youtube.com https://www.youtube-nocookie.com https://docs.google.com https://drive.google.com https://www.google.com https://www.enablesurvey.com",
+];
+
+export const CONTENT_SECURITY_POLICY = [
+  ...CSP_BASE_DIRECTIVES,
+  "script-src 'self' 'unsafe-inline'",
+].join("; ");
+
+export const CONTENT_SECURITY_POLICY_REPORT_ONLY = [
+  ...CSP_BASE_DIRECTIVES,
+  "script-src 'self'",
 ].join("; ");
 
 export const SECURITY_HEADERS: ReadonlyArray<{ key: string; value: string }> = [
+  {
+    key: "Content-Security-Policy",
+    value: CONTENT_SECURITY_POLICY,
+  },
   {
     key: "Content-Security-Policy-Report-Only",
     value: CONTENT_SECURITY_POLICY_REPORT_ONLY,

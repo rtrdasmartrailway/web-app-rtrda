@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 import nextConfig from "../../../next.config";
-import { CONTENT_SECURITY_POLICY_REPORT_ONLY, SECURITY_HEADERS } from "./headers";
+import {
+  CONTENT_SECURITY_POLICY,
+  CONTENT_SECURITY_POLICY_REPORT_ONLY,
+  SECURITY_HEADERS,
+} from "./headers";
 
 describe("security headers", () => {
   it("defines the required browser hardening headers", () => {
@@ -11,15 +15,18 @@ describe("security headers", () => {
     expect(headers.get("X-Content-Type-Options")).toBe("nosniff");
     expect(headers.get("Referrer-Policy")).toBe("strict-origin-when-cross-origin");
     expect(headers.get("Permissions-Policy")).toContain("camera=()");
+    expect(headers.get("Content-Security-Policy")).toBe(CONTENT_SECURITY_POLICY);
     expect(headers.get("Content-Security-Policy-Report-Only")).toBe(
       CONTENT_SECURITY_POLICY_REPORT_ONLY,
     );
   });
 
-  it("uses a restrictive CSP report-only baseline without enforcing unsafe script execution", () => {
-    expect(CONTENT_SECURITY_POLICY_REPORT_ONLY).toContain("default-src 'self'");
-    expect(CONTENT_SECURITY_POLICY_REPORT_ONLY).toContain("object-src 'none'");
-    expect(CONTENT_SECURITY_POLICY_REPORT_ONLY).toContain("frame-ancestors 'none'");
+  it("enforces a compatibility-safe CSP while monitoring a stricter script policy", () => {
+    expect(CONTENT_SECURITY_POLICY).toContain("default-src 'self'");
+    expect(CONTENT_SECURITY_POLICY).toContain("object-src 'none'");
+    expect(CONTENT_SECURITY_POLICY).toContain("frame-ancestors 'none'");
+    expect(CONTENT_SECURITY_POLICY).toContain("script-src 'self' 'unsafe-inline'");
+
     expect(CONTENT_SECURITY_POLICY_REPORT_ONLY).toContain("script-src 'self'");
     expect(CONTENT_SECURITY_POLICY_REPORT_ONLY).not.toContain(
       "script-src 'self' 'unsafe-inline'",

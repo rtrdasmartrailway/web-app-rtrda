@@ -8,6 +8,7 @@ if (!target) {
 
 const requiredHeaders = new Map([
   ["strict-transport-security", /^max-age=\d+/],
+  ["content-security-policy", /default-src 'self'/],
   ["content-security-policy-report-only", /default-src 'self'/],
   ["x-frame-options", /^DENY$/],
   ["x-content-type-options", /^nosniff$/],
