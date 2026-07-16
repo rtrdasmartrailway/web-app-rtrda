@@ -4,6 +4,7 @@ import {
   CONTENT_SECURITY_POLICY,
   CONTENT_SECURITY_POLICY_REPORT_ONLY,
   INLINE_PDF_HEADERS,
+  SAME_ORIGIN_FRAME_HEADERS,
   SECURITY_HEADERS,
 } from "./headers";
 
@@ -53,6 +54,22 @@ describe("security headers", () => {
     );
     for (const { key, value } of INLINE_PDF_HEADERS) {
       expect(routedHeaders.get(key)).toBe(value);
+    }
+  });
+
+  it("overrides clickjacking denial after the global route for mirrored assets", async () => {
+    const routes = await nextConfig.headers?.();
+    const globalIndex = routes?.findIndex((route) => route.source === "/:path*") ?? -1;
+
+    for (const source of ["/wp-content/uploads/:path*", "/sdc-downloads/:path*"]) {
+      const routeIndex = routes?.findIndex((route) => route.source === source) ?? -1;
+      expect(routeIndex).toBeGreaterThan(globalIndex);
+      const route = routes?.[routeIndex];
+      const headers = new Map(route?.headers.map(({ key, value }) => [key, value]));
+      for (const { key, value } of SAME_ORIGIN_FRAME_HEADERS) {
+        expect(headers.get(key)).toBe(value);
+      }
+      expect(headers.get("Cache-Control")).toBe("public, max-age=14400, s-maxage=86400");
     }
   });
 

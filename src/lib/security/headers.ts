@@ -23,10 +23,14 @@ export const CONTENT_SECURITY_POLICY_REPORT_ONLY = [
   "script-src 'self'",
 ].join("; ");
 
-export const INLINE_PDF_HEADERS: ReadonlyArray<{ key: string; value: string }> = [
+export const SAME_ORIGIN_FRAME_HEADERS: ReadonlyArray<{ key: string; value: string }> = [
   { key: "Content-Security-Policy", value: "frame-ancestors 'self'" },
   { key: "Content-Security-Policy-Report-Only", value: "frame-ancestors 'self'" },
   { key: "X-Frame-Options", value: "SAMEORIGIN" },
+];
+
+export const INLINE_PDF_HEADERS: ReadonlyArray<{ key: string; value: string }> = [
+  ...SAME_ORIGIN_FRAME_HEADERS,
   { key: "Cross-Origin-Resource-Policy", value: "same-origin" },
 ];
 

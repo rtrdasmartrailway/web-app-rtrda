@@ -1,5 +1,9 @@
 import type { NextConfig } from "next";
-import { INLINE_PDF_HEADERS, SECURITY_HEADERS } from "./src/lib/security/headers";
+import {
+  INLINE_PDF_HEADERS,
+  SAME_ORIGIN_FRAME_HEADERS,
+  SECURITY_HEADERS,
+} from "./src/lib/security/headers";
 
 const nextConfig: NextConfig = {
   output: "standalone",
@@ -21,18 +25,6 @@ const nextConfig: NextConfig = {
     // also applies to 404 responses, which let Cloudflare cache a "missing"
     // asset for a year if it was requested before the importer mirrored it.
     return [
-      {
-        source: "/wp-content/uploads/:path*",
-        headers: [
-          { key: "Cache-Control", value: "public, max-age=14400, s-maxage=86400" },
-        ],
-      },
-      {
-        source: "/sdc-downloads/:path*",
-        headers: [
-          { key: "Cache-Control", value: "public, max-age=14400, s-maxage=86400" },
-        ],
-      },
       // HTML pages: keep them on the edge briefly so bursts don't pound the
       // origin, but make sure deploys are visible within minutes. Without
       // this rule Next.js defaults to s-maxage=31536000 (1 year) which
@@ -48,6 +40,16 @@ const nextConfig: NextConfig = {
           ...SECURITY_HEADERS,
         ],
       },
+      // Mirrored documents and media may be framed by the same RTRDA origin.
+      // These later rules override only the global frame denial while keeping
+      // third-party framing blocked and preserving bounded CDN caching.
+      ...["/wp-content/uploads/:path*", "/sdc-downloads/:path*"].map((source) => ({
+        source,
+        headers: [
+          { key: "Cache-Control", value: "public, max-age=14400, s-maxage=86400" },
+          ...SAME_ORIGIN_FRAME_HEADERS,
+        ],
+      })),
       // Inline download responses are framed only by the same RTRDA origin.
       // This route-specific policy overrides the global clickjacking denial
       // without allowing third-party sites to embed RTRDA documents.
