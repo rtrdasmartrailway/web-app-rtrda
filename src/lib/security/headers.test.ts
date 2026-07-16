@@ -25,7 +25,12 @@ describe("security headers", () => {
     expect(CONTENT_SECURITY_POLICY).toContain("default-src 'self'");
     expect(CONTENT_SECURITY_POLICY).toContain("object-src 'none'");
     expect(CONTENT_SECURITY_POLICY).toContain("frame-ancestors 'none'");
-    expect(CONTENT_SECURITY_POLICY).toContain("script-src 'self' 'unsafe-inline'");
+    expect(CONTENT_SECURITY_POLICY).toContain(
+      "script-src 'self' 'unsafe-inline' https://static.cloudflareinsights.com",
+    );
+    expect(CONTENT_SECURITY_POLICY).toContain(
+      "connect-src 'self' https://cloudflareinsights.com",
+    );
 
     expect(CONTENT_SECURITY_POLICY_REPORT_ONLY).toContain("script-src 'self'");
     expect(CONTENT_SECURITY_POLICY_REPORT_ONLY).not.toContain(

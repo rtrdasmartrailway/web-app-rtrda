@@ -7,7 +7,7 @@ const CSP_BASE_DIRECTIVES = [
   "img-src 'self' data: blob: https:",
   "font-src 'self' data: https:",
   "style-src 'self' 'unsafe-inline' https:",
-  "connect-src 'self'",
+  "connect-src 'self' https://cloudflareinsights.com",
   "media-src 'self' blob: https:",
   "worker-src 'self' blob:",
   "frame-src 'self' https://www.youtube.com https://www.youtube-nocookie.com https://docs.google.com https://drive.google.com https://www.google.com https://www.enablesurvey.com",
@@ -15,7 +15,7 @@ const CSP_BASE_DIRECTIVES = [
 
 export const CONTENT_SECURITY_POLICY = [
   ...CSP_BASE_DIRECTIVES,
-  "script-src 'self' 'unsafe-inline'",
+  "script-src 'self' 'unsafe-inline' https://static.cloudflareinsights.com",
 ].join("; ");
 
 export const CONTENT_SECURITY_POLICY_REPORT_ONLY = [
