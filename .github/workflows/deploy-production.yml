@@ -63,6 +63,24 @@ jobs:
           git status -sb
           git log --oneline -1
 
+      - name: Stage mirrored public assets from canonical test workspace
+        env:
+          SOURCE_PATH: ${{ steps.resolve.outputs.source_path }}
+        run: |
+          set -euo pipefail
+          MIRRORED_ASSET_SOURCE=/srv/workspace/web-app-rtrda/public
+          test -d "$MIRRORED_ASSET_SOURCE/sdc-downloads"
+          test -d "$MIRRORED_ASSET_SOURCE/wp-content/uploads"
+          mkdir -p "$SOURCE_PATH/public/sdc-downloads" "$SOURCE_PATH/public/wp-content/uploads"
+          rsync -a "$MIRRORED_ASSET_SOURCE/sdc-downloads/" "$SOURCE_PATH/public/sdc-downloads/"
+          rsync -a "$MIRRORED_ASSET_SOURCE/wp-content/uploads/" "$SOURCE_PATH/public/wp-content/uploads/"
+          mirrored_download_count=$(find "$MIRRORED_ASSET_SOURCE/sdc-downloads" -type f | wc -l)
+          staged_download_count=$(find "$SOURCE_PATH/public/sdc-downloads" -type f | wc -l)
+          echo "mirrored_download_count=$mirrored_download_count"
+          echo "staged_download_count=$staged_download_count"
+          test "$mirrored_download_count" -gt 0
+          test "$staged_download_count" -eq "$mirrored_download_count"
+
       - name: Install dependencies and generate Prisma client
         env:
           SOURCE_PATH: ${{ steps.resolve.outputs.source_path }}

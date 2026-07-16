@@ -41,6 +41,19 @@ describe("Deploy rtrda.or.th production workflow", () => {
     expect(deployRemoteScript).toContain("restored previous healthy release");
   });
 
+  it("stages ignored mirrored assets from the canonical test workspace before production deploy", () => {
+    expect(workflow).toContain(
+      "MIRRORED_ASSET_SOURCE=/srv/workspace/web-app-rtrda/public",
+    );
+    expect(workflow).toContain(
+      'rsync -a "$MIRRORED_ASSET_SOURCE/sdc-downloads/" "$SOURCE_PATH/public/sdc-downloads/"',
+    );
+    expect(workflow).toContain(
+      'rsync -a "$MIRRORED_ASSET_SOURCE/wp-content/uploads/" "$SOURCE_PATH/public/wp-content/uploads/"',
+    );
+    expect(workflow).toContain("mirrored_download_count");
+  });
+
   it("preserves legacy host-mounted public assets during production deploy", () => {
     expect(deployTargetScript).toContain("public/wp-content/uploads/");
     expect(deployTargetScript).toContain("public/sdc-downloads/");
