@@ -43,23 +43,50 @@ describe("high-speed rail standards override", () => {
     expect(cleaned).toContain("ยังต้องแสดงอยู่");
   });
 
-  it("replaces imported 3004 and 4013 cards with the supplied 2569 documents", () => {
+  it("keeps all high-speed rail files while using the approved tunnel standard titles", () => {
     expect(importedHighSpeedRailStandardDocuments).toHaveLength(7);
     expect(additionalHighSpeedRailStandardDocuments).toHaveLength(9);
     expect(highSpeedRailStandardDocuments).toHaveLength(16);
     expect(
-      additionalHighSpeedRailStandardDocuments
-        .filter((document) => document.year === "2569")
-        .map((document) => document.code),
-    ).toEqual(["HSR-CT-3002", "HSR-CT-3003", "HSR-CT-3004", "HSR-CT-4013"]);
+      additionalHighSpeedRailStandardDocuments.map((document) => document.code),
+    ).toEqual([
+      "HSR-CT-1001",
+      "HSR-CT-1002",
+      "HSR-CT-3001",
+      "HSR-CT-3002",
+      "HSR-CT-3003",
+      "HSR-CT-3004",
+      "HSR-CT-4012",
+      "HSR-CT-4013",
+      "HSR-CT-5001",
+    ]);
+    expect(highSpeedRailStandardDocuments.map((document) => document.code)).toContain(
+      "HSR-CT-3002",
+    );
     expect(
       highSpeedRailStandardDocuments.slice(0, 4).map((document) => document.code),
     ).toEqual(["HSR-CT-3002", "HSR-CT-3003", "HSR-CT-3004", "HSR-CT-4013"]);
-    expect(highSpeedRailStandardDocuments[0]?.title).toBe(
-      "มาตรฐานการก่อสร้างฐานราก สำหรับโครงสร้างทางยกระดับในโครงการรถไฟความเร็วสูง",
+    expect(
+      highSpeedRailStandardDocuments.slice(4, 9).map((document) => document.code),
+    ).toEqual([
+      "HSR-CT-1001",
+      "HSR-CT-1002",
+      "HSR-CT-3001",
+      "HSR-CT-4012",
+      "HSR-CT-5001",
+    ]);
+    expect(
+      additionalHighSpeedRailStandardDocuments.find(
+        (document) => document.code === "HSR-CT-1001",
+      )?.title,
+    ).toBe("มาตรฐานงานสำรวจวิศวกรรมในการก่อสร้างอุโมงค์ สำหรับโครงการรถไฟความเร็วสูง");
+    expect(
+      additionalHighSpeedRailStandardDocuments.find(
+        (document) => document.code === "HSR-CT-5001",
+      )?.title,
+    ).toBe(
+      "มาตรฐานการป้องกันและงานระบายน้ำในการก่อสร้างอุโมงค์ สำหรับโครงการรถไฟความเร็วสูง",
     );
-    expect(highSpeedRailStandardDocuments[2]?.title).toContain("แกนทรีลาเลียง");
-    expect(highSpeedRailStandardDocuments[3]?.title).toContain("หล่อสาเร็จ");
   });
 
   it("adds one PDF reader target for each additional static PDF card", () => {
@@ -67,8 +94,8 @@ describe("high-speed rail standards override", () => {
     expect(targets).toHaveLength(additionalHighSpeedRailStandardDocuments.length);
     expect(targets).toContainEqual(
       expect.objectContaining({
-        sourceHref: "/standards/high-speed-rail/hsr-ct-3002-2569.pdf",
-        title: expect.stringContaining("HSR-CT-3002 2569"),
+        sourceHref: "/standards/high-speed-rail/hsr-ct-1001-2568.pdf",
+        title: expect.stringContaining("HSR-CT-1001 2568"),
       }),
     );
   });

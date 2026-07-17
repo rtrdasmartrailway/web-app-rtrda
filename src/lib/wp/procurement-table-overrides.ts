@@ -172,6 +172,48 @@ const railComponentDocuments: Array<{
   },
 ];
 
+const railWeldingDocuments = [
+  {
+    title: "มาตรฐานแนะนำการเชื่อมซ่อมผิวหัวรางด้วยการเชื่อมอาร์ก",
+    image: uploadFile("2026/01/124.jpg"),
+    previewHref: "/3d-flip-book/ct-70012568",
+    downloadHref: "/sdc_download/7166",
+  },
+  {
+    title: "มาตรฐานการทดสอบเพื่อรับรองการเชื่อมซ่อมผิวหัวรางด้วยการเชื่อมอาร์ก",
+    image: uploadFile("2026/01/123.jpg"),
+    previewHref: "/3d-flip-book/สทร-ct60012568",
+    downloadHref: "/sdc_download/7169",
+  },
+  {
+    title: "ชุดมาตรฐานการทดสอบโดยไม่ทำลายบนรอยเชื่อมรางรถไฟ",
+    image: uploadFile("2026/01/125.jpg"),
+    previewHref: "/3d-flip-book/ct-6002_6004_2568",
+    downloadHref: "/sdc_download/7163",
+  },
+  {
+    title: "สทร-RS-6001-2568",
+    image: uploadFile("2026/07/rtrda-rs-6001-2568.png"),
+    previewHref: "/3d-flip-book/สทร-rs-6001-2568",
+    downloadHref: uploadFile("2025/12/สทร-RS-6001-2568.pdf"),
+  },
+  {
+    title: "สทร-RS-6002-2568",
+    image: uploadFile("2026/07/rtrda-rs-6002-2568.png"),
+    previewHref: "/3d-flip-book/สทร-rs-6002-2568",
+    downloadHref: uploadFile("2025/12/สทร-RS-6002-2568.pdf"),
+  },
+];
+
+const otherRailStandardDocuments = [
+  {
+    title: "รายงานการพัฒนามาตรฐานระบบราง",
+    image: uploadFile("2024/08/หน้าปก-บทความ-มาตรฐาน-สทร_final-edit.png"),
+    previewHref: "/sdc_download/5544",
+    downloadHref: "/sdc_download/5544",
+  },
+];
+
 const railDevelopmentPlanDocuments = [
   {
     title: "แผนพัฒนามาตรฐานระบบขนส่งทางรางของ สทร.",
@@ -457,14 +499,9 @@ function buildRailComponentCard(
   $: cheerio.CheerioAPI,
   doc: { code: string; title: string; href: string; image: string },
 ): Cheerio<AnyNode> {
-  const column = $("<article></article>")
-    .addClass(
-      "rtrda-rail-component-card wp-block-column is-vertically-aligned-top is-layout-flow wp-block-column-is-layout-flow",
-    )
-    .attr(
-      "style",
-      "background:#ffffff;border-radius:18px;box-shadow:0 12px 30px rgba(15,23,42,.10);padding:22px 18px 20px;display:flex;flex-direction:column;align-items:center;gap:14px;min-height:100%;",
-    );
+  const column = $("<article></article>").addClass(
+    "rtrda-rail-component-card wp-block-column is-vertically-aligned-top is-layout-flow wp-block-column-is-layout-flow",
+  );
   const image = $("<div></div>")
     .addClass("wp-block-image is-style-vk-image-shadow")
     .append(
@@ -477,16 +514,13 @@ function buildRailComponentCard(
             .attr("width", "600")
             .attr("height", "852")
             .attr("src", doc.image)
-            .attr("alt", `สทร. ${doc.code} ${doc.title}`)
-            .attr("style", "width:165px;height:auto;max-width:100%;border-radius:10px;"),
+            .attr("alt", doc.title),
         ),
     );
 
   const heading = $("<h6></h6>").addClass(
     "wp-block-heading has-text-align-center is-style-vk-heading-default",
   );
-  heading.append($("<strong></strong>").text(`สทร. ${doc.code}`));
-  heading.append($("<br>"));
   heading.append($("<strong></strong>").text(doc.title));
 
   const readMore = $("<div></div>").addClass(
@@ -521,12 +555,9 @@ function buildRailComponentCard(
 }
 
 function buildRailComponentFiles($: cheerio.CheerioAPI): Cheerio<AnyNode> {
-  const group = $("<div></div>")
-    .addClass("rtrda-rail-component-standards-files")
-    .attr(
-      "style",
-      "display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:24px;align-items:stretch;margin:24px 0;",
-    );
+  const group = $("<div></div>").addClass(
+    "rtrda-rail-component-standards-files wp-block-columns is-layout-flex wp-block-columns-is-layout-flex",
+  );
   railComponentDocuments.forEach((doc) => group.append(buildRailComponentCard($, doc)));
   return group;
 }
@@ -549,6 +580,113 @@ function applyRailComponentStandards(record: WpContentRecord): WpContentRecord {
   const body = accordion.find(".lightweight-accordion-body").first();
   if (body.length === 0) return record;
   body.prepend(buildRailComponentFiles($));
+  return { ...record, contentHtml: $.html() };
+}
+
+type RailDocumentCard = {
+  title: string;
+  image: string;
+  previewHref: string;
+  downloadHref: string;
+};
+
+function buildRailDocumentCards(
+  $: cheerio.CheerioAPI,
+  markerClass: string,
+  documents: RailDocumentCard[],
+): Cheerio<AnyNode> {
+  const cards = $("<div></div>").addClass(
+    [
+      markerClass,
+      "wp-block-columns",
+      "is-layout-flex",
+      "wp-block-columns-is-layout-flex",
+      documents.length === 1 ? "rtrda-rail-standards-files--single" : "",
+    ]
+      .filter(Boolean)
+      .join(" "),
+  );
+  documents.forEach((document) => cards.append(buildRailDocumentCard($, document)));
+  return cards;
+}
+
+function buildRailDocumentCard(
+  $: cheerio.CheerioAPI,
+  document: RailDocumentCard,
+): Cheerio<AnyNode> {
+  const column = $("<div></div>").addClass(
+    "wp-block-column is-vertically-aligned-top is-layout-flow wp-block-column-is-layout-flow",
+  );
+  const image = $("<div></div>")
+    .addClass("wp-block-image is-style-vk-image-shadow")
+    .append(
+      $("<figure></figure>")
+        .addClass("aligncenter size-full is-resized")
+        .append(
+          $("<img>")
+            .attr("loading", "lazy")
+            .attr("decoding", "async")
+            .attr("width", "600")
+            .attr("height", "852")
+            .attr("src", document.image)
+            .attr("alt", document.title),
+        ),
+    );
+  const title = $("<h6></h6>")
+    .addClass("wp-block-heading has-text-align-center is-style-vk-heading-default")
+    .append($("<strong></strong>").text(document.title));
+  const readMore = $("<div></div>")
+    .addClass(
+      "wp-block-buttons is-content-justification-center is-layout-flex wp-container-core-buttons-is-layout-16018d1d wp-block-buttons-is-layout-flex",
+    )
+    .append(
+      $("<div></div>")
+        .addClass("wp-block-button detail-btn")
+        .append(
+          $("<a></a>")
+            .addClass("wp-block-button__link wp-element-button")
+            .attr("href", document.previewHref)
+            .text("อ่านเพิ่มเติม"),
+        ),
+    );
+  const download = $("<p></p>")
+    .addClass("simple-download-counter")
+    .append(
+      $("<a></a>")
+        .addClass("simple-download-counter-link")
+        .attr("data-pdf-reader-ignore", "true")
+        .attr("download", "")
+        .attr("href", document.downloadHref)
+        .text("ดาวน์โหลดไฟล์"),
+    );
+
+  return column.append(image, title, readMore, download);
+}
+
+function applyRailDocumentCards(
+  record: WpContentRecord,
+  accordionTitle: string,
+  markerClass: string,
+  documents: RailDocumentCard[],
+): WpContentRecord {
+  const $ = cheerio.load(record.contentHtml, null, false);
+  if ($(`.${markerClass}`).length > 0) return record;
+  const body = $(".lightweight-accordion")
+    .filter((_, element) =>
+      $(element)
+        .find("summary")
+        .first()
+        .text()
+        .replace(/\s+/g, " ")
+        .trim()
+        .includes(accordionTitle),
+    )
+    .first()
+    .find(".lightweight-accordion-body")
+    .first();
+  if (body.length === 0) return record;
+
+  body.empty().append(buildRailDocumentCards($, markerClass, documents));
   return { ...record, contentHtml: $.html() };
 }
 
@@ -706,7 +844,19 @@ export function applyProcurementTableOverrides(record: WpContentRecord): WpConte
     return applyEmptyCancelWinnerTable(record);
   }
   if (path === RAIL_STANDARDS_PATH || path === `/en${RAIL_STANDARDS_PATH}`) {
-    return applyRailStandardsTables(applyRailComponentStandards(record));
+    return applyRailStandardsTables(
+      applyRailDocumentCards(
+        applyRailDocumentCards(
+          applyRailComponentStandards(record),
+          "มาตรฐานงานเชื่อม",
+          "rtrda-rail-welding-files",
+          railWeldingDocuments,
+        ),
+        "อื่นๆ",
+        "rtrda-other-rail-standard-files",
+        otherRailStandardDocuments,
+      ),
+    );
   }
   return record;
 }

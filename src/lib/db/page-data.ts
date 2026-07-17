@@ -498,6 +498,10 @@ export const getPageData = cache(async (path: string): Promise<PageData | null> 
     knowledgeDocuments: isKnowledgeDocuments
       ? buildKnowledgeDocumentGroups(recordWithOverrides.contentHtml, {
           validDownloadIds: new Set(downloadIds),
+          excludedGroupTitles:
+            recordWithOverrides.path === "/คลังความรู้"
+              ? new Set(["มาตรฐานระบบราง สทร.", "ร่างมาตรฐานระบบราง สทร."])
+              : undefined,
         })
       : null,
     boardExecutivePresentation: buildBoardExecutivePresentation(

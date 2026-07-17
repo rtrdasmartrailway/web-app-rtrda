@@ -20,6 +20,7 @@ export interface KnowledgeDocumentGroup {
 
 export interface KnowledgeDocumentParseOptions {
   validDownloadIds?: Set<string>;
+  excludedGroupTitles?: Set<string>;
 }
 
 export function isKnowledgeDocumentPath(path: string): boolean {
@@ -291,6 +292,9 @@ export function buildKnowledgeDocumentGroups(
     const title = compactText(
       $accordion.find("summary.lightweight-accordion-title").first().text(),
     );
+    if (options.excludedGroupTitles?.has(title)) {
+      return;
+    }
     const bodyDownloads = allDownloadHrefs($, $body, options);
     const documents = $body
       .children(".wp-block-columns")

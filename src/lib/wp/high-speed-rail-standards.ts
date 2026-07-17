@@ -70,21 +70,21 @@ export const importedHighSpeedRailStandardDocuments: HighSpeedRailStandardDocume
 export const additionalHighSpeedRailStandardDocuments: HighSpeedRailStandardDocument[] = [
   {
     code: "HSR-CT-1001",
-    title: "มาตรฐานงานสำรวจ",
+    title: "มาตรฐานงานสำรวจวิศวกรรมในการก่อสร้างอุโมงค์ สำหรับโครงการรถไฟความเร็วสูง",
     coverImage: `${assetBase}/hsr-ct-1001-2568.png`,
     previewHref: `${assetBase}/hsr-ct-1001-2568.pdf`,
     downloadHref: `${assetBase}/hsr-ct-1001-2568.pdf`,
   },
   {
     code: "HSR-CT-1002",
-    title: "มาตรฐานงานป้องกันน้ำ",
+    title: "มาตรฐานงานเจาะและงานระเบิดในการก่อสร้างอุโมงค์ สำหรับโครงการรถไฟความเร็วสูง",
     coverImage: `${assetBase}/hsr-ct-1002-2568.png`,
     previewHref: `${assetBase}/hsr-ct-1002-2568.pdf`,
     downloadHref: `${assetBase}/hsr-ct-1002-2568.pdf`,
   },
   {
     code: "HSR-CT-3001",
-    title: "มาตรฐานงานเจาะและระเบิด",
+    title: "มาตรฐานงานค้ำยันในการก่อสร้างอุโมงค์ สำหรับโครงการรถไฟความเร็วสูง",
     coverImage: `${assetBase}/hsr-ct-3001-2568.png`,
     previewHref: `${assetBase}/hsr-ct-3001-2568.pdf`,
     downloadHref: `${assetBase}/hsr-ct-3001-2568.pdf`,
@@ -117,7 +117,7 @@ export const additionalHighSpeedRailStandardDocuments: HighSpeedRailStandardDocu
   },
   {
     code: "HSR-CT-4012",
-    title: "มาตรฐานงานตรวจวัด",
+    title: "มาตรฐานงานตรวจวัดและติดตามในการก่อสร้างอุโมงค์ สำหรับโครงการรถไฟความเร็วสูง",
     coverImage: `${assetBase}/hsr-ct-4012-2568.png`,
     previewHref: `${assetBase}/hsr-ct-4012-2568.pdf`,
     downloadHref: `${assetBase}/hsr-ct-4012-2568.pdf`,
@@ -133,7 +133,8 @@ export const additionalHighSpeedRailStandardDocuments: HighSpeedRailStandardDocu
   },
   {
     code: "HSR-CT-5001",
-    title: "มาตรฐานงานค้ำยัน",
+    title:
+      "มาตรฐานการป้องกันและงานระบายน้ำในการก่อสร้างอุโมงค์ สำหรับโครงการรถไฟความเร็วสูง",
     coverImage: `${assetBase}/hsr-ct-5001-2568.png`,
     previewHref: `${assetBase}/hsr-ct-5001-2568.pdf`,
     downloadHref: `${assetBase}/hsr-ct-5001-2568.pdf`,
