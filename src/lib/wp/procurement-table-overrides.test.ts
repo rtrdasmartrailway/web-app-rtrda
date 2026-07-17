@@ -147,7 +147,7 @@ describe("applyProcurementTableOverrides", () => {
     expect(updatedRows[4]?.[1]).toBe("7 กรกฎาคม 2569");
   });
 
-  it("prepends rail component standards using the existing card/button format", () => {
+  it("prepends rail component standards using the shared rail card format", () => {
     const source = record(
       "/มาตรฐานระบบราง-สทร",
       `<div class="lightweight-accordion"><details><summary class="lightweight-accordion-title"><strong>มาตรฐานชิ้นส่วนระบบราง</strong></summary><div class="lightweight-accordion-body"><p>เดิม</p></div></details></div>`,
@@ -156,26 +156,20 @@ describe("applyProcurementTableOverrides", () => {
     const $ = cheerio.load(updated.contentHtml, null, false);
 
     expect($(".rtrda-rail-component-standards-table")).toHaveLength(0);
-    expect(
-      $(".rtrda-rail-component-standards-files .wp-block-column").filter((_, element) =>
-        $(element).find("h6").text().includes("CT-(2002-2005)-2569"),
-      ),
-    ).toHaveLength(1);
+    expect($(".rtrda-rail-component-standards-files").hasClass("wp-block-columns")).toBe(
+      true,
+    );
     expect($(".rtrda-rail-component-card-grid")).toHaveLength(0);
     expect($(".rtrda-rail-component-card")).toHaveLength(5);
-    expect($(".rtrda-rail-component-standards-files").attr("style")).toContain(
-      "display:grid",
-    );
-    expect($(".rtrda-rail-component-card").first().attr("style")).toContain(
-      "border-radius:18px",
-    );
+    expect($(".rtrda-rail-component-standards-files").attr("style")).toBeUndefined();
+    expect($(".rtrda-rail-component-card").first().attr("style")).toBeUndefined();
     expect($(".rtrda-rail-component-standards-files > .wp-block-spacer")).toHaveLength(0);
     expect($(".rtrda-rail-component-standards-files img")).toHaveLength(5);
     expect($(".rtrda-rail-component-standards-files img").first().attr("src")).toContain(
       "ct-2002-2005-2569-rail-fastening-components.png",
     );
-    expect($(".rtrda-rail-component-standards-files h6").first().html()).toContain(
-      "<br>",
+    expect($(".rtrda-rail-component-standards-files h6").first().text()).toBe(
+      "ชุดมาตรฐานอุปกรณ์ยึดเหนี่ยวราง",
     );
     expect(
       $(".rtrda-rail-component-standards-files .wp-block-button__link").first().text(),
@@ -200,6 +194,55 @@ describe("applyProcurementTableOverrides", () => {
       "/wp-content/uploads/standards/rail-components/ct-2002-2005-2569-rail-fastening-components.pdf",
     );
     expect(updated.contentHtml).not.toContain("drive.google.com");
+  });
+
+  it("replaces incomplete welding and other standard cards with complete document cards", () => {
+    const source = record(
+      "/มาตรฐานระบบราง-สทร",
+      `<div class="lightweight-accordion"><details><summary class="lightweight-accordion-title"><strong>มาตรฐานงานเชื่อม</strong></summary><div class="lightweight-accordion-body"><p>–</p></div></details></div><div class="lightweight-accordion"><details><summary class="lightweight-accordion-title"><strong>อื่นๆ</strong></summary><div class="lightweight-accordion-body"><p>–</p></div></details></div>`,
+    );
+    const updated = applyProcurementTableOverrides(source);
+    const $ = cheerio.load(updated.contentHtml, null, false);
+    const welding = $(".rtrda-rail-welding-files");
+    const other = $(".rtrda-other-rail-standard-files");
+
+    expect(welding.hasClass("wp-block-columns")).toBe(true);
+    expect(welding.find(".wp-block-column")).toHaveLength(5);
+    expect(
+      welding
+        .find("h6")
+        .toArray()
+        .map((heading) => $(heading).text()),
+    ).toEqual([
+      "มาตรฐานแนะนำการเชื่อมซ่อมผิวหัวรางด้วยการเชื่อมอาร์ก",
+      "มาตรฐานการทดสอบเพื่อรับรองการเชื่อมซ่อมผิวหัวรางด้วยการเชื่อมอาร์ก",
+      "ชุดมาตรฐานการทดสอบโดยไม่ทำลายบนรอยเชื่อมรางรถไฟ",
+      "สทร-RS-6001-2568",
+      "สทร-RS-6002-2568",
+    ]);
+    expect(
+      welding
+        .find("img")
+        .toArray()
+        .map((image) => $(image).attr("src")),
+    ).toContain("/wp-content/uploads/2026/07/rtrda-rs-6001-2568.png");
+    expect(
+      welding
+        .find("a")
+        .filter((_, link) => $(link).text() === "อ่านเพิ่มเติม")
+        .last()
+        .attr("href"),
+    ).toBe("/3d-flip-book/สทร-rs-6002-2568");
+    expect(other.find(".wp-block-column")).toHaveLength(1);
+    expect(other.hasClass("rtrda-rail-standards-files--single")).toBe(true);
+    expect(other.find("h6").text()).toBe("รายงานการพัฒนามาตรฐานระบบราง");
+    expect(
+      other
+        .find("a")
+        .filter((_, link) => $(link).text() === "อ่านเพิ่มเติม")
+        .attr("href"),
+    ).toBe("/sdc_download/5544");
+    expect(updated.contentHtml).not.toContain("<p>–</p>");
   });
 
   it("adds development plan and standards compilation cards before high-speed rail", () => {

@@ -74,6 +74,18 @@ describe("knowledge document parser", () => {
     });
   });
 
+  it("excludes only the requested knowledge groups", () => {
+    const groups = buildKnowledgeDocumentGroups(
+      `
+      <div class="lightweight-accordion"><details><summary class="lightweight-accordion-title">มาตรฐานระบบราง สทร.</summary><div class="lightweight-accordion-body"><div class="wp-block-columns"><div class="wp-block-column"><h6>มาตรฐาน</h6></div></div></div></details></div>
+      <div class="lightweight-accordion"><details><summary class="lightweight-accordion-title">รายงานผลงานโครงการ</summary><div class="lightweight-accordion-body"><div class="wp-block-columns"><div class="wp-block-column"><h6>รายงาน</h6></div></div></div></details></div>
+      `,
+      { excludedGroupTitles: new Set(["มาตรฐานระบบราง สทร."]) },
+    );
+
+    expect(groups.map((group) => group.title)).toEqual(["รายงานผลงานโครงการ"]);
+  });
+
   it("parses the BEMU station survey report in the project reports group", () => {
     const groups = buildKnowledgeDocumentGroups(`
       <div class="lightweight-accordion">
