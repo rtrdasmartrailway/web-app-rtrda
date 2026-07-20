@@ -63,7 +63,7 @@ const winnerRows: TableRowSpec[] = [
       "160,500.00",
       "–",
     ],
-    href: uploadFile("2026/07/ประกาศผลผู้ชนะการเสนอราคา_17_07_2569.pdf?v=20260717"),
+    href: uploadFile("2026/07/ประกาศผู้ชนะ_17_07_2569.pdf?v=20260717"),
   },
   {
     matchText:

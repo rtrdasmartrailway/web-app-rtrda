@@ -5,10 +5,11 @@ import { normalizeRoutePath } from "./url";
 const PROCUREMENT_PLAN_PATH = "/จัดซื้อจัดจ้าง/แผนการจัดซื้อจัดจ้าง";
 const PROCUREMENT_PLAN_YEAR = "ปี 2569";
 const PROCUREMENT_PLAN_DOCUMENT_HREF_16_JULY_2569 =
-  "/wp-content/uploads/2026/07/ประกาศแผนจัดซื้อจัดจ้าง_17_07_2569.pdf?v=20260717";
+  "/wp-content/uploads/2026/07/ประกาศแผนจัดซื้อจัดจ้าง_16_07_2569.pdf?v=20260716";
 const PROCUREMENT_PLAN_ROW_16_JULY_2569 = {
   date: "16 กรกฎาคม 2569",
-  project: "เผยแพร่แผนการจัดซื้อจัดจ้าง ประจำปีงบประมาณ พ.ศ. 2569",
+  project:
+    "จ้างที่ปรึกษาศึกษาพัฒนา Algorithm เพื่อตรวจจับและแจ้งเตือนการฝ่าฝืนไม้กั้นทางรถไฟ ณ จุดตัดทางรถไฟแนวระดับ",
 };
 
 function isProcurementPlanPath(path: string): boolean {

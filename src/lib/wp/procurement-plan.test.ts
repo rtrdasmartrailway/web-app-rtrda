@@ -67,12 +67,12 @@ describe("applyProcurementPlanOverride", () => {
     expect(firstRowCells.map((_, cell) => $(cell).text().trim()).get()).toEqual([
       "1",
       "16 กรกฎาคม 2569",
-      "เผยแพร่แผนการจัดซื้อจัดจ้าง ประจำปีงบประมาณ พ.ศ. 2569",
+      "จ้างที่ปรึกษาศึกษาพัฒนา Algorithm เพื่อตรวจจับและแจ้งเตือนการฝ่าฝืนไม้กั้นทางรถไฟ ณ จุดตัดทางรถไฟแนวระดับ",
       "เผยแพร่ขึ้นเว็บ",
       "PDF",
     ]);
     expect(firstRowCells.last().find("a").attr("href")).toBe(
-      "/wp-content/uploads/2026/07/ประกาศแผนจัดซื้อจัดจ้าง_17_07_2569.pdf?v=20260717",
+      "/wp-content/uploads/2026/07/ประกาศแผนจัดซื้อจัดจ้าง_16_07_2569.pdf?v=20260716",
     );
   });
 
