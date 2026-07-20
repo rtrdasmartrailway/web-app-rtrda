@@ -128,7 +128,7 @@ describe("applyProcurementTableOverrides", () => {
       "/wp-content/uploads/2026/07/procurement-winner-infrastructure-enhancement-consultant.pdf",
     );
     expect(updated.contentHtml).toContain(
-      "/wp-content/uploads/2026/07/ประกาศผลผู้ชนะการเสนอราคา_17_07_2569.pdf",
+      "/wp-content/uploads/2026/07/ประกาศผลผู้ชนะการเสนอราคา_17_07_2569.pdf?v=20260717",
     );
     expect(updated.contentHtml).not.toContain("drive.google.com");
   });

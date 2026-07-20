@@ -72,7 +72,7 @@ describe("applyProcurementPlanOverride", () => {
       "PDF",
     ]);
     expect(firstRowCells.last().find("a").attr("href")).toBe(
-      "/wp-content/uploads/2026/07/ประกาศแผนจัดซื้อจัดจ้าง_17_07_2569.pdf",
+      "/wp-content/uploads/2026/07/ประกาศแผนจัดซื้อจัดจ้าง_17_07_2569.pdf?v=20260717",
     );
   });
 
