@@ -55,14 +55,7 @@ function firstColumnValues(html: string, accordionIndex: number): string[] {
 }
 
 describe("applyProcurementPlanOverride", () => {
-  it("renumbers only the 2569 procurement plan table from top to bottom", () => {
-    const updated = applyProcurementPlanOverride(record({}));
-
-    expect(firstColumnValues(updated.contentHtml, 0)).toEqual(["1", "2", "3"]);
-    expect(firstColumnValues(updated.contentHtml, 1)).toEqual(["1", "2"]);
-  });
-
-  it("preserves row order, project text, and PDF links", () => {
+  it("prepends the 16 July 2569 procurement plan row with its PDF", () => {
     const updated = applyProcurementPlanOverride(record({}));
     const $ = cheerio.load(updated.contentHtml, null, false);
     const firstRowCells = $(".lightweight-accordion")
@@ -71,9 +64,37 @@ describe("applyProcurementPlanOverride", () => {
       .first()
       .find("td");
 
-    expect(firstRowCells.eq(1).text().trim()).toBe("21 พฤษภาคม 2569");
-    expect(firstRowCells.eq(2).text().trim()).toBe("โครงการล่าสุด");
-    expect(firstRowCells.eq(4).find("a").attr("href")).toBe(
+    expect(firstRowCells.map((_, cell) => $(cell).text().trim()).get()).toEqual([
+      "1",
+      "16 กรกฎาคม 2569",
+      "จ้างที่ปรึกษาศึกษาพัฒนา Algorithm เพื่อตรวจจับและแจ้งเตือนการฝ่าฝืนไม้กั้นทางรถไฟ ณ จุดตัดทางรถไฟแนวระดับ",
+      "เผยแพร่ขึ้นเว็บ",
+      "PDF",
+    ]);
+    expect(firstRowCells.last().find("a").attr("href")).toBe(
+      "/wp-content/uploads/2026/07/ประกาศแผนจัดซื้อจัดจ้าง_16_07_2569.pdf?v=20260716",
+    );
+  });
+
+  it("renumbers only the 2569 procurement plan table from top to bottom", () => {
+    const updated = applyProcurementPlanOverride(record({}));
+
+    expect(firstColumnValues(updated.contentHtml, 0)).toEqual(["1", "2", "3", "4"]);
+    expect(firstColumnValues(updated.contentHtml, 1)).toEqual(["1", "2"]);
+  });
+
+  it("preserves row order, project text, and PDF links", () => {
+    const updated = applyProcurementPlanOverride(record({}));
+    const $ = cheerio.load(updated.contentHtml, null, false);
+    const firstExistingRowCells = $(".lightweight-accordion")
+      .first()
+      .find("tbody tr")
+      .eq(1)
+      .find("td");
+
+    expect(firstExistingRowCells.eq(1).text().trim()).toBe("21 พฤษภาคม 2569");
+    expect(firstExistingRowCells.eq(2).text().trim()).toBe("โครงการล่าสุด");
+    expect(firstExistingRowCells.eq(4).find("a").attr("href")).toBe(
       "/wp-content/uploads/2026/05/latest.pdf",
     );
   });
@@ -82,5 +103,11 @@ describe("applyProcurementPlanOverride", () => {
     const source = record({ path: "/จัดซื้อจัดจ้าง/ประกาศจัดซื้อจัดจ้าง" });
 
     expect(applyProcurementPlanOverride(source)).toBe(source);
+  });
+
+  it("is idempotent", () => {
+    const once = applyProcurementPlanOverride(record({}));
+
+    expect(applyProcurementPlanOverride(once)).toBe(once);
   });
 });
