@@ -67,6 +67,27 @@ describe("security middleware", () => {
     },
   );
 
+  it("allows POST only for the analytics collector", () => {
+    const allowed = middleware(
+      request("https://test.rtrda.or.th/api/analytics/events", { method: "POST" }),
+    );
+    expect(allowed.status).toBe(200);
+    expect(allowed.headers.get("x-middleware-next")).toBe("1");
+
+    const blocked = middleware(
+      request("https://test.rtrda.or.th/api/other", { method: "POST" }),
+    );
+    expect(blocked.status).toBe(405);
+  });
+
+  it("advertises only POST and OPTIONS for the analytics collector", () => {
+    const response = middleware(
+      request("https://test.rtrda.or.th/api/analytics/events", { method: "OPTIONS" }),
+    );
+    expect(response.status).toBe(204);
+    expect(response.headers.get("allow")).toBe("POST, OPTIONS");
+  });
+
   it("answers OPTIONS without rendering the application", () => {
     const response = middleware(
       request("https://test.rtrda.or.th/", { method: "OPTIONS" }),

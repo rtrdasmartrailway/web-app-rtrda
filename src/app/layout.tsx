@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { IBM_Plex_Sans_Thai } from "next/font/google";
 import { SITE_ORIGIN } from "@/lib/site-config";
+import { WebAnalyticsTracker } from "@/components/analytics/web-analytics-tracker";
 import "./globals.css";
 
 const thaiFont = IBM_Plex_Sans_Thai({
@@ -67,7 +68,10 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="th" className={thaiFont.variable}>
-      <body>{children}</body>
+      <body>
+        <WebAnalyticsTracker />
+        {children}
+      </body>
     </html>
   );
 }
