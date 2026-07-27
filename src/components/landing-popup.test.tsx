@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import {
@@ -22,17 +23,30 @@ class MemoryStorage {
 }
 
 describe("LandingPopup", () => {
-  it("renders the old WordPress image-only popup when opened", () => {
+  it("renders the royal tribute SVG popup at its portrait dimensions", () => {
     const html = renderToStaticMarkup(<LandingPopup path="/" forceOpen />);
 
+    expect(LANDING_POPUP_CONTENT.src).toBe("/wp-content/uploads/2026/07/ทรงพระเจริญ.svg");
+    expect(LANDING_POPUP_CONTENT.width).toBe(1080);
+    expect(LANDING_POPUP_CONTENT.height).toBe(1350);
     expect(html).toContain('role="dialog"');
     expect(html).toContain("landing-popup-image");
-    expect(html).toContain(encodeURIComponent(LANDING_POPUP_CONTENT.src));
+    expect(html).toContain(LANDING_POPUP_CONTENT.src);
     expect(html).toContain(LANDING_POPUP_CONTENT.alt);
-    expect(html).toContain('width="1024"');
-    expect(html).toContain('height="1024"');
-    expect(html).not.toContain("ดร. โชติชัย เจริญงาม");
-    expect(html).not.toContain("การศึกษา");
+    expect(html).toContain('width="1080"');
+    expect(html).toContain('height="1350"');
+    expect(html).not.toContain("อินโฟภายนอก-11-2-1024x1024.png");
+  });
+
+  it("constrains the portrait popup inside desktop and mobile viewports", () => {
+    const css = readFileSync(new URL("../app/globals.css", import.meta.url), "utf8");
+    const modalRule = css.match(/\.landing-popup-modal\s*\{([^}]*)\}/)?.[1] ?? "";
+
+    expect(modalRule).toContain(
+      "width: min(800px, calc(100vw - 56px), calc(80dvh - 44.8px));",
+    );
+    expect(modalRule).not.toContain("width: fit-content;");
+    expect(css).toContain("width: min(100%, calc(80dvh - 19.2px));");
   });
 
   it("renders only a hidden mount point before client hydration opens it", () => {
@@ -54,6 +68,10 @@ describe("LandingPopup", () => {
 });
 
 describe("landing popup session storage", () => {
+  it("uses a fresh dismissal key for the royal tribute campaign", () => {
+    expect(LANDING_POPUP_SESSION_KEY).toBe("rtrda-landing-popup-86-dismissed");
+  });
+
   it("shows until dismissed for the current session", () => {
     const storage = new MemoryStorage();
 

@@ -3207,10 +3207,10 @@ body:has(.yutth-lightbox) {
   box-shadow: 0 28px 72px rgba(0, 0, 0, 0.45);
   color: var(--navy-900);
   font-size: 14px;
-  max-height: min(800px, calc(100dvh - 56px));
+  max-height: calc(100dvh - 56px);
   overflow: hidden;
   position: relative;
-  width: min(800px, calc(100vw - 56px));
+  width: min(800px, calc(100vw - 56px), calc(80dvh - 44.8px));
 }
 
 .landing-popup-close {
@@ -3247,7 +3247,7 @@ body:has(.yutth-lightbox) {
 .landing-popup-image {
   display: block;
   height: auto;
-  max-height: min(800px, calc(100dvh - 56px));
+  max-width: 100%;
   object-fit: contain;
   width: 100%;
 }
@@ -5595,7 +5595,7 @@ a.calendar-cell.has-posts:hover {
 
 @media (max-width: 900px) {
   .landing-popup-modal {
-    width: min(92vw, 760px);
+    width: min(760px, 92vw, calc(80dvh - 44.8px));
   }
 
   .content-layout.with-sidebar {
@@ -5770,11 +5770,7 @@ a.calendar-cell.has-posts:hover {
 
   .landing-popup-modal {
     max-height: calc(100dvh - 24px);
-    width: min(100%, calc(100dvh - 24px));
-  }
-
-  .landing-popup-image {
-    max-height: calc(100dvh - 24px);
+    width: min(100%, calc(80dvh - 19.2px));
   }
 
   .footer-contact {
