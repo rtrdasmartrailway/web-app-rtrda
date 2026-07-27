@@ -3,16 +3,16 @@
 import Image from "next/image";
 import { useCallback, useEffect, useRef, useState } from "react";
 
-export const LANDING_POPUP_SESSION_KEY = "rtrda-landing-popup-85-dismissed";
+export const LANDING_POPUP_SESSION_KEY = "rtrda-landing-popup-86-dismissed";
 
 type PopupStorage = Pick<Storage, "getItem" | "setItem">;
 
 export const LANDING_POPUP_CONTENT = {
-  src: "/wp-content/uploads/2026/06/อินโฟภายนอก-11-2-1024x1024.png",
-  alt: "ประกาศประชาสัมพันธ์จากสถาบันวิจัยและพัฒนาเทคโนโลยีระบบราง",
+  src: "/wp-content/uploads/2026/07/ทรงพระเจริญ.svg",
+  alt: "ทรงพระเจริญ พระบาทสมเด็จพระเจ้าอยู่หัว",
   closeLabel: "ปิดหน้าต่าง",
-  width: 1024,
-  height: 1024,
+  width: 1080,
+  height: 1350,
 } as const;
 
 export function isPublicLandingPopupPath(path: string): boolean {
@@ -136,6 +136,7 @@ export function LandingPopup({
           priority
           sizes="(max-width: 680px) calc(100vw - 24px), 800px"
           src={LANDING_POPUP_CONTENT.src}
+          unoptimized
           width={LANDING_POPUP_CONTENT.width}
         />
       </article>
