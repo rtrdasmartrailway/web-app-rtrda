@@ -49,6 +49,8 @@
   },
   "overrides": {
     "postcss": "8.5.19",
-    "sharp": "$sharp"
+    "sharp": "$sharp",
+    "find-my-way": "9.7.0",
+    "valibot": "1.4.2"
   }
 }
