@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import {
@@ -35,6 +36,17 @@ describe("LandingPopup", () => {
     expect(html).toContain('width="1080"');
     expect(html).toContain('height="1350"');
     expect(html).not.toContain("อินโฟภายนอก-11-2-1024x1024.png");
+  });
+
+  it("constrains the portrait popup inside desktop and mobile viewports", () => {
+    const css = readFileSync(new URL("../app/globals.css", import.meta.url), "utf8");
+    const modalRule = css.match(/\.landing-popup-modal\s*\{([^}]*)\}/)?.[1] ?? "";
+
+    expect(modalRule).toContain(
+      "width: min(800px, calc(100vw - 56px), calc(80dvh - 44.8px));",
+    );
+    expect(modalRule).not.toContain("width: fit-content;");
+    expect(css).toContain("width: min(100%, calc(80dvh - 19.2px));");
   });
 
   it("renders only a hidden mount point before client hydration opens it", () => {

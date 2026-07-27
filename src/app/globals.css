@@ -3208,10 +3208,9 @@ body:has(.yutth-lightbox) {
   color: var(--navy-900);
   font-size: 14px;
   max-height: calc(100dvh - 56px);
-  max-width: min(800px, calc(100vw - 56px));
   overflow: hidden;
   position: relative;
-  width: fit-content;
+  width: min(800px, calc(100vw - 56px), calc(80dvh - 44.8px));
 }
 
 .landing-popup-close {
@@ -3248,10 +3247,9 @@ body:has(.yutth-lightbox) {
 .landing-popup-image {
   display: block;
   height: auto;
-  max-height: calc(100dvh - 56px);
   max-width: 100%;
   object-fit: contain;
-  width: auto;
+  width: 100%;
 }
 
 .wp-content .lightweight-accordion {
@@ -5597,7 +5595,7 @@ a.calendar-cell.has-posts:hover {
 
 @media (max-width: 900px) {
   .landing-popup-modal {
-    max-width: min(92vw, 760px);
+    width: min(760px, 92vw, calc(80dvh - 44.8px));
   }
 
   .content-layout.with-sidebar {
@@ -5772,11 +5770,7 @@ a.calendar-cell.has-posts:hover {
 
   .landing-popup-modal {
     max-height: calc(100dvh - 24px);
-    max-width: 100%;
-  }
-
-  .landing-popup-image {
-    max-height: calc(100dvh - 24px);
+    width: min(100%, calc(80dvh - 19.2px));
   }
 
   .footer-contact {
