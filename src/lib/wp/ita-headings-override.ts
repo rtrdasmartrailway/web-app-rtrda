@@ -170,12 +170,8 @@ const ITA_LINK_OVERRIDES: ReadonlyArray<{
     marker: "O9",
     links: [
       {
-        title: "คู่มือการให้บริการการยืมครุภัณฑ์บุคคลภายนอก",
-        href: `${ITA_O9_UPLOAD_DIR}/09คู่มือ_การยืมทรัพย์สินทางราชการ_บุคคลภาย.pdf`,
-      },
-      {
-        title: "คู่มือการให้บริการข้อมูลข่าวสารของ สทร. (ฉบับปรับปรุง)",
-        href: `${ITA_O9_UPLOAD_DIR}/09คู่มือการให้บริการข้อมูลข่าวสารของ_สทร._.pdf`,
+        title: "คู่มือการให้บริการรถทดสอบแบบเคลื่อนที่ (Mobile Lab)",
+        href: `${ITA_O9_UPLOAD_DIR}/o9_03_PM-RTRDA-300-01-01-การให้บริการMobile-Lab-v7-Final.pdf`,
       },
       {
         title: "คู่มือการขอเข้าศึกษาดูงานสถาบันฯ",
@@ -423,7 +419,7 @@ const ITA_LINK_OVERRIDES: ReadonlyArray<{
     links: [
       {
         title: "ช่องทางแจ้งเรื่องร้องเรียนการทุจริตและประพฤติมิชอบ",
-        href: "https://test.rtrda.or.th/%E0%B8%8A%E0%B9%88%E0%B8%AD%E0%B8%87%E0%B8%97%E0%B8%B2%E0%B8%87%E0%B8%81%E0%B8%B2%E0%B8%A3%E0%B9%81%E0%B8%88%E0%B9%89%E0%B8%87%E0%B9%80%E0%B8%A3%E0%B8%B7%E0%B9%88%E0%B8%AD%E0%B8%87%E0%B8%81%E0%B8%B2",
+        href: "/ช่องทางการแจ้งเรื่องกา",
       },
       {
         title: "ช่องทางแจ้งร้องเรียนฯ สำนักงาน ป.ป.ช.",
@@ -453,7 +449,7 @@ const ITA_LINK_OVERRIDES: ReadonlyArray<{
     links: [
       {
         title: ITA_O19_NEWS_TITLE,
-        href: "https://test.rtrda.or.th/สทร-จัดประชุมเทคนิคพิจ-3/",
+        href: "/สทร-จัดประชุมเทคนิคพิจ-3/",
       },
       {
         title: "แบบฟอร์มการมีส่วนร่วมo19_v3",
@@ -502,10 +498,10 @@ const ITA_LINK_OVERRIDES: ReadonlyArray<{
       {
         title:
           "สทร.ร่วมประกาศเจตนารมณ์การต่อต้านการทุจริตคอร์รัปชันในองค์กร การไม่รับของขวัญ (No Gift Policy)",
-        href: "https://test.rtrda.or.th/%E0%B8%AA%E0%B8%97%E0%B8%A3-%E0%B8%A3%E0%B9%88%E0%B8%A7%E0%B8%A1%E0%B8%9B%E0%B8%A3%E0%B8%B0%E0%B8%81%E0%B8%B2%E0%B8%A8%E0%B9%80%E0%B8%88%E0%B8%95%E0%B8%99%E0%B8%B2%E0%B8%A3%E0%B8%A1%E0%B8%93%E0%B9%8C-no-gift-policy-2569",
+        href: "/สทร-ร่วมประกาศเจตนารมณ์-no-gift-policy-2569",
       },
       {
-        title: 'หนังสือประกาศเจตนารมณ์ No Gift Policy "ฉบับภาษาไทยและภาษาอังกฤษ"',
+        title: 'หนังสือประกาศเจตนารมณ์ No Gift Policy "ฉบับภาษาไทย"',
         href: sdcDownloadInlineHref("ita2569-o20-01"),
       },
       {
@@ -656,12 +652,20 @@ function linkParagraph(
   href: string,
   options: { indent?: boolean } = {},
 ): string {
+  if (!href.startsWith("/") && !href.startsWith("https://")) {
+    throw new Error(`Unsafe ITA link: ${href}`);
+  }
+
   const paragraph = $("<p></p>");
   if (options.indent) {
     paragraph.attr("style", "margin-left: 1.5rem; padding-left: 1rem;");
   }
   const link = $("<a></a>");
   link.attr("href", href);
+  if (href.startsWith("https://")) {
+    link.attr("rel", "noopener noreferrer");
+    link.attr("target", "_blank");
+  }
   link.text(`– ${title}`);
   paragraph.append(link);
   return $.html(paragraph);

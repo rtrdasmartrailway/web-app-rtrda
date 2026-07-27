@@ -5,6 +5,7 @@ import {
   isInlineRequest,
 } from "./download-response";
 import type { WpDownloadAsset } from "@/lib/wp/types";
+import { getStaticDownloadOverride } from "@/lib/wp/static-download-overrides";
 
 const download: WpDownloadAsset = {
   id: "5540",
@@ -38,5 +39,15 @@ describe("sdc_download route helpers", () => {
     expect(
       isInlineRequest(new Request("https://test.rtrda.or.th/sdc_download/5540?inline=1")),
     ).toBe(true);
+  });
+
+  it("provides a safe fallback for every O19 supporting document", () => {
+    for (let index = 1; index <= 7; index += 1) {
+      const id = `ita2569-o19-0${index}`;
+      const fallback = getStaticDownloadOverride(id);
+
+      expect(fallback?.localPath).toBe(`/sdc-downloads/${id}.pdf`);
+      expect(fallback?.mimeType).toBe("application/pdf");
+    }
   });
 });

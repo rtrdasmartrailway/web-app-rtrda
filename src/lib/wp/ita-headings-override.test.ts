@@ -295,19 +295,15 @@ describe("applyItaHeadingsOverride", () => {
     ]);
     expect(linksFor("O9")).toEqual([
       {
-        title: "– คู่มือการให้บริการการยืมครุภัณฑ์บุคคลภายนอก",
-        href: "/wp-content/uploads/ita2569/O9/09คู่มือ_การยืมทรัพย์สินทางราชการ_บุคคลภาย.pdf",
-      },
-      {
-        title: "– คู่มือการให้บริการข้อมูลข่าวสารของ สทร. (ฉบับปรับปรุง)",
-        href: "/wp-content/uploads/ita2569/O9/09คู่มือการให้บริการข้อมูลข่าวสารของ_สทร._.pdf",
+        title: "– คู่มือการให้บริการรถทดสอบแบบเคลื่อนที่ (Mobile Lab)",
+        href: "/wp-content/uploads/ita2569/O9/o9_03_PM-RTRDA-300-01-01-การให้บริการMobile-Lab-v7-Final.pdf",
       },
       {
         title: "– คู่มือการขอเข้าศึกษาดูงานสถาบันฯ",
         href: "/sdc_download/ita2569-o9-03?inline=1",
       },
     ]);
-    expect(section2024).not.toContain("Mobile-Lab-v7-Final");
+    expect(section2024).toContain("Mobile Lab");
     expect(linksFor("O11")).toEqual([
       {
         title: "– O11 ไตรมาสที่ 1",
@@ -409,7 +405,7 @@ describe("applyItaHeadingsOverride", () => {
     expect(linksFor("O17")).toEqual([
       {
         title: "– ช่องทางแจ้งเรื่องร้องเรียนการทุจริตและประพฤติมิชอบ",
-        href: "https://test.rtrda.or.th/%E0%B8%8A%E0%B9%88%E0%B8%AD%E0%B8%87%E0%B8%97%E0%B8%B2%E0%B8%87%E0%B8%81%E0%B8%B2%E0%B8%A3%E0%B9%81%E0%B8%88%E0%B9%89%E0%B8%87%E0%B9%80%E0%B8%A3%E0%B8%B7%E0%B9%88%E0%B8%AD%E0%B8%87%E0%B8%81%E0%B8%B2",
+        href: "/ช่องทางการแจ้งเรื่องกา",
       },
       {
         title: "– ช่องทางแจ้งร้องเรียนฯ สำนักงาน ป.ป.ช.",
@@ -424,10 +420,10 @@ describe("applyItaHeadingsOverride", () => {
       {
         title:
           "– สทร.ร่วมประกาศเจตนารมณ์การต่อต้านการทุจริตคอร์รัปชันในองค์กร การไม่รับของขวัญ (No Gift Policy)",
-        href: "https://test.rtrda.or.th/%E0%B8%AA%E0%B8%97%E0%B8%A3-%E0%B8%A3%E0%B9%88%E0%B8%A7%E0%B8%A1%E0%B8%9B%E0%B8%A3%E0%B8%B0%E0%B8%81%E0%B8%B2%E0%B8%A8%E0%B9%80%E0%B8%88%E0%B8%95%E0%B8%99%E0%B8%B2%E0%B8%A3%E0%B8%A1%E0%B8%93%E0%B9%8C-no-gift-policy-2569",
+        href: "/สทร-ร่วมประกาศเจตนารมณ์-no-gift-policy-2569",
       },
       {
-        title: '– หนังสือประกาศเจตนารมณ์ No Gift Policy "ฉบับภาษาไทยและภาษาอังกฤษ"',
+        title: '– หนังสือประกาศเจตนารมณ์ No Gift Policy "ฉบับภาษาไทย"',
         href: "/sdc_download/ita2569-o20-01?inline=1",
       },
       {
@@ -557,7 +553,7 @@ describe("applyItaHeadingsOverride", () => {
         "/wp-content/uploads/ita2569/O12/1.สขร.เดือน_ตุลาคม_2567.xlsx",
       );
     }
-    expect(section2024Html).toContain("https://test.rtrda.or.th/");
+    expect(section2024Html).not.toContain("https://test.rtrda.or.th/");
     expect(section2024Html).toContain(
       "/wp-content/uploads/ita2569/O15/o15_ประมวลจริยธรรม.pdf",
     );
@@ -572,5 +568,7 @@ describe("applyItaHeadingsOverride", () => {
     expect(section2024Html).toContain("/sdc_download/ita2569-o22-03");
     expect(section2024Html).toContain("/sdc_download/ita2569-o24-01");
     expect(section2024Html).not.toContain("https://www.rtrda.or.th/en/");
+    expect(section2024Html).toContain('rel="noopener noreferrer"');
+    expect(section2024Html).toContain('target="_blank"');
   });
 });

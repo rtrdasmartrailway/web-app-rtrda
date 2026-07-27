@@ -12,6 +12,8 @@ services:
       PORT: 3000
       # Public origin for canonical URLs/sitemap; also defaulted in code.
       SITE_ORIGIN: https://test.rtrda.or.th
+      ANALYTICS_ENV: test
+      ANALYTICS_HASH_SALT: ${ANALYTICS_HASH_SALT:?ANALYTICS_HASH_SALT is required}
       DATABASE_URL: postgresql://rtrda:${POSTGRES_PASSWORD}@db:5432/rtrda
     depends_on:
       db:
