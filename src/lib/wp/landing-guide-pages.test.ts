@@ -29,6 +29,14 @@ describe("landing guide pages", () => {
     });
   });
 
+  it("uses the correct Thai title for the ethics code documents", () => {
+    const ethicsCode = supplementalKnowledgePages.find(
+      (page) => page.slug === "ethics-code",
+    );
+
+    expect(ethicsCode?.groups[0]?.title).toBe("ประมวลจริยธรรม");
+  });
+
   it("resolves requested compatibility paths to their canonical landing guide pages", () => {
     expect(getLandingGuidePage("/คู่มือO9/procurement-summary")?.path).toBe("/คู่มือO9");
     expect(getLandingGuidePage("/บริการและข้อมูลสำคัญ/no-gift-policy")?.path).toBe(

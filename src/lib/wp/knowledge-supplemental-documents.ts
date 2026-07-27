@@ -18,7 +18,7 @@ const supplementalKnowledgeGroups: Array<{
   {
     slug: "ethics-code",
     group: {
-      title: "ประมวลจริยะธรรม",
+      title: "ประมวลจริยธรรม",
       open: true,
       documents: [
         {
