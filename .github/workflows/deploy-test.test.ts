@@ -20,4 +20,9 @@ describe("Deploy test.rtrda.or.th workflow", () => {
     expect(workflow).not.toContain("CLOUDFLARE_API_TOKEN");
     expect(workflow).not.toContain("purge_cache");
   });
+
+  it("labels the running container with the exact pushed SHA", () => {
+    expect(workflow).toContain('RTRDA_RELEASE_SHA="${GITHUB_SHA}"');
+    expect(workflow).toContain("org.opencontainers.image.revision");
+  });
 });

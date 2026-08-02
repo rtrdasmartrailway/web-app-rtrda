@@ -6,6 +6,8 @@ services:
     image: web-app-rtrda:test
     container_name: web-app-rtrda-test
     restart: unless-stopped
+    labels:
+      org.opencontainers.image.revision: ${RTRDA_RELEASE_SHA:-unknown}
     environment:
       NODE_ENV: production
       HOSTNAME: 0.0.0.0
