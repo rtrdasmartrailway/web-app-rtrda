@@ -77,5 +77,7 @@ This DGT workspace is the team test workspace for `test.rtrda.or.th`.
 - Default branch for team/opencode/Paperclip work: `test`.
 - Team agents may edit, commit, build, seed, restart, and verify the test environment on DGT.
 - Do not push or deploy `main`/production from this workspace unless พี่ J explicitly says to push production.
-- When production is approved, merge/promote validated `test` changes into `main` through Valent's production flow, then run the GitHub Actions production workflow and verify public production.
+- `check web test update` is a permanently read-only deployed-state audit. Run the release worker and compare the running Test container SHA against the deployed Cloud/RTRDA02 production release SHA; never push or deploy while checking.
+- Ignore workspace-only commits when reporting deployed updates. A Test release is promotable only when the container SHA label equals `origin/test` and both production targets are healthy/in parity.
+- When production is approved for an exact deployed Test SHA, use `scripts/rtrda-release-worker.mjs promote`; the `main` production workflow must deploy the same release to both Cloud primary and RTRDA02 fallback. See `docs/RTRDA_RELEASE_PIPELINE.md`.
 - Do not expose secrets, tokens, passwords, private keys, or auth stores.

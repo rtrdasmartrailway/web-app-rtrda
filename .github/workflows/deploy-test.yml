@@ -89,7 +89,9 @@ jobs:
         run: |
           set -euo pipefail
           cd /srv/workspace/web-app-rtrda
-          docker compose up -d --build web-app-rtrda-test
+          RTRDA_RELEASE_SHA="${GITHUB_SHA}" docker compose up -d --build web-app-rtrda-test
+          deployed_sha="$(docker inspect web-app-rtrda-test --format '{{ index .Config.Labels "org.opencontainers.image.revision" }}')"
+          test "$deployed_sha" = "${GITHUB_SHA}"
 
       - name: Wait for local and public health checks
         run: |
