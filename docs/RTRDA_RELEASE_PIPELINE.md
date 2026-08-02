@@ -58,9 +58,7 @@ node scripts/rtrda-release-worker.mjs promote \
   --execute
 ```
 
-The worker creates/reuses the `test -> main` PR, waits for checks, merge-promotes
-to `main`, and watches `deploy-production.yml`. The production workflow deploys
-the same merged main SHA to both:
+The worker first proves that the prospective Production merge tree equals the deployed Test tree. If `main`/`test` history has diverged, it automatically creates an exact-tree release branch from `main` instead of merging `test` directly. It then creates/reuses the safe Production PR, waits for checks, merge-promotes to `main`, and watches `deploy-production.yml`. The production workflow deploys the same merged main SHA to both:
 
 - Cloud primary: `100.77.64.92:3021`
 - RTRDA02 on-premise fallback/redundant: `100.91.174.121:3021`

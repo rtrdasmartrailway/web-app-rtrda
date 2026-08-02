@@ -142,7 +142,9 @@ function usage() {
 
 export function buildPromotionPlan(sha) {
   return [
-    `gh pr create --repo rtrdasmartrailway/web-app-rtrda --base main --head test --title "Promote deployed test ${sha.slice(0, 7)} to production" --body "Exact deployed test SHA: ${sha}"`,
+    `verify prospective main merge tree equals deployed test tree ${sha.slice(0, 7)}`,
+    "if branch topology diverged, create an exact-tree release branch from main",
+    `gh pr create --repo rtrdasmartrailway/web-app-rtrda --base main --head <SAFE_HEAD> --title "Promote deployed test ${sha.slice(0, 7)} to production" --body "Exact deployed test SHA: ${sha}"`,
     "gh pr merge <PR_NUMBER> --repo rtrdasmartrailway/web-app-rtrda --merge",
     "gh workflow run deploy-production.yml --repo rtrdasmartrailway/web-app-rtrda --ref main -f ref=<MERGED_MAIN_SHA> (fallback only if merge did not trigger CI)",
     "gh run watch <PRODUCTION_RUN_ID> --repo rtrdasmartrailway/web-app-rtrda --exit-status",
@@ -150,8 +152,80 @@ export function buildPromotionPlan(sha) {
   ];
 }
 
-function executePromotion(approvedSha) {
+export function choosePromotionStrategy({ approvedSha, testTree, prospectiveTree }) {
+  if (testTree === prospectiveTree) {
+    return { mode: "direct-test", headBranch: "test" };
+  }
+  return {
+    mode: "exact-tree-release",
+    headBranch: `release/exact-test-${approvedSha.slice(0, 12)}`,
+  };
+}
+
+function preparePromotionHead(approvedSha, repoPath) {
+  if (run("git", ["status", "--porcelain"], { cwd: repoPath })) {
+    throw new Error("Promotion workspace must be clean");
+  }
+  run("git", ["fetch", "origin", "main", "test", "--prune"], { cwd: repoPath });
+  const originTestSha = run("git", ["rev-parse", "origin/test"], { cwd: repoPath });
+  if (originTestSha !== approvedSha) {
+    throw new Error("Approved deployed SHA no longer equals origin/test");
+  }
+  const testTree = run("git", ["rev-parse", `${approvedSha}^{tree}`], {
+    cwd: repoPath,
+  });
+  const prospectiveTree = run(
+    "git",
+    ["merge-tree", "--write-tree", "origin/main", approvedSha],
+    { cwd: repoPath },
+  ).split("\n")[0];
+  const strategy = choosePromotionStrategy({
+    approvedSha,
+    testTree,
+    prospectiveTree,
+  });
+
+  if (strategy.mode === "exact-tree-release") {
+    run("git", ["switch", "-C", strategy.headBranch, "origin/main"], {
+      cwd: repoPath,
+    });
+    run("git", ["read-tree", "--reset", "-u", approvedSha], { cwd: repoPath });
+    run("git", ["add", "-A"], { cwd: repoPath });
+    run(
+      "git",
+      [
+        "commit",
+        "--allow-empty",
+        "-m",
+        `chore(release): promote exact tested tree ${approvedSha.slice(0, 12)}`,
+      ],
+      { cwd: repoPath },
+    );
+    const releaseTree = run("git", ["rev-parse", "HEAD^{tree}"], {
+      cwd: repoPath,
+    });
+    if (releaseTree !== testTree)
+      throw new Error("Exact-tree release verification failed");
+    run("git", ["push", "--force-with-lease", "-u", "origin", strategy.headBranch], {
+      cwd: repoPath,
+    });
+  }
+
+  run("git", ["fetch", "origin", "main", strategy.headBranch], { cwd: repoPath });
+  const safeProspectiveTree = run(
+    "git",
+    ["merge-tree", "--write-tree", "origin/main", `origin/${strategy.headBranch}`],
+    { cwd: repoPath },
+  ).split("\n")[0];
+  if (safeProspectiveTree !== testTree) {
+    throw new Error("Production PR would not preserve the exact tested tree");
+  }
+  return { ...strategy, testTree };
+}
+
+function executePromotion(approvedSha, repoPath) {
   const repo = "rtrdasmartrailway/web-app-rtrda";
+  const strategy = preparePromotionHead(approvedSha, repoPath);
   let prNumber = run("gh", [
     "pr",
     "list",
@@ -160,7 +234,7 @@ function executePromotion(approvedSha) {
     "--base",
     "main",
     "--head",
-    "test",
+    strategy.headBranch,
     "--state",
     "open",
     "--json",
@@ -177,7 +251,7 @@ function executePromotion(approvedSha) {
       "--base",
       "main",
       "--head",
-      "test",
+      strategy.headBranch,
       "--title",
       `Promote deployed test ${approvedSha.slice(0, 7)} to production`,
       "--body",
@@ -195,7 +269,22 @@ function executePromotion(approvedSha) {
       ".number",
     ]);
   }
-  run("gh", ["pr", "checks", prNumber, "--repo", repo, "--watch"]);
+  const checkCount = Number(
+    run("gh", [
+      "pr",
+      "checks",
+      prNumber,
+      "--repo",
+      repo,
+      "--json",
+      "name",
+      "--jq",
+      "length",
+    ]) || "0",
+  );
+  if (checkCount > 0) {
+    run("gh", ["pr", "checks", prNumber, "--repo", repo, "--watch"]);
+  }
   run("gh", ["pr", "merge", prNumber, "--repo", repo, "--merge"]);
   const mainSha = run("gh", ["api", `repos/${repo}/commits/main`, "--jq", ".sha"]);
 
@@ -251,7 +340,7 @@ function executePromotion(approvedSha) {
   execFileSync("gh", ["run", "watch", runId, "--repo", repo, "--exit-status"], {
     stdio: "inherit",
   });
-  return { prNumber, mainSha, productionRunId: runId };
+  return { prNumber, mainSha, productionRunId: runId, strategy };
 }
 
 function main() {
@@ -286,7 +375,13 @@ function main() {
     console.log(JSON.stringify({ dryRun: true, approvedSha, commands }, null, 2));
     return;
   }
-  console.log(JSON.stringify(executePromotion(approvedSha), null, 2));
+  console.log(
+    JSON.stringify(
+      executePromotion(approvedSha, valueAfter(args, "--repo") ?? process.cwd()),
+      null,
+      2,
+    ),
+  );
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {

@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { buildPromotionPlan, evaluateAudit } from "./rtrda-release-worker.mjs";
+import {
+  buildPromotionPlan,
+  choosePromotionStrategy,
+  evaluateAudit,
+} from "./rtrda-release-worker.mjs";
 
 const SHA_TEST = "a".repeat(40);
 const SHA_PROD = "b".repeat(40);
@@ -46,6 +50,29 @@ describe("RTRDA release worker audit", () => {
     expect(report.production.sha).toBe(SHA_PROD);
     expect(report.changedFiles).toEqual(["M\tsrc/example.ts"]);
     expect(report.blockers).toEqual([]);
+  });
+
+  it("uses test directly only when the prospective merge preserves the tested tree", () => {
+    expect(
+      choosePromotionStrategy({
+        approvedSha: SHA_TEST,
+        testTree: "1".repeat(40),
+        prospectiveTree: "1".repeat(40),
+      }),
+    ).toEqual({ mode: "direct-test", headBranch: "test" });
+  });
+
+  it("uses an exact-tree release branch when main and test topology diverged", () => {
+    expect(
+      choosePromotionStrategy({
+        approvedSha: SHA_TEST,
+        testTree: "1".repeat(40),
+        prospectiveTree: "2".repeat(40),
+      }),
+    ).toEqual({
+      mode: "exact-tree-release",
+      headBranch: `release/exact-test-${SHA_TEST.slice(0, 12)}`,
+    });
   });
 
   it("promotes through main CI instead of deploying production hosts directly", () => {
