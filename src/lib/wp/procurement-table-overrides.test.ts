@@ -73,7 +73,7 @@ describe("applyProcurementTableOverrides", () => {
     expect(updated.contentHtml).not.toContain("drive.google.com");
   });
 
-  it("adds both June monthly procurement summary rows before existing rows", () => {
+  it("adds the July and June monthly procurement summary rows before existing rows", () => {
     const source = record(
       "/จัดซื้อจัดจ้าง/ประกาศจดซอจดจางตามแบบส",
       yearTableHtml(
@@ -82,10 +82,17 @@ describe("applyProcurementTableOverrides", () => {
     );
     const updatedRows = rows(applyProcurementTableOverrides(source).contentHtml);
 
-    expect(updatedRows.map((row) => row[0])).toEqual(["1", "2", "3"]);
-    expect(updatedRows[0]?.[1]).toBe("3 กรกฎาคม 2569");
-    expect(updatedRows[1]?.[1]).toBe("11 มิถุนายน 2569");
-    expect(updatedRows[2]?.[1]).toBe("14 พฤษภาคม 2569");
+    expect(updatedRows.map((row) => row[0])).toEqual(["1", "2", "3", "4"]);
+    expect(updatedRows[0]?.[1]).toBe("5 สิงหาคม 2569");
+    expect(updatedRows[0]?.[2]).toBe(
+      "สรุปผลการดำเนินการจัดซื้อจัดจ้างในรอบเดือน กรกฎาคม 2569",
+    );
+    expect(updatedRows[1]?.[1]).toBe("3 กรกฎาคม 2569");
+    expect(updatedRows[2]?.[1]).toBe("11 มิถุนายน 2569");
+    expect(updatedRows[3]?.[1]).toBe("14 พฤษภาคม 2569");
+    expect(applyProcurementTableOverrides(source).contentHtml).toContain(
+      "/wp-content/uploads/2026/08/procurement-summary-july-2569-20260805.pdf",
+    );
     expect(applyProcurementTableOverrides(source).contentHtml).toContain(
       "/wp-content/uploads/2026/07/procurement-summary-june-2569-20260703.pdf",
     );

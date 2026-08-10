@@ -4,13 +4,20 @@ import { normalizeRoutePath } from "./url";
 
 const PROCUREMENT_PLAN_PATH = "/จัดซื้อจัดจ้าง/แผนการจัดซื้อจัดจ้าง";
 const PROCUREMENT_PLAN_YEAR = "ปี 2569";
-const PROCUREMENT_PLAN_DOCUMENT_HREF_16_JULY_2569 =
-  "/wp-content/uploads/2026/07/ประกาศแผนจัดซื้อจัดจ้าง_16_07_2569.pdf?v=20260716";
-const PROCUREMENT_PLAN_ROW_16_JULY_2569 = {
-  date: "16 กรกฎาคม 2569",
-  project:
-    "จ้างที่ปรึกษาศึกษาพัฒนา Algorithm เพื่อตรวจจับและแจ้งเตือนการฝ่าฝืนไม้กั้นทางรถไฟ ณ จุดตัดทางรถไฟแนวระดับ",
-};
+const PROCUREMENT_PLAN_ROWS_2569 = [
+  {
+    date: "23 กรกฎาคม 2569",
+    project:
+      "จ้างที่ปรึกษาโครงการส่งเสริมการแข่งขันและส่งเสริมสภาพแวดล้อมระบบรางเพื่อส่งเสริมการใช้งานระบบราง",
+    href: "/wp-content/uploads/2026/07/procurement-plan-rail-competition-25690723.pdf",
+  },
+  {
+    date: "16 กรกฎาคม 2569",
+    project:
+      "จ้างที่ปรึกษาศึกษาพัฒนา Algorithm เพื่อตรวจจับและแจ้งเตือนการฝ่าฝืนไม้กั้นทางรถไฟ ณ จุดตัดทางรถไฟแนวระดับ",
+    href: "/wp-content/uploads/2026/07/ประกาศแผนจัดซื้อจัดจ้าง_16_07_2569.pdf?v=20260716",
+  },
+];
 
 function isProcurementPlanPath(path: string): boolean {
   return normalizeRoutePath(path) === PROCUREMENT_PLAN_PATH;
@@ -33,26 +40,29 @@ export function applyProcurementPlanOverride(record: WpContentRecord): WpContent
     return record;
   }
 
-  const existingRow = rows
-    .filter((_, row) => $(row).text().includes(PROCUREMENT_PLAN_ROW_16_JULY_2569.project))
-    .first();
   let changed = false;
-  if (existingRow.length === 0) {
+  for (const plan of [...PROCUREMENT_PLAN_ROWS_2569].reverse()) {
+    const existingRow = accordion
+      .find("tbody tr")
+      .filter((_, row) => $(row).text().includes(plan.project))
+      .first();
+    if (existingRow.length) continue;
+
     const row = $("<tr></tr>");
     row.append($("<td></td>"));
-    row.append($("<td></td>").text(PROCUREMENT_PLAN_ROW_16_JULY_2569.date));
-    row.append($("<td></td>").text(PROCUREMENT_PLAN_ROW_16_JULY_2569.project));
+    row.append($("<td></td>").text(plan.date));
+    row.append($("<td></td>").text(plan.project));
     row.append($("<td></td>").text("เผยแพร่ขึ้นเว็บ"));
     row.append(
       $("<td></td>").append(
         $("<a></a>")
-          .attr("href", PROCUREMENT_PLAN_DOCUMENT_HREF_16_JULY_2569)
+          .attr("href", plan.href)
           .attr("target", "_blank")
           .attr("rel", "noreferrer noopener")
           .text("PDF"),
       ),
     );
-    rows.first().before(row);
+    accordion.find("tbody tr").first().before(row);
     changed = true;
   }
 
