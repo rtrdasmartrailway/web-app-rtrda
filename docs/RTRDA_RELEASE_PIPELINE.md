@@ -63,8 +63,10 @@ The worker creates or reuses `release/exact-<TEST_SHA>` with the audited
 Production SHA as its only parent and the exact deployed Test tree. Before any
 GitHub mutation, it validates the approved SHA in a clean detached worktree
 (`npm ci`, Prisma generation, tests, lint, typecheck, format, security audit, and
-build). It then opens a review PR, creates and verifies the two-parent merge
-commit, and updates `main` with GitHub's non-force atomic fast-forward API. A
+build), then rechecks deployed Test, `origin/test`, and Production parity before
+any GitHub mutation. It then opens a review PR, creates and verifies the
+two-parent merge commit, and updates `main` with GitHub's non-force atomic
+fast-forward API. A
 concurrent `main` change therefore fails before mutation. The worker verifies
 the merge parents/tree before manually dispatching `deploy-production.yml` for
 the exact merge SHA. Retries finish immediately only when live Production

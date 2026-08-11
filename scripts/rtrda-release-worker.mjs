@@ -189,6 +189,17 @@ export function assertLivePromotionState(report, liveReport, approvedSha) {
   }
 }
 
+export function assertPostValidationState(auditedProductionSha, liveReport, approvedSha) {
+  if (
+    !liveReport.promotable ||
+    liveReport.test.sha !== approvedSha ||
+    liveReport.test.originTestSha !== approvedSha ||
+    liveReport.production.sha !== auditedProductionSha
+  ) {
+    throw new Error("Live release state changed during exact-SHA validation");
+  }
+}
+
 export function assertReleaseHead(
   productionSha,
   testTree,
@@ -281,6 +292,8 @@ function executePromotion(approvedSha, auditedProductionSha) {
   const repo = "rtrdasmartrailway/web-app-rtrda";
   const testTree = run("git", ["rev-parse", `${approvedSha}^{tree}`]);
   runReleaseValidation(approvedSha);
+  const postValidationReport = evaluateAudit(collectLiveEvidence(process.cwd()));
+  assertPostValidationState(auditedProductionSha, postValidationReport, approvedSha);
   const releaseBranch = `release/exact-${approvedSha}`;
   const matchingRefPath = `repos/${repo}/git/matching-refs/heads/release/exact-${approvedSha}`;
   let releaseHeadSha = run("gh", [

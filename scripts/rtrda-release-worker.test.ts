@@ -96,6 +96,19 @@ describe("RTRDA release worker audit", () => {
     expect(workerSource).not.toContain('"pr", "checks"');
   });
 
+  it("rechecks live state after clean validation and before GitHub mutation", () => {
+    const validationIndex = workerSource.indexOf("runReleaseValidation(approvedSha)");
+    const recheckIndex = workerSource.indexOf("postValidationReport");
+    const mutationIndex = workerSource.indexOf("matchingRefPath");
+
+    expect(validationIndex).toBeGreaterThan(-1);
+    expect(recheckIndex).toBeGreaterThan(validationIndex);
+    expect(mutationIndex).toBeGreaterThan(recheckIndex);
+    expect(workerSource).toContain(
+      "assertPostValidationState(auditedProductionSha, postValidationReport, approvedSha)",
+    );
+  });
+
   it("reuses only an in-flight exact production run", () => {
     const query = releaseWorker.selectProductionRunQuery?.("d".repeat(40));
 
