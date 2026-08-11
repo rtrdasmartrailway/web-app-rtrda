@@ -399,6 +399,48 @@ const OFFICIAL_WEBSITE_NEWS = [
       height: 4032,
       mimeType: "image/jpeg",
     },
+    gallery: [
+      {
+        id: "91110",
+        sourceUrl: "https://apprtrda.sharepoint.com/sites/EntrepreneurDevelopment/",
+        localPath: "/wp-content/uploads/news-2569/en15085-070869/en15085-meeting-02.jpg",
+        title: "en15085-meeting-02",
+        alt: "การประชุมหารือมาตรฐาน EN 15085",
+        width: 6000,
+        height: 4000,
+        mimeType: "image/jpeg",
+      },
+      {
+        id: "91111",
+        sourceUrl: "https://apprtrda.sharepoint.com/sites/EntrepreneurDevelopment/",
+        localPath: "/wp-content/uploads/news-2569/en15085-070869/en15085-meeting-03.jpg",
+        title: "en15085-meeting-03",
+        alt: "การประชุมหารือมาตรฐาน EN 15085",
+        width: 6000,
+        height: 4000,
+        mimeType: "image/jpeg",
+      },
+      {
+        id: "91112",
+        sourceUrl: "https://apprtrda.sharepoint.com/sites/EntrepreneurDevelopment/",
+        localPath: "/wp-content/uploads/news-2569/en15085-070869/en15085-meeting-04.jpg",
+        title: "en15085-meeting-04",
+        alt: "การประชุมหารือมาตรฐาน EN 15085",
+        width: 6000,
+        height: 4000,
+        mimeType: "image/jpeg",
+      },
+      {
+        id: "91113",
+        sourceUrl: "https://apprtrda.sharepoint.com/sites/EntrepreneurDevelopment/",
+        localPath: "/wp-content/uploads/news-2569/en15085-070869/en15085-meeting-05.jpg",
+        title: "en15085-meeting-05",
+        alt: "การประชุมหารือมาตรฐาน EN 15085",
+        width: 6000,
+        height: 4000,
+        mimeType: "image/jpeg",
+      },
+    ],
   },
 ];
 
@@ -408,10 +450,14 @@ function facebookRestoredNewsContentHtml(news) {
   const paragraphs = news.paragraphs
     .map((paragraph) => `<p>${paragraph}</p>`)
     .join("\n\n");
-  const image = news.media
-    ? `\n\n<figure class="wp-block-image size-large"><img src="${news.media.localPath}" alt="${news.title}" /></figure>`
-    : "";
-  return `${paragraphs}${image}`;
+  const images = [news.media, ...(news.gallery ?? [])]
+    .filter(Boolean)
+    .map(
+      (media) =>
+        `<figure class="wp-block-image size-large"><img src="${media.localPath}" alt="${media.alt || news.title}" /></figure>`,
+    )
+    .join("\n\n");
+  return `${images}${images ? "\n\n" : ""}${paragraphs}`;
 }
 
 function facebookRestoredNewsListItem(news) {
@@ -517,10 +563,12 @@ function withSupplementalCategories(categories, records) {
 
 function withSupplementalMedia(media) {
   const existingIds = new Set(media.map((asset) => String(asset.id)));
-  const facebookMedia = SUPPLEMENTAL_NEWS.filter((news) => news.media).map((news) => ({
-    ...news.media,
-    id: String(news.media.id),
-  }));
+  const facebookMedia = SUPPLEMENTAL_NEWS.flatMap((news) => [
+    news.media,
+    ...(news.gallery ?? []),
+  ])
+    .filter(Boolean)
+    .map((media) => ({ ...media, id: String(media.id) }));
   const supplemental = [...NO_GIFT_POLICY_MEDIA, ...facebookMedia].filter(
     (asset) => !existingIds.has(asset.id),
   );
