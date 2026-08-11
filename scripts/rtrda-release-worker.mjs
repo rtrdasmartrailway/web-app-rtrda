@@ -108,6 +108,22 @@ function runReleaseValidation(approvedSha, repoPath = process.cwd()) {
   }
 }
 
+export function readRemoteEvidence(key, destination, path, runner = run) {
+  try {
+    const output = runner("ssh", [
+      "-i",
+      key,
+      "-o",
+      "BatchMode=yes",
+      destination,
+      `cd ${path} && git rev-parse HEAD && cat .deploy-state/preprod-release`,
+    ]).split(/\s+/);
+    return { git: output[0] ?? "", marker: output[1] ?? "" };
+  } catch {
+    return { git: "", marker: "" };
+  }
+}
+
 function collectLiveEvidence(repoPath = process.cwd()) {
   run("git", ["fetch", "origin", "test", "main", "--prune"], { cwd: repoPath });
   const testContainerSha = run("docker", [
@@ -117,34 +133,24 @@ function collectLiveEvidence(repoPath = process.cwd()) {
     '{{ index .Config.Labels "org.opencontainers.image.revision" }}',
   ]);
   const originTestSha = run("git", ["rev-parse", "origin/test"], { cwd: repoPath });
-  const remote = (key, destination, path) => {
-    const output = run("ssh", [
-      "-i",
-      key,
-      "-o",
-      "BatchMode=yes",
-      destination,
-      `cd ${path} && git rev-parse HEAD && cat .deploy-state/preprod-release`,
-    ]).split(/\s+/);
-    return { git: output[0] ?? "", marker: output[1] ?? "" };
-  };
-  const cloud = remote(
+  const cloud = readRemoteEvidence(
     `${process.env.HOME}/.ssh/rtrda-cloud-preprod-sync_ed25519`,
     "ubuntu@100.77.64.92",
     "/home/ubuntu/rtrda-preprod/web-app-rtrda",
   );
-  const rtrda02 = remote(
+  const rtrda02 = readRemoteEvidence(
     `${process.env.HOME}/.ssh/rtrda02_prod_preview_sync_ed25519`,
     "rtrda@100.91.174.121",
     "/srv/apps/web-app-rtrda-preprod-rtrda02",
   );
-  const changedFiles = FULL_SHA.test(testContainerSha)
-    ? run("git", ["diff", "--name-status", `${cloud.git}..${testContainerSha}`], {
-        cwd: repoPath,
-      })
-        .split("\n")
-        .filter(Boolean)
-    : [];
+  const changedFiles =
+    FULL_SHA.test(testContainerSha) && FULL_SHA.test(cloud.git)
+      ? run("git", ["diff", "--name-status", `${cloud.git}..${testContainerSha}`], {
+          cwd: repoPath,
+        })
+          .split("\n")
+          .filter(Boolean)
+      : [];
   return {
     testContainerSha,
     originTestSha,

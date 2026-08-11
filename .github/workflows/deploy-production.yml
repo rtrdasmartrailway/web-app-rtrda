@@ -101,10 +101,13 @@ jobs:
       - name: Deploy exact main SHA to cloud primary
         env:
           SOURCE_PATH: ${{ steps.resolve.outputs.source_path }}
+          DEPLOY_SHA: ${{ steps.resolve.outputs.deploy_sha }}
           GITHUB_SHA: ${{ steps.resolve.outputs.deploy_sha }}
         run: |
           set -euo pipefail
           cd "$SOURCE_PATH"
+          git fetch origin main --prune
+          test "$DEPLOY_SHA" = "$(git rev-parse origin/main)"
           chmod +x .github/scripts/deploy-preprod-target.sh
           SOURCE_PATH="$SOURCE_PATH" \
           TARGET_NAME=cloud \

@@ -50,6 +50,35 @@ describe("RTRDA release worker audit", () => {
     expect(workerSource).toContain('"https://test.rtrda.or.th/healthz"');
   });
 
+  it("turns an unreachable production target into empty audit evidence", () => {
+    const reader = (
+      releaseWorker as typeof releaseWorker & {
+        readRemoteEvidence?: (
+          key: string,
+          destination: string,
+          path: string,
+          runner: () => string,
+        ) => { git: string; marker: string };
+      }
+    ).readRemoteEvidence;
+
+    expect(reader).toBeTypeOf("function");
+    expect(
+      reader?.("/tmp/key", "host", "/app", () => {
+        throw new Error("unreachable");
+      }),
+    ).toEqual({ git: "", marker: "" });
+    expect(
+      evaluateAudit(
+        evidence({
+          cloudGitSha: "",
+          cloudMarkerSha: "",
+          cloudHealth: false,
+        }),
+      ).blockers,
+    ).toEqual(expect.arrayContaining(["cloud_release_unverified", "cloud_unhealthy"]));
+  });
+
   it("rejects production targets that are not on the same release", () => {
     const report = evaluateAudit(evidence({ rtrda02MarkerSha: "c".repeat(40) }));
     expect(report.promotable).toBe(false);

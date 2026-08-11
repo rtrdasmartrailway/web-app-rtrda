@@ -23,7 +23,7 @@ describe("Deploy rtrda.or.th production workflow", () => {
     expect(workflow).toContain('test -n "$INPUT_REF"');
     expect(
       workflow.match(/test "\$DEPLOY_SHA" = "\$\(git rev-parse origin\/main\)"/g),
-    ).toHaveLength(2);
+    ).toHaveLength(3);
     expect(workflow).not.toContain(
       'git merge-base --is-ancestor "$DEPLOY_SHA" origin/main',
     );
