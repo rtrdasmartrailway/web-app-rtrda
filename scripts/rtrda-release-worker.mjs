@@ -155,23 +155,54 @@ export function assertLivePromotionState(report, liveReport, approvedSha) {
   }
 }
 
+export function assertExactReleaseTree(testTree, prospectiveTree) {
+  if (!FULL_SHA.test(testTree ?? "") || testTree !== prospectiveTree) {
+    throw new Error(
+      "Prospective production release tree does not equal deployed test tree",
+    );
+  }
+}
+
+export function assertMergeIdentity(productionSha, testSha, mergeSha, parentShas) {
+  if (
+    !FULL_SHA.test(mergeSha ?? "") ||
+    parentShas.length !== 2 ||
+    parentShas[0] !== productionSha ||
+    parentShas[1] !== testSha
+  ) {
+    throw new Error(
+      "Merge identity does not match audited production and approved test parents",
+    );
+  }
+  return mergeSha;
+}
+
 export function selectProductionRunQuery(mainSha) {
   if (!FULL_SHA.test(mainSha ?? "")) throw new Error("main SHA must be a full SHA");
-  return `.[] | select(.headSha == "${mainSha}") | .databaseId`;
+  return `.[] | select(.displayTitle == "Deploy production ${mainSha}") | .databaseId`;
 }
 
 export function buildPromotionPlan(sha) {
   return [
     `gh pr create --repo rtrdasmartrailway/web-app-rtrda --base main --head test --title "Promote deployed test ${sha.slice(0, 7)} to production" --body "Exact deployed test SHA: ${sha}"`,
     `gh pr merge <PR_NUMBER> --repo rtrdasmartrailway/web-app-rtrda --merge --match-head-commit ${sha}`,
-    "gh workflow run deploy-production.yml --repo rtrdasmartrailway/web-app-rtrda --ref main -f ref=<MERGED_MAIN_SHA> (fallback only if merge did not trigger CI)",
+    "Verify the PR merge commit parents are [audited production SHA, approved test SHA].",
+    "gh workflow run deploy-production.yml --repo rtrdasmartrailway/web-app-rtrda --ref main -f ref=<VERIFIED_MERGE_COMMIT_SHA>",
     "gh run watch <PRODUCTION_RUN_ID> --repo rtrdasmartrailway/web-app-rtrda --exit-status",
     "Re-run check and require Cloud/RTRDA02 release markers to equal the merged main SHA.",
   ];
 }
 
-function executePromotion(approvedSha) {
+function executePromotion(approvedSha, auditedProductionSha) {
   const repo = "rtrdasmartrailway/web-app-rtrda";
+  const testTree = run("git", ["rev-parse", `${approvedSha}^{tree}`]);
+  const prospectiveTree = run("git", [
+    "merge-tree",
+    "--write-tree",
+    auditedProductionSha,
+    approvedSha,
+  ]).split("\n")[0];
+  assertExactReleaseTree(testTree, prospectiveTree);
   let prNumber = run("gh", [
     "pr",
     "list",
@@ -216,19 +247,22 @@ function executePromotion(approvedSha) {
     ]);
   }
   run("gh", ["pr", "checks", prNumber, "--repo", repo, "--watch"]);
-  const prHeadSha = run("gh", [
-    "pr",
-    "view",
-    prNumber,
-    "--repo",
-    repo,
-    "--json",
-    "headRefOid",
-    "--jq",
-    ".headRefOid",
-  ]);
-  if (prHeadSha !== approvedSha) {
+  const prIdentity = JSON.parse(
+    run("gh", [
+      "pr",
+      "view",
+      prNumber,
+      "--repo",
+      repo,
+      "--json",
+      "headRefOid,baseRefOid",
+    ]),
+  );
+  if (prIdentity.headRefOid !== approvedSha) {
     throw new Error("PR head no longer matches approved deployed test SHA");
+  }
+  if (prIdentity.baseRefOid !== auditedProductionSha) {
+    throw new Error("PR base no longer matches audited production SHA");
   }
   run("gh", [
     "pr",
@@ -240,8 +274,37 @@ function executePromotion(approvedSha) {
     "--match-head-commit",
     approvedSha,
   ]);
-  const mainSha = run("gh", ["api", `repos/${repo}/commits/main`, "--jq", ".sha"]);
 
+  let mergeCommitSha = "";
+  for (let attempt = 0; attempt < 12 && !mergeCommitSha; attempt += 1) {
+    const mergedPr = JSON.parse(
+      run("gh", ["pr", "view", prNumber, "--repo", repo, "--json", "state,mergeCommit"]),
+    );
+    if (mergedPr.state === "MERGED" && FULL_SHA.test(mergedPr.mergeCommit?.oid ?? "")) {
+      mergeCommitSha = mergedPr.mergeCommit.oid;
+    } else {
+      run("sleep", ["5"]);
+    }
+  }
+  if (!mergeCommitSha) throw new Error("Verified PR merge commit was not created");
+
+  const mergeCommit = JSON.parse(
+    run("gh", ["api", `repos/${repo}/commits/${mergeCommitSha}`]),
+  );
+  const parentShas = (mergeCommit.parents ?? []).map((parent) => parent.sha);
+  assertMergeIdentity(auditedProductionSha, approvedSha, mergeCommitSha, parentShas);
+
+  run("gh", [
+    "workflow",
+    "run",
+    "deploy-production.yml",
+    "--repo",
+    repo,
+    "--ref",
+    "main",
+    "-f",
+    `ref=${mergeCommitSha}`,
+  ]);
   let runId = "";
   for (let attempt = 0; attempt < 12 && !runId; attempt += 1) {
     runId = run("gh", [
@@ -251,54 +314,22 @@ function executePromotion(approvedSha) {
       repo,
       "--workflow",
       "deploy-production.yml",
-      "--branch",
-      "main",
+      "--event",
+      "workflow_dispatch",
       "--limit",
       "20",
       "--json",
-      "databaseId,headSha",
+      "databaseId,displayTitle",
       "--jq",
-      selectProductionRunQuery(mainSha),
+      selectProductionRunQuery(mergeCommitSha),
     ]).split("\n")[0];
     if (!runId) run("sleep", ["5"]);
-  }
-  if (!runId) {
-    run("gh", [
-      "workflow",
-      "run",
-      "deploy-production.yml",
-      "--repo",
-      repo,
-      "--ref",
-      "main",
-      "-f",
-      `ref=${mainSha}`,
-    ]);
-    for (let attempt = 0; attempt < 12 && !runId; attempt += 1) {
-      runId = run("gh", [
-        "run",
-        "list",
-        "--repo",
-        repo,
-        "--workflow",
-        "deploy-production.yml",
-        "--branch",
-        "main",
-        "--limit",
-        "20",
-        "--json",
-        "databaseId,headSha",
-        "--jq",
-        selectProductionRunQuery(mainSha),
-      ]).split("\n")[0];
-      if (!runId) run("sleep", ["5"]);
-    }
   }
   if (!runId) throw new Error("Production workflow run was not created");
   execFileSync("gh", ["run", "watch", runId, "--repo", repo, "--exit-status"], {
     stdio: "inherit",
   });
-  return { prNumber, mainSha, productionRunId: runId };
+  return { prNumber, mainSha: mergeCommitSha, productionRunId: runId };
 }
 
 function main() {
@@ -337,7 +368,9 @@ function main() {
     collectLiveEvidence(valueAfter(args, "--repo") ?? process.cwd()),
   );
   assertLivePromotionState(report, liveReport, approvedSha);
-  console.log(JSON.stringify(executePromotion(approvedSha), null, 2));
+  console.log(
+    JSON.stringify(executePromotion(approvedSha, report.production.sha), null, 2),
+  );
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {

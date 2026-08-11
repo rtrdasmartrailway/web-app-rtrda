@@ -1,14 +1,12 @@
 name: Deploy rtrda.or.th production
+run-name: Deploy production ${{ inputs.ref }}
 
 on:
-  push:
-    branches:
-      - main
   workflow_dispatch:
     inputs:
       ref:
-        description: "Git ref/SHA to deploy (blank = pushed SHA / latest origin/main)"
-        required: false
+        description: "Exact verified main merge SHA to deploy"
+        required: true
         type: string
 
 concurrency:
@@ -37,13 +35,9 @@ jobs:
           fi
           cd "$SOURCE_PATH"
           git fetch origin main --prune
-          if [ -n "$INPUT_REF" ]; then
-            DEPLOY_SHA="$(git rev-parse "$INPUT_REF")"
-          elif [ "${GITHUB_EVENT_NAME}" = "push" ]; then
-            DEPLOY_SHA="${GITHUB_SHA}"
-          else
-            DEPLOY_SHA="$(git rev-parse origin/main)"
-          fi
+          test -n "$INPUT_REF"
+          DEPLOY_SHA="$(git rev-parse "$INPUT_REF")"
+          test "${#DEPLOY_SHA}" -eq 40
           git merge-base --is-ancestor "$DEPLOY_SHA" origin/main
           echo "deploy_sha=$DEPLOY_SHA" >> "$GITHUB_OUTPUT"
           echo "source_path=$SOURCE_PATH" >> "$GITHUB_OUTPUT"

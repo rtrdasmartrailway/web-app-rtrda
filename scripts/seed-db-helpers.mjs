@@ -444,9 +444,41 @@ const OFFICIAL_WEBSITE_NEWS = [
   },
 ];
 
+const ENGLISH_OFFICIAL_WEBSITE_NEWS = [
+  {
+    ...OFFICIAL_WEBSITE_NEWS[0],
+    wpId: "en15085-070869-en",
+    language: "en",
+    path: `/en${OFFICIAL_WEBSITE_NEWS[0].path}`,
+    title: "RTRDA and partners advance Thai manufacturers toward EN 15085",
+    excerpt:
+      "A Pilot/Sandbox initiative will strengthen rail-component production and increase Thai local content.",
+    paragraphs: [
+      "RTRDA, the Thailand Automotive Institute and the Federation of Thai Industries' Rail Transportation Industry Cluster met on 7 August 2026 to discuss how Thai welding manufacturers can advance toward EN 15085 certification.",
+      "The initiative aims to prepare Thai manufacturers for the international welding standard for railway vehicles and components, an important requirement for participating in the global rail-industry supply chain.",
+      "Participants included experts in welding, workforce development, assessment and certification, together with representatives from industry, universities, the Thailand Automotive Institute and RTRDA.",
+      "The meeting emphasized that EN 15085 covers the complete production-quality system—not only welder skills—including design, personnel, manufacturing processes, inspection, traceability and certification.",
+      "The proposed Pilot/Sandbox will select capable manufacturers, define target products and markets, and determine the appropriate certification level for items such as car-body structures, bogies and related structural components.",
+      "Each participating manufacturer will undergo a gap assessment covering ISO 3834 welding-quality systems, personnel and welding coordinators, welding procedures, production mock-ups and readiness for EN 15085 certification.",
+      "The work will be coordinated with RTRDA's rail-industry workforce plan for welding coordination, welders and welding operators, non-destructive testing and quality inspection.",
+      "RTRDA will use the meeting's recommendations to develop the Pilot/Sandbox framework with partner organizations, linking market demand, product selection, factory and workforce development, testing and certification.",
+      "The objective is to expand Thai manufacturers' participation in rail-component production and increase local content on the basis of international standards, supporting sustainable long-term growth of Thailand's rail industry.",
+    ],
+    media: {
+      ...OFFICIAL_WEBSITE_NEWS[0].media,
+      alt: "Meeting on advancing Thai rail-industry welding manufacturers toward EN 15085",
+    },
+    gallery: OFFICIAL_WEBSITE_NEWS[0].gallery.map((media) => ({
+      ...media,
+      alt: "EN 15085 rail-industry standards meeting",
+    })),
+  },
+];
+
 const SUPPLEMENTAL_NEWS = [...FACEBOOK_RESTORED_NEWS, ...OFFICIAL_WEBSITE_NEWS].sort(
   (left, right) => Date.parse(right.date) - Date.parse(left.date),
 );
+const ALL_SUPPLEMENTAL_NEWS = [...SUPPLEMENTAL_NEWS, ...ENGLISH_OFFICIAL_WEBSITE_NEWS];
 
 function facebookRestoredNewsContentHtml(news) {
   const paragraphs = news.paragraphs
@@ -459,14 +491,20 @@ function facebookRestoredNewsContentHtml(news) {
         `<figure class="wp-block-image size-large"><img src="${media.localPath}" alt="${media.alt || news.title}" /></figure>`,
     )
     .join("\n\n");
-  return `${images}${images ? "\n\n" : ""}${paragraphs}`;
+  const separator = images ? "\n\n" : "";
+  return news.gallery?.length
+    ? `${images}${separator}${paragraphs}`
+    : `${paragraphs}${separator}${images}`;
 }
 
 function facebookRestoredNewsListItem(news) {
   return `<li><a href="${news.path}">${news.title}</a><time datetime="${news.date}">${news.date.slice(0, 10)}</time><p>${news.excerpt}</p></li>`;
 }
 
-const NEWS_CATEGORY_PATH = "/category/ข่าวและกิจกรรม";
+const NEWS_CATEGORY_PATHS = {
+  th: "/category/ข่าวและกิจกรรม",
+  en: "/en/category/ข่าวและกิจกรรม",
+};
 
 function noGiftPolicyContentHtml() {
   const paragraphs = NO_GIFT_POLICY_PARAGRAPHS.map(
@@ -486,47 +524,67 @@ function noGiftPolicyListItem() {
 
 function withSupplementalRecords(records) {
   const existingPaths = new Set(records.map((record) => record.path));
-  const supplementalNews = SUPPLEMENTAL_NEWS.map((news) => ({
-    id: `th-post-${news.id}`,
-    wpId: news.wpId,
-    language: "th",
-    kind: "post",
-    path: news.path,
-    sourceUrl: news.sourceUrl,
-    title: news.title,
-    excerpt: news.excerpt,
-    contentHtml: facebookRestoredNewsContentHtml(news),
-    searchText: [news.title, news.excerpt, ...news.paragraphs].join("\n"),
-    date: news.date,
-    modified: news.modified ?? news.date,
-    parentPath: null,
-    categoryIds: [7],
-    featuredMediaId: news.media ? Number(news.media.id) : null,
-    authorId: null,
-  }));
+  const supplementalNews = ALL_SUPPLEMENTAL_NEWS.map((news) => {
+    const language = news.language ?? "th";
+    return {
+      id: `${language}-post-${news.id}`,
+      wpId: news.wpId,
+      language,
+      kind: "post",
+      path: news.path,
+      sourceUrl: news.sourceUrl,
+      title: news.title,
+      excerpt: news.excerpt,
+      contentHtml: facebookRestoredNewsContentHtml(news),
+      searchText: [news.title, news.excerpt, ...news.paragraphs].join("\n"),
+      date: news.date,
+      modified: news.modified ?? news.date,
+      parentPath: null,
+      categoryIds: [7],
+      featuredMediaId: news.media ? Number(news.media.id) : null,
+      authorId: null,
+    };
+  });
 
-  const listItems = [
-    ...SUPPLEMENTAL_NEWS.filter((news) => !existingPaths.has(news.path)).map(
-      facebookRestoredNewsListItem,
-    ),
-    existingPaths.has(NO_GIFT_POLICY_NEWS.path) ? "" : noGiftPolicyListItem(),
-  ]
-    .filter(Boolean)
-    .join("\n");
+  const categoryConfigs = [
+    {
+      path: NEWS_CATEGORY_PATHS.th,
+      news: SUPPLEMENTAL_NEWS,
+      includeNoGift: true,
+    },
+    {
+      path: NEWS_CATEGORY_PATHS.en,
+      news: ENGLISH_OFFICIAL_WEBSITE_NEWS,
+      includeNoGift: false,
+    },
+  ];
+  const listItemsByPath = new Map(
+    categoryConfigs.map((config) => {
+      const listItems = [
+        ...config.news
+          .filter((news) => !existingPaths.has(news.path))
+          .map(facebookRestoredNewsListItem),
+        config.includeNoGift && !existingPaths.has(NO_GIFT_POLICY_NEWS.path)
+          ? noGiftPolicyListItem()
+          : "",
+      ]
+        .filter(Boolean)
+        .join("\n");
+      return [config.path, { listItems, modified: config.news[0]?.date }];
+    }),
+  );
 
   const nextRecords = records.map((record) => {
-    if (record.path !== NEWS_CATEGORY_PATH || !listItems) {
-      return record;
-    }
+    const categoryUpdate = listItemsByPath.get(record.path);
+    if (!categoryUpdate?.listItems) return record;
 
     return {
       ...record,
       contentHtml: record.contentHtml.replace(
         /<ul class="wp-import-list">/,
-        `<ul class="wp-import-list">
-${listItems}`,
+        `<ul class="wp-import-list">\n${categoryUpdate.listItems}`,
       ),
-      modified: "2026-06-29T00:00:00",
+      modified: categoryUpdate.modified ?? record.modified,
     };
   });
 
@@ -549,17 +607,16 @@ ${listItems}`,
 
 function withSupplementalCategories(categories, records) {
   const existingPaths = new Set(records.map((record) => record.path));
-  const missingSupplementalCount = [
-    NO_GIFT_POLICY_NEWS.path,
-    ...SUPPLEMENTAL_NEWS.map((news) => news.path),
-  ].filter((path) => !existingPaths.has(path)).length;
+  const pathsByLanguage = {
+    th: [NO_GIFT_POLICY_NEWS.path, ...SUPPLEMENTAL_NEWS.map((news) => news.path)],
+    en: ENGLISH_OFFICIAL_WEBSITE_NEWS.map((news) => news.path),
+  };
 
   return categories.map((category) => {
-    if (category.id !== 7 || category.language !== "th") {
-      return { ...category };
-    }
-
-    return { ...category, count: category.count + missingSupplementalCount };
+    const paths = pathsByLanguage[category.language];
+    if (category.id !== 7 || !paths) return { ...category };
+    const missingCount = paths.filter((path) => !existingPaths.has(path)).length;
+    return { ...category, count: category.count + missingCount };
   });
 }
 

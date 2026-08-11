@@ -73,11 +73,12 @@ describe("RTRDA release worker audit", () => {
     expect(workerSource).toMatch(/"--match-head-commit",\s*approvedSha/);
   });
 
-  it("selects both automatic and fallback production runs by the merged main SHA", () => {
+  it("selects the single dispatched production run by verified merge SHA", () => {
     const selectorUses =
-      workerSource.match(/selectProductionRunQuery\(mainSha\),/g) ?? [];
+      workerSource.match(/selectProductionRunQuery\(mergeCommitSha\),/g) ?? [];
 
-    expect(selectorUses).toHaveLength(2);
+    expect(selectorUses).toHaveLength(1);
+    expect(workerSource).toContain("databaseId,displayTitle");
     expect(workerSource).not.toContain('".[0].databaseId"');
   });
 
@@ -114,6 +115,43 @@ describe("RTRDA release worker audit", () => {
     expect(workerSource).toContain(
       "assertLivePromotionState(report, liveReport, approvedSha)",
     );
+  });
+
+  it("requires the prospective production tree to equal the deployed test tree", () => {
+    const guard = (
+      releaseWorker as typeof releaseWorker & {
+        assertExactReleaseTree?: (testTree: string, prospectiveTree: string) => void;
+      }
+    ).assertExactReleaseTree;
+
+    expect(guard).toBeTypeOf("function");
+    expect(() => guard?.("a".repeat(40), "a".repeat(40))).not.toThrow();
+    expect(() => guard?.("a".repeat(40), "b".repeat(40))).toThrow(/release tree/i);
+    expect(workerSource).toContain("assertExactReleaseTree(testTree, prospectiveTree)");
+  });
+
+  it("binds the dispatched merge commit to audited production and approved test parents", () => {
+    const guard = (
+      releaseWorker as typeof releaseWorker & {
+        assertMergeIdentity?: (
+          productionSha: string,
+          testSha: string,
+          mergeSha: string,
+          parentShas: string[],
+        ) => string;
+      }
+    ).assertMergeIdentity;
+    const mergeSha = "d".repeat(40);
+
+    expect(guard).toBeTypeOf("function");
+    expect(guard?.(SHA_PROD, SHA_TEST, mergeSha, [SHA_PROD, SHA_TEST])).toBe(mergeSha);
+    expect(() =>
+      guard?.(SHA_PROD, SHA_TEST, mergeSha, ["c".repeat(40), SHA_TEST]),
+    ).toThrow(/merge identity/i);
+    expect(workerSource).toContain(
+      "assertMergeIdentity(auditedProductionSha, approvedSha, mergeCommitSha, parentShas)",
+    );
+    expect(workerSource).not.toContain("commits/main");
   });
 
   it("promotes through main CI instead of deploying production hosts directly", () => {

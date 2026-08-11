@@ -105,7 +105,7 @@ describe("manifestToRows", () => {
   const rows = manifestToRows(manifest);
 
   it("maps records, coercing wpId to string and defaulting optional fields", () => {
-    expect(rows.records).toHaveLength(12);
+    expect(rows.records).toHaveLength(13);
     const [page, post] = rows.records;
     expect(page).toMatchObject({
       id: "th-page-1",
@@ -239,6 +239,9 @@ describe("manifestToRows", () => {
     ]);
     expect(restoredNews[0].contentHtml).toContain("การพัฒนารถไฟท่องเที่ยว Siamese Train");
     expect(restoredNews[0].contentHtml).not.toContain("ดูโพสต์ต้นทางบน Facebook");
+    expect(restoredNews[0].contentHtml.indexOf("<p>")).toBeLessThan(
+      restoredNews[0].contentHtml.indexOf("<figure"),
+    );
     expect(
       restoredNews.find((record) => record.id === "th-post-91006")?.contentHtml,
     ).toContain("Workshop ประเมินศักยภาพองค์กร");
@@ -249,7 +252,27 @@ describe("manifestToRows", () => {
     expect(officialNews).toMatchObject({
       date: "2026-08-07T09:00:00",
       modified: "2026-08-07T09:00:00",
+      featuredMediaId: 91109,
     });
+    expect(officialNews.contentHtml.match(/wp-block-image/g)).toHaveLength(5);
+
+    const officialMedia = rows.media.filter((asset) =>
+      ["91109", "91110", "91111", "91112", "91113"].includes(asset.id),
+    );
+    expect(officialMedia).toHaveLength(5);
+    expect(new Set(officialMedia.map((asset) => asset.localPath)).size).toBe(5);
+    expect(officialMedia).toEqual(
+      expect.arrayContaining(
+        ["91109", "91110", "91111", "91112", "91113"].map((id) =>
+          expect.objectContaining({
+            id,
+            width: 2400,
+            height: 1600,
+            mimeType: "image/jpeg",
+          }),
+        ),
+      ),
+    );
 
     const restoredMedia = rows.media.filter((asset) =>
       asset.localPath.includes("/wp-content/uploads/news-2569/fb-"),
@@ -280,6 +303,22 @@ describe("manifestToRows", () => {
           categoryIds: [],
           featuredMediaId: null,
         },
+        {
+          id: "en-category-7",
+          wpId: 7,
+          language: "en",
+          kind: "category",
+          path: "/en/category/ข่าวและกิจกรรม",
+          sourceUrl: "https://www.rtrda.or.th/en/category/ข่าวและกิจกรรม/",
+          title: "News and Activities",
+          excerpt: "",
+          contentHtml: '<ul class="wp-import-list"></ul>',
+          modified: "2026-01-01T00:00:00",
+          date: "2026-01-01T00:00:00",
+          parentPath: null,
+          categoryIds: [],
+          featuredMediaId: null,
+        },
       ],
       categories: [
         ...manifest.categories,
@@ -289,6 +328,15 @@ describe("manifestToRows", () => {
           path: "/category/ข่าวและกิจกรรม",
           slug: "ข่าวและกิจกรรม",
           name: "ข่าวและกิจกรรม",
+          count: 1,
+          parent: 0,
+        },
+        {
+          id: 7,
+          language: "en",
+          path: "/en/category/ข่าวและกิจกรรม",
+          slug: "ข่าวและกิจกรรม",
+          name: "News and Activities",
           count: 1,
           parent: 0,
         },
@@ -318,6 +366,28 @@ describe("manifestToRows", () => {
     );
     expect(category?.contentHtml).toContain("Siamese Train");
     expect(category?.contentHtml).toContain("Incubation Team");
+
+    const englishNews = rowsWithCategory.records.find(
+      (record) => record.id === "en-post-en15085-070869",
+    );
+    expect(englishNews).toMatchObject({
+      language: "en",
+      path: "/en/สทร-ผนึกพันธมิตร-ปูทางผู้ประกอบการไทยสู่มาตรฐาน-en-15085",
+      title: "RTRDA and partners advance Thai manufacturers toward EN 15085",
+      date: "2026-08-07T09:00:00",
+      modified: "2026-08-07T09:00:00",
+      featuredMediaId: 91109,
+    });
+    const englishCategory = rowsWithCategory.records.find(
+      (record) => record.path === "/en/category/ข่าวและกิจกรรม",
+    );
+    expect(englishCategory?.contentHtml).toContain(englishNews?.path);
+    expect(englishCategory?.contentHtml).toContain(englishNews?.title);
+    expect(
+      rowsWithCategory.categories.find(
+        (category) => category.id === 7 && category.language === "en",
+      )?.count,
+    ).toBe(2);
   });
 
   it("does not duplicate supplemental ITA 2569 downloads from the manifest", () => {
