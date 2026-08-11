@@ -14,6 +14,7 @@ export function evaluateAudit(raw) {
   if (evidence.testContainerSha !== evidence.originTestSha)
     blockers.push("test_deploy_not_on_origin_test");
   if (!evidence.testHealth) blockers.push("test_unhealthy");
+  if (!evidence.testPublicHealth) blockers.push("test_public_unhealthy");
 
   const cloudConsistent =
     valid(evidence.cloudGitSha) && evidence.cloudGitSha === evidence.cloudMarkerSha;
@@ -36,7 +37,9 @@ export function evaluateAudit(raw) {
     test: {
       sha: valid(evidence.testContainerSha) ? evidence.testContainerSha : null,
       originTestSha: evidence.originTestSha ?? null,
-      healthy: Boolean(evidence.testHealth),
+      healthy: Boolean(evidence.testHealth && evidence.testPublicHealth),
+      localHealthy: Boolean(evidence.testHealth),
+      publicHealthy: Boolean(evidence.testPublicHealth),
     },
     production: {
       sha:
@@ -120,6 +123,7 @@ function collectLiveEvidence(repoPath = process.cwd()) {
     rtrda02GitSha: rtrda02.git,
     rtrda02MarkerSha: rtrda02.marker,
     testHealth: succeeds("curl", ["-fsS", "http://127.0.0.1:3020/healthz"]),
+    testPublicHealth: succeeds("curl", ["-fsS", "https://test.rtrda.or.th/healthz"]),
     cloudHealth: succeeds("curl", ["-fsS", "http://100.77.64.92:3021/healthz"]),
     rtrda02Health: succeeds("curl", ["-fsS", "http://100.91.174.121:3021/healthz"]),
     changedFiles,
@@ -203,7 +207,7 @@ export function assertMergeIdentity(
 
 export function selectProductionRunQuery(mainSha) {
   if (!FULL_SHA.test(mainSha ?? "")) throw new Error("main SHA must be a full SHA");
-  return `.[] | select(.displayTitle == "Deploy production ${mainSha}") | .databaseId`;
+  return `.[] | select(.displayTitle == "Deploy production ${mainSha}") | select(.status != "completed" or .conclusion == "success") | .databaseId`;
 }
 
 export function buildPromotionPlan(sha) {
@@ -211,8 +215,8 @@ export function buildPromotionPlan(sha) {
   return [
     `Create/reuse ${releaseBranch} with parent=<AUDITED_PRODUCTION_SHA> and tree=${sha}^{tree}`,
     `gh pr create --repo rtrdasmartrailway/web-app-rtrda --base main --head ${releaseBranch} --title "Promote exact deployed test ${sha.slice(0, 7)} to production" --body "Exact deployed test SHA: ${sha}"`,
-    "gh pr merge <PR_NUMBER> --repo rtrdasmartrailway/web-app-rtrda --merge --match-head-commit <VERIFIED_RELEASE_HEAD_SHA>",
-    "Verify merge parents and merge tree against audited production and deployed Test tree.",
+    "Create and verify an exact-tree merge commit with parents [audited production, verified release head].",
+    "Use GitHub's non-force atomic fast-forward to update refs/heads/main to the verified merge commit.",
     "gh workflow run deploy-production.yml --repo rtrdasmartrailway/web-app-rtrda --ref main -f ref=<VERIFIED_MERGE_COMMIT_SHA>",
     "gh run watch <PRODUCTION_RUN_ID> --repo rtrdasmartrailway/web-app-rtrda --exit-status",
     "Re-run check and require Cloud/RTRDA02 release markers to equal the merged main SHA.",
@@ -267,90 +271,145 @@ function executePromotion(approvedSha, auditedProductionSha) {
     releaseParentShas,
     releaseCommit.tree?.sha,
   );
-  let prNumber = run("gh", [
-    "pr",
-    "list",
-    "--repo",
-    repo,
-    "--base",
-    "main",
-    "--head",
-    releaseBranch,
-    "--state",
-    "open",
-    "--json",
-    "number",
-    "--jq",
-    ".[0].number // empty",
-  ]);
-  if (!prNumber) {
-    const url = run("gh", [
+  const existingPrs = JSON.parse(
+    run("gh", [
       "pr",
-      "create",
+      "list",
       "--repo",
       repo,
       "--base",
       "main",
       "--head",
       releaseBranch,
-      "--title",
-      `Promote exact deployed test ${approvedSha.slice(0, 7)} to production`,
-      "--body",
-      `Exact deployed test SHA: ${approvedSha}\nExact deployed test tree: ${testTree}`,
-    ]);
-    prNumber = run("gh", [
-      "pr",
-      "view",
-      url,
-      "--repo",
-      repo,
+      "--state",
+      "all",
       "--json",
-      "number",
-      "--jq",
-      ".number",
-    ]);
-  }
-  run("gh", ["pr", "checks", prNumber, "--repo", repo, "--watch"]);
-  const prIdentity = JSON.parse(
-    run("gh", [
-      "pr",
-      "view",
-      prNumber,
-      "--repo",
-      repo,
-      "--json",
-      "headRefOid,baseRefOid",
+      "number,state,headRefOid,baseRefOid,mergeCommit",
     ]),
   );
-  if (prIdentity.headRefOid !== releaseHeadSha) {
-    throw new Error("PR head no longer matches verified exact-tree release head");
-  }
-  if (prIdentity.baseRefOid !== auditedProductionSha) {
-    throw new Error("PR base no longer matches audited production SHA");
-  }
-  run("gh", [
-    "pr",
-    "merge",
-    prNumber,
-    "--repo",
-    repo,
-    "--merge",
-    "--match-head-commit",
-    releaseHeadSha,
-  ]);
-
-  let mergeCommitSha = "";
-  for (let attempt = 0; attempt < 12 && !mergeCommitSha; attempt += 1) {
-    const mergedPr = JSON.parse(
-      run("gh", ["pr", "view", prNumber, "--repo", repo, "--json", "state,mergeCommit"]),
+  const existingPr =
+    existingPrs.find(
+      (candidate) =>
+        candidate.headRefOid === releaseHeadSha && candidate.state === "MERGED",
+    ) ??
+    existingPrs.find(
+      (candidate) =>
+        candidate.headRefOid === releaseHeadSha && candidate.state === "OPEN",
     );
-    if (mergedPr.state === "MERGED" && FULL_SHA.test(mergedPr.mergeCommit?.oid ?? "")) {
-      mergeCommitSha = mergedPr.mergeCommit.oid;
-    } else {
-      run("sleep", ["5"]);
+  let prNumber = existingPr?.number ? String(existingPr.number) : "";
+  let mergeCommitSha =
+    existingPr &&
+    existingPr.state === "MERGED" &&
+    FULL_SHA.test(existingPr.mergeCommit?.oid ?? "")
+      ? existingPr.mergeCommit.oid
+      : "";
+
+  if (!mergeCommitSha) {
+    if (existingPr && existingPr.state !== "OPEN") {
+      throw new Error("Existing exact-tree promotion PR is not reusable");
+    }
+    if (!prNumber) {
+      const url = run("gh", [
+        "pr",
+        "create",
+        "--repo",
+        repo,
+        "--base",
+        "main",
+        "--head",
+        releaseBranch,
+        "--title",
+        `Promote exact deployed test ${approvedSha.slice(0, 7)} to production`,
+        "--body",
+        `Exact deployed test SHA: ${approvedSha}\nExact deployed test tree: ${testTree}`,
+      ]);
+      prNumber = run("gh", [
+        "pr",
+        "view",
+        url,
+        "--repo",
+        repo,
+        "--json",
+        "number",
+        "--jq",
+        ".number",
+      ]);
+    }
+    run("gh", ["pr", "checks", prNumber, "--repo", repo, "--watch"]);
+    const prIdentity = JSON.parse(
+      run("gh", [
+        "pr",
+        "view",
+        prNumber,
+        "--repo",
+        repo,
+        "--json",
+        "headRefOid,baseRefOid",
+      ]),
+    );
+    if (prIdentity.headRefOid !== releaseHeadSha) {
+      throw new Error("PR head no longer matches verified exact-tree release head");
+    }
+    if (prIdentity.baseRefOid !== auditedProductionSha) {
+      throw new Error("PR base no longer matches audited production SHA");
+    }
+    const currentMainSha = run("gh", [
+      "api",
+      `repos/${repo}/git/refs/heads/main`,
+      "--jq",
+      ".object.sha",
+    ]);
+    if (currentMainSha !== auditedProductionSha) {
+      throw new Error("Main changed after production evidence was captured");
+    }
+
+    mergeCommitSha = run("gh", [
+      "api",
+      "--method",
+      "POST",
+      `repos/${repo}/git/commits`,
+      "-f",
+      `message=Promote exact deployed test ${approvedSha} to production`,
+      "-f",
+      `tree=${testTree}`,
+      "-f",
+      `parents[]=${auditedProductionSha}`,
+      "-f",
+      `parents[]=${releaseHeadSha}`,
+      "--jq",
+      ".sha",
+    ]);
+    const pendingMerge = JSON.parse(
+      run("gh", ["api", `repos/${repo}/git/commits/${mergeCommitSha}`]),
+    );
+    assertMergeIdentity(
+      auditedProductionSha,
+      releaseHeadSha,
+      testTree,
+      mergeCommitSha,
+      (pendingMerge.parents ?? []).map((parent) => parent.sha),
+      pendingMerge.tree?.sha,
+    );
+    run("gh", [
+      "api",
+      "--method",
+      "PATCH",
+      `repos/${repo}/git/refs/heads/main`,
+      "-f",
+      `sha=${mergeCommitSha}`,
+      "-F",
+      "force=false",
+    ]);
+    const updatedMainSha = run("gh", [
+      "api",
+      `repos/${repo}/git/refs/heads/main`,
+      "--jq",
+      ".object.sha",
+    ]);
+    if (updatedMainSha !== mergeCommitSha) {
+      throw new Error("Atomic main update did not land on the verified merge commit");
     }
   }
-  if (!mergeCommitSha) throw new Error("Verified PR merge commit was not created");
 
   const mergeCommit = JSON.parse(
     run("gh", ["api", `repos/${repo}/git/commits/${mergeCommitSha}`]),
@@ -366,20 +425,8 @@ function executePromotion(approvedSha, auditedProductionSha) {
     mergeTree,
   );
 
-  run("gh", [
-    "workflow",
-    "run",
-    "deploy-production.yml",
-    "--repo",
-    repo,
-    "--ref",
-    "main",
-    "-f",
-    `ref=${mergeCommitSha}`,
-  ]);
-  let runId = "";
-  for (let attempt = 0; attempt < 12 && !runId; attempt += 1) {
-    runId = run("gh", [
+  const findProductionRun = () =>
+    run("gh", [
       "run",
       "list",
       "--repo",
@@ -391,11 +438,28 @@ function executePromotion(approvedSha, auditedProductionSha) {
       "--limit",
       "20",
       "--json",
-      "databaseId,displayTitle",
+      "databaseId,displayTitle,status,conclusion",
       "--jq",
       selectProductionRunQuery(mergeCommitSha),
     ]).split("\n")[0];
-    if (!runId) run("sleep", ["5"]);
+
+  let runId = findProductionRun();
+  if (!runId) {
+    run("gh", [
+      "workflow",
+      "run",
+      "deploy-production.yml",
+      "--repo",
+      repo,
+      "--ref",
+      "main",
+      "-f",
+      `ref=${mergeCommitSha}`,
+    ]);
+    for (let attempt = 0; attempt < 12 && !runId; attempt += 1) {
+      runId = findProductionRun();
+      if (!runId) run("sleep", ["5"]);
+    }
   }
   if (!runId) throw new Error("Production workflow run was not created");
   execFileSync("gh", ["run", "watch", runId, "--repo", repo, "--exit-status"], {

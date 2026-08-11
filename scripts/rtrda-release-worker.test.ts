@@ -22,6 +22,7 @@ function evidence(overrides: Record<string, unknown> = {}) {
     rtrda02GitSha: SHA_PROD,
     rtrda02MarkerSha: SHA_PROD,
     testHealth: true,
+    testPublicHealth: true,
     cloudHealth: true,
     rtrda02Health: true,
     changedFiles: ["M\tsrc/example.ts"],
@@ -40,6 +41,13 @@ describe("RTRDA release worker audit", () => {
     const report = evaluateAudit(evidence({ originTestSha: "c".repeat(40) }));
     expect(report.promotable).toBe(false);
     expect(report.blockers).toContain("test_deploy_not_on_origin_test");
+  });
+
+  it("rejects a publicly unreachable Test release", () => {
+    const report = evaluateAudit(evidence({ testPublicHealth: false }));
+    expect(report.promotable).toBe(false);
+    expect(report.blockers).toContain("test_public_unhealthy");
+    expect(workerSource).toContain('"https://test.rtrda.or.th/healthz"');
   });
 
   it("rejects production targets that are not on the same release", () => {
@@ -66,21 +74,23 @@ describe("RTRDA release worker audit", () => {
     expect(promotionAudit.production.sha).toBe(SHA_PROD);
   });
 
-  it("atomically binds the merge to the verified exact-tree release head", () => {
+  it("atomically fast-forwards main from the audited base to the verified merge", () => {
     const plan = buildPromotionPlan(SHA_TEST);
 
     expect(plan.join("\n")).toContain(`release/exact-${SHA_TEST}`);
-    expect(plan.join("\n")).toContain("--match-head-commit <VERIFIED_RELEASE_HEAD_SHA>");
-    expect(workerSource).toMatch(/"--match-head-commit",\s*releaseHeadSha/);
+    expect(plan.join("\n")).toContain("atomic fast-forward");
+    expect(workerSource).toContain("git/refs/heads/main");
+    expect(workerSource).toMatch(/"-F",\s*"force=false"/);
+    expect(workerSource).not.toMatch(/"pr",\s*"merge"/);
   });
 
-  it("selects the single dispatched production run by verified merge SHA", () => {
-    const selectorUses =
-      workerSource.match(/selectProductionRunQuery\(mergeCommitSha\),/g) ?? [];
+  it("reuses a successful or in-flight exact production run and redispatches failures", () => {
+    const query = releaseWorker.selectProductionRunQuery?.("d".repeat(40));
 
-    expect(selectorUses).toHaveLength(1);
-    expect(workerSource).toContain("databaseId,displayTitle");
-    expect(workerSource).not.toContain('".[0].databaseId"');
+    expect(query).toContain("displayTitle");
+    expect(query).toContain('status != "completed"');
+    expect(query).toContain('conclusion == "success"');
+    expect(workerSource).toContain("databaseId,displayTitle,status,conclusion");
   });
 
   it("revalidates saved evidence against live state before any mutation", () => {
@@ -145,6 +155,12 @@ describe("RTRDA release worker audit", () => {
     expect(workerSource).toContain("assertReleaseHead(");
   });
 
+  it("resumes an already-merged exact promotion instead of creating a duplicate PR", () => {
+    expect(workerSource).toMatch(/"--state",\s*"all"/);
+    expect(workerSource).toContain('existingPr.state === "MERGED"');
+    expect(workerSource).toContain("existingPr.mergeCommit?.oid");
+  });
+
   it("binds the dispatched merge commit to production, release head, and exact test tree", () => {
     const guard = (
       releaseWorker as typeof releaseWorker & {
@@ -182,10 +198,11 @@ describe("RTRDA release worker audit", () => {
     expect(workerSource).not.toContain("commits/main");
   });
 
-  it("promotes through main CI instead of deploying production hosts directly", () => {
+  it("promotes through a reviewed exact-tree PR and main CI without direct host deploys", () => {
     const plan = buildPromotionPlan(SHA_TEST);
-    expect(plan.join("\n")).toContain("gh pr merge");
+    expect(plan.join("\n")).toContain("gh pr create");
     expect(plan.join("\n")).toContain("deploy-production.yml");
+    expect(plan.join("\n")).not.toContain("gh pr merge");
     expect(plan.join("\n")).not.toContain("ssh ");
   });
 });

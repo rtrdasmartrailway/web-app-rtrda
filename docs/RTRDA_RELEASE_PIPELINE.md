@@ -20,7 +20,8 @@ The report is promotable only when all conditions are true:
    `org.opencontainers.image.revision` SHA label.
 2. That deployed SHA equals `origin/test`; commits merely present in the DGT
    worktree are ignored.
-3. Test health passes.
+3. Local and public Test health pass (`127.0.0.1:3020` and
+   `https://test.rtrda.or.th/healthz`).
 4. Cloud primary Git SHA equals its release marker.
 5. RTRDA02 fallback Git SHA equals its release marker.
 6. Cloud and RTRDA02 are healthy and on the same production SHA.
@@ -58,9 +59,17 @@ node scripts/rtrda-release-worker.mjs promote \
   --execute
 ```
 
-The worker creates/reuses the `test -> main` PR, waits for checks, merge-promotes
-to `main`, and watches `deploy-production.yml`. The production workflow deploys
-the same merged main SHA to both:
+The worker creates or reuses `release/exact-<TEST_SHA>` with the audited
+Production SHA as its only parent and the exact deployed Test tree. It opens a
+review PR and waits for its checks, creates and verifies the two-parent merge
+commit, then updates `main` with GitHub's non-force atomic fast-forward API. A
+concurrent `main` change therefore fails before mutation. The worker verifies
+the merge parents/tree before manually dispatching `deploy-production.yml` for
+the exact merge SHA. Retries reuse a verified merged PR and any successful or
+in-flight exact workflow run; failed runs may be dispatched again.
+
+The production workflow has no `push` trigger. It accepts only an explicit,
+required SHA and deploys that same verified release to both:
 
 - Cloud primary: `100.77.64.92:3021`
 - RTRDA02 on-premise fallback/redundant: `100.91.174.121:3021`
