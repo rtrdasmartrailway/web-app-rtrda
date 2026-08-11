@@ -66,11 +66,12 @@ describe("RTRDA release worker audit", () => {
     expect(promotionAudit.production.sha).toBe(SHA_PROD);
   });
 
-  it("atomically binds the merge to the approved test SHA", () => {
+  it("atomically binds the merge to the verified exact-tree release head", () => {
     const plan = buildPromotionPlan(SHA_TEST);
 
-    expect(plan.join("\n")).toContain(`--match-head-commit ${SHA_TEST}`);
-    expect(workerSource).toMatch(/"--match-head-commit",\s*approvedSha/);
+    expect(plan.join("\n")).toContain(`release/exact-${SHA_TEST}`);
+    expect(plan.join("\n")).toContain("--match-head-commit <VERIFIED_RELEASE_HEAD_SHA>");
+    expect(workerSource).toMatch(/"--match-head-commit",\s*releaseHeadSha/);
   });
 
   it("selects the single dispatched production run by verified merge SHA", () => {
@@ -117,39 +118,66 @@ describe("RTRDA release worker audit", () => {
     );
   });
 
-  it("requires the prospective production tree to equal the deployed test tree", () => {
+  it("builds a release head from audited production with the exact test tree", () => {
     const guard = (
       releaseWorker as typeof releaseWorker & {
-        assertExactReleaseTree?: (testTree: string, prospectiveTree: string) => void;
+        assertReleaseHead?: (
+          productionSha: string,
+          testTree: string,
+          releaseSha: string,
+          parentShas: string[],
+          releaseTree: string,
+        ) => void;
       }
-    ).assertExactReleaseTree;
+    ).assertReleaseHead;
+    const testTree = "e".repeat(40);
+    const releaseSha = "f".repeat(40);
 
     expect(guard).toBeTypeOf("function");
-    expect(() => guard?.("a".repeat(40), "a".repeat(40))).not.toThrow();
-    expect(() => guard?.("a".repeat(40), "b".repeat(40))).toThrow(/release tree/i);
-    expect(workerSource).toContain("assertExactReleaseTree(testTree, prospectiveTree)");
+    expect(() =>
+      guard?.(SHA_PROD, testTree, releaseSha, [SHA_PROD], testTree),
+    ).not.toThrow();
+    expect(() =>
+      guard?.(SHA_PROD, testTree, releaseSha, [SHA_PROD], "0".repeat(40)),
+    ).toThrow(/release head/i);
+    expect(workerSource).toContain("git/commits");
+    expect(workerSource).toContain("matching-refs/heads/release/exact-");
+    expect(workerSource).toContain("assertReleaseHead(");
   });
 
-  it("binds the dispatched merge commit to audited production and approved test parents", () => {
+  it("binds the dispatched merge commit to production, release head, and exact test tree", () => {
     const guard = (
       releaseWorker as typeof releaseWorker & {
         assertMergeIdentity?: (
           productionSha: string,
-          testSha: string,
+          releaseSha: string,
+          testTree: string,
           mergeSha: string,
           parentShas: string[],
+          mergeTree: string,
         ) => string;
       }
     ).assertMergeIdentity;
+    const releaseSha = "e".repeat(40);
+    const testTree = "f".repeat(40);
     const mergeSha = "d".repeat(40);
 
     expect(guard).toBeTypeOf("function");
-    expect(guard?.(SHA_PROD, SHA_TEST, mergeSha, [SHA_PROD, SHA_TEST])).toBe(mergeSha);
+    expect(
+      guard?.(SHA_PROD, releaseSha, testTree, mergeSha, [SHA_PROD, releaseSha], testTree),
+    ).toBe(mergeSha);
     expect(() =>
-      guard?.(SHA_PROD, SHA_TEST, mergeSha, ["c".repeat(40), SHA_TEST]),
+      guard?.(
+        SHA_PROD,
+        releaseSha,
+        testTree,
+        mergeSha,
+        ["c".repeat(40), releaseSha],
+        testTree,
+      ),
     ).toThrow(/merge identity/i);
-    expect(workerSource).toContain(
-      "assertMergeIdentity(auditedProductionSha, approvedSha, mergeCommitSha, parentShas)",
+    expect(workerSource).toMatch(
+      /assertMergeIdentity\(\s*auditedProductionSha,\s*releaseHeadSha,\s*testTree,\s*mergeCommitSha,\s*parentShas,\s*mergeTree,?\s*\)/,
     );
     expect(workerSource).not.toContain("commits/main");
   });

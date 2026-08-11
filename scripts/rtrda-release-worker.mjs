@@ -155,23 +155,47 @@ export function assertLivePromotionState(report, liveReport, approvedSha) {
   }
 }
 
-export function assertExactReleaseTree(testTree, prospectiveTree) {
-  if (!FULL_SHA.test(testTree ?? "") || testTree !== prospectiveTree) {
-    throw new Error(
-      "Prospective production release tree does not equal deployed test tree",
-    );
+export function assertReleaseHead(
+  productionSha,
+  testTree,
+  releaseSha,
+  parentShas,
+  releaseTree,
+) {
+  if (
+    !FULL_SHA.test(productionSha ?? "") ||
+    !FULL_SHA.test(testTree ?? "") ||
+    !FULL_SHA.test(releaseSha ?? "") ||
+    !FULL_SHA.test(releaseTree ?? "") ||
+    parentShas.length !== 1 ||
+    parentShas[0] !== productionSha ||
+    releaseTree !== testTree
+  ) {
+    throw new Error("Release head is not an exact test tree based on audited production");
   }
 }
 
-export function assertMergeIdentity(productionSha, testSha, mergeSha, parentShas) {
+export function assertMergeIdentity(
+  productionSha,
+  releaseSha,
+  testTree,
+  mergeSha,
+  parentShas,
+  mergeTree,
+) {
   if (
+    !FULL_SHA.test(productionSha ?? "") ||
+    !FULL_SHA.test(releaseSha ?? "") ||
+    !FULL_SHA.test(testTree ?? "") ||
     !FULL_SHA.test(mergeSha ?? "") ||
+    !FULL_SHA.test(mergeTree ?? "") ||
     parentShas.length !== 2 ||
     parentShas[0] !== productionSha ||
-    parentShas[1] !== testSha
+    parentShas[1] !== releaseSha ||
+    mergeTree !== testTree
   ) {
     throw new Error(
-      "Merge identity does not match audited production and approved test parents",
+      "Merge identity does not match audited production, verified release head, and exact test tree",
     );
   }
   return mergeSha;
@@ -183,10 +207,12 @@ export function selectProductionRunQuery(mainSha) {
 }
 
 export function buildPromotionPlan(sha) {
+  const releaseBranch = `release/exact-${sha}`;
   return [
-    `gh pr create --repo rtrdasmartrailway/web-app-rtrda --base main --head test --title "Promote deployed test ${sha.slice(0, 7)} to production" --body "Exact deployed test SHA: ${sha}"`,
-    `gh pr merge <PR_NUMBER> --repo rtrdasmartrailway/web-app-rtrda --merge --match-head-commit ${sha}`,
-    "Verify the PR merge commit parents are [audited production SHA, approved test SHA].",
+    `Create/reuse ${releaseBranch} with parent=<AUDITED_PRODUCTION_SHA> and tree=${sha}^{tree}`,
+    `gh pr create --repo rtrdasmartrailway/web-app-rtrda --base main --head ${releaseBranch} --title "Promote exact deployed test ${sha.slice(0, 7)} to production" --body "Exact deployed test SHA: ${sha}"`,
+    "gh pr merge <PR_NUMBER> --repo rtrdasmartrailway/web-app-rtrda --merge --match-head-commit <VERIFIED_RELEASE_HEAD_SHA>",
+    "Verify merge parents and merge tree against audited production and deployed Test tree.",
     "gh workflow run deploy-production.yml --repo rtrdasmartrailway/web-app-rtrda --ref main -f ref=<VERIFIED_MERGE_COMMIT_SHA>",
     "gh run watch <PRODUCTION_RUN_ID> --repo rtrdasmartrailway/web-app-rtrda --exit-status",
     "Re-run check and require Cloud/RTRDA02 release markers to equal the merged main SHA.",
@@ -196,13 +222,51 @@ export function buildPromotionPlan(sha) {
 function executePromotion(approvedSha, auditedProductionSha) {
   const repo = "rtrdasmartrailway/web-app-rtrda";
   const testTree = run("git", ["rev-parse", `${approvedSha}^{tree}`]);
-  const prospectiveTree = run("git", [
-    "merge-tree",
-    "--write-tree",
+  const releaseBranch = `release/exact-${approvedSha}`;
+  const matchingRefPath = `repos/${repo}/git/matching-refs/heads/release/exact-${approvedSha}`;
+  let releaseHeadSha = run("gh", [
+    "api",
+    matchingRefPath,
+    "--jq",
+    `.[] | select(.ref == "refs/heads/${releaseBranch}") | .object.sha`,
+  ]);
+  if (!releaseHeadSha) {
+    releaseHeadSha = run("gh", [
+      "api",
+      "--method",
+      "POST",
+      `repos/${repo}/git/commits`,
+      "-f",
+      `message=Promote exact deployed test ${approvedSha} to production`,
+      "-f",
+      `tree=${testTree}`,
+      "-f",
+      `parents[]=${auditedProductionSha}`,
+      "--jq",
+      ".sha",
+    ]);
+    run("gh", [
+      "api",
+      "--method",
+      "POST",
+      `repos/${repo}/git/refs`,
+      "-f",
+      `ref=refs/heads/${releaseBranch}`,
+      "-f",
+      `sha=${releaseHeadSha}`,
+    ]);
+  }
+  const releaseCommit = JSON.parse(
+    run("gh", ["api", `repos/${repo}/git/commits/${releaseHeadSha}`]),
+  );
+  const releaseParentShas = (releaseCommit.parents ?? []).map((parent) => parent.sha);
+  assertReleaseHead(
     auditedProductionSha,
-    approvedSha,
-  ]).split("\n")[0];
-  assertExactReleaseTree(testTree, prospectiveTree);
+    testTree,
+    releaseHeadSha,
+    releaseParentShas,
+    releaseCommit.tree?.sha,
+  );
   let prNumber = run("gh", [
     "pr",
     "list",
@@ -211,7 +275,7 @@ function executePromotion(approvedSha, auditedProductionSha) {
     "--base",
     "main",
     "--head",
-    "test",
+    releaseBranch,
     "--state",
     "open",
     "--json",
@@ -228,11 +292,11 @@ function executePromotion(approvedSha, auditedProductionSha) {
       "--base",
       "main",
       "--head",
-      "test",
+      releaseBranch,
       "--title",
-      `Promote deployed test ${approvedSha.slice(0, 7)} to production`,
+      `Promote exact deployed test ${approvedSha.slice(0, 7)} to production`,
       "--body",
-      `Exact deployed test SHA: ${approvedSha}`,
+      `Exact deployed test SHA: ${approvedSha}\nExact deployed test tree: ${testTree}`,
     ]);
     prNumber = run("gh", [
       "pr",
@@ -258,8 +322,8 @@ function executePromotion(approvedSha, auditedProductionSha) {
       "headRefOid,baseRefOid",
     ]),
   );
-  if (prIdentity.headRefOid !== approvedSha) {
-    throw new Error("PR head no longer matches approved deployed test SHA");
+  if (prIdentity.headRefOid !== releaseHeadSha) {
+    throw new Error("PR head no longer matches verified exact-tree release head");
   }
   if (prIdentity.baseRefOid !== auditedProductionSha) {
     throw new Error("PR base no longer matches audited production SHA");
@@ -272,7 +336,7 @@ function executePromotion(approvedSha, auditedProductionSha) {
     repo,
     "--merge",
     "--match-head-commit",
-    approvedSha,
+    releaseHeadSha,
   ]);
 
   let mergeCommitSha = "";
@@ -289,10 +353,18 @@ function executePromotion(approvedSha, auditedProductionSha) {
   if (!mergeCommitSha) throw new Error("Verified PR merge commit was not created");
 
   const mergeCommit = JSON.parse(
-    run("gh", ["api", `repos/${repo}/commits/${mergeCommitSha}`]),
+    run("gh", ["api", `repos/${repo}/git/commits/${mergeCommitSha}`]),
   );
   const parentShas = (mergeCommit.parents ?? []).map((parent) => parent.sha);
-  assertMergeIdentity(auditedProductionSha, approvedSha, mergeCommitSha, parentShas);
+  const mergeTree = mergeCommit.tree?.sha;
+  assertMergeIdentity(
+    auditedProductionSha,
+    releaseHeadSha,
+    testTree,
+    mergeCommitSha,
+    parentShas,
+    mergeTree,
+  );
 
   run("gh", [
     "workflow",
