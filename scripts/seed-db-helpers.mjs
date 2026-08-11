@@ -363,18 +363,148 @@ const FACEBOOK_RESTORED_NEWS = [
   },
 ];
 
+const OFFICIAL_WEBSITE_NEWS = [
+  {
+    id: "en15085-070869",
+    wpId: "en15085-070869",
+    path: "/สทร-ผนึกพันธมิตร-ปูทางผู้ประกอบการไทยสู่มาตรฐาน-en-15085",
+    sourceUrl: "https://www.facebook.com/share/p/1HFgYmrD7y/",
+    shareUrl: "https://www.facebook.com/share/p/1HFgYmrD7y/",
+    title: "สทร. ผนึกพันธมิตร ปูทางผู้ประกอบการไทยสู่มาตรฐาน EN 15085",
+    excerpt:
+      "เดินหน้า Pilot/Sandbox ยกระดับการผลิตชิ้นส่วนรถไฟ เสริม Local Content อุตสาหกรรมระบบรางไทย",
+    date: "2026-08-07T09:00:00",
+    paragraphs: [
+      "เดินหน้า Pilot/Sandbox ยกระดับการผลิตชิ้นส่วนรถไฟ เสริม Local Content อุตสาหกรรมระบบรางไทย",
+      "เมื่อวันที่ 7 สิงหาคม 2569 สถาบันวิจัยและพัฒนาเทคโนโลยีระบบราง (องค์การมหาชน) หรือ สทร. โดยกลุ่มงานพัฒนาผู้ประกอบการและธุรกิจใหม่ ร่วมกับสถาบันยานยนต์ (สยย.) และสภาอุตสาหกรรมแห่งประเทศไทย โดยคลัสเตอร์อุตสาหกรรมขนส่งทางราง จัดประชุมหารือเรื่อง “การยกระดับผู้ประกอบการงานเชื่อมอุตสาหกรรมระบบรางไทยสู่มาตรฐาน EN 15085” ณ สถาบันยานยนต์ กล้วยน้ำไท กรุงเทพมหานคร",
+      "การหารือครั้งนี้มีเป้าหมายเพื่อร่วมกำหนดแนวทางพัฒนาศักยภาพผู้ประกอบการไทยให้มีความพร้อมเข้าสู่มาตรฐานงานเชื่อมสำหรับรถไฟและส่วนประกอบของรถไฟ ซึ่งเป็นหนึ่งในองค์ประกอบสำคัญต่อการเข้าสู่ห่วงโซ่อุปทานอุตสาหกรรมระบบรางในระดับสากล",
+      "ที่ประชุมมีผู้เชี่ยวชาญด้านงานเชื่อม การพัฒนาบุคลากร และการตรวจประเมินรับรอง เข้าร่วมแลกเปลี่ยนข้อคิดเห็น ประกอบด้วย รศ.ดร.บวรโชค ผู้พัฒน์ จาก KINGWELD มหาวิทยาลัยเทคโนโลยีพระจอมเกล้าธนบุรี ผศ.ดร.กิตติชัย โสจิพันธ์ จาก TGGS มหาวิทยาลัยเทคโนโลยีพระจอมเกล้าพระนครเหนือ และคุณชัยวัฒน์ พันธุ์ชาติ จาก TÜV NORD (Thailand) Ltd. พร้อมด้วยผู้แทนจากภาคอุตสาหกรรม สถาบันการศึกษา สถาบันยานยนต์ และ สทร.",
+      "หนึ่งในข้อสรุปสำคัญของการหารือ คือ มาตรฐาน EN 15085 ไม่ได้หมายถึงการรับรองทักษะของช่างเชื่อมเพียงอย่างเดียว แต่ครอบคลุมระบบคุณภาพของกระบวนการผลิตทั้งระบบ ตั้งแต่การออกแบบ บุคลากร กระบวนการผลิต การตรวจสอบ การสอบกลับข้อมูล (Traceability) ไปจนถึงการรับรองมาตรฐาน",
+      "ด้วยเหตุนี้ การยกระดับผู้ประกอบการไทยจึงจำเป็นต้องพัฒนาไปพร้อมกันทั้ง “โรงงาน–บุคลากร–กระบวนการ–มาตรฐาน” เพื่อให้ความสามารถในการผลิตของผู้ประกอบการไทยสอดคล้องกับข้อกำหนดของอุตสาหกรรมรถไฟในระดับสากลอย่างเป็นระบบ",
+      "ที่ประชุมจึงเสนอแนวทางเริ่มต้นในรูปแบบ Pilot/Sandbox โดยคัดเลือกผู้ประกอบการที่มีศักยภาพและมีความพร้อมในการลงทุน พร้อมกำหนดผลิตภัณฑ์เป้าหมายและโอกาสทางตลาดให้ชัดเจน เช่น โครงสร้างตัวรถ โบกี้ หรือชิ้นส่วนโครงสร้างที่เกี่ยวข้อง ก่อนกำหนดระดับการรับรองที่เหมาะสมกับผลิตภัณฑ์และกระบวนการผลิต",
+      "จากนั้นจะเข้าสู่กระบวนการประเมินช่องว่างหรือ Gap Assessment เพื่อพิจารณาว่าผู้ประกอบการแต่ละรายยังต้องพัฒนาในด้านใด รวมถึงการพัฒนาระบบคุณภาพงานเชื่อมตาม ISO 3834 การพัฒนาบุคลากรและ Welding Coordinator การจัดทำ Welding Procedure การจัดทำ Production Mock-up และการเตรียมความพร้อมเข้าสู่กระบวนการตรวจรับรอง EN 15085",
+      "แนวทางดังกล่าวเป็นส่วนหนึ่งของการขับเคลื่อนภารกิจของ สทร. ในการพัฒนาศักยภาพผู้ประกอบการและเสริมความเข้มแข็งให้กับห่วงโซ่อุปทานระบบรางของประเทศ โดยต่อยอดจากการประเมินศักยภาพผู้ประกอบการไทยที่ผ่านมา ซึ่งพบว่า มาตรฐานงานเชื่อม EN 15085 เป็นหนึ่งในช่องว่างสำคัญที่ต้องเร่งพัฒนา เพื่อเชื่อมศักยภาพของภาคการผลิตไทยเข้ากับความต้องการของอุตสาหกรรมระบบรางและข้อกำหนดมาตรฐานสากล",
+      "ขณะเดียวกัน การพัฒนาผู้ประกอบการจะดำเนินควบคู่กับการพัฒนากำลังคนของประเทศ โดยเชื่อมโยงกับแผนพัฒนาบุคลากรภาคอุตสาหกรรมระบบรางของ สทร. ครอบคลุมบุคลากรด้าน Welding Coordination, Welder/Welding Operator, NDT และการตรวจสอบคุณภาพ ซึ่งเป็นกำลังสำคัญต่อการสร้างระบบการผลิตที่สามารถเข้าสู่กระบวนการรับรองมาตรฐานได้อย่างสมบูรณ์",
+      "การพัฒนาในลักษณะดังกล่าวจะช่วยให้ประเทศไทยไม่ได้มีเพียงโรงงานที่มีศักยภาพในการผลิต แต่ยังเกิดการสร้างบุคลากรและองค์ความรู้ภายในประเทศที่สามารถต่อยอดและถ่ายทอดไปยังผู้ประกอบการรายอื่นในอุตสาหกรรมได้ในอนาคต",
+      "จากผลการหารือ สทร. เตรียมนำข้อเสนอไปพัฒนากรอบการดำเนินงาน Pilot/Sandbox สำหรับต้นแบบการยกระดับผู้ประกอบการไทยสู่ EN 15085 ร่วมกับหน่วยงานและภาคีที่เกี่ยวข้อง โดยมุ่งเชื่อมโยงตั้งแต่ความต้องการของตลาด การเลือกผลิตภัณฑ์เป้าหมาย การพัฒนาระบบโรงงานและบุคลากร การทดสอบ ไปจนถึงการเข้าสู่กระบวนการรับรองมาตรฐาน",
+      "เป้าหมายสำคัญคือการเพิ่มขีดความสามารถของผู้ประกอบการไทย เปิดโอกาสให้ภาคอุตสาหกรรมไทยมีส่วนร่วมในการผลิตชิ้นส่วนระบบรางมากขึ้น และสนับสนุนการเพิ่ม Local Content บนพื้นฐานของมาตรฐานสากล เพื่อวางรากฐานให้อุตสาหกรรมระบบรางของประเทศไทยเติบโตได้อย่างเข้มแข็งและยั่งยืนในระยะยาว",
+    ],
+    media: {
+      id: "91109",
+      sourceUrl: "https://apprtrda.sharepoint.com/sites/EntrepreneurDevelopment/",
+      localPath: "/wp-content/uploads/news-2569/en15085-070869/en15085-meeting-01.jpg",
+      title: "en15085-meeting-01",
+      alt: "การประชุมหารือยกระดับผู้ประกอบการงานเชื่อมอุตสาหกรรมระบบรางไทยสู่มาตรฐาน EN 15085",
+      width: 2400,
+      height: 1600,
+      mimeType: "image/jpeg",
+    },
+    gallery: [
+      {
+        id: "91110",
+        sourceUrl: "https://apprtrda.sharepoint.com/sites/EntrepreneurDevelopment/",
+        localPath: "/wp-content/uploads/news-2569/en15085-070869/en15085-meeting-02.jpg",
+        title: "en15085-meeting-02",
+        alt: "การประชุมหารือมาตรฐาน EN 15085",
+        width: 2400,
+        height: 1600,
+        mimeType: "image/jpeg",
+      },
+      {
+        id: "91111",
+        sourceUrl: "https://apprtrda.sharepoint.com/sites/EntrepreneurDevelopment/",
+        localPath: "/wp-content/uploads/news-2569/en15085-070869/en15085-meeting-03.jpg",
+        title: "en15085-meeting-03",
+        alt: "การประชุมหารือมาตรฐาน EN 15085",
+        width: 2400,
+        height: 1600,
+        mimeType: "image/jpeg",
+      },
+      {
+        id: "91112",
+        sourceUrl: "https://apprtrda.sharepoint.com/sites/EntrepreneurDevelopment/",
+        localPath: "/wp-content/uploads/news-2569/en15085-070869/en15085-meeting-04.jpg",
+        title: "en15085-meeting-04",
+        alt: "การประชุมหารือมาตรฐาน EN 15085",
+        width: 2400,
+        height: 1600,
+        mimeType: "image/jpeg",
+      },
+      {
+        id: "91113",
+        sourceUrl: "https://apprtrda.sharepoint.com/sites/EntrepreneurDevelopment/",
+        localPath: "/wp-content/uploads/news-2569/en15085-070869/en15085-meeting-05.jpg",
+        title: "en15085-meeting-05",
+        alt: "การประชุมหารือมาตรฐาน EN 15085",
+        width: 2400,
+        height: 1600,
+        mimeType: "image/jpeg",
+      },
+    ],
+  },
+];
+
+const ENGLISH_OFFICIAL_WEBSITE_NEWS = [
+  {
+    ...OFFICIAL_WEBSITE_NEWS[0],
+    wpId: "en15085-070869-en",
+    language: "en",
+    path: `/en${OFFICIAL_WEBSITE_NEWS[0].path}`,
+    title: "RTRDA and partners advance Thai manufacturers toward EN 15085",
+    excerpt:
+      "A Pilot/Sandbox initiative will strengthen rail-component production and increase Thai local content.",
+    paragraphs: [
+      "RTRDA, the Thailand Automotive Institute and the Federation of Thai Industries' Rail Transportation Industry Cluster met on 7 August 2026 to discuss how Thai welding manufacturers can advance toward EN 15085 certification.",
+      "The initiative aims to prepare Thai manufacturers for the international welding standard for railway vehicles and components, an important requirement for participating in the global rail-industry supply chain.",
+      "Participants included experts in welding, workforce development, assessment and certification, together with representatives from industry, universities, the Thailand Automotive Institute and RTRDA.",
+      "The meeting emphasized that EN 15085 covers the complete production-quality system—not only welder skills—including design, personnel, manufacturing processes, inspection, traceability and certification.",
+      "The proposed Pilot/Sandbox will select capable manufacturers, define target products and markets, and determine the appropriate certification level for items such as car-body structures, bogies and related structural components.",
+      "Each participating manufacturer will undergo a gap assessment covering ISO 3834 welding-quality systems, personnel and welding coordinators, welding procedures, production mock-ups and readiness for EN 15085 certification.",
+      "The work will be coordinated with RTRDA's rail-industry workforce plan for welding coordination, welders and welding operators, non-destructive testing and quality inspection.",
+      "RTRDA will use the meeting's recommendations to develop the Pilot/Sandbox framework with partner organizations, linking market demand, product selection, factory and workforce development, testing and certification.",
+      "The objective is to expand Thai manufacturers' participation in rail-component production and increase local content on the basis of international standards, supporting sustainable long-term growth of Thailand's rail industry.",
+    ],
+    media: {
+      ...OFFICIAL_WEBSITE_NEWS[0].media,
+      alt: "Meeting on advancing Thai rail-industry welding manufacturers toward EN 15085",
+    },
+    gallery: OFFICIAL_WEBSITE_NEWS[0].gallery.map((media) => ({
+      ...media,
+      alt: "EN 15085 rail-industry standards meeting",
+    })),
+  },
+];
+
+const SUPPLEMENTAL_NEWS = [...FACEBOOK_RESTORED_NEWS, ...OFFICIAL_WEBSITE_NEWS].sort(
+  (left, right) => Date.parse(right.date) - Date.parse(left.date),
+);
+const ALL_SUPPLEMENTAL_NEWS = [...SUPPLEMENTAL_NEWS, ...ENGLISH_OFFICIAL_WEBSITE_NEWS];
+
 function facebookRestoredNewsContentHtml(news) {
   const paragraphs = news.paragraphs
     .map((paragraph) => `<p>${paragraph}</p>`)
     .join("\n\n");
-  return `${paragraphs}\n\n<figure class="wp-block-image size-large"><img src="${news.media.localPath}" alt="${news.title}" /></figure>`;
+  const images = [news.media, ...(news.gallery ?? [])]
+    .filter(Boolean)
+    .map(
+      (media) =>
+        `<figure class="wp-block-image size-large"><img src="${media.localPath}" alt="${media.alt || news.title}" /></figure>`,
+    )
+    .join("\n\n");
+  const separator = images ? "\n\n" : "";
+  return news.gallery?.length
+    ? `${images}${separator}${paragraphs}`
+    : `${paragraphs}${separator}${images}`;
 }
 
 function facebookRestoredNewsListItem(news) {
   return `<li><a href="${news.path}">${news.title}</a><time datetime="${news.date}">${news.date.slice(0, 10)}</time><p>${news.excerpt}</p></li>`;
 }
 
-const NEWS_CATEGORY_PATH = "/category/ข่าวและกิจกรรม";
+const NEWS_CATEGORY_PATHS = {
+  th: "/category/ข่าวและกิจกรรม",
+  en: "/en/category/ข่าวและกิจกรรม",
+};
 
 function noGiftPolicyContentHtml() {
   const paragraphs = NO_GIFT_POLICY_PARAGRAPHS.map(
@@ -394,47 +524,67 @@ function noGiftPolicyListItem() {
 
 function withSupplementalRecords(records) {
   const existingPaths = new Set(records.map((record) => record.path));
-  const supplementalNews = FACEBOOK_RESTORED_NEWS.map((news) => ({
-    id: `th-post-${news.id}`,
-    wpId: news.wpId,
-    language: "th",
-    kind: "post",
-    path: news.path,
-    sourceUrl: news.sourceUrl,
-    title: news.title,
-    excerpt: news.excerpt,
-    contentHtml: facebookRestoredNewsContentHtml(news),
-    searchText: [news.title, news.excerpt, ...news.paragraphs].join("\n"),
-    date: news.date,
-    modified: "2026-06-29T00:00:00",
-    parentPath: null,
-    categoryIds: [7],
-    featuredMediaId: Number(news.media.id),
-    authorId: null,
-  }));
+  const supplementalNews = ALL_SUPPLEMENTAL_NEWS.map((news) => {
+    const language = news.language ?? "th";
+    return {
+      id: `${language}-post-${news.id}`,
+      wpId: news.wpId,
+      language,
+      kind: "post",
+      path: news.path,
+      sourceUrl: news.sourceUrl,
+      title: news.title,
+      excerpt: news.excerpt,
+      contentHtml: facebookRestoredNewsContentHtml(news),
+      searchText: [news.title, news.excerpt, ...news.paragraphs].join("\n"),
+      date: news.date,
+      modified: news.modified ?? news.date,
+      parentPath: null,
+      categoryIds: [7],
+      featuredMediaId: news.media ? Number(news.media.id) : null,
+      authorId: null,
+    };
+  });
 
-  const listItems = [
-    ...FACEBOOK_RESTORED_NEWS.filter((news) => !existingPaths.has(news.path)).map(
-      facebookRestoredNewsListItem,
-    ),
-    existingPaths.has(NO_GIFT_POLICY_NEWS.path) ? "" : noGiftPolicyListItem(),
-  ]
-    .filter(Boolean)
-    .join("\n");
+  const categoryConfigs = [
+    {
+      path: NEWS_CATEGORY_PATHS.th,
+      news: SUPPLEMENTAL_NEWS,
+      includeNoGift: true,
+    },
+    {
+      path: NEWS_CATEGORY_PATHS.en,
+      news: ENGLISH_OFFICIAL_WEBSITE_NEWS,
+      includeNoGift: false,
+    },
+  ];
+  const listItemsByPath = new Map(
+    categoryConfigs.map((config) => {
+      const listItems = [
+        ...config.news
+          .filter((news) => !existingPaths.has(news.path))
+          .map(facebookRestoredNewsListItem),
+        config.includeNoGift && !existingPaths.has(NO_GIFT_POLICY_NEWS.path)
+          ? noGiftPolicyListItem()
+          : "",
+      ]
+        .filter(Boolean)
+        .join("\n");
+      return [config.path, { listItems, modified: config.news[0]?.date }];
+    }),
+  );
 
   const nextRecords = records.map((record) => {
-    if (record.path !== NEWS_CATEGORY_PATH || !listItems) {
-      return record;
-    }
+    const categoryUpdate = listItemsByPath.get(record.path);
+    if (!categoryUpdate?.listItems) return record;
 
     return {
       ...record,
       contentHtml: record.contentHtml.replace(
         /<ul class="wp-import-list">/,
-        `<ul class="wp-import-list">
-${listItems}`,
+        `<ul class="wp-import-list">\n${categoryUpdate.listItems}`,
       ),
-      modified: "2026-06-29T00:00:00",
+      modified: categoryUpdate.modified ?? record.modified,
     };
   });
 
@@ -457,26 +607,27 @@ ${listItems}`,
 
 function withSupplementalCategories(categories, records) {
   const existingPaths = new Set(records.map((record) => record.path));
-  const missingSupplementalCount = [
-    NO_GIFT_POLICY_NEWS.path,
-    ...FACEBOOK_RESTORED_NEWS.map((news) => news.path),
-  ].filter((path) => !existingPaths.has(path)).length;
+  const pathsByLanguage = {
+    th: [NO_GIFT_POLICY_NEWS.path, ...SUPPLEMENTAL_NEWS.map((news) => news.path)],
+    en: ENGLISH_OFFICIAL_WEBSITE_NEWS.map((news) => news.path),
+  };
 
   return categories.map((category) => {
-    if (category.id !== 7 || category.language !== "th") {
-      return { ...category };
-    }
-
-    return { ...category, count: category.count + missingSupplementalCount };
+    const paths = pathsByLanguage[category.language];
+    if (category.id !== 7 || !paths) return { ...category };
+    const missingCount = paths.filter((path) => !existingPaths.has(path)).length;
+    return { ...category, count: category.count + missingCount };
   });
 }
 
 function withSupplementalMedia(media) {
   const existingIds = new Set(media.map((asset) => String(asset.id)));
-  const facebookMedia = FACEBOOK_RESTORED_NEWS.map((news) => ({
-    ...news.media,
-    id: String(news.media.id),
-  }));
+  const facebookMedia = SUPPLEMENTAL_NEWS.flatMap((news) => [
+    news.media,
+    ...(news.gallery ?? []),
+  ])
+    .filter(Boolean)
+    .map((media) => ({ ...media, id: String(media.id) }));
   const supplemental = [...NO_GIFT_POLICY_MEDIA, ...facebookMedia].filter(
     (asset) => !existingIds.has(asset.id),
   );
