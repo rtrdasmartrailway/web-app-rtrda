@@ -308,7 +308,7 @@ describe("RTRDA release worker audit", () => {
       originTestSha: SHA_TEST,
       testHealth: true,
       testPublicHealth: true,
-      cloudGitSha: SHA_PROD,
+      cloudGitSha: mergeSha,
       cloudMarkerSha: SHA_PROD,
       cloudHealth: true,
       rtrda02GitSha: mergeSha,

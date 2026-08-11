@@ -313,7 +313,10 @@ export function assertRecoveryTargets(report, recovery) {
   if (
     targets.some(
       ([gitSha, markerSha]) =>
-        !FULL_SHA.test(gitSha ?? "") || gitSha !== markerSha || !allowed.has(gitSha),
+        !FULL_SHA.test(gitSha ?? "") ||
+        !FULL_SHA.test(markerSha ?? "") ||
+        !allowed.has(gitSha) ||
+        !allowed.has(markerSha),
     )
   ) {
     throw new Error("Production target is outside the verified recovery transition");
