@@ -276,6 +276,71 @@ export function assertProductionRelease(mergeSha, report) {
   return mergeSha;
 }
 
+export function assertRecoveryIdentity(
+  testTree,
+  mainSha,
+  mainTree,
+  mainParents,
+  releaseHeadSha,
+  releaseTree,
+  releaseParents,
+) {
+  const productionSha = releaseParents[0];
+  if (
+    !FULL_SHA.test(testTree ?? "") ||
+    !FULL_SHA.test(mainSha ?? "") ||
+    !FULL_SHA.test(releaseHeadSha ?? "") ||
+    !FULL_SHA.test(productionSha ?? "") ||
+    releaseParents.length !== 1 ||
+    releaseTree !== testTree ||
+    mainTree !== testTree ||
+    mainParents.length !== 2 ||
+    mainParents[0] !== productionSha ||
+    mainParents[1] !== releaseHeadSha
+  ) {
+    throw new Error("Partial-deployment recovery identity is invalid");
+  }
+  return { productionSha, mergeSha: mainSha };
+}
+
+function inspectRecoveryState(approvedSha) {
+  const repo = "rtrdasmartrailway/web-app-rtrda";
+  try {
+    const testTree = run("git", ["rev-parse", `${approvedSha}^{tree}`]);
+    const releaseBranch = `release/exact-${approvedSha}`;
+    const releaseHeadSha = run("gh", [
+      "api",
+      `repos/${repo}/git/matching-refs/heads/release/exact-${approvedSha}`,
+      "--jq",
+      `.[] | select(.ref == "refs/heads/${releaseBranch}") | .object.sha`,
+    ]);
+    if (!releaseHeadSha) return null;
+    const mainSha = run("gh", [
+      "api",
+      `repos/${repo}/git/refs/heads/main`,
+      "--jq",
+      ".object.sha",
+    ]);
+    const releaseCommit = JSON.parse(
+      run("gh", ["api", `repos/${repo}/git/commits/${releaseHeadSha}`]),
+    );
+    const mainCommit = JSON.parse(
+      run("gh", ["api", `repos/${repo}/git/commits/${mainSha}`]),
+    );
+    return assertRecoveryIdentity(
+      testTree,
+      mainSha,
+      mainCommit.tree?.sha,
+      (mainCommit.parents ?? []).map((parent) => parent.sha),
+      releaseHeadSha,
+      releaseCommit.tree?.sha,
+      (releaseCommit.parents ?? []).map((parent) => parent.sha),
+    );
+  } catch {
+    return null;
+  }
+}
+
 export function selectProductionRunQuery(mainSha) {
   if (!FULL_SHA.test(mainSha ?? "")) throw new Error("main SHA must be a full SHA");
   return `.[] | select(.displayTitle == "Deploy production ${mainSha}") | select(.status != "completed") | .databaseId`;
@@ -294,12 +359,25 @@ export function buildPromotionPlan(sha) {
   ];
 }
 
-function executePromotion(approvedSha, auditedProductionSha) {
+function executePromotion(approvedSha, auditedProductionSha, recoveryMode = false) {
   const repo = "rtrdasmartrailway/web-app-rtrda";
   const testTree = run("git", ["rev-parse", `${approvedSha}^{tree}`]);
   runReleaseValidation(approvedSha);
   const postValidationReport = evaluateAudit(collectLiveEvidence(process.cwd()));
-  assertPostValidationState(auditedProductionSha, postValidationReport, approvedSha);
+  if (recoveryMode) {
+    const recovery = inspectRecoveryState(approvedSha);
+    if (
+      !recovery ||
+      recovery.productionSha !== auditedProductionSha ||
+      postValidationReport.test.sha !== approvedSha ||
+      postValidationReport.test.originTestSha !== approvedSha ||
+      !postValidationReport.test.healthy
+    ) {
+      throw new Error("Partial-deployment recovery changed during validation");
+    }
+  } else {
+    assertPostValidationState(auditedProductionSha, postValidationReport, approvedSha);
+  }
   const releaseBranch = `release/exact-${approvedSha}`;
   const matchingRefPath = `repos/${repo}/git/matching-refs/heads/release/exact-${approvedSha}`;
   let releaseHeadSha = run("gh", [
@@ -589,22 +667,47 @@ function main() {
   const approvedSha = valueAfter(args, "--approved-sha");
   if (!FULL_SHA.test(approvedSha ?? ""))
     throw new Error("--approved-sha must be a full SHA");
-  if (!report.promotable)
+
+  let recovery = report.promotable ? null : inspectRecoveryState(approvedSha);
+  if (!report.promotable && !recovery)
     throw new Error(`Promotion blocked: ${report.blockers.join(", ")}`);
-  if (report.test.sha !== approvedSha)
+  if (report.promotable && report.test.sha !== approvedSha)
     throw new Error("Approved SHA does not match deployed test SHA");
 
   const commands = buildPromotionPlan(approvedSha);
   if (!args.includes("--execute")) {
-    console.log(JSON.stringify({ dryRun: true, approvedSha, commands }, null, 2));
+    console.log(
+      JSON.stringify(
+        { dryRun: true, approvedSha, recovery: Boolean(recovery), commands },
+        null,
+        2,
+      ),
+    );
     return;
   }
   const liveReport = evaluateAudit(
     collectLiveEvidence(valueAfter(args, "--repo") ?? process.cwd()),
   );
-  assertLivePromotionState(report, liveReport, approvedSha);
+  if (!liveReport.promotable) {
+    recovery = inspectRecoveryState(approvedSha);
+    if (
+      !recovery ||
+      liveReport.test.sha !== approvedSha ||
+      liveReport.test.originTestSha !== approvedSha ||
+      !liveReport.test.healthy
+    ) {
+      throw new Error(`Promotion recovery blocked: ${liveReport.blockers.join(", ")}`);
+    }
+  } else if (!recovery) {
+    assertLivePromotionState(report, liveReport, approvedSha);
+  }
+  const auditedProductionSha = recovery?.productionSha ?? report.production.sha;
   console.log(
-    JSON.stringify(executePromotion(approvedSha, report.production.sha), null, 2),
+    JSON.stringify(
+      executePromotion(approvedSha, auditedProductionSha, Boolean(recovery)),
+      null,
+      2,
+    ),
   );
 }
 

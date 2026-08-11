@@ -254,6 +254,49 @@ describe("RTRDA release worker audit", () => {
     );
   });
 
+  it("allows recovery only for the exact merge already on main", () => {
+    const guard = (
+      releaseWorker as typeof releaseWorker & {
+        assertRecoveryIdentity?: (
+          testTree: string,
+          mainSha: string,
+          mainTree: string,
+          mainParents: string[],
+          releaseHeadSha: string,
+          releaseTree: string,
+          releaseParents: string[],
+        ) => { productionSha: string; mergeSha: string };
+      }
+    ).assertRecoveryIdentity;
+    const testTree = "d".repeat(40);
+    const releaseHead = "e".repeat(40);
+    const mergeSha = "f".repeat(40);
+
+    expect(
+      guard?.(
+        testTree,
+        mergeSha,
+        testTree,
+        [SHA_PROD, releaseHead],
+        releaseHead,
+        testTree,
+        [SHA_PROD],
+      ),
+    ).toEqual({ productionSha: SHA_PROD, mergeSha });
+    expect(() =>
+      guard?.(
+        testTree,
+        mergeSha,
+        "0".repeat(40),
+        [SHA_PROD, releaseHead],
+        releaseHead,
+        testTree,
+        [SHA_PROD],
+      ),
+    ).toThrow(/recovery identity/i);
+    expect(workerSource).toContain("inspectRecoveryState(approvedSha)");
+  });
+
   it("binds the dispatched merge commit to production, release head, and exact test tree", () => {
     const guard = (
       releaseWorker as typeof releaseWorker & {
