@@ -35,15 +35,6 @@ const quarterlyRows: TableRowSpec[] = [
 
 const summaryRows: TableRowSpec[] = [
   {
-    matchText: "5 สิงหาคม 2569 สรุปผลการดำเนินการจัดซื้อจัดจ้างในรอบเดือน กรกฎาคม 2569",
-    cells: [
-      "5 สิงหาคม 2569",
-      "สรุปผลการดำเนินการจัดซื้อจัดจ้างในรอบเดือน กรกฎาคม 2569",
-      PUBLISHED_STATUS,
-    ],
-    href: uploadFile("2026/08/procurement-summary-july-2569-20260805.pdf"),
-  },
-  {
     matchText: "3 กรกฎาคม 2569 สรุปผลการดำเนินการจัดซื้อจัดจ้างในรอบเดือน มิถุนายน",
     cells: [
       "3 กรกฎาคม 2569",

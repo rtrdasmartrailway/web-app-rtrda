@@ -55,7 +55,7 @@ function firstColumnValues(html: string, accordionIndex: number): string[] {
 }
 
 describe("applyProcurementPlanOverride", () => {
-  it("prepends the July 2569 procurement plan rows with their PDFs", () => {
+  it("prepends the 16 July 2569 procurement plan row with its PDF", () => {
     const updated = applyProcurementPlanOverride(record({}));
     const $ = cheerio.load(updated.contentHtml, null, false);
     const firstRowCells = $(".lightweight-accordion")
@@ -66,28 +66,12 @@ describe("applyProcurementPlanOverride", () => {
 
     expect(firstRowCells.map((_, cell) => $(cell).text().trim()).get()).toEqual([
       "1",
-      "23 กรกฎาคม 2569",
-      "จ้างที่ปรึกษาโครงการส่งเสริมการแข่งขันและส่งเสริมสภาพแวดล้อมระบบรางเพื่อส่งเสริมการใช้งานระบบราง",
-      "เผยแพร่ขึ้นเว็บ",
-      "PDF",
-    ]);
-    expect(firstRowCells.last().find("a").attr("href")).toBe(
-      "/wp-content/uploads/2026/07/procurement-plan-rail-competition-25690723.pdf",
-    );
-
-    const secondRowCells = $(".lightweight-accordion")
-      .first()
-      .find("tbody tr")
-      .eq(1)
-      .find("td");
-    expect(secondRowCells.map((_, cell) => $(cell).text().trim()).get()).toEqual([
-      "2",
       "16 กรกฎาคม 2569",
       "จ้างที่ปรึกษาศึกษาพัฒนา Algorithm เพื่อตรวจจับและแจ้งเตือนการฝ่าฝืนไม้กั้นทางรถไฟ ณ จุดตัดทางรถไฟแนวระดับ",
       "เผยแพร่ขึ้นเว็บ",
       "PDF",
     ]);
-    expect(secondRowCells.last().find("a").attr("href")).toBe(
+    expect(firstRowCells.last().find("a").attr("href")).toBe(
       "/wp-content/uploads/2026/07/ประกาศแผนจัดซื้อจัดจ้าง_16_07_2569.pdf?v=20260716",
     );
   });
@@ -95,7 +79,7 @@ describe("applyProcurementPlanOverride", () => {
   it("renumbers only the 2569 procurement plan table from top to bottom", () => {
     const updated = applyProcurementPlanOverride(record({}));
 
-    expect(firstColumnValues(updated.contentHtml, 0)).toEqual(["1", "2", "3", "4", "5"]);
+    expect(firstColumnValues(updated.contentHtml, 0)).toEqual(["1", "2", "3", "4"]);
     expect(firstColumnValues(updated.contentHtml, 1)).toEqual(["1", "2"]);
   });
 
@@ -105,7 +89,7 @@ describe("applyProcurementPlanOverride", () => {
     const firstExistingRowCells = $(".lightweight-accordion")
       .first()
       .find("tbody tr")
-      .eq(2)
+      .eq(1)
       .find("td");
 
     expect(firstExistingRowCells.eq(1).text().trim()).toBe("21 พฤษภาคม 2569");
