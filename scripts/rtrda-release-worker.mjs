@@ -303,6 +303,23 @@ export function assertRecoveryIdentity(
   return { productionSha, mergeSha: mainSha };
 }
 
+export function assertRecoveryTargets(report, recovery) {
+  const allowed = new Set([recovery.productionSha, recovery.mergeSha]);
+  const evidence = report.evidence ?? {};
+  const targets = [
+    [evidence.cloudGitSha, evidence.cloudMarkerSha],
+    [evidence.rtrda02GitSha, evidence.rtrda02MarkerSha],
+  ];
+  if (
+    targets.some(
+      ([gitSha, markerSha]) =>
+        !FULL_SHA.test(gitSha ?? "") || gitSha !== markerSha || !allowed.has(gitSha),
+    )
+  ) {
+    throw new Error("Production target is outside the verified recovery transition");
+  }
+}
+
 function inspectRecoveryState(approvedSha) {
   const repo = "rtrdasmartrailway/web-app-rtrda";
   try {
@@ -375,6 +392,7 @@ function executePromotion(approvedSha, auditedProductionSha, recoveryMode = fals
     ) {
       throw new Error("Partial-deployment recovery changed during validation");
     }
+    assertRecoveryTargets(postValidationReport, recovery);
   } else {
     assertPostValidationState(auditedProductionSha, postValidationReport, approvedSha);
   }
@@ -671,6 +689,7 @@ function main() {
   let recovery = report.promotable ? null : inspectRecoveryState(approvedSha);
   if (!report.promotable && !recovery)
     throw new Error(`Promotion blocked: ${report.blockers.join(", ")}`);
+  if (recovery) assertRecoveryTargets(report, recovery);
   if (report.promotable && report.test.sha !== approvedSha)
     throw new Error("Approved SHA does not match deployed test SHA");
 
@@ -698,6 +717,7 @@ function main() {
     ) {
       throw new Error(`Promotion recovery blocked: ${liveReport.blockers.join(", ")}`);
     }
+    assertRecoveryTargets(liveReport, recovery);
   } else if (!recovery) {
     assertLivePromotionState(report, liveReport, approvedSha);
   }

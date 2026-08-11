@@ -294,6 +294,40 @@ describe("RTRDA release worker audit", () => {
         [SHA_PROD],
       ),
     ).toThrow(/recovery identity/i);
+
+    const targetGuard = (
+      releaseWorker as typeof releaseWorker & {
+        assertRecoveryTargets?: (
+          report: ReturnType<typeof releaseWorker.evaluateAudit>,
+          recovery: { productionSha: string; mergeSha: string },
+        ) => void;
+      }
+    ).assertRecoveryTargets;
+    const partialReport = releaseWorker.evaluateAudit({
+      testContainerSha: SHA_TEST,
+      originTestSha: SHA_TEST,
+      testHealth: true,
+      testPublicHealth: true,
+      cloudGitSha: SHA_PROD,
+      cloudMarkerSha: SHA_PROD,
+      cloudHealth: true,
+      rtrda02GitSha: mergeSha,
+      rtrda02MarkerSha: mergeSha,
+      rtrda02Health: true,
+    });
+    expect(() =>
+      targetGuard?.(partialReport, { productionSha: SHA_PROD, mergeSha }),
+    ).not.toThrow();
+    expect(() =>
+      targetGuard?.(
+        releaseWorker.evaluateAudit({
+          ...partialReport.evidence,
+          cloudGitSha: "9".repeat(40),
+          cloudMarkerSha: "9".repeat(40),
+        }),
+        { productionSha: SHA_PROD, mergeSha },
+      ),
+    ).toThrow(/production target/i);
     expect(workerSource).toContain("inspectRecoveryState(approvedSha)");
   });
 
