@@ -84,12 +84,24 @@ describe("RTRDA release worker audit", () => {
     expect(workerSource).not.toMatch(/"pr",\s*"merge"/);
   });
 
-  it("reuses a successful or in-flight exact production run and redispatches failures", () => {
+  it("runs all validation gates in a clean exact-SHA worktree before promotion", () => {
+    expect(workerSource).toContain("runReleaseValidation(approvedSha)");
+    expect(workerSource).toContain('run("npm", ["ci"]');
+    expect(workerSource).toContain('run("npm", ["test"]');
+    expect(workerSource).toContain('run("npm", ["run", "lint"]');
+    expect(workerSource).toContain('run("npm", ["run", "typecheck"]');
+    expect(workerSource).toContain('run("npm", ["run", "format:check"]');
+    expect(workerSource).toContain('run("npm", ["run", "security:audit"]');
+    expect(workerSource).toContain('run("npm", ["run", "build"]');
+    expect(workerSource).not.toContain('"pr", "checks"');
+  });
+
+  it("reuses only an in-flight exact production run", () => {
     const query = releaseWorker.selectProductionRunQuery?.("d".repeat(40));
 
     expect(query).toContain("displayTitle");
     expect(query).toContain('status != "completed"');
-    expect(query).toContain('conclusion == "success"');
+    expect(query).not.toContain('conclusion == "success"');
     expect(workerSource).toContain("databaseId,displayTitle,status,conclusion");
   });
 
@@ -172,6 +184,32 @@ describe("RTRDA release worker audit", () => {
     expect(guard?.(SHA_TEST, SHA_TEST)).toBe(SHA_TEST);
     expect(() => guard?.(SHA_TEST, SHA_PROD)).toThrow(/main/i);
     expect(workerSource).toContain("assertCurrentMain(mergeCommitSha, currentMainSha)");
+  });
+
+  it("accepts a prior deployment only when live production serves the exact merge", () => {
+    const guard = (
+      releaseWorker as typeof releaseWorker & {
+        assertProductionRelease?: (
+          mergeSha: string,
+          report: ReturnType<typeof evaluateAudit>,
+        ) => string;
+      }
+    ).assertProductionRelease;
+    const live = evaluateAudit(
+      evidence({
+        cloudGitSha: SHA_TEST,
+        cloudMarkerSha: SHA_TEST,
+        rtrda02GitSha: SHA_TEST,
+        rtrda02MarkerSha: SHA_TEST,
+      }),
+    );
+
+    expect(guard).toBeTypeOf("function");
+    expect(guard?.(SHA_TEST, live)).toBe(SHA_TEST);
+    expect(() => guard?.(SHA_PROD, live)).toThrow(/production/i);
+    expect(workerSource).toContain(
+      "assertProductionRelease(mergeCommitSha, finalReport)",
+    );
   });
 
   it("binds the dispatched merge commit to production, release head, and exact test tree", () => {

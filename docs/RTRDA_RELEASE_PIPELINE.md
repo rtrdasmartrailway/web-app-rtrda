@@ -60,14 +60,17 @@ node scripts/rtrda-release-worker.mjs promote \
 ```
 
 The worker creates or reuses `release/exact-<TEST_SHA>` with the audited
-Production SHA as its only parent and the exact deployed Test tree. It opens a
-review PR and waits for its checks, creates and verifies the two-parent merge
-commit, then updates `main` with GitHub's non-force atomic fast-forward API. A
+Production SHA as its only parent and the exact deployed Test tree. Before any
+GitHub mutation, it validates the approved SHA in a clean detached worktree
+(`npm ci`, Prisma generation, tests, lint, typecheck, format, security audit, and
+build). It then opens a review PR, creates and verifies the two-parent merge
+commit, and updates `main` with GitHub's non-force atomic fast-forward API. A
 concurrent `main` change therefore fails before mutation. The worker verifies
 the merge parents/tree before manually dispatching `deploy-production.yml` for
-the exact merge SHA. Retries reuse a verified merged PR and any successful or
-in-flight exact workflow run only while that merge remains the current `main`;
-failed runs may then be dispatched again. Historical ancestors are never
+the exact merge SHA. Retries finish immediately only when live Production
+markers and direct health already match the merge; otherwise they reuse an
+in-flight exact run or dispatch a new one. Historical successful runs are not
+accepted as proof of current deployment, and historical ancestors are never
 accepted as implicit rollbacks.
 
 The production workflow has no `push` trigger. It accepts only an explicit,

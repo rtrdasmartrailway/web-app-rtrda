@@ -78,6 +78,36 @@ function succeeds(command, args) {
   }
 }
 
+function runReleaseValidation(approvedSha, repoPath = process.cwd()) {
+  const validationDir = run("mktemp", ["-d", "/tmp/rtrda-release-validation.XXXXXX"]);
+  let worktreeAdded = false;
+  try {
+    run("git", ["worktree", "add", "--detach", validationDir, approvedSha], {
+      cwd: repoPath,
+    });
+    worktreeAdded = true;
+    const options = {
+      cwd: validationDir,
+      env: {
+        ...process.env,
+        DATABASE_URL: "postgresql://rtrda:build@localhost:5432/build",
+      },
+    };
+    run("npm", ["ci"], options);
+    run("npx", ["prisma", "generate"], options);
+    run("npm", ["test"], options);
+    run("npm", ["run", "lint"], options);
+    run("npm", ["run", "typecheck"], options);
+    run("npm", ["run", "format:check"], options);
+    run("npm", ["run", "security:audit"], options);
+    run("npm", ["run", "build"], options);
+  } finally {
+    if (worktreeAdded) {
+      succeeds("git", ["-C", repoPath, "worktree", "remove", "--force", validationDir]);
+    }
+  }
+}
+
 function collectLiveEvidence(repoPath = process.cwd()) {
   run("git", ["fetch", "origin", "test", "main", "--prune"], { cwd: repoPath });
   const testContainerSha = run("docker", [
@@ -216,9 +246,22 @@ export function assertCurrentMain(mergeSha, currentMainSha) {
   return mergeSha;
 }
 
+export function assertProductionRelease(mergeSha, report) {
+  if (
+    !FULL_SHA.test(mergeSha ?? "") ||
+    report.production.sha !== mergeSha ||
+    !report.production.parity ||
+    !report.production.cloudHealthy ||
+    !report.production.rtrda02Healthy
+  ) {
+    throw new Error("Live production does not serve the verified merge release");
+  }
+  return mergeSha;
+}
+
 export function selectProductionRunQuery(mainSha) {
   if (!FULL_SHA.test(mainSha ?? "")) throw new Error("main SHA must be a full SHA");
-  return `.[] | select(.displayTitle == "Deploy production ${mainSha}") | select(.status != "completed" or .conclusion == "success") | .databaseId`;
+  return `.[] | select(.displayTitle == "Deploy production ${mainSha}") | select(.status != "completed") | .databaseId`;
 }
 
 export function buildPromotionPlan(sha) {
@@ -237,6 +280,7 @@ export function buildPromotionPlan(sha) {
 function executePromotion(approvedSha, auditedProductionSha) {
   const repo = "rtrdasmartrailway/web-app-rtrda";
   const testTree = run("git", ["rev-parse", `${approvedSha}^{tree}`]);
+  runReleaseValidation(approvedSha);
   const releaseBranch = `release/exact-${approvedSha}`;
   const matchingRefPath = `repos/${repo}/git/matching-refs/heads/release/exact-${approvedSha}`;
   let releaseHeadSha = run("gh", [
@@ -346,7 +390,6 @@ function executePromotion(approvedSha, auditedProductionSha) {
         ".number",
       ]);
     }
-    run("gh", ["pr", "checks", prNumber, "--repo", repo, "--watch"]);
     const prIdentity = JSON.parse(
       run("gh", [
         "pr",
@@ -444,6 +487,22 @@ function executePromotion(approvedSha, auditedProductionSha) {
   ]);
   assertCurrentMain(mergeCommitSha, currentMainSha);
 
+  const liveBeforeDeploy = evaluateAudit(collectLiveEvidence(process.cwd()));
+  if (
+    liveBeforeDeploy.production.sha === mergeCommitSha &&
+    liveBeforeDeploy.production.parity &&
+    liveBeforeDeploy.production.cloudHealthy &&
+    liveBeforeDeploy.production.rtrda02Healthy
+  ) {
+    assertProductionRelease(mergeCommitSha, liveBeforeDeploy);
+    return {
+      prNumber,
+      mainSha: mergeCommitSha,
+      productionRunId: null,
+      productionAlreadyVerified: true,
+    };
+  }
+
   const findProductionRun = () =>
     run("gh", [
       "run",
@@ -484,6 +543,8 @@ function executePromotion(approvedSha, auditedProductionSha) {
   execFileSync("gh", ["run", "watch", runId, "--repo", repo, "--exit-status"], {
     stdio: "inherit",
   });
+  const finalReport = evaluateAudit(collectLiveEvidence(process.cwd()));
+  assertProductionRelease(mergeCommitSha, finalReport);
   return { prNumber, mainSha: mergeCommitSha, productionRunId: runId };
 }
 
