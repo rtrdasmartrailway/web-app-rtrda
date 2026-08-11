@@ -1,5 +1,12 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { buildPromotionPlan, evaluateAudit } from "./rtrda-release-worker.mjs";
+
+const workerSource = readFileSync(
+  join(process.cwd(), "scripts/rtrda-release-worker.mjs"),
+  "utf8",
+);
 
 const SHA_TEST = "a".repeat(40);
 const SHA_PROD = "b".repeat(40);
@@ -46,6 +53,30 @@ describe("RTRDA release worker audit", () => {
     expect(report.production.sha).toBe(SHA_PROD);
     expect(report.changedFiles).toEqual(["M\tsrc/example.ts"]);
     expect(report.blockers).toEqual([]);
+  });
+
+  it("reuses the exact evidence emitted by a successful check", () => {
+    const checkOutput = evaluateAudit(evidence());
+    const promotionAudit = evaluateAudit(checkOutput);
+
+    expect(promotionAudit.promotable).toBe(true);
+    expect(promotionAudit.test.sha).toBe(SHA_TEST);
+    expect(promotionAudit.production.sha).toBe(SHA_PROD);
+  });
+
+  it("atomically binds the merge to the approved test SHA", () => {
+    const plan = buildPromotionPlan(SHA_TEST);
+
+    expect(plan.join("\n")).toContain(`--match-head-commit ${SHA_TEST}`);
+    expect(workerSource).toMatch(/"--match-head-commit",\s*approvedSha/);
+  });
+
+  it("selects both automatic and fallback production runs by the merged main SHA", () => {
+    const selectorUses =
+      workerSource.match(/selectProductionRunQuery\(mainSha\),/g) ?? [];
+
+    expect(selectorUses).toHaveLength(2);
+    expect(workerSource).not.toContain('".[0].databaseId"');
   });
 
   it("promotes through main CI instead of deploying production hosts directly", () => {

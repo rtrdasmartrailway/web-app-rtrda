@@ -5,7 +5,8 @@ import { readFileSync } from "node:fs";
 const FULL_SHA = /^[0-9a-f]{40}$/;
 
 export function evaluateAudit(raw) {
-  const evidence = { ...raw };
+  const suppliedEvidence = raw?.evidence ?? raw ?? {};
+  const evidence = { ...suppliedEvidence };
   const blockers = [];
   const valid = (value) => FULL_SHA.test(value ?? "");
 
@@ -53,6 +54,7 @@ export function evaluateAudit(raw) {
     },
     changedFiles: evidence.changedFiles ?? [],
     blockers: [...new Set(blockers)],
+    evidence,
   };
 }
 
@@ -140,10 +142,15 @@ function usage() {
   ].join("\n");
 }
 
+export function selectProductionRunQuery(mainSha) {
+  if (!FULL_SHA.test(mainSha ?? "")) throw new Error("main SHA must be a full SHA");
+  return `.[] | select(.headSha == "${mainSha}") | .databaseId`;
+}
+
 export function buildPromotionPlan(sha) {
   return [
     `gh pr create --repo rtrdasmartrailway/web-app-rtrda --base main --head test --title "Promote deployed test ${sha.slice(0, 7)} to production" --body "Exact deployed test SHA: ${sha}"`,
-    "gh pr merge <PR_NUMBER> --repo rtrdasmartrailway/web-app-rtrda --merge",
+    `gh pr merge <PR_NUMBER> --repo rtrdasmartrailway/web-app-rtrda --merge --match-head-commit ${sha}`,
     "gh workflow run deploy-production.yml --repo rtrdasmartrailway/web-app-rtrda --ref main -f ref=<MERGED_MAIN_SHA> (fallback only if merge did not trigger CI)",
     "gh run watch <PRODUCTION_RUN_ID> --repo rtrdasmartrailway/web-app-rtrda --exit-status",
     "Re-run check and require Cloud/RTRDA02 release markers to equal the merged main SHA.",
@@ -196,7 +203,30 @@ function executePromotion(approvedSha) {
     ]);
   }
   run("gh", ["pr", "checks", prNumber, "--repo", repo, "--watch"]);
-  run("gh", ["pr", "merge", prNumber, "--repo", repo, "--merge"]);
+  const prHeadSha = run("gh", [
+    "pr",
+    "view",
+    prNumber,
+    "--repo",
+    repo,
+    "--json",
+    "headRefOid",
+    "--jq",
+    ".headRefOid",
+  ]);
+  if (prHeadSha !== approvedSha) {
+    throw new Error("PR head no longer matches approved deployed test SHA");
+  }
+  run("gh", [
+    "pr",
+    "merge",
+    prNumber,
+    "--repo",
+    repo,
+    "--merge",
+    "--match-head-commit",
+    approvedSha,
+  ]);
   const mainSha = run("gh", ["api", `repos/${repo}/commits/main`, "--jq", ".sha"]);
 
   let runId = "";
@@ -215,7 +245,7 @@ function executePromotion(approvedSha) {
       "--json",
       "databaseId,headSha",
       "--jq",
-      `.[] | select(.headSha == "${mainSha}") | .databaseId`,
+      selectProductionRunQuery(mainSha),
     ]).split("\n")[0];
     if (!runId) run("sleep", ["5"]);
   }
@@ -231,21 +261,25 @@ function executePromotion(approvedSha) {
       "-f",
       `ref=${mainSha}`,
     ]);
-    run("sleep", ["5"]);
-    runId = run("gh", [
-      "run",
-      "list",
-      "--repo",
-      repo,
-      "--workflow",
-      "deploy-production.yml",
-      "--limit",
-      "1",
-      "--json",
-      "databaseId",
-      "--jq",
-      ".[0].databaseId",
-    ]);
+    for (let attempt = 0; attempt < 12 && !runId; attempt += 1) {
+      runId = run("gh", [
+        "run",
+        "list",
+        "--repo",
+        repo,
+        "--workflow",
+        "deploy-production.yml",
+        "--branch",
+        "main",
+        "--limit",
+        "20",
+        "--json",
+        "databaseId,headSha",
+        "--jq",
+        selectProductionRunQuery(mainSha),
+      ]).split("\n")[0];
+      if (!runId) run("sleep", ["5"]);
+    }
   }
   if (!runId) throw new Error("Production workflow run was not created");
   execFileSync("gh", ["run", "watch", runId, "--repo", repo, "--exit-status"], {
