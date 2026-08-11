@@ -243,6 +243,14 @@ describe("manifestToRows", () => {
       restoredNews.find((record) => record.id === "th-post-91006")?.contentHtml,
     ).toContain("Workshop ประเมินศักยภาพองค์กร");
 
+    const officialNews = rows.records.find(
+      (record) => record.id === "th-post-en15085-070869",
+    );
+    expect(officialNews).toMatchObject({
+      date: "2026-08-07T09:00:00",
+      modified: "2026-08-07T09:00:00",
+    });
+
     const restoredMedia = rows.media.filter((asset) =>
       asset.localPath.includes("/wp-content/uploads/news-2569/fb-"),
     );
@@ -304,6 +312,9 @@ describe("manifestToRows", () => {
     ).toBe(11);
     expect(category?.contentHtml).toContain(
       "สทร. ผนึกพันธมิตร ปูทางผู้ประกอบการไทยสู่มาตรฐาน EN 15085",
+    );
+    expect(category?.contentHtml.indexOf("มาตรฐาน EN 15085")).toBeLessThan(
+      category?.contentHtml.indexOf("Siamese Train") ?? Number.POSITIVE_INFINITY,
     );
     expect(category?.contentHtml).toContain("Siamese Train");
     expect(category?.contentHtml).toContain("Incubation Team");

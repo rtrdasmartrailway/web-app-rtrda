@@ -142,6 +142,19 @@ function usage() {
   ].join("\n");
 }
 
+export function assertLivePromotionState(report, liveReport, approvedSha) {
+  if (
+    !liveReport.promotable ||
+    liveReport.test.sha !== approvedSha ||
+    liveReport.test.originTestSha !== approvedSha
+  ) {
+    throw new Error("Live promotion state no longer matches the approved test release");
+  }
+  if (liveReport.production.sha !== report.production.sha) {
+    throw new Error("Production release changed after evidence was captured");
+  }
+}
+
 export function selectProductionRunQuery(mainSha) {
   if (!FULL_SHA.test(mainSha ?? "")) throw new Error("main SHA must be a full SHA");
   return `.[] | select(.headSha == "${mainSha}") | .databaseId`;
@@ -320,6 +333,10 @@ function main() {
     console.log(JSON.stringify({ dryRun: true, approvedSha, commands }, null, 2));
     return;
   }
+  const liveReport = evaluateAudit(
+    collectLiveEvidence(valueAfter(args, "--repo") ?? process.cwd()),
+  );
+  assertLivePromotionState(report, liveReport, approvedSha);
   console.log(JSON.stringify(executePromotion(approvedSha), null, 2));
 }
 

@@ -444,7 +444,9 @@ const OFFICIAL_WEBSITE_NEWS = [
   },
 ];
 
-const SUPPLEMENTAL_NEWS = [...FACEBOOK_RESTORED_NEWS, ...OFFICIAL_WEBSITE_NEWS];
+const SUPPLEMENTAL_NEWS = [...FACEBOOK_RESTORED_NEWS, ...OFFICIAL_WEBSITE_NEWS].sort(
+  (left, right) => Date.parse(right.date) - Date.parse(left.date),
+);
 
 function facebookRestoredNewsContentHtml(news) {
   const paragraphs = news.paragraphs
@@ -496,7 +498,7 @@ function withSupplementalRecords(records) {
     contentHtml: facebookRestoredNewsContentHtml(news),
     searchText: [news.title, news.excerpt, ...news.paragraphs].join("\n"),
     date: news.date,
-    modified: "2026-06-29T00:00:00",
+    modified: news.modified ?? news.date,
     parentPath: null,
     categoryIds: [7],
     featuredMediaId: news.media ? Number(news.media.id) : null,

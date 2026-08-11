@@ -1,7 +1,9 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { buildPromotionPlan, evaluateAudit } from "./rtrda-release-worker.mjs";
+import * as releaseWorker from "./rtrda-release-worker.mjs";
+
+const { buildPromotionPlan, evaluateAudit } = releaseWorker;
 
 const workerSource = readFileSync(
   join(process.cwd(), "scripts/rtrda-release-worker.mjs"),
@@ -77,6 +79,41 @@ describe("RTRDA release worker audit", () => {
 
     expect(selectorUses).toHaveLength(2);
     expect(workerSource).not.toContain('".[0].databaseId"');
+  });
+
+  it("revalidates saved evidence against live state before any mutation", () => {
+    const guard = (
+      releaseWorker as typeof releaseWorker & {
+        assertLivePromotionState?: (
+          saved: ReturnType<typeof evaluateAudit>,
+          live: ReturnType<typeof evaluateAudit>,
+          approvedSha: string,
+        ) => void;
+      }
+    ).assertLivePromotionState;
+
+    expect(guard).toBeTypeOf("function");
+    const saved = evaluateAudit(evidence());
+    expect(() =>
+      guard?.(saved, evaluateAudit(evidence({ cloudHealth: false })), SHA_TEST),
+    ).toThrow(/live promotion state/i);
+    expect(() =>
+      guard?.(
+        saved,
+        evaluateAudit(
+          evidence({
+            cloudGitSha: "c".repeat(40),
+            cloudMarkerSha: "c".repeat(40),
+            rtrda02GitSha: "c".repeat(40),
+            rtrda02MarkerSha: "c".repeat(40),
+          }),
+        ),
+        SHA_TEST,
+      ),
+    ).toThrow(/production release changed/i);
+    expect(workerSource).toContain(
+      "assertLivePromotionState(report, liveReport, approvedSha)",
+    );
   });
 
   it("promotes through main CI instead of deploying production hosts directly", () => {
