@@ -205,6 +205,17 @@ export function assertMergeIdentity(
   return mergeSha;
 }
 
+export function assertCurrentMain(mergeSha, currentMainSha) {
+  if (
+    !FULL_SHA.test(mergeSha ?? "") ||
+    !FULL_SHA.test(currentMainSha ?? "") ||
+    mergeSha !== currentMainSha
+  ) {
+    throw new Error("Verified merge commit is no longer the current main SHA");
+  }
+  return mergeSha;
+}
+
 export function selectProductionRunQuery(mainSha) {
   if (!FULL_SHA.test(mainSha ?? "")) throw new Error("main SHA must be a full SHA");
   return `.[] | select(.displayTitle == "Deploy production ${mainSha}") | select(.status != "completed" or .conclusion == "success") | .databaseId`;
@@ -424,6 +435,14 @@ function executePromotion(approvedSha, auditedProductionSha) {
     parentShas,
     mergeTree,
   );
+
+  const currentMainSha = run("gh", [
+    "api",
+    `repos/${repo}/git/refs/heads/main`,
+    "--jq",
+    ".object.sha",
+  ]);
+  assertCurrentMain(mergeCommitSha, currentMainSha);
 
   const findProductionRun = () =>
     run("gh", [

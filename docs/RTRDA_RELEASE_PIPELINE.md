@@ -66,7 +66,9 @@ commit, then updates `main` with GitHub's non-force atomic fast-forward API. A
 concurrent `main` change therefore fails before mutation. The worker verifies
 the merge parents/tree before manually dispatching `deploy-production.yml` for
 the exact merge SHA. Retries reuse a verified merged PR and any successful or
-in-flight exact workflow run; failed runs may be dispatched again.
+in-flight exact workflow run only while that merge remains the current `main`;
+failed runs may then be dispatched again. Historical ancestors are never
+accepted as implicit rollbacks.
 
 The production workflow has no `push` trigger. It accepts only an explicit,
 required SHA and deploys that same verified release to both:

@@ -21,6 +21,10 @@ describe("Deploy rtrda.or.th production workflow", () => {
     expect(workflow).not.toContain("  push:");
     expect(workflow).toContain("required: true");
     expect(workflow).toContain('test -n "$INPUT_REF"');
+    expect(workflow).toContain('test "$DEPLOY_SHA" = "$(git rev-parse origin/main)"');
+    expect(workflow).not.toContain(
+      'git merge-base --is-ancestor "$DEPLOY_SHA" origin/main',
+    );
     expect(workflow).toContain("TARGET_NAME=cloud");
     expect(workflow).toContain("TARGET_NAME=rtrda02");
     expect(workflow).toContain("http://100.77.64.92:3021/healthz");

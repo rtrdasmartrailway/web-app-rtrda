@@ -38,7 +38,7 @@ jobs:
           test -n "$INPUT_REF"
           DEPLOY_SHA="$(git rev-parse "$INPUT_REF")"
           test "${#DEPLOY_SHA}" -eq 40
-          git merge-base --is-ancestor "$DEPLOY_SHA" origin/main
+          test "$DEPLOY_SHA" = "$(git rev-parse origin/main)"
           echo "deploy_sha=$DEPLOY_SHA" >> "$GITHUB_OUTPUT"
           echo "source_path=$SOURCE_PATH" >> "$GITHUB_OUTPUT"
           echo "Deploy SHA: $DEPLOY_SHA"

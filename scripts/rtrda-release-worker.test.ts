@@ -161,6 +161,19 @@ describe("RTRDA release worker audit", () => {
     expect(workerSource).toContain("existingPr.mergeCommit?.oid");
   });
 
+  it("rejects retrying a merged promotion after main has advanced", () => {
+    const guard = (
+      releaseWorker as typeof releaseWorker & {
+        assertCurrentMain?: (mergeSha: string, currentMainSha: string) => string;
+      }
+    ).assertCurrentMain;
+
+    expect(guard).toBeTypeOf("function");
+    expect(guard?.(SHA_TEST, SHA_TEST)).toBe(SHA_TEST);
+    expect(() => guard?.(SHA_TEST, SHA_PROD)).toThrow(/main/i);
+    expect(workerSource).toContain("assertCurrentMain(mergeCommitSha, currentMainSha)");
+  });
+
   it("binds the dispatched merge commit to production, release head, and exact test tree", () => {
     const guard = (
       releaseWorker as typeof releaseWorker & {
