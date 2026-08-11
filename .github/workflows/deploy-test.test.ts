@@ -6,6 +6,7 @@ const workflow = readFileSync(
   join(process.cwd(), ".github/workflows/deploy-test.yml"),
   "utf8",
 );
+const dockerIgnore = readFileSync(join(process.cwd(), ".dockerignore"), "utf8");
 
 describe("Deploy test.rtrda.or.th workflow", () => {
   it("deploys only the DGT test runtime and does not touch production targets", () => {
@@ -19,6 +20,11 @@ describe("Deploy test.rtrda.or.th workflow", () => {
     expect(workflow).not.toContain("https://www.rtrda.or.th/healthz");
     expect(workflow).not.toContain("CLOUDFLARE_API_TOKEN");
     expect(workflow).not.toContain("purge_cache");
+  });
+
+  it("includes the tracked popup asset in the Docker build context", () => {
+    expect(dockerIgnore).toContain("!public/wp-content/uploads/2026/07/");
+    expect(dockerIgnore).toContain("!public/wp-content/uploads/2026/07/ทรงพระเจริญ.webp");
   });
 
   it("labels the running container with the exact pushed SHA", () => {

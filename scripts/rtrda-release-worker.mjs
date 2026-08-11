@@ -5,7 +5,8 @@ import { readFileSync } from "node:fs";
 const FULL_SHA = /^[0-9a-f]{40}$/;
 
 export function evaluateAudit(raw) {
-  const evidence = { ...raw };
+  const suppliedEvidence = raw?.evidence ?? raw ?? {};
+  const evidence = { ...suppliedEvidence };
   const blockers = [];
   const valid = (value) => FULL_SHA.test(value ?? "");
 
@@ -13,6 +14,7 @@ export function evaluateAudit(raw) {
   if (evidence.testContainerSha !== evidence.originTestSha)
     blockers.push("test_deploy_not_on_origin_test");
   if (!evidence.testHealth) blockers.push("test_unhealthy");
+  if (!evidence.testPublicHealth) blockers.push("test_public_unhealthy");
 
   const cloudConsistent =
     valid(evidence.cloudGitSha) && evidence.cloudGitSha === evidence.cloudMarkerSha;
@@ -35,7 +37,9 @@ export function evaluateAudit(raw) {
     test: {
       sha: valid(evidence.testContainerSha) ? evidence.testContainerSha : null,
       originTestSha: evidence.originTestSha ?? null,
-      healthy: Boolean(evidence.testHealth),
+      healthy: Boolean(evidence.testHealth && evidence.testPublicHealth),
+      localHealthy: Boolean(evidence.testHealth),
+      publicHealthy: Boolean(evidence.testPublicHealth),
     },
     production: {
       sha:
@@ -53,6 +57,7 @@ export function evaluateAudit(raw) {
     },
     changedFiles: evidence.changedFiles ?? [],
     blockers: [...new Set(blockers)],
+    evidence,
   };
 }
 
@@ -73,6 +78,52 @@ function succeeds(command, args) {
   }
 }
 
+function runReleaseValidation(approvedSha, repoPath = process.cwd()) {
+  const validationDir = run("mktemp", ["-d", "/tmp/rtrda-release-validation.XXXXXX"]);
+  let worktreeAdded = false;
+  try {
+    run("git", ["worktree", "add", "--detach", validationDir, approvedSha], {
+      cwd: repoPath,
+    });
+    worktreeAdded = true;
+    const options = {
+      cwd: validationDir,
+      env: {
+        ...process.env,
+        DATABASE_URL: "postgresql://rtrda:build@localhost:5432/build",
+      },
+    };
+    run("npm", ["ci"], options);
+    run("npx", ["prisma", "generate"], options);
+    run("npm", ["test"], options);
+    run("npm", ["run", "lint"], options);
+    run("npm", ["run", "typecheck"], options);
+    run("npm", ["run", "format:check"], options);
+    run("npm", ["run", "security:audit"], options);
+    run("npm", ["run", "build"], options);
+  } finally {
+    if (worktreeAdded) {
+      succeeds("git", ["-C", repoPath, "worktree", "remove", "--force", validationDir]);
+    }
+  }
+}
+
+export function readRemoteEvidence(key, destination, path, runner = run) {
+  try {
+    const output = runner("ssh", [
+      "-i",
+      key,
+      "-o",
+      "BatchMode=yes",
+      destination,
+      `cd ${path} && git rev-parse HEAD && cat .deploy-state/preprod-release`,
+    ]).split(/\s+/);
+    return { git: output[0] ?? "", marker: output[1] ?? "" };
+  } catch {
+    return { git: "", marker: "" };
+  }
+}
+
 function collectLiveEvidence(repoPath = process.cwd()) {
   run("git", ["fetch", "origin", "test", "main", "--prune"], { cwd: repoPath });
   const testContainerSha = run("docker", [
@@ -82,34 +133,24 @@ function collectLiveEvidence(repoPath = process.cwd()) {
     '{{ index .Config.Labels "org.opencontainers.image.revision" }}',
   ]);
   const originTestSha = run("git", ["rev-parse", "origin/test"], { cwd: repoPath });
-  const remote = (key, destination, path) => {
-    const output = run("ssh", [
-      "-i",
-      key,
-      "-o",
-      "BatchMode=yes",
-      destination,
-      `cd ${path} && git rev-parse HEAD && cat .deploy-state/preprod-release`,
-    ]).split(/\s+/);
-    return { git: output[0] ?? "", marker: output[1] ?? "" };
-  };
-  const cloud = remote(
+  const cloud = readRemoteEvidence(
     `${process.env.HOME}/.ssh/rtrda-cloud-preprod-sync_ed25519`,
     "ubuntu@100.77.64.92",
     "/home/ubuntu/rtrda-preprod/web-app-rtrda",
   );
-  const rtrda02 = remote(
+  const rtrda02 = readRemoteEvidence(
     `${process.env.HOME}/.ssh/rtrda02_prod_preview_sync_ed25519`,
     "rtrda@100.91.174.121",
     "/srv/apps/web-app-rtrda-preprod-rtrda02",
   );
-  const changedFiles = FULL_SHA.test(testContainerSha)
-    ? run("git", ["diff", "--name-status", `${cloud.git}..${testContainerSha}`], {
-        cwd: repoPath,
-      })
-        .split("\n")
-        .filter(Boolean)
-    : [];
+  const changedFiles =
+    FULL_SHA.test(testContainerSha) && FULL_SHA.test(cloud.git)
+      ? run("git", ["diff", "--name-status", `${cloud.git}..${testContainerSha}`], {
+          cwd: repoPath,
+        })
+          .split("\n")
+          .filter(Boolean)
+      : [];
   return {
     testContainerSha,
     originTestSha,
@@ -118,6 +159,7 @@ function collectLiveEvidence(repoPath = process.cwd()) {
     rtrda02GitSha: rtrda02.git,
     rtrda02MarkerSha: rtrda02.marker,
     testHealth: succeeds("curl", ["-fsS", "http://127.0.0.1:3020/healthz"]),
+    testPublicHealth: succeeds("curl", ["-fsS", "https://test.rtrda.or.th/healthz"]),
     cloudHealth: succeeds("curl", ["-fsS", "http://100.77.64.92:3021/healthz"]),
     rtrda02Health: succeeds("curl", ["-fsS", "http://100.91.174.121:3021/healthz"]),
     changedFiles,
@@ -140,85 +182,464 @@ function usage() {
   ].join("\n");
 }
 
+export function assertLivePromotionState(report, liveReport, approvedSha) {
+  if (
+    !liveReport.promotable ||
+    liveReport.test.sha !== approvedSha ||
+    liveReport.test.originTestSha !== approvedSha
+  ) {
+    throw new Error("Live promotion state no longer matches the approved test release");
+  }
+  if (liveReport.production.sha !== report.production.sha) {
+    throw new Error("Production release changed after evidence was captured");
+  }
+}
+
+export function assertPostValidationState(auditedProductionSha, liveReport, approvedSha) {
+  if (
+    !liveReport.promotable ||
+    liveReport.test.sha !== approvedSha ||
+    liveReport.test.originTestSha !== approvedSha ||
+    liveReport.production.sha !== auditedProductionSha
+  ) {
+    throw new Error("Live release state changed during exact-SHA validation");
+  }
+}
+
+export function assertReleaseHead(
+  productionSha,
+  testTree,
+  releaseSha,
+  parentShas,
+  releaseTree,
+) {
+  if (
+    !FULL_SHA.test(productionSha ?? "") ||
+    !FULL_SHA.test(testTree ?? "") ||
+    !FULL_SHA.test(releaseSha ?? "") ||
+    !FULL_SHA.test(releaseTree ?? "") ||
+    parentShas.length !== 1 ||
+    parentShas[0] !== productionSha ||
+    releaseTree !== testTree
+  ) {
+    throw new Error("Release head is not an exact test tree based on audited production");
+  }
+}
+
+export function assertMergeIdentity(
+  productionSha,
+  releaseSha,
+  testTree,
+  mergeSha,
+  parentShas,
+  mergeTree,
+) {
+  if (
+    !FULL_SHA.test(productionSha ?? "") ||
+    !FULL_SHA.test(releaseSha ?? "") ||
+    !FULL_SHA.test(testTree ?? "") ||
+    !FULL_SHA.test(mergeSha ?? "") ||
+    !FULL_SHA.test(mergeTree ?? "") ||
+    parentShas.length !== 2 ||
+    parentShas[0] !== productionSha ||
+    parentShas[1] !== releaseSha ||
+    mergeTree !== testTree
+  ) {
+    throw new Error(
+      "Merge identity does not match audited production, verified release head, and exact test tree",
+    );
+  }
+  return mergeSha;
+}
+
+export function assertCurrentMain(mergeSha, currentMainSha) {
+  if (
+    !FULL_SHA.test(mergeSha ?? "") ||
+    !FULL_SHA.test(currentMainSha ?? "") ||
+    mergeSha !== currentMainSha
+  ) {
+    throw new Error("Verified merge commit is no longer the current main SHA");
+  }
+  return mergeSha;
+}
+
+export function assertProductionRelease(mergeSha, report) {
+  if (
+    !FULL_SHA.test(mergeSha ?? "") ||
+    report.production.sha !== mergeSha ||
+    !report.production.parity ||
+    !report.production.cloudHealthy ||
+    !report.production.rtrda02Healthy
+  ) {
+    throw new Error("Live production does not serve the verified merge release");
+  }
+  return mergeSha;
+}
+
+export function assertRecoveryIdentity(
+  testTree,
+  mainSha,
+  mainTree,
+  mainParents,
+  releaseHeadSha,
+  releaseTree,
+  releaseParents,
+) {
+  const productionSha = releaseParents[0];
+  if (
+    !FULL_SHA.test(testTree ?? "") ||
+    !FULL_SHA.test(mainSha ?? "") ||
+    !FULL_SHA.test(releaseHeadSha ?? "") ||
+    !FULL_SHA.test(productionSha ?? "") ||
+    releaseParents.length !== 1 ||
+    releaseTree !== testTree ||
+    mainTree !== testTree ||
+    mainParents.length !== 2 ||
+    mainParents[0] !== productionSha ||
+    mainParents[1] !== releaseHeadSha
+  ) {
+    throw new Error("Partial-deployment recovery identity is invalid");
+  }
+  return { productionSha, mergeSha: mainSha };
+}
+
+export function assertRecoveryTargets(report, recovery) {
+  const allowed = new Set([recovery.productionSha, recovery.mergeSha]);
+  const evidence = report.evidence ?? {};
+  const targets = [
+    [evidence.cloudGitSha, evidence.cloudMarkerSha],
+    [evidence.rtrda02GitSha, evidence.rtrda02MarkerSha],
+  ];
+  if (
+    targets.some(
+      ([gitSha, markerSha]) =>
+        !FULL_SHA.test(gitSha ?? "") ||
+        !FULL_SHA.test(markerSha ?? "") ||
+        !allowed.has(gitSha) ||
+        !allowed.has(markerSha),
+    )
+  ) {
+    throw new Error("Production target is outside the verified recovery transition");
+  }
+}
+
+function inspectRecoveryState(approvedSha) {
+  const repo = "rtrdasmartrailway/web-app-rtrda";
+  try {
+    const testTree = run("git", ["rev-parse", `${approvedSha}^{tree}`]);
+    const releaseBranch = `release/exact-${approvedSha}`;
+    const releaseHeadSha = run("gh", [
+      "api",
+      `repos/${repo}/git/matching-refs/heads/release/exact-${approvedSha}`,
+      "--jq",
+      `.[] | select(.ref == "refs/heads/${releaseBranch}") | .object.sha`,
+    ]);
+    if (!releaseHeadSha) return null;
+    const mainSha = run("gh", [
+      "api",
+      `repos/${repo}/git/refs/heads/main`,
+      "--jq",
+      ".object.sha",
+    ]);
+    const releaseCommit = JSON.parse(
+      run("gh", ["api", `repos/${repo}/git/commits/${releaseHeadSha}`]),
+    );
+    const mainCommit = JSON.parse(
+      run("gh", ["api", `repos/${repo}/git/commits/${mainSha}`]),
+    );
+    return assertRecoveryIdentity(
+      testTree,
+      mainSha,
+      mainCommit.tree?.sha,
+      (mainCommit.parents ?? []).map((parent) => parent.sha),
+      releaseHeadSha,
+      releaseCommit.tree?.sha,
+      (releaseCommit.parents ?? []).map((parent) => parent.sha),
+    );
+  } catch {
+    return null;
+  }
+}
+
+export function selectProductionRunQuery(mainSha) {
+  if (!FULL_SHA.test(mainSha ?? "")) throw new Error("main SHA must be a full SHA");
+  return `.[] | select(.displayTitle == "Deploy production ${mainSha}") | select(.status != "completed") | .databaseId`;
+}
+
 export function buildPromotionPlan(sha) {
+  const releaseBranch = `release/exact-${sha}`;
   return [
-    `gh pr create --repo rtrdasmartrailway/web-app-rtrda --base main --head test --title "Promote deployed test ${sha.slice(0, 7)} to production" --body "Exact deployed test SHA: ${sha}"`,
-    "gh pr merge <PR_NUMBER> --repo rtrdasmartrailway/web-app-rtrda --merge",
-    "gh workflow run deploy-production.yml --repo rtrdasmartrailway/web-app-rtrda --ref main -f ref=<MERGED_MAIN_SHA> (fallback only if merge did not trigger CI)",
+    `Create/reuse ${releaseBranch} with parent=<AUDITED_PRODUCTION_SHA> and tree=${sha}^{tree}`,
+    `gh pr create --repo rtrdasmartrailway/web-app-rtrda --base main --head ${releaseBranch} --title "Promote exact deployed test ${sha.slice(0, 7)} to production" --body "Exact deployed test SHA: ${sha}"`,
+    "Create and verify an exact-tree merge commit with parents [audited production, verified release head].",
+    "Use GitHub's non-force atomic fast-forward to update refs/heads/main to the verified merge commit.",
+    "gh workflow run deploy-production.yml --repo rtrdasmartrailway/web-app-rtrda --ref main -f ref=<VERIFIED_MERGE_COMMIT_SHA>",
     "gh run watch <PRODUCTION_RUN_ID> --repo rtrdasmartrailway/web-app-rtrda --exit-status",
     "Re-run check and require Cloud/RTRDA02 release markers to equal the merged main SHA.",
   ];
 }
 
-function executePromotion(approvedSha) {
+function executePromotion(approvedSha, auditedProductionSha, recoveryMode = false) {
   const repo = "rtrdasmartrailway/web-app-rtrda";
-  let prNumber = run("gh", [
-    "pr",
-    "list",
-    "--repo",
-    repo,
-    "--base",
-    "main",
-    "--head",
-    "test",
-    "--state",
-    "open",
-    "--json",
-    "number",
+  const testTree = run("git", ["rev-parse", `${approvedSha}^{tree}`]);
+  runReleaseValidation(approvedSha);
+  const postValidationReport = evaluateAudit(collectLiveEvidence(process.cwd()));
+  if (recoveryMode) {
+    const recovery = inspectRecoveryState(approvedSha);
+    if (
+      !recovery ||
+      recovery.productionSha !== auditedProductionSha ||
+      postValidationReport.test.sha !== approvedSha ||
+      postValidationReport.test.originTestSha !== approvedSha ||
+      !postValidationReport.test.healthy
+    ) {
+      throw new Error("Partial-deployment recovery changed during validation");
+    }
+    assertRecoveryTargets(postValidationReport, recovery);
+  } else {
+    assertPostValidationState(auditedProductionSha, postValidationReport, approvedSha);
+  }
+  const releaseBranch = `release/exact-${approvedSha}`;
+  const matchingRefPath = `repos/${repo}/git/matching-refs/heads/release/exact-${approvedSha}`;
+  let releaseHeadSha = run("gh", [
+    "api",
+    matchingRefPath,
     "--jq",
-    ".[0].number // empty",
+    `.[] | select(.ref == "refs/heads/${releaseBranch}") | .object.sha`,
   ]);
-  if (!prNumber) {
-    const url = run("gh", [
+  if (!releaseHeadSha) {
+    releaseHeadSha = run("gh", [
+      "api",
+      "--method",
+      "POST",
+      `repos/${repo}/git/commits`,
+      "-f",
+      `message=Promote exact deployed test ${approvedSha} to production`,
+      "-f",
+      `tree=${testTree}`,
+      "-f",
+      `parents[]=${auditedProductionSha}`,
+      "--jq",
+      ".sha",
+    ]);
+    run("gh", [
+      "api",
+      "--method",
+      "POST",
+      `repos/${repo}/git/refs`,
+      "-f",
+      `ref=refs/heads/${releaseBranch}`,
+      "-f",
+      `sha=${releaseHeadSha}`,
+    ]);
+  }
+  const releaseCommit = JSON.parse(
+    run("gh", ["api", `repos/${repo}/git/commits/${releaseHeadSha}`]),
+  );
+  const releaseParentShas = (releaseCommit.parents ?? []).map((parent) => parent.sha);
+  assertReleaseHead(
+    auditedProductionSha,
+    testTree,
+    releaseHeadSha,
+    releaseParentShas,
+    releaseCommit.tree?.sha,
+  );
+  const existingPrs = JSON.parse(
+    run("gh", [
       "pr",
-      "create",
+      "list",
       "--repo",
       repo,
       "--base",
       "main",
       "--head",
-      "test",
-      "--title",
-      `Promote deployed test ${approvedSha.slice(0, 7)} to production`,
-      "--body",
-      `Exact deployed test SHA: ${approvedSha}`,
-    ]);
-    prNumber = run("gh", [
-      "pr",
-      "view",
-      url,
-      "--repo",
-      repo,
+      releaseBranch,
+      "--state",
+      "all",
       "--json",
-      "number",
-      "--jq",
-      ".number",
-    ]);
-  }
-  run("gh", ["pr", "checks", prNumber, "--repo", repo, "--watch"]);
-  run("gh", ["pr", "merge", prNumber, "--repo", repo, "--merge"]);
-  const mainSha = run("gh", ["api", `repos/${repo}/commits/main`, "--jq", ".sha"]);
+      "number,state,headRefOid,baseRefOid,mergeCommit",
+    ]),
+  );
+  const existingPr =
+    existingPrs.find(
+      (candidate) =>
+        candidate.headRefOid === releaseHeadSha && candidate.state === "MERGED",
+    ) ??
+    existingPrs.find(
+      (candidate) =>
+        candidate.headRefOid === releaseHeadSha && candidate.state === "OPEN",
+    );
+  let prNumber = existingPr?.number ? String(existingPr.number) : "";
+  let mergeCommitSha =
+    existingPr &&
+    existingPr.state === "MERGED" &&
+    FULL_SHA.test(existingPr.mergeCommit?.oid ?? "")
+      ? existingPr.mergeCommit.oid
+      : "";
 
-  let runId = "";
-  for (let attempt = 0; attempt < 12 && !runId; attempt += 1) {
-    runId = run("gh", [
+  if (!mergeCommitSha) {
+    if (existingPr && existingPr.state !== "OPEN") {
+      throw new Error("Existing exact-tree promotion PR is not reusable");
+    }
+    if (!prNumber) {
+      const url = run("gh", [
+        "pr",
+        "create",
+        "--repo",
+        repo,
+        "--base",
+        "main",
+        "--head",
+        releaseBranch,
+        "--title",
+        `Promote exact deployed test ${approvedSha.slice(0, 7)} to production`,
+        "--body",
+        `Exact deployed test SHA: ${approvedSha}\nExact deployed test tree: ${testTree}`,
+      ]);
+      prNumber = run("gh", [
+        "pr",
+        "view",
+        url,
+        "--repo",
+        repo,
+        "--json",
+        "number",
+        "--jq",
+        ".number",
+      ]);
+    }
+    const prIdentity = JSON.parse(
+      run("gh", [
+        "pr",
+        "view",
+        prNumber,
+        "--repo",
+        repo,
+        "--json",
+        "headRefOid,baseRefOid",
+      ]),
+    );
+    if (prIdentity.headRefOid !== releaseHeadSha) {
+      throw new Error("PR head no longer matches verified exact-tree release head");
+    }
+    if (prIdentity.baseRefOid !== auditedProductionSha) {
+      throw new Error("PR base no longer matches audited production SHA");
+    }
+    const currentMainSha = run("gh", [
+      "api",
+      `repos/${repo}/git/refs/heads/main`,
+      "--jq",
+      ".object.sha",
+    ]);
+    if (currentMainSha !== auditedProductionSha) {
+      throw new Error("Main changed after production evidence was captured");
+    }
+
+    mergeCommitSha = run("gh", [
+      "api",
+      "--method",
+      "POST",
+      `repos/${repo}/git/commits`,
+      "-f",
+      `message=Promote exact deployed test ${approvedSha} to production`,
+      "-f",
+      `tree=${testTree}`,
+      "-f",
+      `parents[]=${auditedProductionSha}`,
+      "-f",
+      `parents[]=${releaseHeadSha}`,
+      "--jq",
+      ".sha",
+    ]);
+    const pendingMerge = JSON.parse(
+      run("gh", ["api", `repos/${repo}/git/commits/${mergeCommitSha}`]),
+    );
+    assertMergeIdentity(
+      auditedProductionSha,
+      releaseHeadSha,
+      testTree,
+      mergeCommitSha,
+      (pendingMerge.parents ?? []).map((parent) => parent.sha),
+      pendingMerge.tree?.sha,
+    );
+    run("gh", [
+      "api",
+      "--method",
+      "PATCH",
+      `repos/${repo}/git/refs/heads/main`,
+      "-f",
+      `sha=${mergeCommitSha}`,
+      "-F",
+      "force=false",
+    ]);
+    const updatedMainSha = run("gh", [
+      "api",
+      `repos/${repo}/git/refs/heads/main`,
+      "--jq",
+      ".object.sha",
+    ]);
+    if (updatedMainSha !== mergeCommitSha) {
+      throw new Error("Atomic main update did not land on the verified merge commit");
+    }
+  }
+
+  const mergeCommit = JSON.parse(
+    run("gh", ["api", `repos/${repo}/git/commits/${mergeCommitSha}`]),
+  );
+  const parentShas = (mergeCommit.parents ?? []).map((parent) => parent.sha);
+  const mergeTree = mergeCommit.tree?.sha;
+  assertMergeIdentity(
+    auditedProductionSha,
+    releaseHeadSha,
+    testTree,
+    mergeCommitSha,
+    parentShas,
+    mergeTree,
+  );
+
+  const currentMainSha = run("gh", [
+    "api",
+    `repos/${repo}/git/refs/heads/main`,
+    "--jq",
+    ".object.sha",
+  ]);
+  assertCurrentMain(mergeCommitSha, currentMainSha);
+
+  const liveBeforeDeploy = evaluateAudit(collectLiveEvidence(process.cwd()));
+  if (
+    liveBeforeDeploy.production.sha === mergeCommitSha &&
+    liveBeforeDeploy.production.parity &&
+    liveBeforeDeploy.production.cloudHealthy &&
+    liveBeforeDeploy.production.rtrda02Healthy
+  ) {
+    assertProductionRelease(mergeCommitSha, liveBeforeDeploy);
+    return {
+      prNumber,
+      mainSha: mergeCommitSha,
+      productionRunId: null,
+      productionAlreadyVerified: true,
+    };
+  }
+
+  const findProductionRun = () =>
+    run("gh", [
       "run",
       "list",
       "--repo",
       repo,
       "--workflow",
       "deploy-production.yml",
-      "--branch",
-      "main",
+      "--event",
+      "workflow_dispatch",
       "--limit",
       "20",
       "--json",
-      "databaseId,headSha",
+      "databaseId,displayTitle,status,conclusion",
       "--jq",
-      `.[] | select(.headSha == "${mainSha}") | .databaseId`,
+      selectProductionRunQuery(mergeCommitSha),
     ]).split("\n")[0];
-    if (!runId) run("sleep", ["5"]);
-  }
+
+  let runId = findProductionRun();
   if (!runId) {
     run("gh", [
       "workflow",
@@ -229,29 +650,20 @@ function executePromotion(approvedSha) {
       "--ref",
       "main",
       "-f",
-      `ref=${mainSha}`,
+      `ref=${mergeCommitSha}`,
     ]);
-    run("sleep", ["5"]);
-    runId = run("gh", [
-      "run",
-      "list",
-      "--repo",
-      repo,
-      "--workflow",
-      "deploy-production.yml",
-      "--limit",
-      "1",
-      "--json",
-      "databaseId",
-      "--jq",
-      ".[0].databaseId",
-    ]);
+    for (let attempt = 0; attempt < 12 && !runId; attempt += 1) {
+      runId = findProductionRun();
+      if (!runId) run("sleep", ["5"]);
+    }
   }
   if (!runId) throw new Error("Production workflow run was not created");
   execFileSync("gh", ["run", "watch", runId, "--repo", repo, "--exit-status"], {
     stdio: "inherit",
   });
-  return { prNumber, mainSha, productionRunId: runId };
+  const finalReport = evaluateAudit(collectLiveEvidence(process.cwd()));
+  assertProductionRelease(mergeCommitSha, finalReport);
+  return { prNumber, mainSha: mergeCommitSha, productionRunId: runId };
 }
 
 function main() {
@@ -276,17 +688,50 @@ function main() {
   const approvedSha = valueAfter(args, "--approved-sha");
   if (!FULL_SHA.test(approvedSha ?? ""))
     throw new Error("--approved-sha must be a full SHA");
-  if (!report.promotable)
+
+  let recovery = report.promotable ? null : inspectRecoveryState(approvedSha);
+  if (!report.promotable && !recovery)
     throw new Error(`Promotion blocked: ${report.blockers.join(", ")}`);
-  if (report.test.sha !== approvedSha)
+  if (recovery) assertRecoveryTargets(report, recovery);
+  if (report.promotable && report.test.sha !== approvedSha)
     throw new Error("Approved SHA does not match deployed test SHA");
 
   const commands = buildPromotionPlan(approvedSha);
   if (!args.includes("--execute")) {
-    console.log(JSON.stringify({ dryRun: true, approvedSha, commands }, null, 2));
+    console.log(
+      JSON.stringify(
+        { dryRun: true, approvedSha, recovery: Boolean(recovery), commands },
+        null,
+        2,
+      ),
+    );
     return;
   }
-  console.log(JSON.stringify(executePromotion(approvedSha), null, 2));
+  const liveReport = evaluateAudit(
+    collectLiveEvidence(valueAfter(args, "--repo") ?? process.cwd()),
+  );
+  if (!liveReport.promotable) {
+    recovery = inspectRecoveryState(approvedSha);
+    if (
+      !recovery ||
+      liveReport.test.sha !== approvedSha ||
+      liveReport.test.originTestSha !== approvedSha ||
+      !liveReport.test.healthy
+    ) {
+      throw new Error(`Promotion recovery blocked: ${liveReport.blockers.join(", ")}`);
+    }
+    assertRecoveryTargets(liveReport, recovery);
+  } else if (!recovery) {
+    assertLivePromotionState(report, liveReport, approvedSha);
+  }
+  const auditedProductionSha = recovery?.productionSha ?? report.production.sha;
+  console.log(
+    JSON.stringify(
+      executePromotion(approvedSha, auditedProductionSha, Boolean(recovery)),
+      null,
+      2,
+    ),
+  );
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {

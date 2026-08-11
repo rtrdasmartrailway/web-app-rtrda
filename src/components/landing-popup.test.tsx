@@ -1,4 +1,5 @@
-import { readFileSync } from "node:fs";
+import { readFileSync, statSync } from "node:fs";
+import { join } from "node:path";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import {
@@ -23,15 +24,23 @@ class MemoryStorage {
 }
 
 describe("LandingPopup", () => {
-  it("renders the royal tribute SVG popup at its portrait dimensions", () => {
+  it("renders an optimized royal tribute popup at its portrait dimensions", () => {
     const html = renderToStaticMarkup(<LandingPopup path="/" forceOpen />);
+    const source = readFileSync(new URL("./landing-popup.tsx", import.meta.url), "utf8");
 
-    expect(LANDING_POPUP_CONTENT.src).toBe("/wp-content/uploads/2026/07/ทรงพระเจริญ.svg");
+    expect(LANDING_POPUP_CONTENT.src).toBe(
+      "/wp-content/uploads/2026/07/ทรงพระเจริญ.webp",
+    );
     expect(LANDING_POPUP_CONTENT.width).toBe(1080);
     expect(LANDING_POPUP_CONTENT.height).toBe(1350);
+    expect(
+      statSync(join(process.cwd(), "public", LANDING_POPUP_CONTENT.src)).size,
+    ).toBeLessThan(600_000);
+    expect(source).not.toMatch(/^\s*priority\s*$/m);
+    expect(source).not.toMatch(/^\s*unoptimized\s*$/m);
     expect(html).toContain('role="dialog"');
     expect(html).toContain("landing-popup-image");
-    expect(html).toContain(LANDING_POPUP_CONTENT.src);
+    expect(html).toContain(encodeURIComponent(LANDING_POPUP_CONTENT.src));
     expect(html).toContain(LANDING_POPUP_CONTENT.alt);
     expect(html).toContain('width="1080"');
     expect(html).toContain('height="1350"');

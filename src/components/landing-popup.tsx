@@ -8,7 +8,7 @@ export const LANDING_POPUP_SESSION_KEY = "rtrda-landing-popup-86-dismissed";
 type PopupStorage = Pick<Storage, "getItem" | "setItem">;
 
 export const LANDING_POPUP_CONTENT = {
-  src: "/wp-content/uploads/2026/07/ทรงพระเจริญ.svg",
+  src: "/wp-content/uploads/2026/07/ทรงพระเจริญ.webp",
   alt: "ทรงพระเจริญ พระบาทสมเด็จพระเจ้าอยู่หัว",
   closeLabel: "ปิดหน้าต่าง",
   width: 1080,
@@ -133,10 +133,8 @@ export function LandingPopup({
           alt={LANDING_POPUP_CONTENT.alt}
           className="landing-popup-image"
           height={LANDING_POPUP_CONTENT.height}
-          priority
           sizes="(max-width: 680px) calc(100vw - 24px), 800px"
           src={LANDING_POPUP_CONTENT.src}
-          unoptimized
           width={LANDING_POPUP_CONTENT.width}
         />
       </article>

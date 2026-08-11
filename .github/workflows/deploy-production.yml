@@ -1,14 +1,12 @@
 name: Deploy rtrda.or.th production
+run-name: Deploy production ${{ inputs.ref }}
 
 on:
-  push:
-    branches:
-      - main
   workflow_dispatch:
     inputs:
       ref:
-        description: "Git ref/SHA to deploy (blank = pushed SHA / latest origin/main)"
-        required: false
+        description: "Exact verified main merge SHA to deploy"
+        required: true
         type: string
 
 concurrency:
@@ -37,14 +35,10 @@ jobs:
           fi
           cd "$SOURCE_PATH"
           git fetch origin main --prune
-          if [ -n "$INPUT_REF" ]; then
-            DEPLOY_SHA="$(git rev-parse "$INPUT_REF")"
-          elif [ "${GITHUB_EVENT_NAME}" = "push" ]; then
-            DEPLOY_SHA="${GITHUB_SHA}"
-          else
-            DEPLOY_SHA="$(git rev-parse origin/main)"
-          fi
-          git merge-base --is-ancestor "$DEPLOY_SHA" origin/main
+          test -n "$INPUT_REF"
+          DEPLOY_SHA="$(git rev-parse "$INPUT_REF")"
+          test "${#DEPLOY_SHA}" -eq 40
+          test "$DEPLOY_SHA" = "$(git rev-parse origin/main)"
           echo "deploy_sha=$DEPLOY_SHA" >> "$GITHUB_OUTPUT"
           echo "source_path=$SOURCE_PATH" >> "$GITHUB_OUTPUT"
           echo "Deploy SHA: $DEPLOY_SHA"
@@ -57,6 +51,7 @@ jobs:
           set -euo pipefail
           cd "$SOURCE_PATH"
           git fetch origin main test --prune
+          test "$DEPLOY_SHA" = "$(git rev-parse origin/main)"
           git checkout --detach "$DEPLOY_SHA"
           git reset --hard "$DEPLOY_SHA"
           git clean -fdx
@@ -106,10 +101,13 @@ jobs:
       - name: Deploy exact main SHA to cloud primary
         env:
           SOURCE_PATH: ${{ steps.resolve.outputs.source_path }}
+          DEPLOY_SHA: ${{ steps.resolve.outputs.deploy_sha }}
           GITHUB_SHA: ${{ steps.resolve.outputs.deploy_sha }}
         run: |
           set -euo pipefail
           cd "$SOURCE_PATH"
+          git fetch origin main --prune
+          test "$DEPLOY_SHA" = "$(git rev-parse origin/main)"
           chmod +x .github/scripts/deploy-preprod-target.sh
           SOURCE_PATH="$SOURCE_PATH" \
           TARGET_NAME=cloud \

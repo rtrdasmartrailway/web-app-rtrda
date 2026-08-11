@@ -20,7 +20,8 @@ The report is promotable only when all conditions are true:
    `org.opencontainers.image.revision` SHA label.
 2. That deployed SHA equals `origin/test`; commits merely present in the DGT
    worktree are ignored.
-3. Test health passes.
+3. Local and public Test health pass (`127.0.0.1:3020` and
+   `https://test.rtrda.or.th/healthz`).
 4. Cloud primary Git SHA equals its release marker.
 5. RTRDA02 fallback Git SHA equals its release marker.
 6. Cloud and RTRDA02 are healthy and on the same production SHA.
@@ -58,9 +59,24 @@ node scripts/rtrda-release-worker.mjs promote \
   --execute
 ```
 
-The worker creates/reuses the `test -> main` PR, waits for checks, merge-promotes
-to `main`, and watches `deploy-production.yml`. The production workflow deploys
-the same merged main SHA to both:
+The worker creates or reuses `release/exact-<TEST_SHA>` with the audited
+Production SHA as its only parent and the exact deployed Test tree. Before any
+GitHub mutation, it validates the approved SHA in a clean detached worktree
+(`npm ci`, Prisma generation, tests, lint, typecheck, format, security audit, and
+build), then rechecks deployed Test, `origin/test`, and Production parity before
+any GitHub mutation. It then opens a review PR, creates and verifies the
+two-parent merge commit, and updates `main` with GitHub's non-force atomic
+fast-forward API. A
+concurrent `main` change therefore fails before mutation. The worker verifies
+the merge parents/tree before manually dispatching `deploy-production.yml` for
+the exact merge SHA. Retries finish immediately only when live Production
+markers and direct health already match the merge; otherwise they reuse an
+in-flight exact run or dispatch a new one. Historical successful runs are not
+accepted as proof of current deployment, and historical ancestors are never
+accepted as implicit rollbacks.
+
+The production workflow has no `push` trigger. It accepts only an explicit,
+required SHA and deploys that same verified release to both:
 
 - Cloud primary: `100.77.64.92:3021`
 - RTRDA02 on-premise fallback/redundant: `100.91.174.121:3021`

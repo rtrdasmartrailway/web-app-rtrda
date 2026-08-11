@@ -16,8 +16,17 @@ const deployRemoteScript = readFileSync(
 );
 
 describe("Deploy rtrda.or.th production workflow", () => {
-  it("deploys production only from main to cloud primary and rtrda02 fallback", () => {
-    expect(workflow).toContain("branches:\n      - main");
+  it("deploys only an explicitly dispatched main SHA to cloud primary and rtrda02 fallback", () => {
+    expect(workflow).toContain("workflow_dispatch:");
+    expect(workflow).not.toContain("  push:");
+    expect(workflow).toContain("required: true");
+    expect(workflow).toContain('test -n "$INPUT_REF"');
+    expect(
+      workflow.match(/test "\$DEPLOY_SHA" = "\$\(git rev-parse origin\/main\)"/g),
+    ).toHaveLength(3);
+    expect(workflow).not.toContain(
+      'git merge-base --is-ancestor "$DEPLOY_SHA" origin/main',
+    );
     expect(workflow).toContain("TARGET_NAME=cloud");
     expect(workflow).toContain("TARGET_NAME=rtrda02");
     expect(workflow).toContain("http://100.77.64.92:3021/healthz");
