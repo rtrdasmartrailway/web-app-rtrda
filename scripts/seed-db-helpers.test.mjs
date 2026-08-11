@@ -105,7 +105,7 @@ describe("manifestToRows", () => {
   const rows = manifestToRows(manifest);
 
   it("maps records, coercing wpId to string and defaulting optional fields", () => {
-    expect(rows.records).toHaveLength(11);
+    expect(rows.records).toHaveLength(12);
     const [page, post] = rows.records;
     expect(page).toMatchObject({
       id: "th-page-1",
@@ -301,7 +301,10 @@ describe("manifestToRows", () => {
       rowsWithCategory.categories.find(
         (category) => category.id === 7 && category.language === "th",
       )?.count,
-    ).toBe(10);
+    ).toBe(11);
+    expect(category?.contentHtml).toContain(
+      "สทร. ผนึกพันธมิตร ปูทางผู้ประกอบการไทยสู่มาตรฐาน EN 15085",
+    );
     expect(category?.contentHtml).toContain("Siamese Train");
     expect(category?.contentHtml).toContain("Incubation Team");
   });
