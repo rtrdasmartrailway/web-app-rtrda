@@ -3,16 +3,16 @@
 import Image from "next/image";
 import { useCallback, useEffect, useRef, useState } from "react";
 
-export const LANDING_POPUP_SESSION_KEY = "rtrda-landing-popup-86-dismissed";
+export const LANDING_POPUP_SESSION_KEY = "rtrda-landing-popup-mothers-day-2569-dismissed";
 
 type PopupStorage = Pick<Storage, "getItem" | "setItem">;
 
 export const LANDING_POPUP_CONTENT = {
-  src: "/wp-content/uploads/2026/07/ทรงพระเจริญ.webp",
-  alt: "ทรงพระเจริญ พระบาทสมเด็จพระเจ้าอยู่หัว",
+  src: "/wp-content/uploads/2026/07/วันแม่แห่งชาติ-12-สิงหาคม-2569-v2.webp",
+  alt: "ทรงพระเจริญ เนื่องในโอกาสวันเฉลิมพระชนมพรรษา สมเด็จพระนางเจ้าสิริกิติ์ พระบรมราชชนนีพันปีหลวง 12 สิงหาคม 2569",
   closeLabel: "ปิดหน้าต่าง",
   width: 1080,
-  height: 1350,
+  height: 1080,
 } as const;
 
 export function isPublicLandingPopupPath(path: string): boolean {

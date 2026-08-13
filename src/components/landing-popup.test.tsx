@@ -24,15 +24,15 @@ class MemoryStorage {
 }
 
 describe("LandingPopup", () => {
-  it("renders an optimized royal tribute popup at its portrait dimensions", () => {
+  it("renders an optimized Mother's Day royal tribute popup at its square dimensions", () => {
     const html = renderToStaticMarkup(<LandingPopup path="/" forceOpen />);
     const source = readFileSync(new URL("./landing-popup.tsx", import.meta.url), "utf8");
 
     expect(LANDING_POPUP_CONTENT.src).toBe(
-      "/wp-content/uploads/2026/07/ทรงพระเจริญ.webp",
+      "/wp-content/uploads/2026/07/วันแม่แห่งชาติ-12-สิงหาคม-2569-v2.webp",
     );
     expect(LANDING_POPUP_CONTENT.width).toBe(1080);
-    expect(LANDING_POPUP_CONTENT.height).toBe(1350);
+    expect(LANDING_POPUP_CONTENT.height).toBe(1080);
     expect(
       statSync(join(process.cwd(), "public", LANDING_POPUP_CONTENT.src)).size,
     ).toBeLessThan(600_000);
@@ -43,11 +43,11 @@ describe("LandingPopup", () => {
     expect(html).toContain(encodeURIComponent(LANDING_POPUP_CONTENT.src));
     expect(html).toContain(LANDING_POPUP_CONTENT.alt);
     expect(html).toContain('width="1080"');
-    expect(html).toContain('height="1350"');
-    expect(html).not.toContain("อินโฟภายนอก-11-2-1024x1024.png");
+    expect(html).toContain('height="1080"');
+    expect(html).not.toContain("ทรงพระเจริญ.webp");
   });
 
-  it("constrains the portrait popup inside desktop and mobile viewports", () => {
+  it("constrains the square popup inside desktop and mobile viewports", () => {
     const css = readFileSync(new URL("../app/globals.css", import.meta.url), "utf8");
     const modalRule = css.match(/\.landing-popup-modal\s*\{([^}]*)\}/)?.[1] ?? "";
 
@@ -77,8 +77,10 @@ describe("LandingPopup", () => {
 });
 
 describe("landing popup session storage", () => {
-  it("uses a fresh dismissal key for the royal tribute campaign", () => {
-    expect(LANDING_POPUP_SESSION_KEY).toBe("rtrda-landing-popup-86-dismissed");
+  it("uses a fresh dismissal key for the Mother's Day campaign", () => {
+    expect(LANDING_POPUP_SESSION_KEY).toBe(
+      "rtrda-landing-popup-mothers-day-2569-dismissed",
+    );
   });
 
   it("shows until dismissed for the current session", () => {
@@ -90,12 +92,12 @@ describe("landing popup session storage", () => {
     expect(shouldShowLandingPopup(storage)).toBe(false);
   });
 
-  it("ignores the legacy biography popup dismissal key", () => {
+  it("ignores the previous royal tribute popup dismissal key", () => {
     const storage = new MemoryStorage();
 
-    storage.setItem("rtrda-landing-popup-dismissed", "1");
+    storage.setItem("rtrda-landing-popup-86-dismissed", "1");
 
-    expect(LANDING_POPUP_SESSION_KEY).not.toBe("rtrda-landing-popup-dismissed");
+    expect(LANDING_POPUP_SESSION_KEY).not.toBe("rtrda-landing-popup-86-dismissed");
     expect(shouldShowLandingPopup(storage)).toBe(true);
   });
 });

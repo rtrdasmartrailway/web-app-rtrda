@@ -24,7 +24,9 @@ describe("Deploy test.rtrda.or.th workflow", () => {
 
   it("includes the tracked popup asset in the Docker build context", () => {
     expect(dockerIgnore).toContain("!public/wp-content/uploads/2026/07/");
-    expect(dockerIgnore).toContain("!public/wp-content/uploads/2026/07/ทรงพระเจริญ.webp");
+    expect(dockerIgnore).toContain(
+      "!public/wp-content/uploads/2026/07/วันแม่แห่งชาติ-12-สิงหาคม-2569-v2.webp",
+    );
   });
 
   it("labels the running container with the exact pushed SHA", () => {
