@@ -105,7 +105,7 @@ describe("manifestToRows", () => {
   const rows = manifestToRows(manifest);
 
   it("maps records, coercing wpId to string and defaulting optional fields", () => {
-    expect(rows.records).toHaveLength(13);
+    expect(rows.records).toHaveLength(14);
     const [page, post] = rows.records;
     expect(page).toMatchObject({
       id: "th-page-1",
@@ -256,11 +256,24 @@ describe("manifestToRows", () => {
     });
     expect(officialNews.contentHtml.match(/wp-block-image/g)).toHaveLength(5);
 
-    const officialMedia = rows.media.filter((asset) =>
-      ["91109", "91110", "91111", "91112", "91113"].includes(asset.id),
+    const techToTrackNews = rows.records.find(
+      (record) => record.id === "th-post-tech-to-track-140869",
     );
-    expect(officialMedia).toHaveLength(5);
-    expect(new Set(officialMedia.map((asset) => asset.localPath)).size).toBe(5);
+    expect(techToTrackNews).toMatchObject({
+      date: "2026-08-14T09:00:00",
+      featuredMediaId: 91114,
+      path: "/พิพัฒน์-ต่อยอด-mou-tech-to-track-เร่งเทคโนโลยีไทยลงราง",
+    });
+    expect(techToTrackNews?.contentHtml).toContain("Tech to Track");
+    expect(techToTrackNews?.contentHtml).toContain(
+      "/wp-content/uploads/news-2569/tech-to-track-140869/tech-to-track-140869.png",
+    );
+
+    const officialMedia = rows.media.filter((asset) =>
+      ["91109", "91110", "91111", "91112", "91113", "91114"].includes(asset.id),
+    );
+    expect(officialMedia).toHaveLength(6);
+    expect(new Set(officialMedia.map((asset) => asset.localPath)).size).toBe(6);
     expect(officialMedia).toEqual(
       expect.arrayContaining(
         ["91109", "91110", "91111", "91112", "91113"].map((id) =>
@@ -272,6 +285,14 @@ describe("manifestToRows", () => {
           }),
         ),
       ),
+    );
+    expect(officialMedia).toContainEqual(
+      expect.objectContaining({
+        id: "91114",
+        width: 1680,
+        height: 940,
+        mimeType: "image/png",
+      }),
     );
 
     const restoredMedia = rows.media.filter((asset) =>
@@ -349,6 +370,9 @@ describe("manifestToRows", () => {
     expect(category?.contentHtml).toContain(
       "/สทร-ร่วมประกาศเจตนารมณ์-no-gift-policy-2569",
     );
+    expect(category?.contentHtml).toContain(
+      "/พิพัฒน์-ต่อยอด-mou-tech-to-track-เร่งเทคโนโลยีไทยลงราง",
+    );
     expect(category?.contentHtml).toContain("No Gift Policy");
     expect(category?.contentHtml.indexOf("no-gift-policy-2569")).toBeLessThan(
       category?.contentHtml.indexOf("/existing-news") ?? Number.POSITIVE_INFINITY,
@@ -357,7 +381,10 @@ describe("manifestToRows", () => {
       rowsWithCategory.categories.find(
         (category) => category.id === 7 && category.language === "th",
       )?.count,
-    ).toBe(11);
+    ).toBe(12);
+    expect(category?.contentHtml.indexOf("tech-to-track")).toBeLessThan(
+      category?.contentHtml.indexOf("มาตรฐาน EN 15085") ?? Number.POSITIVE_INFINITY,
+    );
     expect(category?.contentHtml).toContain(
       "สทร. ผนึกพันธมิตร ปูทางผู้ประกอบการไทยสู่มาตรฐาน EN 15085",
     );
