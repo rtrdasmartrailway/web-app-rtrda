@@ -1,13 +1,8 @@
-import os, urllib.request, json
+import urllib.request, json
+from pathlib import Path
 
-env_lines = open('/srv/workspace/hermes/.env').readlines()
-for line in env_lines:
-    line = line.strip()
-    if line and not line.startswith('#') and '=' in line:
-        k, v = line.split('=', 1)
-        os.environ[k] = v
-
-token = os.environ['GITHUB_FINE_GRAINS_TOKEN']
+TOKEN_FILE = Path('/home/rtrda-dgt/.hermes/credentials/RTRDA_GITHUN_FINE_GRAINED_TOKEN')
+token = TOKEN_FILE.read_text().strip()
 runs = json.load(urllib.request.urlopen(urllib.request.Request(
     'https://api.github.com/repos/rtrdasmartrailway/web-app-rtrda/actions/runs?branch=test&per_page=3',
     headers={'Authorization': f'Bearer {token}', 'Accept': 'application/vnd.github+json'}

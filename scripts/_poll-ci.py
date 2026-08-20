@@ -1,6 +1,9 @@
 
-import urllib.request, json, time, os, base64
-token = os.environ['GITHUB_FINE_GRAINS_TOKEN']
+import urllib.request, json, time
+from pathlib import Path
+
+TOKEN_FILE = Path('/home/rtrda-dgt/.hermes/credentials/RTRDA_GITHUN_FINE_GRAINED_TOKEN')
+token = TOKEN_FILE.read_text().strip()
 for i in range(15):
     time.sleep(20)
     req = urllib.request.Request(
