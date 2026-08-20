@@ -101,7 +101,7 @@ describe("applyProcurementTableOverrides", () => {
     );
   });
 
-  it("adds the July winner rows to the winner price table and numbers bottom-up", () => {
+  it("adds the August and July winner rows to the winner price table and numbers bottom-up", () => {
     const source = record(
       "/จัดซื้อจัดจ้าง/ประกาศผลผู้ชนะการเสนอร",
       yearTableHtml(
@@ -112,6 +112,7 @@ describe("applyProcurementTableOverrides", () => {
     const updatedRows = rows(updated.contentHtml);
 
     expect(updatedRows.map((row) => row[0])).toEqual([
+      "9",
       "8",
       "7",
       "6",
@@ -121,22 +122,28 @@ describe("applyProcurementTableOverrides", () => {
       "2",
       "1",
     ]);
-    expect(updatedRows[0]?.[1]).toBe("21 กรกฎาคม 2569");
-    expect(updatedRows[0]?.[2]).toContain("Siamese Train");
-    expect(updatedRows[0]?.[3]).toBe("21,000,000.00");
-    expect(updatedRows[1]?.[1]).toBe("17 กรกฎาคม 2569");
-    expect(updatedRows[1]?.[2]).toContain("International Engineering Expo 2026");
-    expect(updatedRows[1]?.[3]).toBe("160,500.00");
-    expect(updatedRows[2]?.[2]).toContain("ทรัพย์สินทางปัญญาของสถาบัน");
-    expect(updatedRows[2]?.[3]).toBe("4,300,000.00");
-    expect(updatedRows[3]?.[2]).toContain("จัดทำของที่ระลึก");
-    expect(updatedRows[3]?.[3]).toBe("249,738.00");
-    expect(updatedRows[4]?.[2]).toContain("National Rolling Stock Company");
-    expect(updatedRows[4]?.[3]).toBe("7,950,000.00");
-    expect(updatedRows[5]?.[2]).toContain("จัดจ้างงานออกแบบและพิมพ์รายงานประจำปี 2568");
-    expect(updatedRows[5]?.[3]).toBe("342,400.00");
-    expect(updatedRows[6]?.[2]).toContain("Infrastructure Enhancement");
-    expect(updatedRows[6]?.[3]).toBe("11,354,305.00");
+    expect(updatedRows[0]?.[1]).toBe("19 สิงหาคม 2569");
+    expect(updatedRows[0]?.[2]).toContain("งานจ้างที่ปรึกษาโครงการส่งเสริมการแข่งขัน");
+    expect(updatedRows[0]?.[3]).toBe("900,000.00");
+    expect(updatedRows[1]?.[1]).toBe("21 กรกฎาคม 2569");
+    expect(updatedRows[1]?.[2]).toContain("Siamese Train");
+    expect(updatedRows[1]?.[3]).toBe("21,000,000.00");
+    expect(updatedRows[2]?.[1]).toBe("17 กรกฎาคม 2569");
+    expect(updatedRows[2]?.[2]).toContain("International Engineering Expo 2026");
+    expect(updatedRows[2]?.[3]).toBe("160,500.00");
+    expect(updatedRows[3]?.[2]).toContain("ทรัพย์สินทางปัญญาของสถาบัน");
+    expect(updatedRows[3]?.[3]).toBe("4,300,000.00");
+    expect(updatedRows[4]?.[2]).toContain("จัดทำของที่ระลึก");
+    expect(updatedRows[4]?.[3]).toBe("249,738.00");
+    expect(updatedRows[5]?.[2]).toContain("National Rolling Stock Company");
+    expect(updatedRows[5]?.[3]).toBe("7,950,000.00");
+    expect(updatedRows[6]?.[2]).toContain("จัดจ้างงานออกแบบและพิมพ์รายงานประจำปี 2568");
+    expect(updatedRows[6]?.[3]).toBe("342,400.00");
+    expect(updatedRows[7]?.[2]).toContain("Infrastructure Enhancement");
+    expect(updatedRows[7]?.[3]).toBe("11,354,305.00");
+    expect(updated.contentHtml).toContain(
+      "/wp-content/uploads/2026/08/procurement-winner-rail-competition-consultant-25690819.pdf",
+    );
     expect(updated.contentHtml).toContain(
       "/wp-content/uploads/2026/07/procurement-winner-consultant-ip-management-25690708.pdf",
     );
@@ -165,6 +172,7 @@ describe("applyProcurementTableOverrides", () => {
     const updatedRows = rows(applyProcurementTableOverrides(source).contentHtml);
 
     expect(updatedRows.map((row) => row[0])).toEqual([
+      "10",
       "9",
       "8",
       "7",
@@ -175,16 +183,17 @@ describe("applyProcurementTableOverrides", () => {
       "2",
       "1",
     ]);
-    expect(updatedRows[0]?.[1]).toBe("21 กรกฎาคม 2569");
-    expect(updatedRows[1]?.[1]).toBe("17 กรกฎาคม 2569");
-    expect(updatedRows[2]?.[1]).toBe("10 กรกฎาคม 2569");
-    expect(updatedRows[2]?.[2]).toContain("จ้างเหมาบริการจัดงานพิธีทำบุญวันสถาปนา");
-    expect(updatedRows.slice(3, 6).map((row) => row[1])).toEqual([
+    expect(updatedRows[0]?.[1]).toBe("19 สิงหาคม 2569");
+    expect(updatedRows[1]?.[1]).toBe("21 กรกฎาคม 2569");
+    expect(updatedRows[2]?.[1]).toBe("17 กรกฎาคม 2569");
+    expect(updatedRows[3]?.[1]).toBe("10 กรกฎาคม 2569");
+    expect(updatedRows[3]?.[2]).toContain("จ้างเหมาบริการจัดงานพิธีทำบุญวันสถาปนา");
+    expect(updatedRows.slice(4, 7).map((row) => row[1])).toEqual([
       "8 กรกฎาคม 2569",
       "8 กรกฎาคม 2569",
       "8 กรกฎาคม 2569",
     ]);
-    expect(updatedRows[6]?.[1]).toBe("7 กรกฎาคม 2569");
+    expect(updatedRows[7]?.[1]).toBe("7 กรกฎาคม 2569");
   });
 
   it("prepends rail component standards using the shared rail card format", () => {
