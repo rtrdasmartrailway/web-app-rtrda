@@ -234,18 +234,6 @@ const railWeldingDocuments = [
     previewHref: "/3d-flip-book/ct-6002_6004_2568",
     downloadHref: "/sdc_download/7163",
   },
-  {
-    title: "สทร-RS-6001-2568",
-    image: uploadFile("2026/07/rtrda-rs-6001-2568.png"),
-    previewHref: "/3d-flip-book/สทร-rs-6001-2568",
-    downloadHref: uploadFile("2025/12/สทร-RS-6001-2568.pdf"),
-  },
-  {
-    title: "สทร-RS-6002-2568",
-    image: uploadFile("2026/07/rtrda-rs-6002-2568.png"),
-    previewHref: "/3d-flip-book/สทร-rs-6002-2568",
-    downloadHref: uploadFile("2025/12/สทร-RS-6002-2568.pdf"),
-  },
 ];
 
 const otherRailStandardDocuments = [
@@ -869,6 +857,12 @@ function applyRailStandardsTables(record: WpContentRecord): WpContentRecord {
   return { ...record, contentHtml: $.html() };
 }
 
+function closeRailStandardsAccordions(record: WpContentRecord): WpContentRecord {
+  const $ = cheerio.load(record.contentHtml, null, false);
+  $("details").removeAttr("open");
+  return { ...record, contentHtml: $.html() };
+}
+
 export function applyProcurementTableOverrides(record: WpContentRecord): WpContentRecord {
   const path = normalized(record.path);
   if (path === QUARTERLY_WINNER_PATH || path === `/en${QUARTERLY_WINNER_PATH}`) {
@@ -887,17 +881,19 @@ export function applyProcurementTableOverrides(record: WpContentRecord): WpConte
     return applyEmptyCancelWinnerTable(record);
   }
   if (path === RAIL_STANDARDS_PATH || path === `/en${RAIL_STANDARDS_PATH}`) {
-    return applyRailStandardsTables(
-      applyRailDocumentCards(
+    return closeRailStandardsAccordions(
+      applyRailStandardsTables(
         applyRailDocumentCards(
-          applyRailComponentStandards(record),
-          "มาตรฐานงานเชื่อม",
-          "rtrda-rail-welding-files",
-          railWeldingDocuments,
+          applyRailDocumentCards(
+            applyRailComponentStandards(record),
+            "มาตรฐานงานเชื่อม",
+            "rtrda-rail-welding-files",
+            railWeldingDocuments,
+          ),
+          "อื่นๆ",
+          "rtrda-other-rail-standard-files",
+          otherRailStandardDocuments,
         ),
-        "อื่นๆ",
-        "rtrda-other-rail-standard-files",
-        otherRailStandardDocuments,
       ),
     );
   }

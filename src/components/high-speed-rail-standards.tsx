@@ -8,7 +8,7 @@ import {
 function HighSpeedRailStandardsSection() {
   return (
     <div className="lightweight-accordion has-text-color">
-      <details open>
+      <details>
         <summary className="lightweight-accordion-title" style={{ color: "#003471" }}>
           <span>
             <strong>มาตรฐานโครงการรถไฟความเร็วสูง</strong>
