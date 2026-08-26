@@ -248,7 +248,7 @@ describe("applyProcurementTableOverrides", () => {
   it("replaces incomplete welding and other standard cards with complete document cards", () => {
     const source = record(
       "/มาตรฐานระบบราง-สทร",
-      `<div class="lightweight-accordion"><details><summary class="lightweight-accordion-title"><strong>มาตรฐานงานเชื่อม</strong></summary><div class="lightweight-accordion-body"><p>–</p></div></details></div><div class="lightweight-accordion"><details><summary class="lightweight-accordion-title"><strong>อื่นๆ</strong></summary><div class="lightweight-accordion-body"><p>–</p></div></details></div>`,
+      `<div class="lightweight-accordion"><details open><summary class="lightweight-accordion-title"><strong>มาตรฐานงานเชื่อม</strong></summary><div class="lightweight-accordion-body"><p>–</p></div></details></div><div class="lightweight-accordion"><details open><summary class="lightweight-accordion-title"><strong>อื่นๆ</strong></summary><div class="lightweight-accordion-body"><p>–</p></div></details></div>`,
     );
     const updated = applyProcurementTableOverrides(source);
     const $ = cheerio.load(updated.contentHtml, null, false);
@@ -256,7 +256,7 @@ describe("applyProcurementTableOverrides", () => {
     const other = $(".rtrda-other-rail-standard-files");
 
     expect(welding.hasClass("wp-block-columns")).toBe(true);
-    expect(welding.find(".wp-block-column")).toHaveLength(5);
+    expect(welding.find(".wp-block-column")).toHaveLength(3);
     expect(
       welding
         .find("h6")
@@ -266,22 +266,10 @@ describe("applyProcurementTableOverrides", () => {
       "มาตรฐานแนะนำการเชื่อมซ่อมผิวหัวรางด้วยการเชื่อมอาร์ก",
       "มาตรฐานการทดสอบเพื่อรับรองการเชื่อมซ่อมผิวหัวรางด้วยการเชื่อมอาร์ก",
       "ชุดมาตรฐานการทดสอบโดยไม่ทำลายบนรอยเชื่อมรางรถไฟ",
-      "สทร-RS-6001-2568",
-      "สทร-RS-6002-2568",
     ]);
-    expect(
-      welding
-        .find("img")
-        .toArray()
-        .map((image) => $(image).attr("src")),
-    ).toContain("/wp-content/uploads/2026/07/rtrda-rs-6001-2568.png");
-    expect(
-      welding
-        .find("a")
-        .filter((_, link) => $(link).text() === "อ่านเพิ่มเติม")
-        .last()
-        .attr("href"),
-    ).toBe("/3d-flip-book/สทร-rs-6002-2568");
+    expect(welding.text()).not.toContain("สทร-RS-6001-2568");
+    expect(welding.text()).not.toContain("สทร-RS-6002-2568");
+    expect($("details[open]")).toHaveLength(0);
     expect(other.find(".wp-block-column")).toHaveLength(1);
     expect(other.hasClass("rtrda-rail-standards-files--single")).toBe(true);
     expect(other.find("h6").text()).toBe("รายงานการพัฒนามาตรฐานระบบราง");
