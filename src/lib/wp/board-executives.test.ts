@@ -68,6 +68,19 @@ describe("board executive parser", () => {
     expect(english?.html).not.toContain("เนติบัณฑิตไทย");
   });
 
+  it("selects Thai and English content for Pisit's popup", () => {
+    const thai = getBoardExecutiveDetailByName("ผศ. พิศิษฐ์ แสง-ชูโต", "th");
+    const english = getBoardExecutiveDetailByName("Asst. Prof. Pisit Saeng-Xuto", "en");
+
+    expect(thai?.html).toContain("ประธานสาขาวิศวกรรมอุตสาหการ");
+    expect(thai?.html).toContain(
+      "กรรมการบริหารกองทุนสมเด็จพระบรมโอรสาธิราชสยามมกุฎราชกุมาร",
+    );
+    expect(english?.html).toContain("Directorships and Committees");
+    expect(english?.html).toContain("Director, e-Testing Bureau");
+    expect(english?.html).not.toContain("ประธานสาขาวิศวกรรมอุตสาหการ");
+  });
+
   it("detects the Thai and English board executive routes", () => {
     expect(isBoardExecutivePath("/เกี่ยวกับ-สทร/คณะกรรมการ-ผู้บริหาร")).toBe(true);
     expect(isBoardExecutivePath("/en/เกี่ยวกับ-สทร/คณะกรรมการ-ผู้บริหาร")).toBe(true);
