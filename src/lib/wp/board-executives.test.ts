@@ -57,6 +57,17 @@ describe("board executive parser", () => {
     expect(english?.html).not.toContain("วิศวกรรมสาธารณสุขเขตร้อน");
   });
 
+  it("selects Thai and English content for Chanchao's popup", () => {
+    const thai = getBoardExecutiveDetailByName("ชาญเชาวน์ ไชยานุกิจ", "th");
+    const english = getBoardExecutiveDetailByName("ชาญเชาวน์ ไชยานุกิจ", "en");
+
+    expect(thai?.html).toContain("เนติบัณฑิตไทย");
+    expect(thai?.html).toContain("กรมคุมประพฤติ");
+    expect(english?.html).toContain("Thai Barrister-at-Law");
+    expect(english?.html).toContain("Director General, Department of Probation");
+    expect(english?.html).not.toContain("เนติบัณฑิตไทย");
+  });
+
   it("detects the Thai and English board executive routes", () => {
     expect(isBoardExecutivePath("/เกี่ยวกับ-สทร/คณะกรรมการ-ผู้บริหาร")).toBe(true);
     expect(isBoardExecutivePath("/en/เกี่ยวกับ-สทร/คณะกรรมการ-ผู้บริหาร")).toBe(true);

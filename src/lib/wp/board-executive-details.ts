@@ -31,6 +31,14 @@ const DETAILS: BoardExecutiveDetailDefinition[] = [
     },
   },
   {
+    trigger: "chanchao",
+    name: "ชาญเชาวน์ ไชยานุกิจ",
+    html: {
+      th: "<header><h2>ชาญเชาวน์ ไชยานุกิจ</h2></header><h3><strong>ประวัติการศึกษา</strong></h3><ul><li>ปริญญาโท LL.M. (International and Comparatives Laws) โดยทุนรัฐบาล (ก.พ.), University of Iowa</li><li>ปริญญาโท LL.M. (International Legal Studies) โดยทุนรัฐบาล (ก.พ.), The American University</li><li>เนติบัณฑิตไทย</li><li>ปริญญาตรี นิติศาสตร์บัณฑิต (เกียรตินิยมอันดับสอง) มหาวิทยาลัยธรรมศาสตร์</li></ul><h3><strong>ประสบการณ์ทำงาน</strong></h3><ul><li>อธิบดี กรมคุ้มครองสิทธิและเสรีภาพ กระทรวงยุติธรรม</li><li>อธิบดี กรมคุมประพฤติ กระทรวงยุติธรรม</li><li>รองปลัด กระทรวงยุติธรรม</li><li>ปลัดกระทรวงยุติธรรม</li><li>คณะกรรมการจัดทำยุทธศาสตร์ชาติ</li><li>คณะกรรมการปฏิรูปประเทศด้านการยุติธรรม</li></ul>",
+      en: "<header><h2>ชาญเชาวน์ ไชยานุกิจ</h2></header><h3><strong>Education</strong></h3><ul><li>LL.M. (International and Comparatives Laws), University of Iowa</li><li>LL.M. (International Legal Studies), The American University</li><li>Thai Barrister-at-Law</li><li>Bachelor of Laws (Honors), Thammasat University</li></ul><h3><strong>Experience</strong></h3><ul><li>Director General, Rights and Liberties Protection Department</li><li>Director General, Department of Probation</li><li>Deputy Permanent Secretary, Ministry of Justice</li><li>Permanent Secretary, Ministry of Justice</li><li>National Strategy Drafting Committee</li><li>National Reform Committee on Justice</li></ul>",
+    },
+  },
+  {
     trigger: "tayakon",
     name: "ดร.ทยากร จันทรางศุ",
     html: "<header>\n<div>\n<div>\n<h2>ดร.ทยากร จันทรางศุ</h2>\n</div>\n\n</div>\n</header>\n<div>\n<div>\n<div><h3><strong>การศึกษา</strong></h3>\n<ul>\n<li>2553 ปริญญาเอก สาขาวิชาวิศวกรรมโยธา มหาวิทยาลัยซิดนีย์ ออสเตรเลีย</li>\n<li>2548 ปริญญาโท สาขาวิชาวิศวกรรมโยธา มหาวิทยาลัยสแตนฟอร์ด สหรัฐอเมริกา</li>\n<li>2546 ปริญญาตรี สาขาวิชาวิศวกรรมโยธา มหาวิทยาลัยวิสคอนซิน แมดิสัน สหรัฐอเมริกา</li>\n<li>2558 ปริญญาตรี สาขานิติศาสตรบัณฑิต (เกียรตินิยมอันดับ 2) จุฬาลงกรณ์มหาวิทยาลัย</li>\n</ul>\n<h3><strong>ประสบการณ์การทำงาน</strong></h3>\n<ul>\n<li>2563 – ปัจจุบัน ผู้อำนวยการกองมาตรฐานความปลอดภัยและบำรุงทาง กรมการขนส่งทางราง กระทรวงคมนาคม</li>\n<li>2554 - 2563 วิศวกรโยธา/หัวหน้าศูนย์วิจัยและพัฒนาอาคาร สำนักควบคุมและตรวจสอบอาคาร กรมโยธาธิการและผังเมือง กระทรวงมหาดไทย</li>\n</ul>\n<h3><strong>ประวัติด้านกรรมการ/อนุกรรมการ/ที่ปรึกษา</strong></h3>\n<ul>\n<li>2565 – ปัจจุบัน กรรมการ คณะกรรมการดำเนินการร่วมมือและประสานงานเกี่ยวกับเทคโนโลยีระบบราง สถาบันวิจัยและพัฒนาเทคโนโลยีระบบราง (องค์การมหาชน) กระทรวงคมนาคม</li>\n</ul>\n</div>\n\n\n</div>\n</div>",
