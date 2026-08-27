@@ -17,6 +17,7 @@ import {
   buildBoardExecutivePresentation,
   isBoardExecutivePath,
 } from "./board-executives";
+import { getBoardExecutiveDetailByTrigger } from "./board-executive-details";
 
 async function boardRecord(path = "/เกี่ยวกับ-สทร/คณะกรรมการ-ผู้บริหาร") {
   const manifest = JSON.parse(
@@ -28,6 +29,17 @@ async function boardRecord(path = "/เกี่ยวกับ-สทร/คณ
 }
 
 describe("board executive parser", () => {
+  it("selects Thai and English content for Chotichai's popup", () => {
+    const thai = getBoardExecutiveDetailByTrigger("chotchai", "th");
+    const english = getBoardExecutiveDetailByTrigger("chotchai", "en");
+
+    expect(thai?.html).toContain("ประวัติการศึกษา");
+    expect(thai?.html).toContain("รศ.ดร. โชติชัย เจริญงาม");
+    expect(english?.html).toContain("Education");
+    expect(english?.html).toContain("Assoc. Prof. Dr. Chotichai Charoenngam");
+    expect(english?.html).not.toContain("ประวัติการศึกษา");
+  });
+
   it("detects the Thai and English board executive routes", () => {
     expect(isBoardExecutivePath("/เกี่ยวกับ-สทร/คณะกรรมการ-ผู้บริหาร")).toBe(true);
     expect(isBoardExecutivePath("/en/เกี่ยวกับ-สทร/คณะกรรมการ-ผู้บริหาร")).toBe(true);
