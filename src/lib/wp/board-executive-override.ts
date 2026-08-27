@@ -16,16 +16,42 @@ export const CHAIYUT_NAME = "ชัยวุฒิ ตันไชย";
 const CHAIYUT_EMAIL = "chaiwooth.t@rtrda.or.th";
 export const CHAIYUT_IMAGE_SRC =
   "/wp-content/uploads/2025/10/ชัยวุฒิ-ตันไชย-ผู้จัดการกลุ่มพัฒนาผู้ประกอบการและธุรกิจใหม่.jpg";
+const PICHET_NAMES = new Set([
+  "ดร.พิเชฐ คุณาธรรมรักษ์",
+  "ดร. พิเชฐ คุณาธรรมรักษ์",
+  "Dr. Pichet Kunadhamraks",
+]);
 
 function compactText(value: string): string {
   return value.replace(/\s+/g, " ").trim();
 }
 
-function isThaiBoardExecutivePath(record: WpContentRecord): boolean {
-  return (
-    record.language === "th" &&
-    normalizeRoutePath(record.path).normalize("NFC") === BOARD_EXECUTIVES_PATH
-  );
+function isBoardExecutivePath(record: WpContentRecord): boolean {
+  const path = normalizeRoutePath(record.path).normalize("NFC");
+  return path === BOARD_EXECUTIVES_PATH || path === `/en${BOARD_EXECUTIVES_PATH}`;
+}
+
+function rewritePichetColumn(
+  $: cheerio.CheerioAPI,
+  element: AnyNode,
+  language: WpContentRecord["language"],
+): boolean {
+  const column = $(element);
+  if (!PICHET_NAMES.has(compactText(column.find("h4").first().text()))) {
+    return false;
+  }
+
+  const role = column.find("h5").first();
+  role.empty();
+  if (language === "en") {
+    role.append(
+      "Member, Board of Director<br>Director-General, Department of Rail Transport",
+    );
+  } else {
+    role.append("กรรมการ<br>อธิบดีกรมการขนส่งทางราง");
+  }
+
+  return true;
 }
 
 function rewriteTargetColumn($: cheerio.CheerioAPI, element: AnyNode): boolean {
@@ -80,16 +106,22 @@ function rewriteAdminColumn($: cheerio.CheerioAPI, element: AnyNode): boolean {
 }
 
 export function applyBoardExecutiveOverride(record: WpContentRecord): WpContentRecord {
-  if (!isThaiBoardExecutivePath(record)) {
+  if (!isBoardExecutivePath(record)) {
     return record;
   }
 
   const $ = cheerio.load(record.contentHtml, null, false);
   const columns = $(".lightweight-accordion .wp-block-column").toArray();
-  const didRewriteResearch = columns.some((element) => rewriteTargetColumn($, element));
-  const didRewriteAdmin = columns.some((element) => rewriteAdminColumn($, element));
+  const didRewritePichet = columns.some((element) =>
+    rewritePichetColumn($, element, record.language),
+  );
+  const didRewriteResearch =
+    record.language === "th" &&
+    columns.some((element) => rewriteTargetColumn($, element));
+  const didRewriteAdmin =
+    record.language === "th" && columns.some((element) => rewriteAdminColumn($, element));
 
-  if (!didRewriteResearch && !didRewriteAdmin) {
+  if (!didRewritePichet && !didRewriteResearch && !didRewriteAdmin) {
     return record;
   }
 

@@ -114,6 +114,28 @@ describe("applyBoardExecutiveOverride", () => {
     expect(role.find("a").attr("href")).toBe("mailto:chaiwooth.t@rtrda.or.th");
   });
 
+  it("rewrites Pichet's Thai and English board role", () => {
+    const thai = applyBoardExecutiveOverride(
+      record({
+        contentHtml: `<div class="lightweight-accordion"><div class="wp-block-column"><h4>ดร. พิเชฐ คุณาธรรมรักษ์</h4><h5>กรรมการโดยตำแหน่ง อธิบดีกรมการขนส่งทางราง</h5></div></div>`,
+      }),
+    );
+    const english = applyBoardExecutiveOverride(
+      record({
+        language: "en",
+        path: "/en/เกี่ยวกับ-สทร/คณะกรรมการ-ผู้บริหาร",
+        contentHtml: `<div class="lightweight-accordion"><div class="wp-block-column"><h4>ดร. พิเชฐ คุณาธรรมรักษ์</h4><h5>กรรมการโดยตำแหน่ง อธิบดีกรมการขนส่งทางราง</h5></div></div>`,
+      }),
+    );
+
+    expect(cheerio.load(thai.contentHtml, null, false)("h5").text()).toBe(
+      "กรรมการอธิบดีกรมการขนส่งทางราง",
+    );
+    expect(cheerio.load(english.contentHtml, null, false)("h5").text()).toBe(
+      "Member, Board of DirectorDirector-General, Department of Rail Transport",
+    );
+  });
+
   it("does not duplicate Chaiyut on the entrepreneur card", () => {
     const source = `
       <div class="lightweight-accordion">
