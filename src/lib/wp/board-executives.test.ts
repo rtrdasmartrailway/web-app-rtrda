@@ -81,6 +81,17 @@ describe("board executive parser", () => {
     expect(english?.html).not.toContain("ประธานสาขาวิศวกรรมอุตสาหการ");
   });
 
+  it("selects Thai and English content for Pichet's popup", () => {
+    const thai = getBoardExecutiveDetailByName("ดร. พิเชฐ คุณาธรรมรักษ์", "th");
+    const english = getBoardExecutiveDetailByName("Dr. Pichet Kunadhamraks", "en");
+
+    expect(thai?.html).toContain("วิศวกรรมขนส่ง");
+    expect(thai?.html).toContain("อธิบดีกรมการขนส่งทางราง");
+    expect(english?.html).toContain("Transportation Engineering");
+    expect(english?.html).toContain("Director General, Department of Rail Transport");
+    expect(english?.html).not.toContain("วิศวกรรมขนส่ง");
+  });
+
   it("detects the Thai and English board executive routes", () => {
     expect(isBoardExecutivePath("/เกี่ยวกับ-สทร/คณะกรรมการ-ผู้บริหาร")).toBe(true);
     expect(isBoardExecutivePath("/en/เกี่ยวกับ-สทร/คณะกรรมการ-ผู้บริหาร")).toBe(true);

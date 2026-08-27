@@ -88,9 +88,18 @@ const DETAILS: BoardExecutiveDetailDefinition[] = [
     html: "<header>\n<div>\n<div>\n<h2>ดร.เพียงออ เลาหะวิไลย</h2>\n</div>\n\n</div>\n</header>\n<div>\n<div>\n<div><h3><strong>การศึกษา</strong></h3>\n<ul>\n<li>ปริญญเอก  วิทยาศาสตรดุษฎีบัณฑิต (D. in Knowledge Management) มหาวิทยาลัยเชียงใหม่</li>\n<li>ปริญญาโท  Master of Business Administration (M.B.A. in International Business) Seoul National University, Seoul, Republic of Korea</li>\n<li>ปริญญาตรี  รัฐศาสตรบัณฑิต มหาวิทยาลัยธรรมศาสตร์</li>\n</ul>\n<h3><strong>ประสบการณ์การทำงาน</strong></h3>\n<ul>\n<li>2561 - 2568  อาจารย์ประจําหลักสูตรบัณฑิตศึกษาวิทยาลัยนานาชาตินวัตกรรมดิจิทัล มหาวิทยาลัยเชียงใหม่</li>\n<li>2554 - 2556 ผู้พิพากษาสมทบศาลแรงงานภาค 5</li>\n<li>2534 - 2556 General Manager บริษัท เคอีซี (ประเทศไทย) จำกัด (KEC CORP., KOREA)</li>\n</ul>\n<h3><strong>ประวัติด้านกรรมการ/อนุกรรมการ/ที่ปรึกษา</strong></h3>\n<ul>\n<li>2568 – ปัจจุบัน ผู้อำนวยการสถาบันวิจัยและพัฒนาเทคโนโลยีระบบราง กระทรวงคมนาคม</li>\n</ul>\n<ul>\n<li>2567 – ปัจจุบัน กรรมการการบินพลเรือน</li>\n</ul>\n<ul>\n<li>2567 – ปัจจุบัน กรรมการบริหารการจัดการ ความรู้ เทคโนโลยีและนวัตกรรมการท่าเรือแห่งประเทศไทย</li>\n</ul>\n<ul>\n<li>2567 – ปัจจุบัน กรรมการรัฐวิสาหกิจ (กฟน., กปน.)</li>\n<li>2567 – ปัจจุบัน อนุกรรมการผู้ทรงคุณวุฒิใน อ.ก.พ. กระทรวงคมนาคม</li>\n</ul>\n</div>\n\n\n</div>\n</div>",
   },
   {
-    trigger: "pichet",
+    trigger: "pichet-legacy",
     name: "ดร.พิเชฐ คุณาธรรมรักษ์",
     html: "<header>\n<div>\n<div>\n<h2>ดร.พิเชฐ คุณาธรรมรักษ์</h2>\n</div>\n\n</div>\n</header>\n<div>\n<div>\n<div><h3><strong>การศึกษา</strong></h3>\n<ul>\n<li>2550 ปริญญาเอก วิศวกรรมขนส่ง สถาบันเทคโนโลยีแห่งเอเชีย</li>\n<li>2541 ปริญญาโท บริหารธุรกิจมหาบัณฑิต จุฬาลงกรณ์มหาวิทยาลัย</li>\n<li>2537 ปริญญาตรี วิศวกรรมชลประทาน มหาวิทยาลัยเกษตรศาสตร์</li>\n</ul>\n<h3><strong>ประสบการณ์การทำงาน</strong></h3>\n<ul>\n<li>2565 - ปัจจุบัน อธิบดีกรมขนส่งทางราง กระทรวงคมนาคม</li>\n<li>2563 - 2565 รองอธิบดีกรมขนส่งทางราง กระทรวงคมนาคม</li>\n<li>2563 ผู้ช่วยปลัดกระทรวงคมนาคม</li>\n</ul>\n<h3><strong>ประวัติด้านกรรมการ/อนุกรรมการ/ที่ปรึกษา</strong></h3>\n<ul>\n<li>2565 – ปัจจุบัน กรรมการ สถาบันวิจัยและพัฒนาเทคโนโลยีระบบราง (องค์การมหาชน) กระทรวงคมนาคม</li>\n<li>2565 – ปัจจุบัน กรรมการผู้แทนกระทรวงคมนาคมของคณะกรรมการสถาบันการบินพลเรือน</li>\n<li>2564 – ปัจจุบัน กรรมการบริหารของการทางพิเศษแห่งประเทศไทย (Executive Committee : Ex-Com)</li>\n<li>2564 - ปัจจุบัน อนุกรรมการกำกับกลยุทธ์และการบริหาร บริษัท ขนส่ง จำกัด</li>\n</ul>\n</div>\n\n\n</div>\n</div>",
+  },
+  {
+    trigger: "pichet",
+    name: "ดร. พิเชฐ คุณาธรรมรักษ์",
+    aliases: ["Dr. Pichet Kunadhamraks", "ดร.พิเชฐ คุณาธรรมรักษ์"],
+    html: {
+      th: "<header><h2>ดร. พิเชฐ คุณาธรรมรักษ์</h2></header><h3><strong>ประวัติการศึกษา</strong></h3><ul><li>2550 ปริญญาเอก วิศวกรรมขนส่ง (Transportation Engineering) สถาบันเทคโนโลยีแห่งเอเซีย</li><li>2541 ปริญญาโท บริหารธุรกิจมหาบัณฑิต จุฬาลงกรณ์มหาวิทยาลัย</li><li>2537 ปริญญาตรี วิศวกรรมศาสตรบัณฑิต (วิศวกรรมชลประทาน) มหาวิทยาลัยเกษตรศาสตร์</li></ul><h3><strong>ประสบการณ์ทำงาน</strong></h3><ul><li>2565 - ปัจจุบัน อธิบดีกรมการขนส่งทางราง กระทรวงคมนาคม</li><li>2563 - 2565 รองอธิบดีกรมการขนส่งทางราง กระทรวงคมนาคม</li><li>2563 ผู้ช่วยปลัดกระทรวงคมนาคม</li></ul>",
+      en: "<header><h2>Dr. Pichet Kunadhamraks</h2></header><h3><strong>Education</strong></h3><ul><li>2007 Doctor of Philosophy in Transportation Engineering, Asian Institute of Technology</li><li>1998 Master of Business Administration, Chulalongkorn University</li><li>1994 Bachelor of Engineering in Irrigation Engineering, Kasetsart University</li></ul><h3><strong>Experience</strong></h3><ul><li>2022 - Present Director General, Department of Rail Transport, Ministry of Transport</li><li>2020 - 2022 Deputy Director General, Department of Rail Transport, Ministry of Transport</li><li>2020 Assistant Permanent Secretary, Ministry of Transport</li></ul>",
+    },
   },
   {
     trigger: "pattanapong",
