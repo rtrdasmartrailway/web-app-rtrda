@@ -7,6 +7,7 @@ export interface BoardExecutiveDetailEntry {
 }
 
 type BoardExecutiveDetailDefinition = Omit<BoardExecutiveDetailEntry, "html"> & {
+  aliases?: string[];
   html: string | Partial<Record<WpLanguage, string>>;
 };
 
@@ -14,9 +15,10 @@ const DETAILS: BoardExecutiveDetailDefinition[] = [
   {
     trigger: "chotchai",
     name: "รศ.ดร. โชติชัย เจริญงาม",
+    aliases: ["Assoc. Prof. Dr. Chotchai Charoenngam"],
     html: {
       th: "<header><h2>รศ.ดร. โชติชัย เจริญงาม</h2></header><h3><strong>ประวัติการศึกษา</strong></h3><ul><li>2536 ปริญญาเอก Construction Engineering and Project Management, University of Texas at Austin, USA</li><li>2532 ปริญญาโท Construction Engineering and Project Management, University of Kansas, USA</li><li>2529 ปริญญาตรี วิศวกรรมศาสตร์บัณฑิต สาขาวิศวกรรมโยธา มหาวิทยาลัยเทคโนโลยีพระจอมเกล้าธนบุรี (เกียรตินิยม อันดับ 2)</li></ul><h3><strong>ประสบการณ์ทำงาน</strong></h3><ul><li>2541 - 2565 รองศาสตราจารย์ คณะวิศวกรรมศาสตร์และเทคโนโลยี สถาบันเทคโนโลยีแห่งเอเซีย (AIT)</li><li>2538 ผู้เชี่ยวชาญระบบวางแผนและควบคุมต้นทุนโครงการ องค์การสหประชาชาติ (UNDP)</li><li>2535 - 2537 วิศวกรที่ปรึกษา ด้านการวางแผนและควบคุมโครงการ C&amp;C Consultants, Austin, Texas, USA</li><li>2534 - 2535 วิศวกรประเมินประสิทธิภาพการดำเนินงาน Nuclear Power Plants, Texas Public Utility Commissions, USA</li></ul><h3><strong>ประวัติด้านกรรมการ/อนุกรรมการ</strong></h3><ul><li>2565 - ปัจจุบัน ประธานกรรมการ สถาบันวิจัยและพัฒนาเทคโนโลยีระบบราง (องค์การมหาชน)</li><li>2561 - ปัจจุบัน กรรมการ มูลนิธิแพทย์อาสาสมเด็จพระศรีนครินทราบรมราชชนนี</li><li>2558 - ปัจจุบัน ประธานกรรมการและประธานกรรมการตรวจสอบ บริษัท แมสเทค ลิงค์ จำกัด (มหาชน)</li><li>2558 - ปัจจุบัน กรรมการ โรงเรียนนานาชาติ KIS (KIS International School)</li><li>2567 - 2569 กรรมการการบินพลเรือน กรรมการกำกับสำนักงานการบินพลเรือน</li><li>2562 - 2568 กรรมการ กรรมการตรวจสอบและประธานกรรมการบริหารความเสี่ยง บริษัท อินเด็กซ์ อินเตอร์เนชั่นแนล กรุ๊ป จำกัด (มหาชน)</li></ul>",
-      en: "<header><h2>Assoc. Prof. Dr. Chotichai Charoenngam</h2></header><h3><strong>Education</strong></h3><ul><li>1993 Doctor of Philosophy in Construction Engineering and Project Management, University of Texas at Austin, USA</li><li>1989 Master of Science in Construction Engineering and Project Management, University of Kansas, USA</li><li>1986 Bachelor of Engineering in Civil Engineering, King Mongkut's University of Technology Thonburi, Second Class Honours</li></ul><h3><strong>Professional Experience</strong></h3><ul><li>1998 - 2022 Associate Professor, School of Engineering and Technology, Asian Institute of Technology (AIT)</li><li>1995 Project Planning and Cost Control Systems Specialist, United Nations Development Programme (UNDP)</li><li>1992 - 1994 Consulting Engineer, Project Planning and Control, C&amp;C Consultants, Austin, Texas, USA</li><li>1991 - 1992 Performance Evaluation Engineer, Nuclear Power Plants, Texas Public Utility Commissions, USA</li></ul><h3><strong>Board and Committee Experience</strong></h3><ul><li>2022 - Present Chairperson, Rail Technology Research and Development Agency (Public Organization)</li><li>2018 - Present Board Member, Princess Srinagarindra Volunteer Doctors Foundation</li><li>2015 - Present Chairperson and Chairperson of the Audit Committee, Mastech Link Public Company Limited</li><li>2015 - Present Board Member, KIS International School</li><li>2024 - 2026 Civil Aviation Board Member and Office of Civil Aviation Regulatory Board Member</li><li>2019 - 2025 Board Member, Audit Committee Member and Chairperson of the Risk Management Committee, Index International Group Public Company Limited</li></ul>",
+      en: "<header><h2>Assoc. Prof. Dr. Chotchai Charoenngam</h2></header><h3><strong>Education</strong></h3><ul><li>1993 Doctor of Philosophy in Construction Engineering and Project Management, University of Texas at Austin, USA</li><li>1989 Master of Science in Construction Engineering and Project Management, University of Kansas, USA</li><li>1986 Bachelor of Engineering in Civil Engineering, King Mongkut's University of Technology Thonburi, Second Class Honours</li></ul><h3><strong>Professional Experience</strong></h3><ul><li>1998 - 2022 Associate Professor, School of Engineering and Technology, Asian Institute of Technology (AIT)</li><li>1995 Project Planning and Cost Control Systems Specialist, United Nations Development Programme (UNDP)</li><li>1992 - 1994 Consulting Engineer, Project Planning and Control, C&amp;C Consultants, Austin, Texas, USA</li><li>1991 - 1992 Performance Evaluation Engineer, Nuclear Power Plants, Texas Public Utility Commissions, USA</li></ul><h3><strong>Board and Committee Experience</strong></h3><ul><li>2022 - Present Chairperson, Rail Technology Research and Development Agency (Public Organization)</li><li>2018 - Present Board Member, Princess Srinagarindra Volunteer Doctors Foundation</li><li>2015 - Present Chairperson and Chairperson of the Audit Committee, Mastech Link Public Company Limited</li><li>2015 - Present Board Member, KIS International School</li><li>2024 - 2026 Civil Aviation Board Member and Office of Civil Aviation Regulatory Board Member</li><li>2019 - 2025 Board Member, Audit Committee Member and Chairperson of the Risk Management Committee, Index International Group Public Company Limited</li></ul>",
     },
   },
   {
@@ -221,6 +223,9 @@ export const boardExecutiveDetailsByName: Record<string, BoardExecutiveDetailDef
   DETAILS.reduce<Record<string, BoardExecutiveDetailDefinition>>(
     (accumulator, detail) => {
       accumulator[normalizeName(detail.name)] = detail;
+      for (const alias of detail.aliases ?? []) {
+        accumulator[normalizeName(alias)] = detail;
+      }
       return accumulator;
     },
     {},
