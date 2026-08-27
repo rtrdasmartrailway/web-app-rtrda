@@ -46,6 +46,17 @@ describe("board executive parser", () => {
     ).toBe(english?.html);
   });
 
+  it("selects Thai and English content for Darun's popup", () => {
+    const thai = getBoardExecutiveDetailByName("ดรุณ แสงฉาย", "th");
+    const english = getBoardExecutiveDetailByName("Darun Saengshine", "en");
+
+    expect(thai?.html).toContain("วิศวกรรมสาธารณสุขเขตร้อน");
+    expect(thai?.html).toContain("อธิบดีกรมท่าอากาศยาน");
+    expect(english?.html).toContain("Tropical Public Health Engineering");
+    expect(english?.html).toContain("Director General, Department of Airports");
+    expect(english?.html).not.toContain("วิศวกรรมสาธารณสุขเขตร้อน");
+  });
+
   it("detects the Thai and English board executive routes", () => {
     expect(isBoardExecutivePath("/เกี่ยวกับ-สทร/คณะกรรมการ-ผู้บริหาร")).toBe(true);
     expect(isBoardExecutivePath("/en/เกี่ยวกับ-สทร/คณะกรรมการ-ผู้บริหาร")).toBe(true);

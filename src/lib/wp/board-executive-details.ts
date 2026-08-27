@@ -22,6 +22,15 @@ const DETAILS: BoardExecutiveDetailDefinition[] = [
     },
   },
   {
+    trigger: "darun",
+    name: "ดรุณ แสงฉาย",
+    aliases: ["Darun Saengshine"],
+    html: {
+      th: "<header><h2>ดรุณ แสงฉาย</h2></header><h3><strong>ประวัติการศึกษา</strong></h3><ul><li>ปริญญาโท วิทยาศาสตรมหาบัณฑิต (วิศวกรรมสาธารณสุขเขตร้อน) มหาวิทยาลัยลีดส์ สหราชอาณาจักร</li><li>ปริญญาโท บริหารธุรกิจมหาบัณฑิต (สำหรับผู้บริหารระดับสูง) วิทยาลัยพาณิชยศาสตร์ มหาวิทยาลัยบูรพา</li><li>ปริญญาตรี เทคโนโลยีบัณฑิต (การจัดการงานก่อสร้าง) มหาวิทยาลัยสุโขทัยธรรมาธิราช</li><li>ปริญญาตรี วิศวกรรมศาสตรบัณฑิต (วิศวกรรมโยธา) มหาวิทยาลัยสงขลานครินทร์</li></ul><h3><strong>ประสบการณ์ทำงาน</strong></h3><ul><li>2559 - 2561 อธิบดีกรมท่าอากาศยาน</li><li>2558 - 2559 รองปลัดกระทรวงคมนาคม หัวหน้ากลุ่มภารกิจด้านการขนส่ง</li><li>2557 - 2558 อธิบดีกรมทางหลวงชนบท</li><li>2558 - 2561 คณะกรรมการ การท่องเที่ยวแห่งประเทศไทย</li><li>2559 - 2561 คณะกรรมการ รถไฟฟ้าขนส่งมวลชนแห่งประเทศไทย</li></ul>",
+      en: "<header><h2>Darun Saengshine</h2></header><h3><strong>Education</strong></h3><ul><li>Master of Science in Tropical Public Health Engineering, University of Leeds, United Kingdom</li><li>Master of Business Administration (Executive Program), Burapha University Business School</li><li>Bachelor of Technology in Construction Management, Sukhothai Thammathirat Open University</li><li>Bachelor of Engineering in Civil Engineering, Prince of Songkla University</li></ul><h3><strong>Experience</strong></h3><ul><li>2016 - 2018 Director General, Department of Airports</li><li>2015 - 2016 Deputy Permanent Secretary, Ministry of Transport, Head of the Transport Group of Missions</li><li>2014 - 2015 Director General, Department of Rural Roads</li><li>2015 - 2018 Member, Board of Directors, Tourism Authority of Thailand (TAT)</li><li>2016 - 2018 Member, Board of Directors, Mass Rapid Transit Authority of Thailand (MRTA)</li></ul>",
+    },
+  },
+  {
     trigger: "tayakon",
     name: "ดร.ทยากร จันทรางศุ",
     html: "<header>\n<div>\n<div>\n<h2>ดร.ทยากร จันทรางศุ</h2>\n</div>\n\n</div>\n</header>\n<div>\n<div>\n<div><h3><strong>การศึกษา</strong></h3>\n<ul>\n<li>2553 ปริญญาเอก สาขาวิชาวิศวกรรมโยธา มหาวิทยาลัยซิดนีย์ ออสเตรเลีย</li>\n<li>2548 ปริญญาโท สาขาวิชาวิศวกรรมโยธา มหาวิทยาลัยสแตนฟอร์ด สหรัฐอเมริกา</li>\n<li>2546 ปริญญาตรี สาขาวิชาวิศวกรรมโยธา มหาวิทยาลัยวิสคอนซิน แมดิสัน สหรัฐอเมริกา</li>\n<li>2558 ปริญญาตรี สาขานิติศาสตรบัณฑิต (เกียรตินิยมอันดับ 2) จุฬาลงกรณ์มหาวิทยาลัย</li>\n</ul>\n<h3><strong>ประสบการณ์การทำงาน</strong></h3>\n<ul>\n<li>2563 – ปัจจุบัน ผู้อำนวยการกองมาตรฐานความปลอดภัยและบำรุงทาง กรมการขนส่งทางราง กระทรวงคมนาคม</li>\n<li>2554 - 2563 วิศวกรโยธา/หัวหน้าศูนย์วิจัยและพัฒนาอาคาร สำนักควบคุมและตรวจสอบอาคาร กรมโยธาธิการและผังเมือง กระทรวงมหาดไทย</li>\n</ul>\n<h3><strong>ประวัติด้านกรรมการ/อนุกรรมการ/ที่ปรึกษา</strong></h3>\n<ul>\n<li>2565 – ปัจจุบัน กรรมการ คณะกรรมการดำเนินการร่วมมือและประสานงานเกี่ยวกับเทคโนโลยีระบบราง สถาบันวิจัยและพัฒนาเทคโนโลยีระบบราง (องค์การมหาชน) กระทรวงคมนาคม</li>\n</ul>\n</div>\n\n\n</div>\n</div>",
