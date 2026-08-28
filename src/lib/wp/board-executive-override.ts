@@ -37,7 +37,7 @@ const REPRESENTATIVE_RAILWAY_NAMES = new Set([
   "Dr. Weeradet Cheevapattananuwong",
 ]);
 export const WEERADET_IMAGE_SRC =
-  "/wp-content/uploads/2026/08/ดร.-วีรเดช-ชีวาพัฒนานุวงศ์.jpg";
+  "/wp-content/uploads/2026/08/weeradet-cheevapattananuwong.jpg";
 
 function compactText(value: string): string {
   return value.replace(/\s+/g, " ").trim();
