@@ -136,6 +136,28 @@ describe("applyBoardExecutiveOverride", () => {
     );
   });
 
+  it("rewrites Pattanaphong's Thai and English board role", () => {
+    const thai = applyBoardExecutiveOverride(
+      record({
+        contentHtml: `<div class="lightweight-accordion"><div class="wp-block-column"><h4>พัฒนพงษ์ พงศ์ศุภสมิทธิ์</h4><h5>กรรมการโดยตำแหน่ง ผู้แทนผู้ว่าการการรถไฟฟ้าขนส่งมวลชนแห่งประเทศไทย</h5></div></div>`,
+      }),
+    );
+    const english = applyBoardExecutiveOverride(
+      record({
+        language: "en",
+        path: "/en/เกี่ยวกับ-สทร/คณะกรรมการ-ผู้บริหาร",
+        contentHtml: `<div class="lightweight-accordion"><div class="wp-block-column"><h4>Pattanaphong Phongsupatsamit</h4><h5>กรรมการโดยตำแหน่ง</h5></div></div>`,
+      }),
+    );
+
+    expect(cheerio.load(thai.contentHtml, null, false)("h5").text()).toBe(
+      "กรรมการรองผู้ว่าการ รฟม. (บริหาร)ผู้แทนผู้ว่าการ รฟม.",
+    );
+    expect(cheerio.load(english.contentHtml, null, false)("h5").text()).toBe(
+      "Member, Board of DirectorDeputy Governor (Administration)Mass Transit Railway Authority of Thailand",
+    );
+  });
+
   it("does not duplicate Chaiyut on the entrepreneur card", () => {
     const source = `
       <div class="lightweight-accordion">

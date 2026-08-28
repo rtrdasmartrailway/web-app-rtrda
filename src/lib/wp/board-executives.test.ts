@@ -92,6 +92,17 @@ describe("board executive parser", () => {
     expect(english?.html).not.toContain("วิศวกรรมขนส่ง");
   });
 
+  it("selects Thai and English content for Pattanaphong's popup", () => {
+    const thai = getBoardExecutiveDetailByName("พัฒนพงษ์ พงศ์ศุภสมิทธิ์", "th");
+    const english = getBoardExecutiveDetailByName("Pattanaphong Phongsupatsamit", "en");
+
+    expect(thai?.html).toContain("วิศวกรรมการก่อสร้างและการจัดการ");
+    expect(thai?.html).toContain("รองผู้ว่าการการรถไฟขนส่งมวลชนแห่งประเทศไทย");
+    expect(english?.html).toContain("Construction Engineering and Management");
+    expect(english?.html).toContain("Deputy Governor (Administration)");
+    expect(english?.html).not.toContain("วิศวกรรมการก่อสร้างและการจัดการ");
+  });
+
   it("detects the Thai and English board executive routes", () => {
     expect(isBoardExecutivePath("/เกี่ยวกับ-สทร/คณะกรรมการ-ผู้บริหาร")).toBe(true);
     expect(isBoardExecutivePath("/en/เกี่ยวกับ-สทร/คณะกรรมการ-ผู้บริหาร")).toBe(true);

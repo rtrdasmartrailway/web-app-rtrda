@@ -21,6 +21,10 @@ const PICHET_NAMES = new Set([
   "ดร. พิเชฐ คุณาธรรมรักษ์",
   "Dr. Pichet Kunadhamraks",
 ]);
+const PATTANAPHONG_NAMES = new Set([
+  "พัฒนพงษ์ พงศ์ศุภสมิทธิ์",
+  "Pattanaphong Phongsupatsamit",
+]);
 
 function compactText(value: string): string {
   return value.replace(/\s+/g, " ").trim();
@@ -49,6 +53,29 @@ function rewritePichetColumn(
     );
   } else {
     role.append("กรรมการ<br>อธิบดีกรมการขนส่งทางราง");
+  }
+
+  return true;
+}
+
+function rewritePattanaphongColumn(
+  $: cheerio.CheerioAPI,
+  element: AnyNode,
+  language: WpContentRecord["language"],
+): boolean {
+  const column = $(element);
+  if (!PATTANAPHONG_NAMES.has(compactText(column.find("h4").first().text()))) {
+    return false;
+  }
+
+  const role = column.find("h5").first();
+  role.empty();
+  if (language === "en") {
+    role.append(
+      "Member, Board of Director<br>Deputy Governor (Administration)<br>Mass Transit Railway Authority of Thailand",
+    );
+  } else {
+    role.append("กรรมการ<br>รองผู้ว่าการ รฟม. (บริหาร)<br>ผู้แทนผู้ว่าการ รฟม.");
   }
 
   return true;
@@ -115,13 +142,21 @@ export function applyBoardExecutiveOverride(record: WpContentRecord): WpContentR
   const didRewritePichet = columns.some((element) =>
     rewritePichetColumn($, element, record.language),
   );
+  const didRewritePattanaphong = columns.some((element) =>
+    rewritePattanaphongColumn($, element, record.language),
+  );
   const didRewriteResearch =
     record.language === "th" &&
     columns.some((element) => rewriteTargetColumn($, element));
   const didRewriteAdmin =
     record.language === "th" && columns.some((element) => rewriteAdminColumn($, element));
 
-  if (!didRewritePichet && !didRewriteResearch && !didRewriteAdmin) {
+  if (
+    !didRewritePichet &&
+    !didRewritePattanaphong &&
+    !didRewriteResearch &&
+    !didRewriteAdmin
+  ) {
     return record;
   }
 

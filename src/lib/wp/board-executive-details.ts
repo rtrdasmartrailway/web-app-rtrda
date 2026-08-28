@@ -102,9 +102,18 @@ const DETAILS: BoardExecutiveDetailDefinition[] = [
     },
   },
   {
-    trigger: "pattanapong",
+    trigger: "pattanapong-legacy",
     name: "พัฒนพงษ์ พงศ์ศุภสมิทธิ์",
     html: "<header>\n<div>\n<div>\n<h2>พัฒนพงษ์ พงศ์ศุภสมิทธิ์</h2>\n</div>\n\n</div>\n</header>\n<div>\n<div>\n<div><h3><strong>การศึกษา</strong></h3>\n<ul>\n<li>2540 ปริญญาโท วิศวกรรมศาสตรมหาบัณฑิต (วิศวกรรมการก่อสร้างและการจัดการ) สถาบันเทคโนโลยีแห่งเอเชีย</li>\n<li>2538 ปริญญาตรี วิศวกรรมศาสตรบัณฑิต (วิศวกรรมโยธา) มหาวิทยาลัยเทคโนโลยีพระจอมเกล้าธนบุรี</li>\n</ul>\n<h3><strong>ประสบการณ์การทำงาน</strong></h3>\n<ul>\n<li>2565 - ปัจจุบัน รองผู้ว่าการการรถไฟขนส่งมวลชนแห่งประเทศไทย (บริหาร)</li>\n<li>2562 - 2565 ผู้ช่วยผู้ว่าการการรถไฟขนส่งมวลชนแห่งประเทศไทย</li>\n<li>2558 - 2562 ผู้อำนวยการฝ่ายบริหารงานก่อสร้าง 1 การรถไฟฟ้าขนส่งมวลชนแห่งประเทศไทย</li>\n<li>2540 - 2558 วิศวกร - ผู้อำนวยการกองบริหารงานก่อสร้าง 3 การรถไฟฟ้าขนส่งมวลชนแห่งประเทศไทย</li>\n</ul>\n<h3><strong>ประวัติด้านกรรมการ/อนุกรรมการ/ที่ปรึกษา</strong></h3>\n<ul>\n<li>2566 – ปัจจุบัน ประธานกรรมการตรวจสอบ สถาบันวิจัยและพัฒนาเทคโนโลยีระบบราง (องค์การมหาชน) กระทรวงคมนาคม</li>\n</ul>\n<ul>\n<li>2565 – ปัจจุบัน กรรมการ สถาบันวิจัยและพัฒนาเทคโนโลยีระบบราง (องค์การมหาชน) กระทรวงคมนาคม</li>\n</ul>\n<ul>\n<li>2565 – ปัจจุบัน อนุกรรมการเตรียมการเปิดให้บริการและการบริหารโครงการรถไฟฟ้าสายสีเหลือง และสายสีชมพู ด้านการเดินรถ การเชื่อมต่อการให้บริการระบบขนส่ง และการประเมินคุณภาพสถานี กระทรวงคมนาคม</li>\n<li>2564 – 2565 กรรมการ คณะกรรมการกำกับและบริหารจัดการระบบขนส่งทางราง กระทรวงคมนาคม</li>\n</ul>\n</div>\n\n\n</div>\n</div>",
+  },
+  {
+    trigger: "pattanapong",
+    name: "พัฒนพงษ์ พงศ์ศุภสมิทธิ์",
+    aliases: ["Pattanaphong Phongsupatsamit"],
+    html: {
+      th: "<header><h2>พัฒนพงษ์ พงศ์ศุภสมิทธิ์</h2></header><h3><strong>ประวัติการศึกษา</strong></h3><ul><li>2540 ปริญญาโท วิศวกรรมศาสตรมหาบัณฑิต (วิศวกรรมการก่อสร้างและการจัดการ) สถาบันเทคโนโลยีแห่งเอเชีย</li><li>2538 ปริญญาตรี วิศวกรรมศาสตรบัณฑิต (วิศวกรรมโยธา) มหาวิทยาลัยเทคโนโลยีพระจอมเกล้าธนบุรี</li></ul><h3><strong>ประสบการณ์ทำงาน</strong></h3><ul><li>2565 - ปัจจุบัน รองผู้ว่าการการรถไฟขนส่งมวลชนแห่งประเทศไทย (บริหาร)</li><li>2562 - 2565 ผู้ช่วยผู้ว่าการการรถไฟขนส่งมวลชนแห่งประเทศไทย</li><li>2558 - 2562 ผู้อำนวยการฝ่ายบริหารงานก่อสร้าง 1 การรถไฟฟ้าขนส่งมวลชนแห่งประเทศไทย</li></ul>",
+      en: "<header><h2>Pattanaphong Phongsupatsamit</h2></header><h3><strong>Education</strong></h3><ul><li>1997 Master of Engineering (Construction Engineering and Management), Asian Institute of Technology (AIT)</li><li>1995 Bachelor of Engineering (Civil Engineering), King Mongkut's University of Technology Thonburi</li></ul><h3><strong>Experience</strong></h3><ul><li>2022 - Present Deputy Governor (Administration), Mass Rapid Transit Authority of Thailand (MRTA)</li><li>2019 - 2022 Assistant Governor, Mass Rapid Transit Authority of Thailand (MRTA)</li><li>2015 - 2019 Director of Construction Management Department 1, Mass Rapid Transit Authority of Thailand (MRTA)</li></ul>",
+    },
   },
   {
     trigger: "ketsawarong",
