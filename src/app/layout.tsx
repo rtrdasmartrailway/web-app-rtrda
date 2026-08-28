@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { headers } from "next/headers";
 import { IBM_Plex_Sans_Thai } from "next/font/google";
 import { SITE_ORIGIN } from "@/lib/site-config";
 import { WebAnalyticsTracker } from "@/components/analytics/web-analytics-tracker";
@@ -61,13 +62,15 @@ export const metadata: Metadata = {
   },
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const documentLanguage = (await headers()).get("x-rtrda-document-language") ?? "th";
+
   return (
-    <html lang="th" className={thaiFont.variable}>
+    <html lang={documentLanguage} className={thaiFont.variable}>
       <body>
         <WebAnalyticsTracker />
         {children}
