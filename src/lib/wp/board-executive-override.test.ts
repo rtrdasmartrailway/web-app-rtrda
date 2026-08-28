@@ -8,6 +8,7 @@ import {
   ANAN_IMAGE_SRC,
   TACHAKORN_IMAGE_SRC,
   WATCHARACHAN_IMAGE_SRC,
+  VEERACHAI_IMAGE_SRC,
   WEERADET_IMAGE_SRC,
 } from "./board-executive-override";
 
@@ -231,7 +232,11 @@ describe("applyBoardExecutiveOverride", () => {
         )("h4")
         .map((_, element) => cheerio.load(thai.contentHtml, null, false)(element).text())
         .get(),
-    ).toEqual(["นายอนันต์ โพธิ์นิ่มแดง", "ดร. วีรเดช ชีวาพัฒนานุวงศ์"]);
+    ).toEqual([
+      "นายอนันต์ โพธิ์นิ่มแดง",
+      "ดร. วีรเดช ชีวาพัฒนานุวงศ์",
+      "ผศ.ดร.วีรชัย อาจหาญ",
+    ]);
     expect(
       cheerio
         .load(
@@ -241,7 +246,11 @@ describe("applyBoardExecutiveOverride", () => {
         )("h5")
         .map((_, element) => cheerio.load(thai.contentHtml, null, false)(element).text())
         .get(),
-    ).toEqual(["กรรมการ", "กรรมการผู้ทรงคุณวุฒิ"]);
+    ).toEqual([
+      "กรรมการ",
+      "กรรมการผู้ทรงคุณวุฒิ",
+      "ผู้ว่าการ สถาบันวิจัยวิทยาศาสตร์และเทคโนโลยีแห่งประเทศไทย",
+    ]);
     expect(cheerio.load(english.contentHtml, null, false)("h4").text()).toBe(
       "Dr. Weeradet Cheevapattananuwong",
     );
@@ -254,6 +263,9 @@ describe("applyBoardExecutiveOverride", () => {
     expect(cheerio.load(thai.contentHtml, null, false)("img").eq(1).attr("src")).toBe(
       WEERADET_IMAGE_SRC,
     );
+    expect(cheerio.load(thai.contentHtml, null, false)("img").eq(2).attr("src")).toBe(
+      VEERACHAI_IMAGE_SRC,
+    );
     expect(cheerio.load(english.contentHtml, null, false)("img").attr("src")).toBe(
       WEERADET_IMAGE_SRC,
     );
@@ -263,7 +275,7 @@ describe("applyBoardExecutiveOverride", () => {
       expect(image.attr("sizes")).toBeUndefined();
     }
     const repeated = applyBoardExecutiveOverride(thai);
-    expect(cheerio.load(repeated.contentHtml, null, false)("h4")).toHaveLength(2);
+    expect(cheerio.load(repeated.contentHtml, null, false)("h4")).toHaveLength(3);
   });
 
   it("replaces the ministry representative card with Watcharachan", () => {
@@ -280,6 +292,38 @@ describe("applyBoardExecutiveOverride", () => {
     expect($("img").attr("alt")).toBe("วัชรชาญ สิริสุวรรณทัศน์");
     expect($("img").attr("srcset")).toBeUndefined();
     expect($("img").attr("sizes")).toBeUndefined();
+  });
+
+  it("adds a non-clickable Veerachai card only to the Thai board", () => {
+    const source = `<div class="lightweight-accordion"><div class="wp-block-column"><img src="weeradet.jpg" alt="" /><h4>ดร. วีรเดช ชีวาพัฒนานุวงศ์</h4><h5>กรรมการผู้ทรงคุณวุฒิ</h5><div class="detail-btn"><a href="#">รายละเอียด</a></div></div></div>`;
+    const thai = applyBoardExecutiveOverride(record({ contentHtml: source }));
+    const english = applyBoardExecutiveOverride(
+      record({
+        language: "en",
+        path: "/en/เกี่ยวกับ-สทร/คณะกรรมการ-ผู้บริหาร",
+        contentHtml: source,
+      }),
+    );
+    const $thai = cheerio.load(thai.contentHtml, null, false);
+    const veerachai = $thai(".wp-block-column").eq(1);
+
+    expect(veerachai.find("h4").text()).toBe("ผศ.ดร.วีรชัย อาจหาญ");
+    expect(veerachai.find("h5").text()).toBe(
+      "ผู้ว่าการ สถาบันวิจัยวิทยาศาสตร์และเทคโนโลยีแห่งประเทศไทย",
+    );
+    expect(veerachai.find("img").attr("src")).toBe(VEERACHAI_IMAGE_SRC);
+    expect(veerachai.find("img").attr("alt")).toBe("ผศ.ดร.วีรชัย อาจหาญ");
+    expect(veerachai.find(".detail-btn").hasClass("detail-btn-disabled")).toBe(true);
+    expect(veerachai.find("a").attr("href")).toBeUndefined();
+    expect(veerachai.find("a").attr("aria-disabled")).toBe("true");
+    expect($thai("h4")).toHaveLength(2);
+    expect(cheerio.load(english.contentHtml, null, false)("h4")).toHaveLength(1);
+    expect(cheerio.load(thai.contentHtml, null, false)("h4").eq(1).text()).toBe(
+      "ผศ.ดร.วีรชัย อาจหาญ",
+    );
+    expect(
+      cheerio.load(applyBoardExecutiveOverride(thai).contentHtml, null, false)("h4"),
+    ).toHaveLength(2);
   });
 
   it("removes Chulatep and Watcharachan cards from the board tables", () => {

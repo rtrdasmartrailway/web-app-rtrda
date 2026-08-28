@@ -49,6 +49,9 @@ export const WATCHARACHAN_IMAGE_SRC =
   "/wp-content/uploads/2026/08/watcharachan-sirisuwannatat.png";
 export const WEERADET_IMAGE_SRC =
   "/wp-content/uploads/2026/08/weeradet-cheevapattananuwong.jpg";
+export const VEERACHAI_IMAGE_SRC = "/wp-content/uploads/2026/08/veerachai-archan.jpg";
+const VEERACHAI_NAME = "ผศ.ดร.วีรชัย อาจหาญ";
+const VEERACHAI_ROLE = "ผู้ว่าการ สถาบันวิจัยวิทยาศาสตร์และเทคโนโลยีแห่งประเทศไทย";
 
 function compactText(value: string): string {
   return value.replace(/\s+/g, " ").trim();
@@ -199,6 +202,45 @@ function addWeeradetColumn($: cheerio.CheerioAPI, element: AnyNode): boolean {
   return true;
 }
 
+function addVeerachaiColumn($: cheerio.CheerioAPI, elements: AnyNode[]): boolean {
+  const existing = $(".lightweight-accordion .wp-block-column h4").filter(
+    (_, heading) => compactText($(heading).text()) === VEERACHAI_NAME,
+  );
+  if (existing.length > 0 || elements.length === 0) {
+    return false;
+  }
+
+  const source = elements.find((element) =>
+    new Set(["นายอนันต์ โพธิ์นิ่มแดง", "ดร. วีรเดช ชีวาพัฒนานุวงศ์"]).has(
+      compactText($(element).find("h4").first().text()),
+    ),
+  );
+  if (!source) {
+    return false;
+  }
+  const column = $(source);
+  const clone = column.clone();
+  clone.find("h4").first().text(VEERACHAI_NAME);
+  clone.find("h5").first().empty().append(VEERACHAI_ROLE);
+  const image = clone.find("img").first();
+  image.attr("src", VEERACHAI_IMAGE_SRC);
+  image.attr("alt", VEERACHAI_NAME);
+  image.removeAttr("srcset");
+  image.removeAttr("sizes");
+  const detailButton = clone.find(".detail-btn");
+  detailButton.addClass("detail-btn-disabled").attr("aria-disabled", "true");
+  detailButton.find("a").removeAttr("href").attr({
+    "aria-disabled": "true",
+    tabindex: "-1",
+  });
+  const weeradetColumn = $(".lightweight-accordion .wp-block-column").filter(
+    (_, element) =>
+      compactText($(element).find("h4").first().text()) === "ดร. วีรเดช ชีวาพัฒนานุวงศ์",
+  );
+  (weeradetColumn.length > 0 ? weeradetColumn.first() : column).after(clone);
+  return true;
+}
+
 function rewriteMinistryRepresentativeColumn(
   $: cheerio.CheerioAPI,
   element: AnyNode,
@@ -301,6 +343,7 @@ export function applyBoardExecutiveOverride(record: WpContentRecord): WpContentR
   );
   const didAddWeeradet =
     record.language === "th" && columns.some((element) => addWeeradetColumn($, element));
+  const didAddVeerachai = record.language === "th" && addVeerachaiColumn($, columns);
   const didRewriteMinistryRepresentative = columns.some((element) =>
     rewriteMinistryRepresentativeColumn($, element, record.language),
   );
@@ -318,6 +361,7 @@ export function applyBoardExecutiveOverride(record: WpContentRecord): WpContentR
     !didRemoveNamedBoardCards &&
     !didRewriteRailwayRepresentative &&
     !didAddWeeradet &&
+    !didAddVeerachai &&
     !didRewriteMinistryRepresentative &&
     !didRewriteResearch &&
     !didRewriteAdmin
