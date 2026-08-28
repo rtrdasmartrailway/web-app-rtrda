@@ -25,6 +25,11 @@ const PATTANAPHONG_NAMES = new Set([
   "พัฒนพงษ์ พงศ์ศุภสมิทธิ์",
   "Pattanaphong Phongsupatsamit",
 ]);
+const PIANG_OR_NAMES = new Set([
+  "ดร. เพียงออ เลาหะวิไลย",
+  "ดร.เพียงออ เลาหะวิไลย",
+  "Dr. Piang-or Loahavilai",
+]);
 
 function compactText(value: string): string {
   return value.replace(/\s+/g, " ").trim();
@@ -78,6 +83,22 @@ function rewritePattanaphongColumn(
     role.append("กรรมการ<br>รองผู้ว่าการ รฟม. (บริหาร)<br>ผู้แทนผู้ว่าการ รฟม.");
   }
 
+  return true;
+}
+
+function rewritePiangOrColumn(
+  $: cheerio.CheerioAPI,
+  element: AnyNode,
+  language: WpContentRecord["language"],
+): boolean {
+  const column = $(element);
+  if (!PIANG_OR_NAMES.has(compactText(column.find("h4").first().text()))) {
+    return false;
+  }
+
+  const role = column.find("h5").first();
+  role.empty();
+  role.append(language === "en" ? "Member &amp; Secretary" : "กรรมการและเลขานุการฯ");
   return true;
 }
 
@@ -145,6 +166,9 @@ export function applyBoardExecutiveOverride(record: WpContentRecord): WpContentR
   const didRewritePattanaphong = columns.some((element) =>
     rewritePattanaphongColumn($, element, record.language),
   );
+  const didRewritePiangOr = columns.some((element) =>
+    rewritePiangOrColumn($, element, record.language),
+  );
   const didRewriteResearch =
     record.language === "th" &&
     columns.some((element) => rewriteTargetColumn($, element));
@@ -154,6 +178,7 @@ export function applyBoardExecutiveOverride(record: WpContentRecord): WpContentR
   if (
     !didRewritePichet &&
     !didRewritePattanaphong &&
+    !didRewritePiangOr &&
     !didRewriteResearch &&
     !didRewriteAdmin
   ) {

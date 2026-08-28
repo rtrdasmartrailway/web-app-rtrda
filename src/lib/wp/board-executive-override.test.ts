@@ -158,6 +158,28 @@ describe("applyBoardExecutiveOverride", () => {
     );
   });
 
+  it("shows the Thai secretary suffix on Piang-or's board role", () => {
+    const thai = applyBoardExecutiveOverride(
+      record({
+        contentHtml: `<div class="lightweight-accordion"><div class="wp-block-column"><h4>ดร. เพียงออ เลาหะวิไลย</h4><h5>กรรมการและเลขานุการ</h5></div></div>`,
+      }),
+    );
+    const english = applyBoardExecutiveOverride(
+      record({
+        language: "en",
+        path: "/en/เกี่ยวกับ-สทร/คณะกรรมการ-ผู้บริหาร",
+        contentHtml: `<div class="lightweight-accordion"><div class="wp-block-column"><h4>Dr. Piang-or Loahavilai</h4><h5>Member &amp; Secretary</h5></div></div>`,
+      }),
+    );
+
+    expect(cheerio.load(thai.contentHtml, null, false)("h5").text()).toBe(
+      "กรรมการและเลขานุการฯ",
+    );
+    expect(cheerio.load(english.contentHtml, null, false)("h5").text()).toBe(
+      "Member & Secretary",
+    );
+  });
+
   it("does not duplicate Chaiyut on the entrepreneur card", () => {
     const source = `
       <div class="lightweight-accordion">
