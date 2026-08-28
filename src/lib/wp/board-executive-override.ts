@@ -278,12 +278,20 @@ function reorderBoardColumns(
     boardAccordions.length > 0
       ? boardAccordions.first()
       : $(".lightweight-accordion").first();
-  const columns = accordion
+  const allColumns = accordion
     .find(".lightweight-accordion-body .wp-block-column")
     .toArray();
-  if (columns.length === 0) {
-    columns.push(...accordion.find(".wp-block-column").toArray());
+  if (allColumns.length === 0) {
+    allColumns.push(...accordion.find(".wp-block-column").toArray());
   }
+  const firstRow = accordion
+    .find(".lightweight-accordion-body > .wp-block-columns")
+    .first();
+  const firstRowColumns = firstRow.children(".wp-block-column").toArray();
+  const columns =
+    firstRowColumns.length > 0
+      ? allColumns.filter((element) => !firstRowColumns.includes(element))
+      : allColumns;
   const names = columns.map((element) =>
     compactText($(element).find("h4").first().text()),
   );
