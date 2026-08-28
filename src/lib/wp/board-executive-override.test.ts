@@ -6,6 +6,7 @@ import {
   CHAIYUT_IMAGE_SRC,
   CHAIYUT_NAME,
   TACHAKORN_IMAGE_SRC,
+  WEERADET_IMAGE_SRC,
 } from "./board-executive-override";
 
 function record(overrides: Partial<WpContentRecord>): WpContentRecord {
@@ -208,14 +209,14 @@ describe("applyBoardExecutiveOverride", () => {
   it("replaces the railway representative card with Weeradet", () => {
     const thai = applyBoardExecutiveOverride(
       record({
-        contentHtml: `<div class="lightweight-accordion"><div class="wp-block-column"><h4>ผู้แทน ผู้ว่าการรถไฟแห่งประเทศไทย</h4><h5>กรรมการโดยตำแหน่ง ผู้ว่าการรถไฟแห่งประเทศไทย</h5></div></div>`,
+        contentHtml: `<div class="lightweight-accordion"><div class="wp-block-column"><img src="old.jpg" srcset="old.jpg 400w" sizes="auto" alt="" /><h4>ผู้แทน ผู้ว่าการรถไฟแห่งประเทศไทย</h4><h5>กรรมการโดยตำแหน่ง ผู้ว่าการรถไฟแห่งประเทศไทย</h5></div></div>`,
       }),
     );
     const english = applyBoardExecutiveOverride(
       record({
         language: "en",
         path: "/en/เกี่ยวกับ-สทร/คณะกรรมการ-ผู้บริหาร",
-        contentHtml: `<div class="lightweight-accordion"><div class="wp-block-column"><h4>ผู้แทน ผู้ว่าการรถไฟแห่งประเทศไทย</h4><h5>กรรมการโดยตำแหน่ง ผู้ว่าการรถไฟแห่งประเทศไทย</h5></div></div>`,
+        contentHtml: `<div class="lightweight-accordion"><div class="wp-block-column"><img src="old.jpg" srcset="old.jpg 400w" sizes="auto" alt="" /><h4>ผู้แทน ผู้ว่าการรถไฟแห่งประเทศไทย</h4><h5>กรรมการโดยตำแหน่ง ผู้ว่าการรถไฟแห่งประเทศไทย</h5></div></div>`,
       }),
     );
 
@@ -231,6 +232,12 @@ describe("applyBoardExecutiveOverride", () => {
     expect(cheerio.load(english.contentHtml, null, false)("h5").text()).toBe(
       "Expert Committee Member",
     );
+    for (const contentHtml of [thai.contentHtml, english.contentHtml]) {
+      const image = cheerio.load(contentHtml, null, false)("img");
+      expect(image.attr("src")).toBe(WEERADET_IMAGE_SRC);
+      expect(image.attr("srcset")).toBeUndefined();
+      expect(image.attr("sizes")).toBeUndefined();
+    }
   });
 
   it("does not duplicate Chaiyut on the entrepreneur card", () => {
