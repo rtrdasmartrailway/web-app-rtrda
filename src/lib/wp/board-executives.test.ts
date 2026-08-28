@@ -103,6 +103,19 @@ describe("board executive parser", () => {
     expect(english?.html).not.toContain("วิศวกรรมการก่อสร้างและการจัดการ");
   });
 
+  it("selects Thai and English content for Piang-or's popup", () => {
+    const thai = getBoardExecutiveDetailByName("ดร. เพียงออ เลาหะวิไลย", "th");
+    const english = getBoardExecutiveDetailByName("Dr. Piang-or Loahavilai", "en");
+
+    expect(thai?.html).toContain("กรรมการและเลขานุการฯ");
+    expect(thai?.html).toContain("ศูนย์ Sister Cities Research Center");
+    expect(english?.html).toContain("Member &amp; Secretary");
+    expect(english?.html).toContain(
+      "President, Rail Technology Research and Development Agency",
+    );
+    expect(english?.html).not.toContain("กรรมการและเลขานุการฯ");
+  });
+
   it("detects the Thai and English board executive routes", () => {
     expect(isBoardExecutivePath("/เกี่ยวกับ-สทร/คณะกรรมการ-ผู้บริหาร")).toBe(true);
     expect(isBoardExecutivePath("/en/เกี่ยวกับ-สทร/คณะกรรมการ-ผู้บริหาร")).toBe(true);
