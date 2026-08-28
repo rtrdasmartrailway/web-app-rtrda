@@ -180,6 +180,31 @@ describe("applyBoardExecutiveOverride", () => {
     );
   });
 
+  it("removes Thavorn's card from Thai and English board pages", () => {
+    const source = `<div class="lightweight-accordion"><div class="wp-block-column"><h4>ถาวร ชลัษเฐียร</h4><h5>ที่ปรึกษาคณะกรรมการ</h5></div><div class="wp-block-column"><h4>คนอื่น</h4><h5>กรรมการ</h5></div></div>`;
+    const thai = applyBoardExecutiveOverride(record({ contentHtml: source }));
+    const english = applyBoardExecutiveOverride(
+      record({
+        language: "en",
+        path: "/en/เกี่ยวกับ-สทร/คณะกรรมการ-ผู้บริหาร",
+        contentHtml: source.replace("ถาวร ชลัษเฐียร", "Thavorn Chalassathien"),
+      }),
+    );
+    const $thai = cheerio.load(thai.contentHtml, null, false);
+    const $english = cheerio.load(english.contentHtml, null, false);
+
+    expect(
+      $thai("h4")
+        .map((_, element) => $thai(element).text())
+        .get(),
+    ).toEqual(["คนอื่น"]);
+    expect(
+      $english("h4")
+        .map((_, element) => $english(element).text())
+        .get(),
+    ).toEqual(["คนอื่น"]);
+  });
+
   it("does not duplicate Chaiyut on the entrepreneur card", () => {
     const source = `
       <div class="lightweight-accordion">
