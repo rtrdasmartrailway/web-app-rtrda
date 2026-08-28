@@ -233,8 +233,8 @@ describe("applyBoardExecutiveOverride", () => {
         .map((_, element) => cheerio.load(thai.contentHtml, null, false)(element).text())
         .get(),
     ).toEqual([
-      "นายอนันต์ โพธิ์นิ่มแดง",
       "ดร. วีรเดช ชีวาพัฒนานุวงศ์",
+      "นายอนันต์ โพธิ์นิ่มแดง",
       "ผศ.ดร.วีรชัย อาจหาญ",
     ]);
     expect(
@@ -247,8 +247,8 @@ describe("applyBoardExecutiveOverride", () => {
         .map((_, element) => cheerio.load(thai.contentHtml, null, false)(element).text())
         .get(),
     ).toEqual([
-      "กรรมการ",
       "กรรมการผู้ทรงคุณวุฒิ",
+      "กรรมการ",
       "ผู้ว่าการ สถาบันวิจัยวิทยาศาสตร์และเทคโนโลยีแห่งประเทศไทย",
     ]);
     expect(cheerio.load(english.contentHtml, null, false)("h4").text()).toBe(
@@ -258,10 +258,10 @@ describe("applyBoardExecutiveOverride", () => {
       "Expert Committee Member",
     );
     expect(cheerio.load(thai.contentHtml, null, false)("img").eq(0).attr("src")).toBe(
-      ANAN_IMAGE_SRC,
+      WEERADET_IMAGE_SRC,
     );
     expect(cheerio.load(thai.contentHtml, null, false)("img").eq(1).attr("src")).toBe(
-      WEERADET_IMAGE_SRC,
+      ANAN_IMAGE_SRC,
     );
     expect(cheerio.load(thai.contentHtml, null, false)("img").eq(2).attr("src")).toBe(
       VEERACHAI_IMAGE_SRC,
@@ -324,6 +324,83 @@ describe("applyBoardExecutiveOverride", () => {
     expect(
       cheerio.load(applyBoardExecutiveOverride(thai).contentHtml, null, false)("h4"),
     ).toHaveLength(2);
+  });
+
+  it("orders the requested board cards in Thai and English", () => {
+    const card = (name: string) =>
+      `<div class="wp-block-column"><h4>${name}</h4><h5>กรรมการ</h5></div>`;
+    const source = [
+      "พัฒนพงษ์ พงศ์ศุภสมิทธิ์",
+      "ดร. พิเชฐ คุณาธรรมรักษ์",
+      "ผู้แทน กระทรวงการอุดมศึกษา วิทยาศาสตร์ วิจัยและนวัตกรรม",
+      "ดร. วีรเดช ชีวาพัฒนานุวงศ์",
+      "ชาญเชาวน์ ไชยานุกิจ",
+      "ผศ. พิศิษฐ์ แสง-ชูโต",
+      "ดรุณ แสงฉาย",
+      "รศ.ดร. โชติชัย เจริญงาม",
+      "นายอนันต์ โพธิ์นิ่มแดง",
+    ]
+      .map(card)
+      .join("");
+    const thai = applyBoardExecutiveOverride(
+      record({
+        contentHtml: `<div class="lightweight-accordion"><details><summary>คณะกรรมการ</summary><div class="lightweight-accordion-body">${source}</div></details></div>`,
+      }),
+    );
+    const $thai = cheerio.load(thai.contentHtml, null, false);
+
+    expect(
+      $thai("h4")
+        .map((_, element) => $thai(element).text())
+        .get()
+        .slice(0, 9),
+    ).toEqual([
+      "รศ.ดร. โชติชัย เจริญงาม",
+      "ดรุณ แสงฉาย",
+      "ชาญเชาวน์ ไชยานุกิจ",
+      "ผศ. พิศิษฐ์ แสง-ชูโต",
+      "ดร. วีรเดช ชีวาพัฒนานุวงศ์",
+      "วัชรชาญ สิริสุวรรณทัศน์",
+      "ดร. พิเชฐ คุณาธรรมรักษ์",
+      "นายอนันต์ โพธิ์นิ่มแดง",
+      "พัฒนพงษ์ พงศ์ศุภสมิทธิ์",
+    ]);
+
+    const englishSource = [
+      "Pattanaphong Phongnsupatsamit",
+      "Dr. Pichet Kunadhamraks",
+      "ผู้แทน กระทรวงการอุดมศึกษา วิทยาศาสตร์ วิจัยและนวัตกรรม",
+      "Dr. Weeradet Cheevapattananuwong",
+      "ชาญเชาวน์ ไชยานุกิจ",
+      "Asst. Prof. Pisit Saeng-Xuto",
+      "Darun Saengshine",
+      "Assoc. Prof. Dr. Chotchai Charoenngam",
+    ]
+      .map(card)
+      .join("");
+    const english = applyBoardExecutiveOverride(
+      record({
+        language: "en",
+        path: "/en/เกี่ยวกับ-สทร/คณะกรรมการ-ผู้บริหาร",
+        contentHtml: `<div class="lightweight-accordion"><details><summary>Board of Directors</summary><div class="lightweight-accordion-body">${englishSource}</div></details></div>`,
+      }),
+    );
+    const $english = cheerio.load(english.contentHtml, null, false);
+
+    expect(
+      $english("h4")
+        .map((_, element) => $english(element).text())
+        .get(),
+    ).toEqual([
+      "Assoc. Prof. Dr. Chotchai Charoenngam",
+      "Darun Saengshine",
+      "ชาญเชาวน์ ไชยานุกิจ",
+      "Asst. Prof. Pisit Saeng-Xuto",
+      "Dr. Weeradet Cheevapattananuwong",
+      "ผู้แทน กระทรวงการอุดมศึกษา วิทยาศาสตร์ วิจัยและนวัตกรรม",
+      "Dr. Pichet Kunadhamraks",
+      "Pattanaphong Phongnsupatsamit",
+    ]);
   });
 
   it("removes Chulatep and Watcharachan cards from the board tables", () => {
