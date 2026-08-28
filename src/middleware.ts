@@ -16,7 +16,6 @@ const ANALYTICS_METHODS = "POST, OPTIONS";
 const ANALYTICS_EVENT_PATH = "/api/analytics/events";
 const HEALTH_PATHS = new Set(["/healthz", "/api/health"]);
 const PUBLIC_HOSTS = new Set(["rtrda.or.th", "www.rtrda.or.th", "test.rtrda.or.th"]);
-const DOCUMENT_LANGUAGE_HEADER = "x-rtrda-document-language";
 
 function firstForwardedValue(value: string | null): string {
   return value?.split(",")[0]?.trim().toLowerCase() ?? "";
@@ -89,10 +88,5 @@ export function middleware(request: NextRequest) {
     return NextResponse.rewrite(new URL(CANONICAL_O10_ESERVICE_PDF_PATH, request.url));
   }
 
-  const requestHeaders = new Headers(request.headers);
-  requestHeaders.set(
-    DOCUMENT_LANGUAGE_HEADER,
-    rawPath === "/en" || rawPath.startsWith("/en/") ? "en" : "th",
-  );
-  return NextResponse.next({ request: { headers: requestHeaders } });
+  return NextResponse.next();
 }

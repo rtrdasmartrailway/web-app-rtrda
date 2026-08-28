@@ -96,16 +96,4 @@ describe("security middleware", () => {
     expect(response.status).toBe(204);
     expect(response.headers.get("allow")).toBe("GET, HEAD, OPTIONS");
   });
-
-  it.each([
-    ["/", "th"],
-    ["/en/เกี่ยวกับ-สทร/คณะกรรมการ-ผู้บริหาร", "en"],
-  ])("passes the document language for %s", (path, language) => {
-    const response = middleware(request(`https://test.rtrda.or.th${path}`));
-
-    expect(response.headers.get("x-middleware-next")).toBe("1");
-    expect(response.headers.get("x-middleware-request-x-rtrda-document-language")).toBe(
-      language,
-    );
-  });
 });
