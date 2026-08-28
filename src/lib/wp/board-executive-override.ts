@@ -24,6 +24,7 @@ const PICHET_NAMES = new Set([
 const PATTANAPHONG_NAMES = new Set([
   "พัฒนพงษ์ พงศ์ศุภสมิทธิ์",
   "Pattanaphong Phongsupatsamit",
+  "Pattanaphong Phongnsupatsamit",
 ]);
 const PIANG_OR_NAMES = new Set([
   "ดร. เพียงออ เลาหะวิไลย",
@@ -39,6 +40,8 @@ const REPRESENTATIVE_RAILWAY_NAMES = new Set([
 export const ANAN_IMAGE_SRC = "/wp-content/uploads/2026/08/anan-pho-nimdaeng.png";
 const REPRESENTATIVE_MINISTRY_NAME =
   "ผู้แทน กระทรวงการอุดมศึกษา วิทยาศาสตร์ วิจัยและนวัตกรรม";
+const REPRESENTATIVE_MINISTRY_NAME_EN =
+  "Representative of the Ministry of Higher Education, Science, Research and Innovation";
 const REMOVED_BOARD_NAMES = new Set([
   "ดร. จุลเทพ ขจรไชยกูล",
   "ดร.จุลเทพ ขจรไชยกูล",
@@ -49,9 +52,6 @@ export const WATCHARACHAN_IMAGE_SRC =
   "/wp-content/uploads/2026/08/watcharachan-sirisuwannatat.png";
 export const WEERADET_IMAGE_SRC =
   "/wp-content/uploads/2026/08/weeradet-cheevapattananuwong.jpg";
-export const VEERACHAI_IMAGE_SRC = "/wp-content/uploads/2026/08/veerachai-archan.jpg";
-const VEERACHAI_NAME = "ผศ.ดร.วีรชัย อาจหาญ";
-const VEERACHAI_ROLE = "ผู้ว่าการ สถาบันวิจัยวิทยาศาสตร์และเทคโนโลยีแห่งประเทศไทย";
 const BOARD_CARD_ORDER: Record<WpContentRecord["language"], string[]> = {
   th: [
     "รศ.ดร. โชติชัย เจริญงาม",
@@ -67,10 +67,10 @@ const BOARD_CARD_ORDER: Record<WpContentRecord["language"], string[]> = {
   en: [
     "Assoc. Prof. Dr. Chotchai Charoenngam",
     "Darun Saengshine",
-    "ชาญเชาวน์ ไชยานุกิจ",
+    "Chanchao Chaiyanukij",
     "Asst. Prof. Pisit Saeng-Xuto",
     "Dr. Weeradet Cheevapattananuwong",
-    "ผู้แทน กระทรวงการอุดมศึกษา วิทยาศาสตร์ วิจัยและนวัตกรรม",
+    REPRESENTATIVE_MINISTRY_NAME_EN,
     "Dr. Pichet Kunadhamraks",
     "Anan Pho Nimdaeng",
     "Pattanaphong Phongsupatsamit",
@@ -146,6 +146,25 @@ function rewritePiangOrColumn(
   const role = column.find("h5").first();
   role.empty();
   role.append(language === "en" ? "Member &amp; Secretary" : "กรรมการและเลขานุการฯ");
+  return true;
+}
+
+function rewriteChanchaoColumn(
+  $: cheerio.CheerioAPI,
+  element: AnyNode,
+  language: WpContentRecord["language"],
+): boolean {
+  if (language !== "en") {
+    return false;
+  }
+
+  const column = $(element);
+  if (compactText(column.find("h4").first().text()) !== "ชาญเชาวน์ ไชยานุกิจ") {
+    return false;
+  }
+
+  column.find("h4").first().text("Chanchao Chaiyanukij");
+  column.find("h5").first().empty().append("Expert Committee Member");
   return true;
 }
 
@@ -227,45 +246,6 @@ function addWeeradetColumn($: cheerio.CheerioAPI, element: AnyNode): boolean {
   return true;
 }
 
-function addVeerachaiColumn($: cheerio.CheerioAPI, elements: AnyNode[]): boolean {
-  const existing = $(".lightweight-accordion .wp-block-column h4").filter(
-    (_, heading) => compactText($(heading).text()) === VEERACHAI_NAME,
-  );
-  if (existing.length > 0 || elements.length === 0) {
-    return false;
-  }
-
-  const source = elements.find((element) =>
-    new Set(["นายอนันต์ โพธิ์นิ่มแดง", "ดร. วีรเดช ชีวาพัฒนานุวงศ์"]).has(
-      compactText($(element).find("h4").first().text()),
-    ),
-  );
-  if (!source) {
-    return false;
-  }
-  const column = $(source);
-  const clone = column.clone();
-  clone.find("h4").first().text(VEERACHAI_NAME);
-  clone.find("h5").first().empty().append(VEERACHAI_ROLE);
-  const image = clone.find("img").first();
-  image.attr("src", VEERACHAI_IMAGE_SRC);
-  image.attr("alt", VEERACHAI_NAME);
-  image.removeAttr("srcset");
-  image.removeAttr("sizes");
-  const detailButton = clone.find(".detail-btn");
-  detailButton.addClass("detail-btn-disabled").attr("aria-disabled", "true");
-  detailButton.find("a").removeAttr("href").attr({
-    "aria-disabled": "true",
-    tabindex: "-1",
-  });
-  const weeradetColumn = $(".lightweight-accordion .wp-block-column").filter(
-    (_, element) =>
-      compactText($(element).find("h4").first().text()) === "ดร. วีรเดช ชีวาพัฒนานุวงศ์",
-  );
-  (weeradetColumn.length > 0 ? weeradetColumn.first() : column).after(clone);
-  return true;
-}
-
 function reorderBoardColumns(
   $: cheerio.CheerioAPI,
   language: WpContentRecord["language"],
@@ -321,12 +301,14 @@ function rewriteMinistryRepresentativeColumn(
   element: AnyNode,
   language: WpContentRecord["language"],
 ): boolean {
-  if (language !== "th") {
-    return false;
-  }
-
   const column = $(element);
-  if (compactText(column.find("h4").first().text()) !== REPRESENTATIVE_MINISTRY_NAME) {
+  const heading = compactText(column.find("h4").first().text());
+  if (language === "en" && heading === REPRESENTATIVE_MINISTRY_NAME) {
+    column.find("h4").first().text(REPRESENTATIVE_MINISTRY_NAME_EN);
+    column.find("h5").first().empty().append("Ex Officio Board Member");
+    return true;
+  }
+  if (language !== "th" || heading !== REPRESENTATIVE_MINISTRY_NAME) {
     return false;
   }
 
@@ -391,6 +373,47 @@ function rewriteAdminColumn($: cheerio.CheerioAPI, element: AnyNode): boolean {
   return true;
 }
 
+function rewriteEnglishManagerColumn($: cheerio.CheerioAPI, element: AnyNode): boolean {
+  const column = $(element);
+  const role = compactText(column.find("h5").first().text());
+  const roleTranslations: Array<[string, string]> = [
+    ["ผู้จัดการกลุ่มวิจัยและมาตรฐาน", "Research and Standards Group Manager"],
+    [
+      "ผู้จัดการกลุ่มพัฒนาผู้ประกอบการและธุรกิจใหม่",
+      "New Entrepreneurs and Business Development Group Manager",
+    ],
+    [
+      "ผู้จัดการกลุ่มพัฒนาดิจิทัลระบบราง",
+      "Rail Systems Digital Development Group Manager",
+    ],
+    [
+      "ผู้จัดการกลุ่มกลยุทธ์และสื่อสารองค์กร",
+      "Strategy and Corporate Communications Group Manager",
+    ],
+    ["ผู้จัดการกลุ่มบริหารภายใน", "Internal Administration Group Manager"],
+  ];
+  const translation = roleTranslations.find(([thaiRole]) => role.includes(thaiRole));
+  const heading = compactText(column.find("h4").first().text());
+  const nameTranslations = new Map([
+    [OLD_NAME, "Touchakorn Thanawatdamrong"],
+    ["ดร.กิติพันธุ์ นุตยกุล", "Touchakorn Thanawatdamrong"],
+    [CHAIYUT_NAME, "Chaiyut Tanchai"],
+  ]);
+  const translatedName = nameTranslations.get(heading);
+  if (!translation && !translatedName) {
+    return false;
+  }
+
+  if (translation) {
+    column.find("h5").first().empty().append(translation[1]);
+  }
+  if (translatedName) {
+    column.find("h4").first().text(translatedName);
+    column.find("img").first().attr("alt", translatedName);
+  }
+  return true;
+}
+
 export function applyBoardExecutiveOverride(record: WpContentRecord): WpContentRecord {
   if (!isBoardExecutivePath(record)) {
     return record;
@@ -409,6 +432,9 @@ export function applyBoardExecutiveOverride(record: WpContentRecord): WpContentR
   const didRewritePattanaphong = columns.some((element) =>
     rewritePattanaphongColumn($, element, record.language),
   );
+  const didRewriteChanchao = columns.some((element) =>
+    rewriteChanchaoColumn($, element, record.language),
+  );
   const didRewritePiangOr = columns.some((element) =>
     rewritePiangOrColumn($, element, record.language),
   );
@@ -418,7 +444,6 @@ export function applyBoardExecutiveOverride(record: WpContentRecord): WpContentR
   );
   const didAddWeeradet =
     record.language === "th" && columns.some((element) => addWeeradetColumn($, element));
-  const didAddVeerachai = record.language === "th" && addVeerachaiColumn($, columns);
   const didRewriteMinistryRepresentative = columns.some((element) =>
     rewriteMinistryRepresentativeColumn($, element, record.language),
   );
@@ -427,20 +452,28 @@ export function applyBoardExecutiveOverride(record: WpContentRecord): WpContentR
     columns.some((element) => rewriteTargetColumn($, element));
   const didRewriteAdmin =
     record.language === "th" && columns.some((element) => rewriteAdminColumn($, element));
+  let didRewriteEnglishManagers = false;
+  if (record.language === "en") {
+    for (const element of columns) {
+      didRewriteEnglishManagers =
+        rewriteEnglishManagerColumn($, element) || didRewriteEnglishManagers;
+    }
+  }
   const didReorderColumns = reorderBoardColumns($, record.language);
 
   if (
     !didRewritePichet &&
     !didRewritePattanaphong &&
+    !didRewriteChanchao &&
     !didRewritePiangOr &&
     !didRemoveThavorn &&
     !didRemoveNamedBoardCards &&
     !didRewriteRailwayRepresentative &&
     !didAddWeeradet &&
-    !didAddVeerachai &&
     !didRewriteMinistryRepresentative &&
     !didRewriteResearch &&
     !didRewriteAdmin &&
+    !didRewriteEnglishManagers &&
     !didReorderColumns
   ) {
     return record;
