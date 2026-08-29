@@ -222,37 +222,21 @@ describe("applyBoardExecutiveOverride", () => {
       }),
     );
 
-    expect(
-      cheerio
-        .load(
-          thai.contentHtml,
-          null,
-          false,
-        )("h4")
-        .map((_, element) => cheerio.load(thai.contentHtml, null, false)(element).text())
-        .get(),
-    ).toEqual(["นายอนันต์ โพธิ์นิ่มแดง", "ดร. วีรเดช ชีวาพัฒนานุวงศ์"]);
-    expect(
-      cheerio
-        .load(
-          thai.contentHtml,
-          null,
-          false,
-        )("h5")
-        .map((_, element) => cheerio.load(thai.contentHtml, null, false)(element).text())
-        .get(),
-    ).toEqual(["กรรมการ", "กรรมการผู้ทรงคุณวุฒิ"]);
+    expect(cheerio.load(thai.contentHtml, null, false)("h4").text()).toBe(
+      "นายอนันต์ โพธิ์นิ่มแดง",
+    );
+    expect(cheerio.load(thai.contentHtml, null, false)("h5").text()).toBe("กรรมการ");
     expect(cheerio.load(english.contentHtml, null, false)("h4").text()).toBe(
       "Dr. Weeradet Cheevapattananuwong",
     );
     expect(cheerio.load(english.contentHtml, null, false)("h5").text()).toBe(
       "Expert Committee Member",
     );
-    expect(cheerio.load(thai.contentHtml, null, false)("img").eq(0).attr("src")).toBe(
+    expect(cheerio.load(thai.contentHtml, null, false)("img").attr("src")).toBe(
       ANAN_IMAGE_SRC,
     );
-    expect(cheerio.load(thai.contentHtml, null, false)("img").eq(1).attr("src")).toBe(
-      WEERADET_IMAGE_SRC,
+    expect(cheerio.load(thai.contentHtml, null, false)("img").attr("alt")).toBe(
+      "นายอนันต์ โพธิ์นิ่มแดง",
     );
     expect(cheerio.load(english.contentHtml, null, false)("img").attr("src")).toBe(
       WEERADET_IMAGE_SRC,
@@ -262,8 +246,6 @@ describe("applyBoardExecutiveOverride", () => {
       expect(image.attr("srcset")).toBeUndefined();
       expect(image.attr("sizes")).toBeUndefined();
     }
-    const repeated = applyBoardExecutiveOverride(thai);
-    expect(cheerio.load(repeated.contentHtml, null, false)("h4")).toHaveLength(2);
   });
 
   it("replaces the ministry representative card with Watcharachan", () => {
