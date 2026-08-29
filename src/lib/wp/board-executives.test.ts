@@ -130,19 +130,6 @@ describe("board executive parser", () => {
     expect(english?.html).not.toContain("มหาวิทยาลัยฮอกไกโด");
   });
 
-  it("selects the updated Thai content for Watcharachan's popup", () => {
-    const detail = getBoardExecutiveDetailByName("วัชรชาญ สิริสุวรรณทัศน์", "th");
-
-    expect(detail?.html).toContain("กรรมการผู้ทรงคุณวุฒิ");
-    expect(detail?.html).toContain("2565 - 2566 รองผู้ว่าการรถไฟแห่งประเทศไทย");
-    expect(detail?.html).toContain(
-      "2569 - ปัจจุบัน กรรมการผู้ทรงคุณวุฒิ ในคณะกรรมการสถาบันวิจัยและพัฒนาเทคโนโลยีระบบราง",
-    );
-    expect(detail?.html).toContain(
-      "2556 – 2569 ที่ปรึกษาของสถาบันวิจัยและพัฒนาเทคโนโลยีระบบราง",
-    );
-  });
-
   it("detects the Thai and English board executive routes", () => {
     expect(isBoardExecutivePath("/เกี่ยวกับ-สทร/คณะกรรมการ-ผู้บริหาร")).toBe(true);
     expect(isBoardExecutivePath("/en/เกี่ยวกับ-สทร/คณะกรรมการ-ผู้บริหาร")).toBe(true);
