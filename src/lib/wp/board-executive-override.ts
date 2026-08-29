@@ -42,8 +42,6 @@ const REPRESENTATIVE_RAILWAY_NAMES = new Set([
   "Dr. Weeradet Cheevapattananuwong",
 ]);
 export const ANAN_IMAGE_SRC = "/wp-content/uploads/2026/08/anan-pho-nimdaeng.png";
-const REPRESENTATIVE_MINISTRY_NAME =
-  "ผู้แทน กระทรวงการอุดมศึกษา วิทยาศาสตร์ วิจัยและนวัตกรรม";
 const REMOVED_BOARD_NAMES = new Set([
   "ดร. จุลเทพ ขจรไชยกูล",
   "ดร.จุลเทพ ขจรไชยกูล",
