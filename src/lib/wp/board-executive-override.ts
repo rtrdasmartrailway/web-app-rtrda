@@ -214,7 +214,11 @@ function rewriteRailwayRepresentativeColumn(
   language: WpContentRecord["language"],
 ): boolean {
   const column = $(element);
-  if (!REPRESENTATIVE_RAILWAY_NAMES.has(compactText(column.find("h4").first().text()))) {
+  const heading = compactText(column.find("h4").first().text());
+  if (
+    !REPRESENTATIVE_RAILWAY_NAMES.has(heading) ||
+    (language === "th" && heading === "ดร. วีรเดช ชีวาพัฒนานุวงศ์")
+  ) {
     return false;
   }
 
@@ -235,6 +239,30 @@ function rewriteRailwayRepresentativeColumn(
   const role = column.find("h5").first();
   role.empty();
   role.append(language === "en" ? "Expert Committee Member" : "กรรมการ");
+  return true;
+}
+
+function addWeeradetColumn($: cheerio.CheerioAPI, element: AnyNode): boolean {
+  const existing = $(".lightweight-accordion .wp-block-column h4").filter(
+    (_, heading) => compactText($(heading).text()) === "ดร. วีรเดช ชีวาพัฒนานุวงศ์",
+  );
+  if (existing.length > 0) {
+    return false;
+  }
+
+  const column = $(element);
+  if (compactText(column.find("h4").first().text()) !== "นายอนันต์ โพธิ์นิ่มแดง") {
+    return false;
+  }
+  const clone = column.clone();
+  clone.find("h4").first().text("ดร. วีรเดช ชีวาพัฒนานุวงศ์");
+  clone.find("h5").first().empty().append("กรรมการผู้ทรงคุณวุฒิ");
+  const image = clone.find("img").first();
+  image.attr("src", WEERADET_IMAGE_SRC);
+  image.attr("alt", "ดร. วีรเดช ชีวาพัฒนานุวงศ์");
+  image.removeAttr("srcset");
+  image.removeAttr("sizes");
+  column.after(clone);
   return true;
 }
 
@@ -338,6 +366,8 @@ export function applyBoardExecutiveOverride(record: WpContentRecord): WpContentR
   const didRewriteRailwayRepresentative = columns.some((element) =>
     rewriteRailwayRepresentativeColumn($, element, record.language),
   );
+  const didAddWeeradet =
+    record.language === "th" && columns.some((element) => addWeeradetColumn($, element));
   const didRewriteMinistryRepresentative = columns.some((element) =>
     rewriteMinistryRepresentativeColumn($, element, record.language),
   );
@@ -361,6 +391,7 @@ export function applyBoardExecutiveOverride(record: WpContentRecord): WpContentR
     !didRemoveThavorn &&
     !didRemoveNamedBoardCards &&
     !didRewriteRailwayRepresentative &&
+    !didAddWeeradet &&
     !didRewriteMinistryRepresentative &&
     !didRewriteResearch &&
     !didRewriteAdmin &&
