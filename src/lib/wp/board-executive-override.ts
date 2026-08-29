@@ -41,6 +41,8 @@ const REPRESENTATIVE_RAILWAY_NAMES = new Set([
   "ดร. วีรเดช ชีวาพัฒนานุวงศ์",
   "Dr. Weeradet Cheevapattananuwong",
 ]);
+const REPRESENTATIVE_MINISTRY_NAME =
+  "ผู้แทน กระทรวงการอุดมศึกษา วิทยาศาสตร์ วิจัยและนวัตกรรม";
 export const WEERADET_IMAGE_SRC =
   "/wp-content/uploads/2026/08/weeradet-cheevapattananuwong.jpg";
 
@@ -219,6 +221,25 @@ function rewriteRailwayRepresentativeColumn(
   return true;
 }
 
+function rewriteMinistryRepresentativeColumn(
+  $: cheerio.CheerioAPI,
+  element: AnyNode,
+  language: WpContentRecord["language"],
+): boolean {
+  if (language !== "th") {
+    return false;
+  }
+
+  const column = $(element);
+  if (compactText(column.find("h4").first().text()) !== REPRESENTATIVE_MINISTRY_NAME) {
+    return false;
+  }
+
+  column.find("h4").first().text("วัชรชาญ สิริสุวรรณทัศน์");
+  column.find("h5").first().empty().append("กรรมการผู้ทรงคุณวุฒิ");
+  return true;
+}
+
 function rewriteTargetColumn($: cheerio.CheerioAPI, element: AnyNode): boolean {
   const column = $(element);
   const heading = column.find("h4").first();
@@ -290,6 +311,9 @@ export function applyBoardExecutiveOverride(record: WpContentRecord): WpContentR
   const didRewriteRailwayRepresentative = columns.some((element) =>
     rewriteRailwayRepresentativeColumn($, element, record.language),
   );
+  const didRewriteMinistryRepresentative = columns.some((element) =>
+    rewriteMinistryRepresentativeColumn($, element, record.language),
+  );
   const didRewriteResearch =
     record.language === "th" &&
     columns.some((element) => rewriteTargetColumn($, element));
@@ -309,6 +333,7 @@ export function applyBoardExecutiveOverride(record: WpContentRecord): WpContentR
     !didRewritePiangOr &&
     !didRemoveThavorn &&
     !didRewriteRailwayRepresentative &&
+    !didRewriteMinistryRepresentative &&
     !didRewriteResearch &&
     !didRewriteAdmin &&
     !didRewriteEnglish
