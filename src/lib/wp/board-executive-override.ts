@@ -36,6 +36,11 @@ const REPRESENTATIVE_MINISTRY_NAME =
   "ผู้แทน กระทรวงการอุดมศึกษา วิทยาศาสตร์ วิจัยและนวัตกรรม";
 const REPRESENTATIVE_MINISTRY_NAME_EN =
   "Representative of the Ministry of Higher Education, Science, Research and Innovation";
+const REPRESENTATIVE_RAILWAY_NAMES = new Set([
+  "ผู้แทน ผู้ว่าการรถไฟแห่งประเทศไทย",
+  "ดร. วีรเดช ชีวาพัฒนานุวงศ์",
+  "Dr. Weeradet Cheevapattananuwong",
+]);
 
 function compactText(value: string): string {
   return value.replace(/\s+/g, " ").trim();
@@ -180,6 +185,30 @@ function removeThavornColumn($: cheerio.CheerioAPI, element: AnyNode): boolean {
   return true;
 }
 
+function rewriteRailwayRepresentativeColumn(
+  $: cheerio.CheerioAPI,
+  element: AnyNode,
+  language: WpContentRecord["language"],
+): boolean {
+  const column = $(element);
+  if (!REPRESENTATIVE_RAILWAY_NAMES.has(compactText(column.find("h4").first().text()))) {
+    return false;
+  }
+
+  column
+    .find("h4")
+    .first()
+    .text(
+      language === "en"
+        ? "Dr. Weeradet Cheevapattananuwong"
+        : "ดร. วีรเดช ชีวาพัฒนานุวงศ์",
+    );
+  const role = column.find("h5").first();
+  role.empty();
+  role.append(language === "en" ? "Expert Committee Member" : "กรรมการผู้ทรงคุณวุฒิ");
+  return true;
+}
+
 function rewriteTargetColumn($: cheerio.CheerioAPI, element: AnyNode): boolean {
   const column = $(element);
   const heading = column.find("h4").first();
@@ -248,6 +277,9 @@ export function applyBoardExecutiveOverride(record: WpContentRecord): WpContentR
     rewritePiangOrColumn($, element, record.language),
   );
   const didRemoveThavorn = columns.some((element) => removeThavornColumn($, element));
+  const didRewriteRailwayRepresentative = columns.some((element) =>
+    rewriteRailwayRepresentativeColumn($, element, record.language),
+  );
   const didRewriteResearch =
     record.language === "th" &&
     columns.some((element) => rewriteTargetColumn($, element));
@@ -266,6 +298,7 @@ export function applyBoardExecutiveOverride(record: WpContentRecord): WpContentR
     !didRewritePattanaphong &&
     !didRewritePiangOr &&
     !didRemoveThavorn &&
+    !didRewriteRailwayRepresentative &&
     !didRewriteResearch &&
     !didRewriteAdmin &&
     !didRewriteEnglish
