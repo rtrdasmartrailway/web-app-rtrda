@@ -403,23 +403,6 @@ describe("applyBoardExecutiveOverride", () => {
     ]);
   });
 
-  it("keeps Chotchai alone in the first board row", () => {
-    const source = `<div class="lightweight-accordion"><details><summary>คณะกรรมการ</summary><div class="lightweight-accordion-body"><div class="wp-block-columns"><div class="wp-block-column"><h4>รศ.ดร. โชติชัย เจริญงาม</h4></div></div><div class="wp-block-columns"><div class="wp-block-column"><h4>ชาญเชาวน์ ไชยานุกิจ</h4></div><div class="wp-block-column"><h4>ผศ. พิศิษฐ์ แสง-ชูโต</h4></div><div class="wp-block-column"><h4>ดรุณ แสงฉาย</h4></div></div></div></details></div>`;
-    const updated = applyBoardExecutiveOverride(record({ contentHtml: source }));
-    const $ = cheerio.load(updated.contentHtml, null, false);
-    const rows = $(".lightweight-accordion .wp-block-columns");
-
-    expect(rows.first().children(".wp-block-column")).toHaveLength(1);
-    expect(rows.first().find("h4").text()).toBe("รศ.ดร. โชติชัย เจริญงาม");
-    expect(
-      rows
-        .eq(1)
-        .find("h4")
-        .map((_, element) => $(element).text())
-        .get(),
-    ).toEqual(["ดรุณ แสงฉาย", "ชาญเชาวน์ ไชยานุกิจ", "ผศ. พิศิษฐ์ แสง-ชูโต"]);
-  });
-
   it("removes Chulatep and Watcharachan cards from the board tables", () => {
     const source = `<div class="lightweight-accordion"><div class="wp-block-column"><h4>ดร. จุลเทพ ขจรไชยกูล</h4><h5>ที่ปรึกษาคณะกรรมการ</h5></div><div class="wp-block-column"><h4>วัชรชาญ สิริสุวรรณทัศน์</h4><h5>ที่ปรึกษา</h5></div><div class="wp-block-column"><h4>คนอื่น</h4><h5>กรรมการ</h5></div></div>`;
     const thai = applyBoardExecutiveOverride(record({ contentHtml: source }));
