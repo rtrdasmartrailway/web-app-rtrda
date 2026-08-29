@@ -24,6 +24,7 @@ const PICHET_NAMES = new Set([
 const PATTANAPHONG_NAMES = new Set([
   "พัฒนพงษ์ พงศ์ศุภสมิทธิ์",
   "Pattanaphong Phongsupatsamit",
+  "Pattanaphong Phongnsupatsamit",
 ]);
 const PIANG_OR_NAMES = new Set([
   "ดร. เพียงออ เลาหะวิไลย",
@@ -31,6 +32,10 @@ const PIANG_OR_NAMES = new Set([
   "Dr. Piang-or Loahavilai",
 ]);
 const THAVORN_NAMES = new Set(["ถาวร ชลัษเฐียร", "Thavorn Chalassathien"]);
+const REPRESENTATIVE_MINISTRY_NAME =
+  "ผู้แทน กระทรวงการอุดมศึกษา วิทยาศาสตร์ วิจัยและนวัตกรรม";
+const REPRESENTATIVE_MINISTRY_NAME_EN =
+  "Representative of the Ministry of Higher Education, Science, Research and Innovation";
 
 function compactText(value: string): string {
   return value.replace(/\s+/g, " ").trim();
@@ -100,6 +105,61 @@ function rewritePiangOrColumn(
   const role = column.find("h5").first();
   role.empty();
   role.append(language === "en" ? "Member &amp; Secretary" : "กรรมการและเลขานุการฯ");
+  return true;
+}
+
+function rewriteEnglishBoardColumn($: cheerio.CheerioAPI, element: AnyNode): boolean {
+  const column = $(element);
+  const heading = compactText(column.find("h4").first().text());
+  const role = compactText(column.find("h5").first().text());
+  const nameTranslations = new Map([
+    ["ชาญเชาวน์ ไชยานุกิจ", "Chanchao Chaiyanukij"],
+    [OLD_NAME, "Touchakorn Thanawatdamrong"],
+    ["ดร.กิติพันธุ์ นุตยกุล", "Touchakorn Thanawatdamrong"],
+    [CHAIYUT_NAME, "Chaiyut Tanchai"],
+  ]);
+  const roleTranslations = new Map([
+    ["กรรมการผู้ทรงคุณวุฒิ", "Expert Committee Member"],
+    ["ผู้จัดการกลุ่มวิจัยและมาตรฐาน", "Research and Standards Group Manager"],
+    [
+      "ผู้จัดการกลุ่มพัฒนาผู้ประกอบการและธุรกิจใหม่",
+      "New Entrepreneurs and Business Development Group Manager",
+    ],
+    [
+      "ผู้จัดการกลุ่มพัฒนาดิจิทัลระบบราง",
+      "Rail Systems Digital Development Group Manager",
+    ],
+    [
+      "ผู้จัดการกลุ่มกลยุทธ์และสื่อสารองค์กร",
+      "Strategy and Corporate Communications Group Manager",
+    ],
+    ["ผู้จัดการกลุ่มบริหารภายใน", "Internal Administration Group Manager"],
+  ]);
+  const translatedName = nameTranslations.get(heading);
+  const translatedRole = [...roleTranslations].find(([thaiRole]) =>
+    role.includes(thaiRole),
+  )?.[1];
+  if (!translatedName && !translatedRole) {
+    return false;
+  }
+
+  if (translatedName) {
+    column.find("h4").first().text(translatedName);
+    column.find("img").first().attr("alt", translatedName);
+  }
+  if (translatedRole) {
+    column.find("h5").first().empty().append(translatedRole);
+  }
+  return true;
+}
+
+function rewriteEnglishMinistryColumn($: cheerio.CheerioAPI, element: AnyNode): boolean {
+  const column = $(element);
+  if (compactText(column.find("h4").first().text()) !== REPRESENTATIVE_MINISTRY_NAME) {
+    return false;
+  }
+  column.find("h4").first().text(REPRESENTATIVE_MINISTRY_NAME_EN);
+  column.find("h5").first().empty().append("Ex Officio Board Member");
   return true;
 }
 
@@ -186,6 +246,13 @@ export function applyBoardExecutiveOverride(record: WpContentRecord): WpContentR
     columns.some((element) => rewriteTargetColumn($, element));
   const didRewriteAdmin =
     record.language === "th" && columns.some((element) => rewriteAdminColumn($, element));
+  let didRewriteEnglish = false;
+  if (record.language === "en") {
+    for (const element of columns) {
+      didRewriteEnglish = rewriteEnglishBoardColumn($, element) || didRewriteEnglish;
+      didRewriteEnglish = rewriteEnglishMinistryColumn($, element) || didRewriteEnglish;
+    }
+  }
 
   if (
     !didRewritePichet &&
@@ -193,7 +260,8 @@ export function applyBoardExecutiveOverride(record: WpContentRecord): WpContentR
     !didRewritePiangOr &&
     !didRemoveThavorn &&
     !didRewriteResearch &&
-    !didRewriteAdmin
+    !didRewriteAdmin &&
+    !didRewriteEnglish
   ) {
     return record;
   }
