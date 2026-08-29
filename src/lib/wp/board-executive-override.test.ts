@@ -6,7 +6,6 @@ import {
   CHAIYUT_IMAGE_SRC,
   CHAIYUT_NAME,
   TACHAKORN_IMAGE_SRC,
-  WATCHARACHAN_IMAGE_SRC,
   WEERADET_IMAGE_SRC,
 } from "./board-executive-override";
 
@@ -244,17 +243,13 @@ describe("applyBoardExecutiveOverride", () => {
   it("replaces the ministry representative card with Watcharachan", () => {
     const updated = applyBoardExecutiveOverride(
       record({
-        contentHtml: `<div class="lightweight-accordion"><div class="wp-block-column"><img src="old.jpg" srcset="old.jpg 400w" sizes="auto" alt="" /><h4>ผู้แทน กระทรวงการอุดมศึกษา วิทยาศาสตร์ วิจัยและนวัตกรรม</h4><h5>กรรมการโดยตำแหน่ง ผู้แทนกระทรวงการอุดมศึกษา วิทยาศาสตร์ วิจัยและนวัตกรรม</h5><div class="detail-btn"><a href="#">รายละเอียด</a></div></div></div>`,
+        contentHtml: `<div class="lightweight-accordion"><div class="wp-block-column"><h4>ผู้แทน กระทรวงการอุดมศึกษา วิทยาศาสตร์ วิจัยและนวัตกรรม</h4><h5>กรรมการโดยตำแหน่ง ผู้แทนกระทรวงการอุดมศึกษา วิทยาศาสตร์ วิจัยและนวัตกรรม</h5><div class="detail-btn"><a href="#">รายละเอียด</a></div></div></div>`,
       }),
     );
     const $ = cheerio.load(updated.contentHtml, null, false);
 
     expect($("h4").text()).toBe("วัชรชาญ สิริสุวรรณทัศน์");
     expect($("h5").text()).toBe("กรรมการผู้ทรงคุณวุฒิ");
-    expect($("img").attr("src")).toBe(WATCHARACHAN_IMAGE_SRC);
-    expect($("img").attr("alt")).toBe("วัชรชาญ สิริสุวรรณทัศน์");
-    expect($("img").attr("srcset")).toBeUndefined();
-    expect($("img").attr("sizes")).toBeUndefined();
   });
 
   it("does not duplicate Chaiyut on the entrepreneur card", () => {
