@@ -264,6 +264,23 @@ describe("applyBoardExecutiveOverride", () => {
     expect($("img").attr("sizes")).toBeUndefined();
   });
 
+  it("removes Chulatep and Watcharachan cards from the board tables", () => {
+    const source = `<div class="lightweight-accordion"><div class="wp-block-column"><h4>ดร. จุลเทพ ขจรไชยกูล</h4><h5>ที่ปรึกษาคณะกรรมการ</h5></div><div class="wp-block-column"><h4>วัชรชาญ สิริสุวรรณทัศน์</h4><h5>ที่ปรึกษา</h5></div><div class="wp-block-column"><h4>คนอื่น</h4><h5>กรรมการ</h5></div></div>`;
+    const thai = applyBoardExecutiveOverride(record({ contentHtml: source }));
+    const english = applyBoardExecutiveOverride(
+      record({
+        language: "en",
+        path: "/en/เกี่ยวกับ-สทร/คณะกรรมการ-ผู้บริหาร",
+        contentHtml: source
+          .replace("ดร. จุลเทพ ขจรไชยกูล", "ดร. จุลเทพ ขจรไชยกูล")
+          .replace("วัชรชาญ สิริสุวรรณทัศน์", "Watcharachan Sirisuwannatash"),
+      }),
+    );
+
+    expect(cheerio.load(thai.contentHtml, null, false)("h4").text()).toBe("คนอื่น");
+    expect(cheerio.load(english.contentHtml, null, false)("h4").text()).toBe("คนอื่น");
+  });
+
   it("does not duplicate Chaiyut on the entrepreneur card", () => {
     const source = `
       <div class="lightweight-accordion">

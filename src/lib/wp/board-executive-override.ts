@@ -44,6 +44,12 @@ const REPRESENTATIVE_RAILWAY_NAMES = new Set([
 export const ANAN_IMAGE_SRC = "/wp-content/uploads/2026/08/anan-pho-nimdaeng.png";
 const REPRESENTATIVE_MINISTRY_NAME =
   "ผู้แทน กระทรวงการอุดมศึกษา วิทยาศาสตร์ วิจัยและนวัตกรรม";
+const REMOVED_BOARD_NAMES = new Set([
+  "ดร. จุลเทพ ขจรไชยกูล",
+  "ดร.จุลเทพ ขจรไชยกูล",
+  "วัชรชาญ สิริสุวรรณทัศน์",
+  "Watcharachan Sirisuwannatash",
+]);
 export const WATCHARACHAN_IMAGE_SRC =
   "/wp-content/uploads/2026/08/watcharachan-sirisuwannatat.png";
 export const WEERADET_IMAGE_SRC =
@@ -192,6 +198,16 @@ function removeThavornColumn($: cheerio.CheerioAPI, element: AnyNode): boolean {
   return true;
 }
 
+function removeNamedBoardColumn($: cheerio.CheerioAPI, element: AnyNode): boolean {
+  const column = $(element);
+  if (!REMOVED_BOARD_NAMES.has(compactText(column.find("h4").first().text()))) {
+    return false;
+  }
+
+  column.remove();
+  return true;
+}
+
 function rewriteRailwayRepresentativeColumn(
   $: cheerio.CheerioAPI,
   element: AnyNode,
@@ -304,6 +320,11 @@ export function applyBoardExecutiveOverride(record: WpContentRecord): WpContentR
 
   const $ = cheerio.load(record.contentHtml, null, false);
   const columns = $(".lightweight-accordion .wp-block-column").toArray();
+  let didRemoveNamedBoardCards = false;
+  for (const element of columns) {
+    didRemoveNamedBoardCards =
+      removeNamedBoardColumn($, element) || didRemoveNamedBoardCards;
+  }
   const didRewritePichet = columns.some((element) =>
     rewritePichetColumn($, element, record.language),
   );
@@ -338,6 +359,7 @@ export function applyBoardExecutiveOverride(record: WpContentRecord): WpContentR
     !didRewritePattanaphong &&
     !didRewritePiangOr &&
     !didRemoveThavorn &&
+    !didRemoveNamedBoardCards &&
     !didRewriteRailwayRepresentative &&
     !didRewriteMinistryRepresentative &&
     !didRewriteResearch &&
