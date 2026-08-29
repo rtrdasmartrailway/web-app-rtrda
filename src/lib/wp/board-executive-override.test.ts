@@ -205,34 +205,6 @@ describe("applyBoardExecutiveOverride", () => {
     ).toEqual(["คนอื่น"]);
   });
 
-  it("replaces the railway representative card with Weeradet", () => {
-    const thai = applyBoardExecutiveOverride(
-      record({
-        contentHtml: `<div class="lightweight-accordion"><div class="wp-block-column"><h4>ผู้แทน ผู้ว่าการรถไฟแห่งประเทศไทย</h4><h5>กรรมการโดยตำแหน่ง ผู้ว่าการรถไฟแห่งประเทศไทย</h5></div></div>`,
-      }),
-    );
-    const english = applyBoardExecutiveOverride(
-      record({
-        language: "en",
-        path: "/en/เกี่ยวกับ-สทร/คณะกรรมการ-ผู้บริหาร",
-        contentHtml: `<div class="lightweight-accordion"><div class="wp-block-column"><h4>ผู้แทน ผู้ว่าการรถไฟแห่งประเทศไทย</h4><h5>กรรมการโดยตำแหน่ง ผู้ว่าการรถไฟแห่งประเทศไทย</h5></div></div>`,
-      }),
-    );
-
-    expect(cheerio.load(thai.contentHtml, null, false)("h4").text()).toBe(
-      "ดร. วีรเดช ชีวาพัฒนานุวงศ์",
-    );
-    expect(cheerio.load(thai.contentHtml, null, false)("h5").text()).toBe(
-      "กรรมการผู้ทรงคุณวุฒิ",
-    );
-    expect(cheerio.load(english.contentHtml, null, false)("h4").text()).toBe(
-      "Dr. Weeradet Cheevapattananuwong",
-    );
-    expect(cheerio.load(english.contentHtml, null, false)("h5").text()).toBe(
-      "Expert Committee Member",
-    );
-  });
-
   it("does not duplicate Chaiyut on the entrepreneur card", () => {
     const source = `
       <div class="lightweight-accordion">

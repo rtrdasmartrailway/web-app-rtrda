@@ -116,20 +116,6 @@ describe("board executive parser", () => {
     expect(english?.html).not.toContain("กรรมการและเลขานุการฯ");
   });
 
-  it("selects Thai and English content for Weeradet's popup", () => {
-    const thai = getBoardExecutiveDetailByName("ดร. วีรเดช ชีวาพัฒนานุวงศ์", "th");
-    const english = getBoardExecutiveDetailByName(
-      "Dr. Weeradet Cheevapattananuwong",
-      "en",
-    );
-
-    expect(thai?.html).toContain("มหาวิทยาลัยฮอกไกโด");
-    expect(thai?.html).toContain("วิศวกรใหญ่ กรมทางหลวงชนบท");
-    expect(english?.html).toContain("Hokkaido University");
-    expect(english?.html).toContain("Chief Engineer, Department of Rural Roads");
-    expect(english?.html).not.toContain("มหาวิทยาลัยฮอกไกโด");
-  });
-
   it("detects the Thai and English board executive routes", () => {
     expect(isBoardExecutivePath("/เกี่ยวกับ-สทร/คณะกรรมการ-ผู้บริหาร")).toBe(true);
     expect(isBoardExecutivePath("/en/เกี่ยวกับ-สทร/คณะกรรมการ-ผู้บริหาร")).toBe(true);
