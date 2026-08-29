@@ -41,6 +41,8 @@ const REPRESENTATIVE_RAILWAY_NAMES = new Set([
   "ดร. วีรเดช ชีวาพัฒนานุวงศ์",
   "Dr. Weeradet Cheevapattananuwong",
 ]);
+export const WEERADET_IMAGE_SRC =
+  "/wp-content/uploads/2026/08/ดร.-วีรเดช-ชีวาพัฒนานุวงศ์.jpg";
 
 function compactText(value: string): string {
   return value.replace(/\s+/g, " ").trim();
@@ -203,6 +205,14 @@ function rewriteRailwayRepresentativeColumn(
         ? "Dr. Weeradet Cheevapattananuwong"
         : "ดร. วีรเดช ชีวาพัฒนานุวงศ์",
     );
+  const image = column.find("img").first();
+  image.attr("src", WEERADET_IMAGE_SRC);
+  image.attr(
+    "alt",
+    language === "en" ? "Dr. Weeradet Cheevapattananuwong" : "ดร. วีรเดช ชีวาพัฒนานุวงศ์",
+  );
+  image.removeAttr("srcset");
+  image.removeAttr("sizes");
   const role = column.find("h5").first();
   role.empty();
   role.append(language === "en" ? "Expert Committee Member" : "กรรมการผู้ทรงคุณวุฒิ");
