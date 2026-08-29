@@ -49,7 +49,7 @@ const REMOVED_BOARD_NAMES = new Set([
   "Watcharachan Sirisuwannatash",
 ]);
 export const WATCHARACHAN_IMAGE_SRC =
-  "/wp-content/uploads/2026/08/watcharachan-sirisuwannatat.png";
+  "/wp-content/uploads/2026/08/watcharachan-sirisuwannatat.png?v=20260829";
 export const WEERADET_IMAGE_SRC =
   "/wp-content/uploads/2026/08/weeradet-cheevapattananuwong.jpg";
 export const VEERACHAI_IMAGE_SRC = "/wp-content/uploads/2026/08/veerachai-archan.jpg";
@@ -133,6 +133,10 @@ function rewriteEnglishBoardColumn($: cheerio.CheerioAPI, element: AnyNode): boo
   const role = compactText(column.find("h5").first().text());
   const nameTranslations = new Map([
     ["ชาญเชาวน์ ไชยานุกิจ", "Chanchao Chaiyanukij"],
+    ["นายอนันต์ โพธิ์นิ่มแดง", "Anan Pho Nimdaeng"],
+    ["ดร. วีรเดช ชีวาพัฒนานุวงศ์", "Dr. Weeradet Cheevapattananuwong"],
+    [VEERACHAI_NAME, "Assoc. Prof. Dr. Veerachai Archan"],
+    ["วัชรชาญ สิริสุวรรณทัศน์", "Watcharachan Sirisuwannatash"],
     [
       "ผู้แทน ผู้ว่าการรถไฟแห่งประเทศไทย",
       "Representative of the Governor of State Railway of Thailand",
@@ -144,6 +148,11 @@ function rewriteEnglishBoardColumn($: cheerio.CheerioAPI, element: AnyNode): boo
   ]);
   const roleTranslations = new Map([
     ["กรรมการผู้ทรงคุณวุฒิ", "Expert Committee Member"],
+    ["กรรมการ", "Board Member"],
+    [
+      VEERACHAI_ROLE,
+      "Governor, Thailand Institute of Scientific and Technological Research",
+    ],
     ["กรรมการโดยตำแหน่ง ผู้ว่าการรถไฟแห่งประเทศไทย", "Ex Officio Board Member"],
     ["ที่ปรึกษาคณะกรรมการ", "Board Advisor"],
     ["ผู้จัดการกลุ่มวิจัยและมาตรฐาน", "Research and Standards Group Manager"],
@@ -226,70 +235,112 @@ function rewriteRailwayRepresentativeColumn(
   column
     .find("h4")
     .first()
-    .text(
-      language === "en" ? "Dr. Weeradet Cheevapattananuwong" : "นายอนันต์ โพธิ์นิ่มแดง",
-    );
+    .text(language === "en" ? "Anan Pho Nimdaeng" : "นายอนันต์ โพธิ์นิ่มแดง");
   const image = column.find("img").first();
-  image.attr("src", language === "en" ? WEERADET_IMAGE_SRC : ANAN_IMAGE_SRC);
-  image.attr(
-    "alt",
-    language === "en" ? "Dr. Weeradet Cheevapattananuwong" : "นายอนันต์ โพธิ์นิ่มแดง",
-  );
+  image.attr("src", ANAN_IMAGE_SRC);
+  image.attr("alt", language === "en" ? "Anan Pho Nimdaeng" : "นายอนันต์ โพธิ์นิ่มแดง");
   image.removeAttr("srcset");
   image.removeAttr("sizes");
   const role = column.find("h5").first();
   role.empty();
-  role.append(language === "en" ? "Expert Committee Member" : "กรรมการ");
+  role.append(language === "en" ? "Board Member" : "กรรมการ");
   return true;
 }
 
-function addWeeradetColumn($: cheerio.CheerioAPI, element: AnyNode): boolean {
-  const existing = $(".lightweight-accordion .wp-block-column h4").filter(
-    (_, heading) => compactText($(heading).text()) === "ดร. วีรเดช ชีวาพัฒนานุวงศ์",
+function addWeeradetColumn(
+  $: cheerio.CheerioAPI,
+  element: AnyNode,
+  language: WpContentRecord["language"],
+): boolean {
+  const existing = $(".lightweight-accordion .wp-block-column h4").filter((_, heading) =>
+    new Set(["ดร. วีรเดช ชีวาพัฒนานุวงศ์", "Dr. Weeradet Cheevapattananuwong"]).has(
+      compactText($(heading).text()),
+    ),
   );
   if (existing.length > 0) {
     return false;
   }
 
   const column = $(element);
-  if (compactText(column.find("h4").first().text()) !== "นายอนันต์ โพธิ์นิ่มแดง") {
+  if (
+    !new Set(["นายอนันต์ โพธิ์นิ่มแดง", "Anan Pho Nimdaeng"]).has(
+      compactText(column.find("h4").first().text()),
+    )
+  ) {
     return false;
   }
   const clone = column.clone();
-  clone.find("h4").first().text("ดร. วีรเดช ชีวาพัฒนานุวงศ์");
-  clone.find("h5").first().empty().append("กรรมการผู้ทรงคุณวุฒิ");
+  clone
+    .find("h4")
+    .first()
+    .text(
+      language === "en"
+        ? "Dr. Weeradet Cheevapattananuwong"
+        : "ดร. วีรเดช ชีวาพัฒนานุวงศ์",
+    );
+  clone
+    .find("h5")
+    .first()
+    .empty()
+    .append(language === "en" ? "Expert Committee Member" : "กรรมการผู้ทรงคุณวุฒิ");
   const image = clone.find("img").first();
   image.attr("src", WEERADET_IMAGE_SRC);
-  image.attr("alt", "ดร. วีรเดช ชีวาพัฒนานุวงศ์");
+  image.attr(
+    "alt",
+    language === "en" ? "Dr. Weeradet Cheevapattananuwong" : "ดร. วีรเดช ชีวาพัฒนานุวงศ์",
+  );
   image.removeAttr("srcset");
   image.removeAttr("sizes");
   column.after(clone);
   return true;
 }
 
-function addVeerachaiColumn($: cheerio.CheerioAPI, elements: AnyNode[]): boolean {
-  const existing = $(".lightweight-accordion .wp-block-column h4").filter(
-    (_, heading) => compactText($(heading).text()) === VEERACHAI_NAME,
+function addVeerachaiColumn(
+  $: cheerio.CheerioAPI,
+  elements: AnyNode[],
+  language: WpContentRecord["language"],
+): boolean {
+  const existing = $(".lightweight-accordion .wp-block-column h4").filter((_, heading) =>
+    new Set([VEERACHAI_NAME, "Assoc. Prof. Dr. Veerachai Archan"]).has(
+      compactText($(heading).text()),
+    ),
   );
   if (existing.length > 0 || elements.length === 0) {
     return false;
   }
 
   const source = elements.find((element) =>
-    new Set(["นายอนันต์ โพธิ์นิ่มแดง", "ดร. วีรเดช ชีวาพัฒนานุวงศ์"]).has(
-      compactText($(element).find("h4").first().text()),
-    ),
+    new Set([
+      "นายอนันต์ โพธิ์นิ่มแดง",
+      "Anan Pho Nimdaeng",
+      "ดร. วีรเดช ชีวาพัฒนานุวงศ์",
+      "Dr. Weeradet Cheevapattananuwong",
+    ]).has(compactText($(element).find("h4").first().text())),
   );
   if (!source) {
     return false;
   }
   const column = $(source);
   const clone = column.clone();
-  clone.find("h4").first().text(VEERACHAI_NAME);
-  clone.find("h5").first().empty().append(VEERACHAI_ROLE);
+  clone
+    .find("h4")
+    .first()
+    .text(language === "en" ? "Assoc. Prof. Dr. Veerachai Archan" : VEERACHAI_NAME);
+  clone
+    .find("h5")
+    .first()
+    .empty()
+    .append(
+      language === "en"
+        ? "Governor, Thailand Institute of Scientific and Technological Research"
+        : VEERACHAI_ROLE,
+    );
   const image = clone.find("img").first();
   image.attr("src", VEERACHAI_IMAGE_SRC);
-  image.attr("alt", VEERACHAI_NAME);
+  image.attr(
+    "alt",
+    language === "en" ? "Assoc. Prof. Dr. Veerachai Archan" : VEERACHAI_NAME,
+  );
   image.removeAttr("srcset");
   image.removeAttr("sizes");
   const detailButton = clone.find(".detail-btn");
@@ -300,7 +351,9 @@ function addVeerachaiColumn($: cheerio.CheerioAPI, elements: AnyNode[]): boolean
   });
   const weeradetColumn = $(".lightweight-accordion .wp-block-column").filter(
     (_, element) =>
-      compactText($(element).find("h4").first().text()) === "ดร. วีรเดช ชีวาพัฒนานุวงศ์",
+      new Set(["ดร. วีรเดช ชีวาพัฒนานุวงศ์", "Dr. Weeradet Cheevapattananuwong"]).has(
+        compactText($(element).find("h4").first().text()),
+      ),
   );
   (weeradetColumn.length > 0 ? weeradetColumn.first() : column).after(clone);
   return true;
@@ -311,10 +364,6 @@ function rewriteMinistryRepresentativeColumn(
   element: AnyNode,
   language: WpContentRecord["language"],
 ): boolean {
-  if (language !== "th") {
-    return false;
-  }
-
   const column = $(element);
   if (compactText(column.find("h4").first().text()) !== REPRESENTATIVE_MINISTRY_NAME) {
     return false;
@@ -322,11 +371,21 @@ function rewriteMinistryRepresentativeColumn(
 
   const image = column.find("img").first();
   image.attr("src", WATCHARACHAN_IMAGE_SRC);
-  image.attr("alt", "วัชรชาญ สิริสุวรรณทัศน์");
+  image.attr(
+    "alt",
+    language === "en" ? "Watcharachan Sirisuwannatash" : "วัชรชาญ สิริสุวรรณทัศน์",
+  );
   image.removeAttr("srcset");
   image.removeAttr("sizes");
-  column.find("h4").first().text("วัชรชาญ สิริสุวรรณทัศน์");
-  column.find("h5").first().empty().append("กรรมการผู้ทรงคุณวุฒิ");
+  column
+    .find("h4")
+    .first()
+    .text(language === "en" ? "Watcharachan Sirisuwannatash" : "วัชรชาญ สิริสุวรรณทัศน์");
+  column
+    .find("h5")
+    .first()
+    .empty()
+    .append(language === "en" ? "Expert Committee Member" : "กรรมการผู้ทรงคุณวุฒิ");
   return true;
 }
 
@@ -406,9 +465,10 @@ export function applyBoardExecutiveOverride(record: WpContentRecord): WpContentR
   const didRewriteRailwayRepresentative = columns.some((element) =>
     rewriteRailwayRepresentativeColumn($, element, record.language),
   );
-  const didAddWeeradet =
-    record.language === "th" && columns.some((element) => addWeeradetColumn($, element));
-  const didAddVeerachai = record.language === "th" && addVeerachaiColumn($, columns);
+  const didAddWeeradet = columns.some((element) =>
+    addWeeradetColumn($, element, record.language),
+  );
+  const didAddVeerachai = addVeerachaiColumn($, columns, record.language);
   const didRewriteMinistryRepresentative = columns.some((element) =>
     rewriteMinistryRepresentativeColumn($, element, record.language),
   );

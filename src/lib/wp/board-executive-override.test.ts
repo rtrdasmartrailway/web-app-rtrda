@@ -251,12 +251,22 @@ describe("applyBoardExecutiveOverride", () => {
       "กรรมการผู้ทรงคุณวุฒิ",
       "ผู้ว่าการ สถาบันวิจัยวิทยาศาสตร์และเทคโนโลยีแห่งประเทศไทย",
     ]);
-    expect(cheerio.load(english.contentHtml, null, false)("h4").text()).toBe(
+    expect(
+      cheerio
+        .load(
+          english.contentHtml,
+          null,
+          false,
+        )("h4")
+        .map((_, element) =>
+          cheerio.load(english.contentHtml, null, false)(element).text(),
+        )
+        .get(),
+    ).toEqual([
+      "Anan Pho Nimdaeng",
       "Dr. Weeradet Cheevapattananuwong",
-    );
-    expect(cheerio.load(english.contentHtml, null, false)("h5").text()).toBe(
-      "Expert Committee Member",
-    );
+      "Assoc. Prof. Dr. Veerachai Archan",
+    ]);
     expect(cheerio.load(thai.contentHtml, null, false)("img").eq(0).attr("src")).toBe(
       ANAN_IMAGE_SRC,
     );
@@ -266,8 +276,14 @@ describe("applyBoardExecutiveOverride", () => {
     expect(cheerio.load(thai.contentHtml, null, false)("img").eq(2).attr("src")).toBe(
       VEERACHAI_IMAGE_SRC,
     );
-    expect(cheerio.load(english.contentHtml, null, false)("img").attr("src")).toBe(
+    expect(cheerio.load(english.contentHtml, null, false)("img").eq(0).attr("src")).toBe(
+      ANAN_IMAGE_SRC,
+    );
+    expect(cheerio.load(english.contentHtml, null, false)("img").eq(1).attr("src")).toBe(
       WEERADET_IMAGE_SRC,
+    );
+    expect(cheerio.load(english.contentHtml, null, false)("img").eq(2).attr("src")).toBe(
+      VEERACHAI_IMAGE_SRC,
     );
     for (const contentHtml of [thai.contentHtml, english.contentHtml]) {
       const image = cheerio.load(contentHtml, null, false)("img");
@@ -278,13 +294,22 @@ describe("applyBoardExecutiveOverride", () => {
     expect(cheerio.load(repeated.contentHtml, null, false)("h4")).toHaveLength(3);
   });
 
-  it("replaces the ministry representative card with Watcharachan", () => {
+  it("replaces the ministry representative card with Watcharachan in Thai and English", () => {
+    const source = `<div class="lightweight-accordion"><div class="wp-block-column"><img src="old.jpg" srcset="old.jpg 400w" sizes="auto" alt="" /><h4>ผู้แทน กระทรวงการอุดมศึกษา วิทยาศาสตร์ วิจัยและนวัตกรรม</h4><h5>กรรมการโดยตำแหน่ง ผู้แทนกระทรวงการอุดมศึกษา วิทยาศาสตร์ วิจัยและนวัตกรรม</h5><div class="detail-btn"><a href="#">รายละเอียด</a></div></div></div>`;
     const updated = applyBoardExecutiveOverride(
       record({
-        contentHtml: `<div class="lightweight-accordion"><div class="wp-block-column"><img src="old.jpg" srcset="old.jpg 400w" sizes="auto" alt="" /><h4>ผู้แทน กระทรวงการอุดมศึกษา วิทยาศาสตร์ วิจัยและนวัตกรรม</h4><h5>กรรมการโดยตำแหน่ง ผู้แทนกระทรวงการอุดมศึกษา วิทยาศาสตร์ วิจัยและนวัตกรรม</h5><div class="detail-btn"><a href="#">รายละเอียด</a></div></div></div>`,
+        contentHtml: source,
+      }),
+    );
+    const english = applyBoardExecutiveOverride(
+      record({
+        language: "en",
+        path: "/en/เกี่ยวกับ-สทร/คณะกรรมการ-ผู้บริหาร",
+        contentHtml: source,
       }),
     );
     const $ = cheerio.load(updated.contentHtml, null, false);
+    const $english = cheerio.load(english.contentHtml, null, false);
 
     expect($("h4").text()).toBe("วัชรชาญ สิริสุวรรณทัศน์");
     expect($("h5").text()).toBe("กรรมการผู้ทรงคุณวุฒิ");
@@ -292,9 +317,12 @@ describe("applyBoardExecutiveOverride", () => {
     expect($("img").attr("alt")).toBe("วัชรชาญ สิริสุวรรณทัศน์");
     expect($("img").attr("srcset")).toBeUndefined();
     expect($("img").attr("sizes")).toBeUndefined();
+    expect($english("h4").text()).toBe("Watcharachan Sirisuwannatash");
+    expect($english("h5").text()).toBe("Expert Committee Member");
+    expect($english("img").attr("src")).toBe(WATCHARACHAN_IMAGE_SRC);
   });
 
-  it("adds a non-clickable Veerachai card only to the Thai board", () => {
+  it("adds a non-clickable Veerachai card to Thai and English boards", () => {
     const source = `<div class="lightweight-accordion"><div class="wp-block-column"><img src="weeradet.jpg" alt="" /><h4>ดร. วีรเดช ชีวาพัฒนานุวงศ์</h4><h5>กรรมการผู้ทรงคุณวุฒิ</h5><div class="detail-btn"><a href="#">รายละเอียด</a></div></div></div>`;
     const thai = applyBoardExecutiveOverride(record({ contentHtml: source }));
     const english = applyBoardExecutiveOverride(
@@ -317,7 +345,10 @@ describe("applyBoardExecutiveOverride", () => {
     expect(veerachai.find("a").attr("href")).toBeUndefined();
     expect(veerachai.find("a").attr("aria-disabled")).toBe("true");
     expect($thai("h4")).toHaveLength(2);
-    expect(cheerio.load(english.contentHtml, null, false)("h4")).toHaveLength(1);
+    expect(cheerio.load(english.contentHtml, null, false)("h4")).toHaveLength(3);
+    expect(cheerio.load(english.contentHtml, null, false)("h4").eq(2).text()).toBe(
+      "Assoc. Prof. Dr. Veerachai Archan",
+    );
     expect(cheerio.load(thai.contentHtml, null, false)("h4").eq(1).text()).toBe(
       "ผศ.ดร.วีรชัย อาจหาญ",
     );
