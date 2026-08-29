@@ -52,31 +52,6 @@ export const WEERADET_IMAGE_SRC =
 export const VEERACHAI_IMAGE_SRC = "/wp-content/uploads/2026/08/veerachai-archan.jpg";
 const VEERACHAI_NAME = "ผศ.ดร.วีรชัย อาจหาญ";
 const VEERACHAI_ROLE = "ผู้ว่าการ สถาบันวิจัยวิทยาศาสตร์และเทคโนโลยีแห่งประเทศไทย";
-const BOARD_CARD_ORDER: Record<WpContentRecord["language"], string[]> = {
-  th: [
-    "รศ.ดร. โชติชัย เจริญงาม",
-    "ดรุณ แสงฉาย",
-    "ชาญเชาวน์ ไชยานุกิจ",
-    "ผศ. พิศิษฐ์ แสง-ชูโต",
-    "ดร. วีรเดช ชีวาพัฒนานุวงศ์",
-    "วัชรชาญ สิริสุวรรณทัศน์",
-    "ดร. พิเชฐ คุณาธรรมรักษ์",
-    "นายอนันต์ โพธิ์นิ่มแดง",
-    "พัฒนพงษ์ พงศ์ศุภสมิทธิ์",
-  ],
-  en: [
-    "Assoc. Prof. Dr. Chotchai Charoenngam",
-    "Darun Saengshine",
-    "ชาญเชาวน์ ไชยานุกิจ",
-    "Asst. Prof. Pisit Saeng-Xuto",
-    "Dr. Weeradet Cheevapattananuwong",
-    "ผู้แทน กระทรวงการอุดมศึกษา วิทยาศาสตร์ วิจัยและนวัตกรรม",
-    "Dr. Pichet Kunadhamraks",
-    "Anan Pho Nimdaeng",
-    "Pattanaphong Phongsupatsamit",
-    "Pattanaphong Phongnsupatsamit",
-  ],
-};
 
 function compactText(value: string): string {
   return value.replace(/\s+/g, " ").trim();
@@ -266,48 +241,6 @@ function addVeerachaiColumn($: cheerio.CheerioAPI, elements: AnyNode[]): boolean
   return true;
 }
 
-function reorderBoardColumns(
-  $: cheerio.CheerioAPI,
-  language: WpContentRecord["language"],
-): boolean {
-  const boardAccordions = $(".lightweight-accordion").filter((_, element) => {
-    const title = compactText($(element).find("summary").first().text());
-    return title.includes("คณะกรรมการ") || title.includes("Board");
-  });
-  const accordion =
-    boardAccordions.length > 0
-      ? boardAccordions.first()
-      : $(".lightweight-accordion").first();
-  const columns = accordion
-    .find(".lightweight-accordion-body .wp-block-column")
-    .toArray();
-  if (columns.length === 0) {
-    columns.push(...accordion.find(".wp-block-column").toArray());
-  }
-  const names = columns.map((element) =>
-    compactText($(element).find("h4").first().text()),
-  );
-  const desiredNames = BOARD_CARD_ORDER[language].filter((name) => names.includes(name));
-  const orderedNames = [
-    ...desiredNames,
-    ...names.filter((name) => !desiredNames.includes(name)),
-  ];
-  if (orderedNames.every((name, index) => name === names[index])) {
-    return false;
-  }
-
-  const htmlByName = new Map(
-    columns.map((element) => [
-      compactText($(element).find("h4").first().text()),
-      $(element).toString(),
-    ]),
-  );
-  columns.forEach((element, index) => {
-    $(element).replaceWith(htmlByName.get(orderedNames[index]) ?? "");
-  });
-  return true;
-}
-
 function rewriteMinistryRepresentativeColumn(
   $: cheerio.CheerioAPI,
   element: AnyNode,
@@ -419,7 +352,6 @@ export function applyBoardExecutiveOverride(record: WpContentRecord): WpContentR
     columns.some((element) => rewriteTargetColumn($, element));
   const didRewriteAdmin =
     record.language === "th" && columns.some((element) => rewriteAdminColumn($, element));
-  const didReorderColumns = reorderBoardColumns($, record.language);
 
   if (
     !didRewritePichet &&
@@ -432,8 +364,7 @@ export function applyBoardExecutiveOverride(record: WpContentRecord): WpContentR
     !didAddVeerachai &&
     !didRewriteMinistryRepresentative &&
     !didRewriteResearch &&
-    !didRewriteAdmin &&
-    !didReorderColumns
+    !didRewriteAdmin
   ) {
     return record;
   }
