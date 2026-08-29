@@ -43,6 +43,8 @@ const REPRESENTATIVE_RAILWAY_NAMES = new Set([
 ]);
 const REPRESENTATIVE_MINISTRY_NAME =
   "ผู้แทน กระทรวงการอุดมศึกษา วิทยาศาสตร์ วิจัยและนวัตกรรม";
+export const WATCHARACHAN_IMAGE_SRC =
+  "/wp-content/uploads/2026/08/watcharachan-sirisuwannatat.png";
 export const WEERADET_IMAGE_SRC =
   "/wp-content/uploads/2026/08/weeradet-cheevapattananuwong.jpg";
 
@@ -235,6 +237,11 @@ function rewriteMinistryRepresentativeColumn(
     return false;
   }
 
+  const image = column.find("img").first();
+  image.attr("src", WATCHARACHAN_IMAGE_SRC);
+  image.attr("alt", "วัชรชาญ สิริสุวรรณทัศน์");
+  image.removeAttr("srcset");
+  image.removeAttr("sizes");
   column.find("h4").first().text("วัชรชาญ สิริสุวรรณทัศน์");
   column.find("h5").first().empty().append("กรรมการผู้ทรงคุณวุฒิ");
   return true;
