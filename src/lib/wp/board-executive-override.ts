@@ -114,12 +114,19 @@ function rewriteEnglishBoardColumn($: cheerio.CheerioAPI, element: AnyNode): boo
   const role = compactText(column.find("h5").first().text());
   const nameTranslations = new Map([
     ["ชาญเชาวน์ ไชยานุกิจ", "Chanchao Chaiyanukij"],
+    [
+      "ผู้แทน ผู้ว่าการรถไฟแห่งประเทศไทย",
+      "Representative of the Governor of State Railway of Thailand",
+    ],
+    ["ดร. จุลเทพ ขจรไชยกูล", "Dr. Chulatep Khajornchaiyagul"],
     [OLD_NAME, "Touchakorn Thanawatdamrong"],
     ["ดร.กิติพันธุ์ นุตยกุล", "Touchakorn Thanawatdamrong"],
     [CHAIYUT_NAME, "Chaiyut Tanchai"],
   ]);
   const roleTranslations = new Map([
     ["กรรมการผู้ทรงคุณวุฒิ", "Expert Committee Member"],
+    ["กรรมการโดยตำแหน่ง ผู้ว่าการรถไฟแห่งประเทศไทย", "Ex Officio Board Member"],
+    ["ที่ปรึกษาคณะกรรมการ", "Board Advisor"],
     ["ผู้จัดการกลุ่มวิจัยและมาตรฐาน", "Research and Standards Group Manager"],
     [
       "ผู้จัดการกลุ่มพัฒนาผู้ประกอบการและธุรกิจใหม่",
