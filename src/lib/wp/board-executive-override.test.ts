@@ -5,7 +5,6 @@ import {
   applyBoardExecutiveOverride,
   CHAIYUT_IMAGE_SRC,
   CHAIYUT_NAME,
-  ANAN_IMAGE_SRC,
   TACHAKORN_IMAGE_SRC,
   WATCHARACHAN_IMAGE_SRC,
   WEERADET_IMAGE_SRC,
@@ -223,26 +222,20 @@ describe("applyBoardExecutiveOverride", () => {
     );
 
     expect(cheerio.load(thai.contentHtml, null, false)("h4").text()).toBe(
-      "นายอนันต์ โพธิ์นิ่มแดง",
+      "ดร. วีรเดช ชีวาพัฒนานุวงศ์",
     );
-    expect(cheerio.load(thai.contentHtml, null, false)("h5").text()).toBe("กรรมการ");
+    expect(cheerio.load(thai.contentHtml, null, false)("h5").text()).toBe(
+      "กรรมการผู้ทรงคุณวุฒิ",
+    );
     expect(cheerio.load(english.contentHtml, null, false)("h4").text()).toBe(
       "Dr. Weeradet Cheevapattananuwong",
     );
     expect(cheerio.load(english.contentHtml, null, false)("h5").text()).toBe(
       "Expert Committee Member",
     );
-    expect(cheerio.load(thai.contentHtml, null, false)("img").attr("src")).toBe(
-      ANAN_IMAGE_SRC,
-    );
-    expect(cheerio.load(thai.contentHtml, null, false)("img").attr("alt")).toBe(
-      "นายอนันต์ โพธิ์นิ่มแดง",
-    );
-    expect(cheerio.load(english.contentHtml, null, false)("img").attr("src")).toBe(
-      WEERADET_IMAGE_SRC,
-    );
     for (const contentHtml of [thai.contentHtml, english.contentHtml]) {
       const image = cheerio.load(contentHtml, null, false)("img");
+      expect(image.attr("src")).toBe(WEERADET_IMAGE_SRC);
       expect(image.attr("srcset")).toBeUndefined();
       expect(image.attr("sizes")).toBeUndefined();
     }

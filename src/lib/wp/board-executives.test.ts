@@ -143,10 +143,6 @@ describe("board executive parser", () => {
     );
   });
 
-  it("does not provide a popup for Anan's card", () => {
-    expect(getBoardExecutiveDetailByName("นายอนันต์ โพธิ์นิ่มแดง", "th")).toBeNull();
-  });
-
   it("detects the Thai and English board executive routes", () => {
     expect(isBoardExecutivePath("/เกี่ยวกับ-สทร/คณะกรรมการ-ผู้บริหาร")).toBe(true);
     expect(isBoardExecutivePath("/en/เกี่ยวกับ-สทร/คณะกรรมการ-ผู้บริหาร")).toBe(true);

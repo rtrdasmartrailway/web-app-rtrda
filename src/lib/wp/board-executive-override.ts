@@ -36,7 +36,6 @@ const REPRESENTATIVE_RAILWAY_NAMES = new Set([
   "ดร. วีรเดช ชีวาพัฒนานุวงศ์",
   "Dr. Weeradet Cheevapattananuwong",
 ]);
-export const ANAN_IMAGE_SRC = "/wp-content/uploads/2026/08/anan-pho-nimdaeng.png";
 const REPRESENTATIVE_MINISTRY_NAME =
   "ผู้แทน กระทรวงการอุดมศึกษา วิทยาศาสตร์ วิจัยและนวัตกรรม";
 export const WATCHARACHAN_IMAGE_SRC =
@@ -139,19 +138,21 @@ function rewriteRailwayRepresentativeColumn(
     .find("h4")
     .first()
     .text(
-      language === "en" ? "Dr. Weeradet Cheevapattananuwong" : "นายอนันต์ โพธิ์นิ่มแดง",
+      language === "en"
+        ? "Dr. Weeradet Cheevapattananuwong"
+        : "ดร. วีรเดช ชีวาพัฒนานุวงศ์",
     );
   const image = column.find("img").first();
-  image.attr("src", language === "en" ? WEERADET_IMAGE_SRC : ANAN_IMAGE_SRC);
+  image.attr("src", WEERADET_IMAGE_SRC);
   image.attr(
     "alt",
-    language === "en" ? "Dr. Weeradet Cheevapattananuwong" : "นายอนันต์ โพธิ์นิ่มแดง",
+    language === "en" ? "Dr. Weeradet Cheevapattananuwong" : "ดร. วีรเดช ชีวาพัฒนานุวงศ์",
   );
   image.removeAttr("srcset");
   image.removeAttr("sizes");
   const role = column.find("h5").first();
   role.empty();
-  role.append(language === "en" ? "Expert Committee Member" : "กรรมการ");
+  role.append(language === "en" ? "Expert Committee Member" : "กรรมการผู้ทรงคุณวุฒิ");
   return true;
 }
 
