@@ -265,7 +265,7 @@ describe("applyBoardExecutiveOverride", () => {
     ).toEqual([
       "Anan Pho Nimdaeng",
       "Dr. Weeradet Cheevapattananuwong",
-      "Assoc. Prof. Dr. Veerachai Archan",
+      "Asst. Prof. Dr. Veerachai Archan",
     ]);
     expect(cheerio.load(thai.contentHtml, null, false)("img").eq(0).attr("src")).toBe(
       ANAN_IMAGE_SRC,
@@ -347,7 +347,7 @@ describe("applyBoardExecutiveOverride", () => {
     expect($thai("h4")).toHaveLength(2);
     expect(cheerio.load(english.contentHtml, null, false)("h4")).toHaveLength(3);
     expect(cheerio.load(english.contentHtml, null, false)("h4").eq(2).text()).toBe(
-      "Assoc. Prof. Dr. Veerachai Archan",
+      "Asst. Prof. Dr. Veerachai Archan",
     );
     expect(cheerio.load(thai.contentHtml, null, false)("h4").eq(1).text()).toBe(
       "ผศ.ดร.วีรชัย อาจหาญ",

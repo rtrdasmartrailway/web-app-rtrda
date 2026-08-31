@@ -135,7 +135,7 @@ function rewriteEnglishBoardColumn($: cheerio.CheerioAPI, element: AnyNode): boo
     ["ชาญเชาวน์ ไชยานุกิจ", "Chanchao Chaiyanukij"],
     ["นายอนันต์ โพธิ์นิ่มแดง", "Anan Pho Nimdaeng"],
     ["ดร. วีรเดช ชีวาพัฒนานุวงศ์", "Dr. Weeradet Cheevapattananuwong"],
-    [VEERACHAI_NAME, "Assoc. Prof. Dr. Veerachai Archan"],
+    [VEERACHAI_NAME, "Asst. Prof. Dr. Veerachai Archan"],
     ["วัชรชาญ สิริสุวรรณทัศน์", "Watcharachan Sirisuwannatash"],
     [
       "ผู้แทน ผู้ว่าการรถไฟแห่งประเทศไทย",
@@ -301,7 +301,7 @@ function addVeerachaiColumn(
   language: WpContentRecord["language"],
 ): boolean {
   const existing = $(".lightweight-accordion .wp-block-column h4").filter((_, heading) =>
-    new Set([VEERACHAI_NAME, "Assoc. Prof. Dr. Veerachai Archan"]).has(
+    new Set([VEERACHAI_NAME, "Asst. Prof. Dr. Veerachai Archan"]).has(
       compactText($(heading).text()),
     ),
   );
@@ -325,7 +325,7 @@ function addVeerachaiColumn(
   clone
     .find("h4")
     .first()
-    .text(language === "en" ? "Assoc. Prof. Dr. Veerachai Archan" : VEERACHAI_NAME);
+    .text(language === "en" ? "Asst. Prof. Dr. Veerachai Archan" : VEERACHAI_NAME);
   clone
     .find("h5")
     .first()
@@ -339,7 +339,7 @@ function addVeerachaiColumn(
   image.attr("src", VEERACHAI_IMAGE_SRC);
   image.attr(
     "alt",
-    language === "en" ? "Assoc. Prof. Dr. Veerachai Archan" : VEERACHAI_NAME,
+    language === "en" ? "Asst. Prof. Dr. Veerachai Archan" : VEERACHAI_NAME,
   );
   image.removeAttr("srcset");
   image.removeAttr("sizes");
