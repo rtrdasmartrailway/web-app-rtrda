@@ -486,6 +486,7 @@ describe("RTRDA partial promotion", () => {
     expect(workerSource).toContain("http://127.0.0.1:3022");
     expect(workerSource).toContain('join(sourceRepoPath, "public/wp-content/uploads/")');
     expect(workerSource).toContain('join(sourceRepoPath, "public/sdc-downloads/")');
+    expect(workerSource).toContain("--chmod=Du=rwx,Dgo=rx,Fu=rw,Fgo=r");
     expect(workerSource).toContain("collectReleaseCandidateEvidence(candidate)");
     expect(workerSource).toContain("assertPartialCandidateIdentity(");
     expect(workerSource).toContain("executePartialPromotion(");

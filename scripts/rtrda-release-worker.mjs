@@ -630,12 +630,14 @@ function runReleaseCandidate(candidate, sourceRepoPath) {
   };
   run("rsync", [
     "-a",
+    "--chmod=Du=rwx,Dgo=rx,Fu=rw,Fgo=r",
     "--",
     join(sourceRepoPath, "public/wp-content/uploads/"),
     join(candidate.candidateRepo, "public/wp-content/uploads/"),
   ]);
   run("rsync", [
     "-a",
+    "--chmod=Du=rwx,Dgo=rx,Fu=rw,Fgo=r",
     "--",
     join(sourceRepoPath, "public/sdc-downloads/"),
     join(candidate.candidateRepo, "public/sdc-downloads/"),
