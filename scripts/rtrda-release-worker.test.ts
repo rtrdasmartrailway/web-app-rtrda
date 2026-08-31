@@ -515,6 +515,7 @@ describe("RTRDA partial promotion", () => {
     );
     expect(compose).toContain("web-app-rtrda-release-candidate");
     expect(compose).toContain("127.0.0.1:3022:3000");
+    expect(compose).toContain("touch .env");
     expect(compose).toContain("rtrda-release-candidate-db-data");
     expect(compose).not.toContain("web-app-rtrda-test");
     expect(compose).not.toContain("rtrda-db-data");

@@ -47,7 +47,7 @@ services:
     depends_on:
       db-release-candidate:
         condition: service_healthy
-    command: ["bash", "-lc", "npm run db:migrate && npm run db:seed"]
+    command: ["bash", "-lc", "touch .env && npm run db:migrate && npm run db:seed"]
 
   db-release-candidate:
     image: postgres:17-alpine
