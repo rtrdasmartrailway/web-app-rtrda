@@ -275,7 +275,7 @@ describe("applyProcurementTableOverrides", () => {
         .filter((_, link) => $(link).text() === "ดาวน์โหลดไฟล์")
         .last()
         .attr("href"),
-    ).toBe("/wp-content/uploads/2026/01/CT-6002_6004_2568.pdf");
+    ).toBe("/sdc_download/ct-6002-6004-2568");
     expect($("details[open]")).toHaveLength(0);
     expect(other.find(".wp-block-column")).toHaveLength(1);
     expect(other.hasClass("rtrda-rail-standards-files--single")).toBe(true);

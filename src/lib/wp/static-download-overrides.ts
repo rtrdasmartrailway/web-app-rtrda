@@ -1,6 +1,17 @@
 import type { WpDownloadAsset } from "./types";
 
 export const STATIC_DOWNLOAD_OVERRIDES: Record<string, WpDownloadAsset> = {
+  "ct-6002-6004-2568": {
+    id: "ct-6002-6004-2568",
+    sourceUrl: "",
+    localPath: "/wp-content/uploads/2026/01/CT-6002_6004_2568.pdf",
+    fileName: "CT-6002_6004_2568.pdf",
+    mimeType: "application/pdf",
+    sizeBytes: 4_621_134,
+    title: "ชุดมาตรฐานการทดสอบโดยไม่ทำลายบนรอยเชื่อมรางรถไฟ",
+    group: "มาตรฐานงานเชื่อม",
+    sourcePages: ["/มาตรฐานระบบราง-สทร"],
+  },
   "ita2569-o19-01": {
     id: "ita2569-o19-01",
     sourceUrl: "",

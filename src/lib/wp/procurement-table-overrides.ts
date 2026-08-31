@@ -232,7 +232,7 @@ const railWeldingDocuments = [
     title: "ชุดมาตรฐานการทดสอบโดยไม่ทำลายบนรอยเชื่อมรางรถไฟ",
     image: uploadFile("2026/01/125.jpg"),
     previewHref: "/3d-flip-book/ct-6002_6004_2568",
-    downloadHref: uploadFile("2026/01/CT-6002_6004_2568.pdf"),
+    downloadHref: "/sdc_download/ct-6002-6004-2568",
   },
 ];
 
