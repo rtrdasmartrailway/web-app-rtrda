@@ -269,6 +269,13 @@ describe("applyProcurementTableOverrides", () => {
     ]);
     expect(welding.text()).not.toContain("สทร-RS-6001-2568");
     expect(welding.text()).not.toContain("สทร-RS-6002-2568");
+    expect(
+      welding
+        .find("a")
+        .filter((_, link) => $(link).text() === "ดาวน์โหลดไฟล์")
+        .last()
+        .attr("href"),
+    ).toBe("/wp-content/uploads/2026/01/CT-6002_6004_2568.pdf");
     expect($("details[open]")).toHaveLength(0);
     expect(other.find(".wp-block-column")).toHaveLength(1);
     expect(other.hasClass("rtrda-rail-standards-files--single")).toBe(true);
