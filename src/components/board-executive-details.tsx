@@ -19,10 +19,12 @@ function BoardExecutiveDetailModal({
   detail,
   labelledBy,
   onClose,
+  language,
 }: {
   detail: BoardExecutiveDetailEntry;
   labelledBy: string;
   onClose: () => void;
+  language: WpLanguage;
 }) {
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {
@@ -50,7 +52,7 @@ function BoardExecutiveDetailModal({
         onClick={(event) => event.stopPropagation()}
       >
         <button
-          aria-label="ปิดรายละเอียด"
+          aria-label={language === "th" ? "ปิดรายละเอียด" : "Close details"}
           className={styles.detailClose}
           type="button"
           onClick={onClose}
@@ -81,7 +83,7 @@ export function BoardExecutiveDetailButton({
   if (!detail) {
     return (
       <button className={styles.detailButtonDisabled} disabled type="button">
-        รายละเอียด
+        {language === "th" ? "รายละเอียด" : "Details"}
       </button>
     );
   }
@@ -96,13 +98,14 @@ export function BoardExecutiveDetailButton({
         type="button"
         onClick={() => setOpen(true)}
       >
-        รายละเอียด
+        {language === "th" ? "รายละเอียด" : "Details"}
       </button>
       {open ? (
         <BoardExecutiveDetailModal
           detail={detail}
           labelledBy={headingId}
           onClose={() => setOpen(false)}
+          language={language}
         />
       ) : null}
     </>
@@ -168,11 +171,21 @@ function disableLegacyButton(element: Element) {
   link?.setAttribute("tabindex", "-1");
 }
 
-function legacyButtonMarkup(enabled: boolean): string {
+function setLegacyButtonLabel(element: Element, language: WpLanguage) {
+  const label = language === "th" ? "รายละเอียด" : "Details";
+  const wrapper = element.closest(".wp-block-button") ?? element;
+  const link = wrapper.querySelector("a");
+  if (link) {
+    link.textContent = label;
+  }
+}
+
+function legacyButtonMarkup(enabled: boolean, language: WpLanguage): string {
   const disabledAttributes = enabled ? "" : ' aria-disabled="true" tabindex="-1"';
   const disabledClass = enabled ? "" : " detail-btn-disabled";
 
-  return `<div class="wp-block-buttons is-content-justification-center is-layout-flex board-detail-button-injected"><div class="wp-block-button detail-btn${disabledClass}"><a class="wp-block-button__link wp-element-button"${disabledAttributes}>รายละเอียด</a></div></div>`;
+  const label = language === "th" ? "รายละเอียด" : "Details";
+  return `<div class="wp-block-buttons is-content-justification-center is-layout-flex board-detail-button-injected"><div class="wp-block-button detail-btn${disabledClass}"><a class="wp-block-button__link wp-element-button"${disabledAttributes}>${label}</a></div></div>`;
 }
 
 export function BoardExecutiveLegacyDetailsHydrator({
@@ -209,8 +222,15 @@ export function BoardExecutiveLegacyDetailsHydrator({
         disableLegacyButton(button);
       }
 
+      if (button) {
+        setLegacyButtonLabel(button, language);
+      }
+
       if (!button) {
-        column.insertAdjacentHTML("beforeend", legacyButtonMarkup(Boolean(detail)));
+        column.insertAdjacentHTML(
+          "beforeend",
+          legacyButtonMarkup(Boolean(detail), language),
+        );
       }
     }
 
@@ -243,6 +263,7 @@ export function BoardExecutiveLegacyDetailsHydrator({
       detail={activeDetail}
       labelledBy={headingId}
       onClose={() => setActiveDetail(null)}
+      language={language}
     />
   ) : null;
 }

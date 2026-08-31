@@ -143,6 +143,34 @@ describe("board executive parser", () => {
     );
   });
 
+  it("localizes every active English board, steering committee and advisor popup", () => {
+    const activeEnglishNames = [
+      "Chanchao Chaiyanukij",
+      "Pattanaphong Phongnsupatsamit",
+      "Watcharachan Sirisuwannatash",
+      "Dr. Pichit Akrathit, Ph.D.",
+      "Chanin Chaonirattisai",
+      "Dr. Chatkaew Hart-Rawung",
+      "Dr. Poovadol Sirirangsi",
+      "Dr. Kitipong Promwong",
+      "Dr. Tiranee Achalakul",
+      "Dr. Tayakorn Chandrangsu",
+      "Natthaphat Unhakhongkha",
+      "Sucheep Suksawang",
+      "Prof. Dr. Sukit Limpijumnong",
+      "Dr. Sathian Charoenrien",
+      "Yaowalux Champeeratana",
+      "Chunhachit Sungmai",
+      "Assoc. Prof. Dr. Nualnoi Treerat",
+    ];
+
+    for (const name of activeEnglishNames) {
+      const detail = getBoardExecutiveDetailByName(name, "en");
+      expect(detail?.html).toContain(name);
+      expect(detail?.html).not.toMatch(/[\u0E00-\u0E7F]/);
+    }
+  });
+
   it("does not provide a popup for Anan's card", () => {
     expect(getBoardExecutiveDetailByName("นายอนันต์ โพธิ์นิ่มแดง", "th")).toBeNull();
   });
@@ -232,6 +260,34 @@ describe("board executive parser", () => {
     });
 
     expect(generalManagers.map((person) => person.name)).not.toContain("ชัชวาล พานวงษ์");
+  });
+
+  it("mirrors Thai executive card data in English", async () => {
+    const record = await boardRecord("/en/เกี่ยวกับ-สทร/คณะกรรมการ-ผู้บริหาร");
+    const presentation = buildBoardExecutivePresentation(record.path, record.contentHtml);
+    const generalManagers = presentation?.chart.generalManagers ?? [];
+    const gmByRole = new Map(generalManagers.map((person) => [person.role, person]));
+
+    expect(gmByRole.get("Research and Standards Group Manager")).toMatchObject({
+      name: "Touchakorn Thanawatdamrong",
+      imageSrc: TACHAKORN_IMAGE_SRC,
+      email: "touchakorn.t@rtrda.or.th",
+      vacant: false,
+    });
+    expect(
+      gmByRole.get("New Entrepreneurs and Business Development Group Manager"),
+    ).toMatchObject({
+      name: "Chaiyut Tanchai",
+      imageSrc: CHAIYUT_IMAGE_SRC,
+      email: "chaiwooth.t@rtrda.or.th",
+      vacant: false,
+    });
+    expect(gmByRole.get("Internal Administration Group Manager (Acting)")).toMatchObject({
+      name: "Chaiyut Tanchai",
+      imageSrc: CHAIYUT_IMAGE_SRC,
+      email: "chaiwooth.t@rtrda.or.th",
+      vacant: false,
+    });
   });
 
   it("renders the executive chart with detail buttons only for people that have imported details", async () => {

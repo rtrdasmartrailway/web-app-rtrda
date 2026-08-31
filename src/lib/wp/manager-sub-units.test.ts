@@ -19,6 +19,11 @@ describe("manager sub-units config", () => {
       "ผู้จัดการกลุ่มพัฒนาดิจิทัลระบบราง",
       "ผู้จัดการกลุ่มกลยุทธ์และสื่อสารองค์กร",
       "ผู้จัดการกลุ่มบริหารภายใน (รักษาการแทน)",
+      "Research and Standards Group Manager",
+      "New Entrepreneurs and Business Development Group Manager",
+      "Rail Systems Digital Development Group Manager",
+      "Strategy and Corporate Communications Group Manager",
+      "Internal Administration Group Manager (Acting)",
     ]);
   });
 
@@ -33,6 +38,13 @@ describe("manager sub-units config", () => {
     expect(getManagerSubUnits("ผู้จัดการกลุ่มพัฒนาดิจิทัลระบบราง")).toEqual([
       "งาน Smart Railway Project",
       "งาน Network & Performance",
+    ]);
+    expect(getManagerSubUnits("Internal Administration Group Manager (Acting)")).toEqual([
+      "Accounting and Finance",
+      "Legal Affairs",
+      "Administration and Records",
+      "Human Resources",
+      "Governance, Risk and Internal Control",
     ]);
   });
 

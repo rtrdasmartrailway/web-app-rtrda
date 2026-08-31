@@ -198,6 +198,56 @@ function rewriteEnglishMinistryColumn($: cheerio.CheerioAPI, element: AnyNode): 
   return true;
 }
 
+function rewriteEnglishExecutiveColumn($: cheerio.CheerioAPI, element: AnyNode): boolean {
+  const column = $(element);
+  const role = compactText(column.find("h5").first().text());
+  const heading = column.find("h4").first();
+  const image = column.find("img").first();
+
+  if (role.includes(TARGET_ROLE)) {
+    heading.text("Touchakorn Thanawatdamrong");
+    image.attr("src", TACHAKORN_IMAGE_SRC).attr("alt", "Touchakorn Thanawatdamrong");
+    column
+      .find("h5")
+      .first()
+      .empty()
+      .append(
+        'Research and Standards Group Manager<br>Email: <a href="mailto:touchakorn.t@rtrda.or.th">touchakorn.t@rtrda.or.th</a>',
+      );
+    return true;
+  }
+
+  if (role.includes("ผู้จัดการกลุ่มพัฒนาผู้ประกอบการและธุรกิจใหม่")) {
+    heading.text("Chaiyut Tanchai");
+    image.attr("src", CHAIYUT_IMAGE_SRC).attr("alt", "Chaiyut Tanchai");
+    column
+      .find("h5")
+      .first()
+      .empty()
+      .append(
+        'New Entrepreneurs and Business Development Group Manager<br>Email: <a href="mailto:chaiwooth.t@rtrda.or.th">chaiwooth.t@rtrda.or.th</a>',
+      );
+    return true;
+  }
+
+  if (role.includes(ADMIN_ROLE)) {
+    heading.text("Chaiyut Tanchai");
+    image.attr("src", CHAIYUT_IMAGE_SRC).attr("alt", "Chaiyut Tanchai");
+    image.removeAttr("srcset");
+    image.removeAttr("sizes");
+    column
+      .find("h5")
+      .first()
+      .empty()
+      .append(
+        'Internal Administration Group Manager (Acting)<br>Email: <a href="mailto:chaiwooth.t@rtrda.or.th">chaiwooth.t@rtrda.or.th</a>',
+      );
+    return true;
+  }
+
+  return false;
+}
+
 function removeThavornColumn($: cheerio.CheerioAPI, element: AnyNode): boolean {
   const column = $(element);
   if (!THAVORN_NAMES.has(compactText(column.find("h4").first().text()))) {
@@ -480,6 +530,7 @@ export function applyBoardExecutiveOverride(record: WpContentRecord): WpContentR
   let didRewriteEnglish = false;
   if (record.language === "en") {
     for (const element of columns) {
+      didRewriteEnglish = rewriteEnglishExecutiveColumn($, element) || didRewriteEnglish;
       didRewriteEnglish = rewriteEnglishBoardColumn($, element) || didRewriteEnglish;
       didRewriteEnglish = rewriteEnglishMinistryColumn($, element) || didRewriteEnglish;
     }

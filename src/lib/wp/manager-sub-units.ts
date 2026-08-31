@@ -32,6 +32,29 @@ export const MANAGER_SUB_UNITS_BY_ROLE: Readonly<Record<string, readonly string[
     "งานบุคคล",
     "งานธรรมาภิบาล ความเสี่ยงและควบคุมภายใน",
   ],
+  "Research and Standards Group Manager": ["Research Team", "Standards Team"],
+  "New Entrepreneurs and Business Development Group Manager": [
+    "Entrepreneur Development Team",
+    "New Business Development",
+  ],
+  "Rail Systems Digital Development Group Manager": [
+    "Smart Railway Project",
+    "Network & Performance",
+  ],
+  "Strategy and Corporate Communications Group Manager": [
+    "Planning and Budgeting",
+    "Board Secretariat and Stakeholder Management",
+    "Special Projects",
+    "Procurement",
+    "Organizational Performance Evaluation",
+  ],
+  "Internal Administration Group Manager (Acting)": [
+    "Accounting and Finance",
+    "Legal Affairs",
+    "Administration and Records",
+    "Human Resources",
+    "Governance, Risk and Internal Control",
+  ],
 } as const;
 
 export function getManagerSubUnits(role: string): readonly string[] | null {
