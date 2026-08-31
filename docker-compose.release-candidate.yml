@@ -1,0 +1,72 @@
+services:
+  web-app-rtrda-release-candidate:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: web-app-rtrda:release-candidate-${RTRDA_RELEASE_SHA:?RTRDA_RELEASE_SHA is required}
+    container_name: web-app-rtrda-release-candidate
+    restart: unless-stopped
+    labels:
+      org.opencontainers.image.revision: ${RTRDA_RELEASE_SHA:?RTRDA_RELEASE_SHA is required}
+    environment:
+      NODE_ENV: production
+      HOSTNAME: 0.0.0.0
+      PORT: 3000
+      SITE_ORIGIN: http://127.0.0.1:3022
+      ANALYTICS_ENV: release-candidate
+      ANALYTICS_HASH_SALT: ${ANALYTICS_HASH_SALT:?ANALYTICS_HASH_SALT is required}
+      DATABASE_URL: postgresql://rtrda:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}@db-release-candidate:5432/rtrda
+    depends_on:
+      db-release-candidate:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:3022:3000"
+    volumes:
+      - ./public/wp-content/uploads:/app/public/wp-content/uploads:ro
+      - ./public/sdc-downloads:/app/public/sdc-downloads:ro
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          'node -e "fetch(''http://127.0.0.1:3000/healthz'').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"',
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+
+  db-tools-release-candidate:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: builder
+    image: web-app-rtrda:release-candidate-tools-${RTRDA_RELEASE_SHA:?RTRDA_RELEASE_SHA is required}
+    profiles: ["tools"]
+    environment:
+      DATABASE_URL: postgresql://rtrda:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}@db-release-candidate:5432/rtrda
+    depends_on:
+      db-release-candidate:
+        condition: service_healthy
+    command: ["bash", "-lc", "npm run db:migrate && npm run db:seed"]
+
+  db-release-candidate:
+    image: postgres:17-alpine
+    container_name: web-app-rtrda-db-release-candidate
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: rtrda
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+      POSTGRES_DB: rtrda
+    ports:
+      - "127.0.0.1:5438:5432"
+    volumes:
+      - rtrda-release-candidate-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U rtrda -d rtrda"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+volumes:
+  rtrda-release-candidate-db-data:
+    name: rtrda-release-candidate-db-data

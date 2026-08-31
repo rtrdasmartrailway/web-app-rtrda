@@ -1,6 +1,8 @@
 #!/usr/bin/env node
 import { execFileSync } from "node:child_process";
-import { readFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 
 const FULL_SHA = /^[0-9a-f]{40}$/;
 
@@ -69,9 +71,9 @@ function run(command, args, options = {}) {
   }).trim();
 }
 
-function succeeds(command, args) {
+function succeeds(command, args, options = {}) {
   try {
-    run(command, args);
+    run(command, args, options);
     return true;
   } catch {
     return false;
@@ -171,11 +173,178 @@ function valueAfter(args, flag) {
   return index >= 0 ? args[index + 1] : undefined;
 }
 
+export function valuesAfter(args, flag) {
+  const values = [];
+  for (let index = 0; index < args.length; index += 1) {
+    if (args[index] === flag) values.push(args[index + 1]);
+  }
+  return values;
+}
+
+export function validateSelectedCommitShas(commitShas) {
+  if (commitShas.length === 0) throw new Error("At least one --commit is required");
+  if (commitShas.some((sha) => !FULL_SHA.test(sha ?? ""))) {
+    throw new Error("Every --commit must be a full SHA");
+  }
+  if (new Set(commitShas).size !== commitShas.length) {
+    throw new Error("Duplicate selected commit SHA");
+  }
+  return [...commitShas];
+}
+
+export function assertSelectableCommit(commitSha, parentShas, reachableFromDeployedTest) {
+  if (!FULL_SHA.test(commitSha ?? "") || parentShas.length !== 1) {
+    throw new Error("Selected commit must be a full SHA single-parent commit");
+  }
+  if (!reachableFromDeployedTest) {
+    throw new Error("Selected commit is not reachable from deployed Test");
+  }
+  return commitSha;
+}
+
+export function assertPartialCandidateIdentity(expected, actual) {
+  const scalarKeys = [
+    "productionSha",
+    "deployedTestSha",
+    "candidateTree",
+    "candidateSha",
+  ];
+  const validScalars = scalarKeys.every(
+    (key) => FULL_SHA.test(expected?.[key] ?? "") && expected[key] === actual?.[key],
+  );
+  const sameList = (key) =>
+    JSON.stringify(expected?.[key] ?? []) === JSON.stringify(actual?.[key] ?? []);
+  if (
+    !validScalars ||
+    !sameList("selectedCommitShas") ||
+    !sameList("skippedCommitShas")
+  ) {
+    throw new Error(
+      "Partial candidate identity does not match approved candidate identity",
+    );
+  }
+  return actual;
+}
+
+export function assertReleaseCandidateEvidence(evidence) {
+  if (
+    !FULL_SHA.test(evidence?.candidateSha ?? "") ||
+    !FULL_SHA.test(evidence?.candidateTree ?? "") ||
+    evidence.containerSha !== evidence.candidateSha ||
+    evidence.worktreeTree !== evidence.candidateTree ||
+    evidence.healthy !== true
+  ) {
+    throw new Error("Release candidate evidence is not exact and healthy");
+  }
+  return evidence;
+}
+
+export function buildPartialCandidate({
+  repoPath,
+  productionSha,
+  deployedTestSha,
+  selectedCommitShas,
+  keepTemporary = false,
+}) {
+  validateSelectedCommitShas(selectedCommitShas);
+  if (!FULL_SHA.test(productionSha ?? "") || !FULL_SHA.test(deployedTestSha ?? "")) {
+    throw new Error("Production and deployed Test must be full SHAs");
+  }
+
+  const temporaryRoot = mkdtempSync(join(tmpdir(), "rtrda-partial-candidate-"));
+  const candidateRepo = join(temporaryRoot, "repo");
+  const skippedCommitShas = [];
+  try {
+    run("git", ["clone", "--quiet", "--no-checkout", repoPath, candidateRepo]);
+    run("git", ["checkout", "--quiet", "--detach", productionSha], {
+      cwd: candidateRepo,
+    });
+
+    for (const commitSha of selectedCommitShas) {
+      const parents = run("git", ["rev-list", "--parents", "-n", "1", commitSha], {
+        cwd: candidateRepo,
+      })
+        .split(/\s+/)
+        .slice(1);
+      const reachable = succeeds("git", [
+        "-C",
+        candidateRepo,
+        "merge-base",
+        "--is-ancestor",
+        commitSha,
+        deployedTestSha,
+      ]);
+      assertSelectableCommit(commitSha, parents, reachable);
+
+      const beforeTree = run("git", ["write-tree"], { cwd: candidateRepo });
+      try {
+        run("git", ["cherry-pick", "--no-commit", commitSha], { cwd: candidateRepo });
+      } catch (error) {
+        succeeds("git", ["-C", candidateRepo, "cherry-pick", "--abort"]);
+        throw new Error(`Selected commit conflicts with candidate: ${commitSha}`, {
+          cause: error,
+        });
+      }
+      const afterTree = run("git", ["write-tree"], { cwd: candidateRepo });
+      if (afterTree === beforeTree) skippedCommitShas.push(commitSha);
+    }
+
+    const candidateTree = run("git", ["write-tree"], { cwd: candidateRepo });
+    const message = [
+      "Promote selected Test commits to production",
+      "",
+      `Production: ${productionSha}`,
+      `Deployed-Test: ${deployedTestSha}`,
+      ...selectedCommitShas.map((sha) => `Selected: ${sha}`),
+      ...skippedCommitShas.map((sha) => `Skipped-Empty: ${sha}`),
+      "",
+    ].join("\n");
+    const identityEnv = {
+      ...process.env,
+      GIT_AUTHOR_NAME: "RTRDA Release Worker",
+      GIT_AUTHOR_EMAIL: "release-worker@rtrda.or.th",
+      GIT_AUTHOR_DATE: "2000-01-01T00:00:00Z",
+      GIT_COMMITTER_NAME: "RTRDA Release Worker",
+      GIT_COMMITTER_EMAIL: "release-worker@rtrda.or.th",
+      GIT_COMMITTER_DATE: "2000-01-01T00:00:00Z",
+    };
+    const candidateSha = run("git", ["commit-tree", candidateTree, "-p", productionSha], {
+      cwd: candidateRepo,
+      env: identityEnv,
+      input: message,
+      stdio: ["pipe", "pipe", "pipe"],
+    });
+    const changedFiles = run(
+      "git",
+      ["diff", "--name-status", productionSha, candidateSha],
+      { cwd: candidateRepo },
+    )
+      .split("\n")
+      .filter(Boolean);
+    run("git", ["reset", "--hard", candidateSha], { cwd: candidateRepo });
+
+    return {
+      productionSha,
+      deployedTestSha,
+      selectedCommitShas: [...selectedCommitShas],
+      skippedCommitShas,
+      candidateTree,
+      candidateSha,
+      changedFiles,
+      commitMessage: message,
+      ...(keepTemporary ? { temporaryRoot, candidateRepo } : {}),
+    };
+  } finally {
+    if (!keepTemporary) rmSync(temporaryRoot, { recursive: true, force: true });
+  }
+}
+
 function usage() {
   return [
     "Usage:",
     "  node scripts/rtrda-release-worker.mjs check [--repo PATH] [--evidence FILE]",
     "  node scripts/rtrda-release-worker.mjs promote --approved-sha SHA --evidence FILE [--execute]",
+    "  node scripts/rtrda-release-worker.mjs promote-partial --commit SHA [--commit SHA ...] [--approved-candidate-sha SHA --execute]",
     "",
     "check is always read-only. promote fails closed unless the audited deployed test SHA",
     "matches origin/test and Cloud/RTRDA02 production are healthy and in parity.",
@@ -361,6 +530,44 @@ function inspectRecoveryState(approvedSha) {
   }
 }
 
+function inspectPartialRecoveryState(candidateSha) {
+  const repo = "rtrdasmartrailway/web-app-rtrda";
+  if (!FULL_SHA.test(candidateSha ?? "")) return null;
+  try {
+    const releaseBranch = `release/partial-${candidateSha}`;
+    const releaseHeadSha = run("gh", [
+      "api",
+      `repos/${repo}/git/matching-refs/heads/${releaseBranch}`,
+      "--jq",
+      `.[] | select(.ref == "refs/heads/${releaseBranch}") | .object.sha`,
+    ]);
+    if (releaseHeadSha !== candidateSha) return null;
+    const mainSha = run("gh", [
+      "api",
+      `repos/${repo}/git/refs/heads/main`,
+      "--jq",
+      ".object.sha",
+    ]);
+    const releaseCommit = JSON.parse(
+      run("gh", ["api", `repos/${repo}/git/commits/${releaseHeadSha}`]),
+    );
+    const mainCommit = JSON.parse(
+      run("gh", ["api", `repos/${repo}/git/commits/${mainSha}`]),
+    );
+    return assertRecoveryIdentity(
+      releaseCommit.tree?.sha,
+      mainSha,
+      mainCommit.tree?.sha,
+      (mainCommit.parents ?? []).map((parent) => parent.sha),
+      releaseHeadSha,
+      releaseCommit.tree?.sha,
+      (releaseCommit.parents ?? []).map((parent) => parent.sha),
+    );
+  } catch {
+    return null;
+  }
+}
+
 export function selectProductionRunQuery(mainSha) {
   if (!FULL_SHA.test(mainSha ?? "")) throw new Error("main SHA must be a full SHA");
   return `.[] | select(.displayTitle == "Deploy production ${mainSha}") | select(.status != "completed") | .databaseId`;
@@ -379,12 +586,236 @@ export function buildPromotionPlan(sha) {
   ];
 }
 
-function executePromotion(approvedSha, auditedProductionSha, recoveryMode = false) {
+export function buildPartialPromotionPlan(identity) {
+  const releaseBranch = `release/partial-${identity.candidateSha}`;
+  return [
+    `Reconstruct ${identity.selectedCommitShas.length} selected commit(s) from audited production ${identity.productionSha}.`,
+    `Verify release candidate ${identity.candidateSha} in the isolated localhost RC runtime.`,
+    `Create/reuse ${releaseBranch} with parent=${identity.productionSha} and the exact candidate tree.`,
+    "Require the RTRDA02 backup gate before either production target is replaced.",
+    "Create and verify an exact-tree merge commit and atomically fast-forward main.",
+    "Dispatch deploy-production.yml for the verified merge SHA.",
+    "Verify Cloud/RTRDA02 release markers, health, public health, parity, watchdog, and backup evidence.",
+  ];
+}
+
+function collectReleaseCandidateEvidence(candidate) {
+  const healthy = succeeds("curl", ["-fsS", "http://127.0.0.1:3022/healthz"]);
+  return assertReleaseCandidateEvidence({
+    candidateSha: candidate.candidateSha,
+    candidateTree: candidate.candidateTree,
+    containerSha: run("docker", [
+      "inspect",
+      "web-app-rtrda-release-candidate",
+      "--format",
+      '{{ index .Config.Labels "org.opencontainers.image.revision" }}',
+    ]),
+    worktreeTree: run("git", ["rev-parse", "HEAD^{tree}"], {
+      cwd: candidate.candidateRepo,
+    }),
+    healthy,
+  });
+}
+
+function runReleaseCandidate(candidate, sourceRepoPath) {
+  runReleaseValidation(candidate.candidateSha, candidate.candidateRepo);
+  const composeFile = join(
+    candidate.candidateRepo,
+    "docker-compose.release-candidate.yml",
+  );
+  const envFile = join(sourceRepoPath, ".env");
+  const options = {
+    cwd: candidate.candidateRepo,
+    env: { ...process.env, RTRDA_RELEASE_SHA: candidate.candidateSha },
+  };
+  run("rsync", [
+    "-a",
+    "--",
+    join(sourceRepoPath, "public/wp-content/uploads/"),
+    join(candidate.candidateRepo, "public/wp-content/uploads/"),
+  ]);
+  run("rsync", [
+    "-a",
+    "--",
+    join(sourceRepoPath, "public/sdc-downloads/"),
+    join(candidate.candidateRepo, "public/sdc-downloads/"),
+  ]);
+  succeeds(
+    "docker",
+    [
+      "compose",
+      "--env-file",
+      envFile,
+      "-f",
+      composeFile,
+      "down",
+      "--volumes",
+      "--remove-orphans",
+    ],
+    options,
+  );
+  run(
+    "docker",
+    [
+      "compose",
+      "--env-file",
+      envFile,
+      "-f",
+      composeFile,
+      "up",
+      "-d",
+      "db-release-candidate",
+    ],
+    options,
+  );
+  run(
+    "docker",
+    [
+      "compose",
+      "--env-file",
+      envFile,
+      "-f",
+      composeFile,
+      "--profile",
+      "tools",
+      "run",
+      "--rm",
+      "db-tools-release-candidate",
+    ],
+    options,
+  );
+  run(
+    "docker",
+    [
+      "compose",
+      "--env-file",
+      envFile,
+      "-f",
+      composeFile,
+      "up",
+      "-d",
+      "--build",
+      "web-app-rtrda-release-candidate",
+    ],
+    options,
+  );
+  let healthy = false;
+  for (let attempt = 0; attempt < 40 && !healthy; attempt += 1) {
+    healthy = succeeds("curl", ["-fsS", "http://127.0.0.1:3022/healthz"]);
+    if (!healthy) run("sleep", ["3"]);
+  }
+  run(
+    "npm",
+    [
+      "run",
+      "audit:parity",
+      "--",
+      "--new-base",
+      "http://127.0.0.1:3022",
+      "--report-dir",
+      join(candidate.temporaryRoot, "parity-report"),
+    ],
+    options,
+  );
+  return collectReleaseCandidateEvidence(candidate);
+}
+
+function stopReleaseCandidate(candidate, sourceRepoPath) {
+  if (!candidate?.candidateRepo) return;
+  succeeds(
+    "docker",
+    [
+      "compose",
+      "--env-file",
+      join(sourceRepoPath, ".env"),
+      "-f",
+      join(candidate.candidateRepo, "docker-compose.release-candidate.yml"),
+      "down",
+      "--volumes",
+      "--remove-orphans",
+    ],
+    {
+      cwd: candidate.candidateRepo,
+      env: { ...process.env, RTRDA_RELEASE_SHA: candidate.candidateSha },
+    },
+  );
+}
+
+function executePartialPromotion(
+  candidate,
+  rcEvidence,
+  sourceRepoPath,
+  recoveryMode = false,
+) {
   const repo = "rtrdasmartrailway/web-app-rtrda";
-  const testTree = run("git", ["rev-parse", `${approvedSha}^{tree}`]);
-  runReleaseValidation(approvedSha);
-  const postValidationReport = evaluateAudit(collectLiveEvidence(process.cwd()));
-  if (recoveryMode) {
+  const releaseBranch = `release/partial-${candidate.candidateSha}`;
+  assertReleaseCandidateEvidence(rcEvidence);
+  const freshRcEvidence = collectReleaseCandidateEvidence(candidate);
+  const actor = run("gh", ["api", "user", "--jq", ".login"]);
+  const canPush = run("gh", ["api", `repos/${repo}`, "--jq", ".permissions.push"]);
+  if (!actor || canPush !== "true")
+    throw new Error("RTRDA GitHub identity lacks push access");
+  const remoteUrl = run("git", ["remote", "get-url", "origin"], { cwd: sourceRepoPath });
+  run("git", ["remote", "set-url", "origin", remoteUrl], {
+    cwd: candidate.candidateRepo,
+  });
+  const remoteHead = run("git", ["ls-remote", "--heads", "origin", releaseBranch], {
+    cwd: candidate.candidateRepo,
+    timeout: 60000,
+  }).split(/\s+/)[0];
+  if (remoteHead && remoteHead !== candidate.candidateSha) {
+    throw new Error("Existing partial release branch has a different candidate SHA");
+  }
+  if (!remoteHead) {
+    run(
+      "git",
+      [
+        "push",
+        "--porcelain",
+        "origin",
+        `${candidate.candidateSha}:refs/heads/${releaseBranch}`,
+      ],
+      { cwd: candidate.candidateRepo, timeout: 60000 },
+    );
+  }
+  return executePromotion(candidate.candidateSha, candidate.productionSha, recoveryMode, {
+    releaseTree: candidate.candidateTree,
+    releaseBranch,
+    releaseHeadSha: candidate.candidateSha,
+    validationComplete: true,
+    partialIdentity: candidate,
+    rcEvidence: freshRcEvidence,
+    repoPath: sourceRepoPath,
+  });
+}
+
+function executePromotion(
+  approvedSha,
+  auditedProductionSha,
+  recoveryMode = false,
+  options = {},
+) {
+  const repo = "rtrdasmartrailway/web-app-rtrda";
+  const liveRepoPath = options.repoPath ?? process.cwd();
+  const testTree =
+    options.releaseTree ?? run("git", ["rev-parse", `${approvedSha}^{tree}`]);
+  if (!options.validationComplete) runReleaseValidation(approvedSha);
+  const postValidationReport = evaluateAudit(collectLiveEvidence(liveRepoPath));
+  if (options.partialIdentity && recoveryMode) {
+    const recovery = inspectPartialRecoveryState(approvedSha);
+    if (
+      !recovery ||
+      recovery.productionSha !== auditedProductionSha ||
+      postValidationReport.test.sha !== options.partialIdentity.deployedTestSha ||
+      postValidationReport.test.originTestSha !==
+        options.partialIdentity.deployedTestSha ||
+      !postValidationReport.test.healthy
+    ) {
+      throw new Error("Partial-deployment recovery changed during validation");
+    }
+    assertReleaseCandidateEvidence(options.rcEvidence);
+    assertRecoveryTargets(postValidationReport, recovery);
+  } else if (recoveryMode) {
     const recovery = inspectRecoveryState(approvedSha);
     if (
       !recovery ||
@@ -396,18 +827,33 @@ function executePromotion(approvedSha, auditedProductionSha, recoveryMode = fals
       throw new Error("Partial-deployment recovery changed during validation");
     }
     assertRecoveryTargets(postValidationReport, recovery);
+  } else if (options.partialIdentity) {
+    if (
+      !postValidationReport.promotable ||
+      postValidationReport.production.sha !== auditedProductionSha ||
+      postValidationReport.test.sha !== options.partialIdentity.deployedTestSha ||
+      postValidationReport.test.originTestSha !== options.partialIdentity.deployedTestSha
+    ) {
+      throw new Error("Live release state changed during partial candidate validation");
+    }
+    assertReleaseCandidateEvidence(options.rcEvidence);
   } else {
     assertPostValidationState(auditedProductionSha, postValidationReport, approvedSha);
   }
-  const releaseBranch = `release/exact-${approvedSha}`;
-  const matchingRefPath = `repos/${repo}/git/matching-refs/heads/release/exact-${approvedSha}`;
+  const releaseBranch = options.releaseBranch ?? `release/exact-${approvedSha}`;
+  const matchingRefPath = `repos/${repo}/git/matching-refs/heads/${releaseBranch}`;
   let releaseHeadSha = run("gh", [
     "api",
     matchingRefPath,
     "--jq",
     `.[] | select(.ref == "refs/heads/${releaseBranch}") | .object.sha`,
   ]);
+  if (options.releaseHeadSha && releaseHeadSha !== options.releaseHeadSha) {
+    throw new Error("Partial release branch does not match verified candidate SHA");
+  }
   if (!releaseHeadSha) {
+    if (options.releaseHeadSha)
+      throw new Error("Verified partial release branch is missing");
     releaseHeadSha = run("gh", [
       "api",
       "--method",
@@ -605,7 +1051,7 @@ function executePromotion(approvedSha, auditedProductionSha, recoveryMode = fals
   ]);
   assertCurrentMain(mergeCommitSha, currentMainSha);
 
-  const liveBeforeDeploy = evaluateAudit(collectLiveEvidence(process.cwd()));
+  const liveBeforeDeploy = evaluateAudit(collectLiveEvidence(liveRepoPath));
   if (
     liveBeforeDeploy.production.sha === mergeCommitSha &&
     liveBeforeDeploy.production.parity &&
@@ -661,7 +1107,7 @@ function executePromotion(approvedSha, auditedProductionSha, recoveryMode = fals
   execFileSync("gh", ["run", "watch", runId, "--repo", repo, "--exit-status"], {
     stdio: "inherit",
   });
-  const finalReport = evaluateAudit(collectLiveEvidence(process.cwd()));
+  const finalReport = evaluateAudit(collectLiveEvidence(liveRepoPath));
   assertProductionRelease(mergeCommitSha, finalReport);
   return { prNumber, mainSha: mergeCommitSha, productionRunId: runId };
 }
@@ -682,6 +1128,115 @@ function main() {
   if (operation === "check") {
     console.log(JSON.stringify(report, null, 2));
     return;
+  }
+  if (operation === "promote-partial") {
+    const repoPath = valueAfter(args, "--repo") ?? process.cwd();
+    const approvedCandidateSha = valueAfter(args, "--approved-candidate-sha");
+    const inspectedPartialRecovery = inspectPartialRecoveryState(approvedCandidateSha);
+    let recovery = inspectedPartialRecovery;
+    if (!report.promotable && !recovery) {
+      throw new Error(`Partial promotion blocked: ${report.blockers.join(", ")}`);
+    }
+    if (recovery) {
+      if (report.test.sha !== report.test.originTestSha || !report.test.healthy) {
+        throw new Error("Partial promotion recovery requires healthy exact Test state");
+      }
+      assertRecoveryTargets(report, recovery);
+    }
+    const productionSha = recovery?.productionSha ?? report.production.sha;
+    const selectedCommitShas = validateSelectedCommitShas(valuesAfter(args, "--commit"));
+    const candidate = buildPartialCandidate({
+      repoPath,
+      productionSha,
+      deployedTestSha: report.test.sha,
+      selectedCommitShas,
+      keepTemporary: true,
+    });
+    let completed = false;
+    try {
+      if (recovery && candidate.candidateSha !== approvedCandidateSha) {
+        throw new Error("Recovered partial candidate identity changed");
+      }
+      const rcEvidence = runReleaseCandidate(candidate, repoPath);
+      const commands = buildPartialPromotionPlan(candidate);
+      if (!args.includes("--execute")) {
+        console.log(
+          JSON.stringify(
+            {
+              dryRun: true,
+              recovery: Boolean(recovery),
+              candidate: {
+                ...candidate,
+                temporaryRoot: undefined,
+                candidateRepo: undefined,
+              },
+              rcEvidence,
+              commands,
+            },
+            null,
+            2,
+          ),
+        );
+        completed = true;
+        return;
+      }
+      if (!FULL_SHA.test(approvedCandidateSha ?? "")) {
+        throw new Error("--approved-candidate-sha must be a full SHA");
+      }
+      if (approvedCandidateSha !== candidate.candidateSha) {
+        throw new Error("Approved candidate SHA does not match reconstructed candidate");
+      }
+      const liveReport = evaluateAudit(collectLiveEvidence(repoPath));
+      if (!liveReport.promotable) {
+        recovery = inspectPartialRecoveryState(approvedCandidateSha);
+        if (
+          !recovery ||
+          recovery.productionSha !== candidate.productionSha ||
+          liveReport.test.sha !== candidate.deployedTestSha ||
+          liveReport.test.originTestSha !== candidate.deployedTestSha ||
+          !liveReport.test.healthy
+        ) {
+          throw new Error(
+            `Partial promotion recovery blocked: ${liveReport.blockers.join(", ")}`,
+          );
+        }
+        assertRecoveryTargets(liveReport, recovery);
+      } else if (!recovery) {
+        if (
+          liveReport.production.sha !== candidate.productionSha ||
+          liveReport.test.sha !== candidate.deployedTestSha ||
+          liveReport.test.originTestSha !== candidate.deployedTestSha
+        ) {
+          throw new Error("Live release state changed after partial candidate approval");
+        }
+        assertPartialCandidateIdentity(candidate, {
+          ...candidate,
+          productionSha: liveReport.production.sha,
+          deployedTestSha: liveReport.test.sha,
+        });
+      }
+      const result = executePartialPromotion(
+        candidate,
+        rcEvidence,
+        repoPath,
+        Boolean(recovery),
+      );
+      console.log(JSON.stringify(result, null, 2));
+      completed = true;
+      return;
+    } catch (error) {
+      throw new Error(
+        `RC evidence retained at ${candidate.temporaryRoot}: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+        { cause: error },
+      );
+    } finally {
+      if (completed) {
+        stopReleaseCandidate(candidate, repoPath);
+        rmSync(candidate.temporaryRoot, { recursive: true, force: true });
+      }
+    }
   }
   if (operation !== "promote") throw new Error(`Unknown operation: ${operation}`);
 

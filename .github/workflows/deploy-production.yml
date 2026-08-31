@@ -98,6 +98,29 @@ jobs:
           npm run format:check
           npm run security:audit
 
+      - name: Backup current RTRDA02 production
+        id: backup
+        env:
+          SOURCE_PATH: ${{ steps.resolve.outputs.source_path }}
+          DEPLOY_SHA: ${{ steps.resolve.outputs.deploy_sha }}
+        run: |
+          set -euo pipefail
+          SSH_KEY=/home/rtrda-dgt/.ssh/rtrda02_prod_preview_sync_ed25519
+          REMOTE=rtrda@100.91.174.121
+          TARGET_PATH=/srv/apps/web-app-rtrda-preprod-rtrda02
+          SCRIPT=/tmp/backup-rtrda02-production.sh
+          scp -i "$SSH_KEY" -o BatchMode=yes -o ConnectTimeout=10 \
+            "$SOURCE_PATH/.github/scripts/backup-rtrda02-production.sh" "$REMOTE:$SCRIPT"
+          SOURCE_SHA="$(ssh -i "$SSH_KEY" -o BatchMode=yes -o ConnectTimeout=10 "$REMOTE" \
+            "tr -d '[:space:]' < '$TARGET_PATH/.deploy-state/preprod-release'")"
+          test "${#SOURCE_SHA}" -eq 40
+          BACKUP_DIR="$(ssh -i "$SSH_KEY" -o BatchMode=yes -o ConnectTimeout=10 "$REMOTE" \
+            "chmod +x '$SCRIPT' && TARGET_PATH='$TARGET_PATH' COMPOSE_FILE='docker-compose.preprod-rtrda02.yml' APP_SERVICE='web-app-rtrda-preprod-rtrda02' DB_SERVICE='db-preprod-rtrda02' SOURCE_SHA='$SOURCE_SHA' TARGET_SHA='$DEPLOY_SHA' '$SCRIPT'")"
+          test -n "$BACKUP_DIR"
+          ssh -i "$SSH_KEY" -o BatchMode=yes -o ConnectTimeout=10 "$REMOTE" \
+            "cd '$BACKUP_DIR' && sha256sum -c SHA256SUMS >/dev/null && test -s release-manifest.json"
+          echo "backup_dir=$BACKUP_DIR" >> "$GITHUB_OUTPUT"
+
       - name: Deploy exact main SHA to cloud primary
         env:
           SOURCE_PATH: ${{ steps.resolve.outputs.source_path }}
@@ -164,3 +187,29 @@ jobs:
           node "$SOURCE_PATH/scripts/check-live-security.mjs" https://rtrda.or.th
           node "$SOURCE_PATH/scripts/check-live-security.mjs" https://www.rtrda.or.th
           ssh -i ~/.ssh/rtrda02_prod_preview_sync_ed25519 -o BatchMode=yes rtrda@100.91.174.121 '/home/rtrda/bin/rtrda-production-watchdog.py --status'
+
+      - name: Verify backup integrity after production deployment
+        env:
+          BACKUP_DIR: ${{ steps.backup.outputs.backup_dir }}
+          DEPLOY_SHA: ${{ steps.resolve.outputs.deploy_sha }}
+        run: |
+          set -euo pipefail
+          SSH_KEY=/home/rtrda-dgt/.ssh/rtrda02_prod_preview_sync_ed25519
+          REMOTE=rtrda@100.91.174.121
+          test -n "$BACKUP_DIR"
+          ssh -i "$SSH_KEY" -o BatchMode=yes -o ConnectTimeout=10 "$REMOTE" \
+            "cd '$BACKUP_DIR' && sha256sum -c SHA256SUMS >/dev/null && sha256sum -c public-assets.SHA256SUMS >/dev/null && printf '%s\\n' '$DEPLOY_SHA' > RELEASE_SUCCESS && test \"\$(tr -d '[:space:]' < RELEASE_SUCCESS)\" = '$DEPLOY_SHA'"
+
+      - name: Prune successful RTRDA02 backups
+        env:
+          SOURCE_PATH: ${{ steps.resolve.outputs.source_path }}
+        run: |
+          set -euo pipefail
+          SSH_KEY=/home/rtrda-dgt/.ssh/rtrda02_prod_preview_sync_ed25519
+          REMOTE=rtrda@100.91.174.121
+          TARGET_PATH=/srv/apps/web-app-rtrda-preprod-rtrda02
+          SCRIPT=/tmp/prune-rtrda02-backups.sh
+          scp -i "$SSH_KEY" -o BatchMode=yes -o ConnectTimeout=10 \
+            "$SOURCE_PATH/.github/scripts/prune-rtrda02-backups.sh" "$REMOTE:$SCRIPT"
+          ssh -i "$SSH_KEY" -o BatchMode=yes -o ConnectTimeout=10 "$REMOTE" \
+            "chmod +x '$SCRIPT' && TARGET_PATH='$TARGET_PATH' '$SCRIPT'"

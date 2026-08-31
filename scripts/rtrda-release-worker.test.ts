@@ -1,4 +1,6 @@
-import { readFileSync } from "node:fs";
+import { execFileSync } from "node:child_process";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import * as releaseWorker from "./rtrda-release-worker.mjs";
@@ -374,5 +376,200 @@ describe("RTRDA release worker audit", () => {
     expect(plan.join("\n")).toContain("deploy-production.yml");
     expect(plan.join("\n")).not.toContain("gh pr merge");
     expect(plan.join("\n")).not.toContain("ssh ");
+  });
+});
+
+describe("RTRDA partial promotion", () => {
+  const SHA_ONE = "1".repeat(40);
+  const SHA_TWO = "2".repeat(40);
+  const SHA_TREE = "3".repeat(40);
+  const SHA_CANDIDATE = "4".repeat(40);
+
+  it("collects repeated commit flags in their supplied order", () => {
+    expect(
+      releaseWorker.valuesAfter?.(
+        ["promote-partial", "--commit", SHA_ONE, "--commit", SHA_TWO],
+        "--commit",
+      ),
+    ).toEqual([SHA_ONE, SHA_TWO]);
+  });
+
+  it("rejects missing, malformed, and duplicate selected commit SHAs", () => {
+    expect(() => releaseWorker.validateSelectedCommitShas?.([])).toThrow(/at least one/i);
+    expect(() => releaseWorker.validateSelectedCommitShas?.(["abc"])).toThrow(
+      /full sha/i,
+    );
+    expect(() => releaseWorker.validateSelectedCommitShas?.([SHA_ONE, SHA_ONE])).toThrow(
+      /duplicate/i,
+    );
+    expect(releaseWorker.validateSelectedCommitShas?.([SHA_ONE, SHA_TWO])).toEqual([
+      SHA_ONE,
+      SHA_TWO,
+    ]);
+  });
+
+  it("requires every selected commit to be single-parent and reachable from deployed Test", () => {
+    const guard = releaseWorker.assertSelectableCommit;
+    expect(guard).toBeTypeOf("function");
+    expect(() => guard?.(SHA_ONE, [SHA_PROD], true)).not.toThrow();
+    expect(() => guard?.(SHA_ONE, [], true)).toThrow(/single-parent/i);
+    expect(() => guard?.(SHA_ONE, [SHA_PROD, SHA_TWO], true)).toThrow(/single-parent/i);
+    expect(() => guard?.(SHA_ONE, [SHA_PROD], false)).toThrow(/deployed test/i);
+  });
+
+  it("binds a partial candidate to production, deployed Test, ordered commits, tree, and SHA", () => {
+    const identity = {
+      productionSha: SHA_PROD,
+      deployedTestSha: SHA_TEST,
+      selectedCommitShas: [SHA_ONE, SHA_TWO],
+      skippedCommitShas: [],
+      candidateTree: SHA_TREE,
+      candidateSha: SHA_CANDIDATE,
+    };
+    expect(releaseWorker.assertPartialCandidateIdentity?.(identity, identity)).toEqual(
+      identity,
+    );
+    expect(() =>
+      releaseWorker.assertPartialCandidateIdentity?.(identity, {
+        ...identity,
+        selectedCommitShas: [SHA_TWO, SHA_ONE],
+      }),
+    ).toThrow(/candidate identity/i);
+    expect(() =>
+      releaseWorker.assertPartialCandidateIdentity?.(identity, {
+        ...identity,
+        productionSha: "5".repeat(40),
+      }),
+    ).toThrow(/candidate identity/i);
+  });
+
+  it("accepts RC evidence only for the exact candidate revision, tree, and healthy runtime", () => {
+    const valid = {
+      candidateSha: SHA_CANDIDATE,
+      candidateTree: SHA_TREE,
+      containerSha: SHA_CANDIDATE,
+      worktreeTree: SHA_TREE,
+      healthy: true,
+    };
+    expect(releaseWorker.assertReleaseCandidateEvidence?.(valid)).toEqual(valid);
+    expect(() =>
+      releaseWorker.assertReleaseCandidateEvidence?.({ ...valid, containerSha: SHA_ONE }),
+    ).toThrow(/release candidate/i);
+    expect(() =>
+      releaseWorker.assertReleaseCandidateEvidence?.({ ...valid, healthy: false }),
+    ).toThrow(/release candidate/i);
+  });
+
+  it("builds a fail-closed partial promotion plan without changing exact promotion", () => {
+    const plan = releaseWorker.buildPartialPromotionPlan?.({
+      productionSha: SHA_PROD,
+      deployedTestSha: SHA_TEST,
+      selectedCommitShas: [SHA_ONE, SHA_TWO],
+      candidateSha: SHA_CANDIDATE,
+    });
+    expect(plan?.join("\n")).toContain(`release/partial-${SHA_CANDIDATE}`);
+    expect(plan?.join("\n")).toContain("release candidate");
+    expect(plan?.join("\n")).toContain("RTRDA02 backup");
+    expect(plan?.join("\n")).toContain("deploy-production.yml");
+    expect(buildPromotionPlan(SHA_TEST).join("\n")).toContain(
+      `release/exact-${SHA_TEST}`,
+    );
+  });
+
+  it("exposes promote-partial with explicit candidate approval and fresh live checks", () => {
+    expect(workerSource).toContain('operation === "promote-partial"');
+    expect(workerSource).toContain('valuesAfter(args, "--commit")');
+    expect(workerSource).toContain('valueAfter(args, "--approved-candidate-sha")');
+    expect(workerSource).toContain("buildPartialCandidate(");
+    expect(workerSource).toContain("runReleaseCandidate(");
+    expect(workerSource).toContain('"audit:parity"');
+    expect(workerSource).toContain("http://127.0.0.1:3022");
+    expect(workerSource).toContain('join(sourceRepoPath, "public/wp-content/uploads/")');
+    expect(workerSource).toContain('join(sourceRepoPath, "public/sdc-downloads/")');
+    expect(workerSource).toContain("collectReleaseCandidateEvidence(candidate)");
+    expect(workerSource).toContain("assertPartialCandidateIdentity(");
+    expect(workerSource).toContain("executePartialPromotion(");
+  });
+
+  it("recovers a verified partial release and preserves the requested repository path", () => {
+    expect(workerSource).toContain("inspectPartialRecoveryState(");
+    expect(workerSource).toContain(
+      "const inspectedPartialRecovery = inspectPartialRecoveryState(approvedCandidateSha)",
+    );
+    expect(workerSource).toContain("options.partialIdentity && recoveryMode");
+    expect(workerSource).toContain("options.repoPath ?? process.cwd()");
+    expect(workerSource).toContain("RC evidence retained at");
+    expect(workerSource).toContain("if (completed)");
+    expect(workerSource).toMatch(/"down",\s*"--volumes",\s*"--remove-orphans"/);
+  });
+
+  it("keeps Test isolated and binds RC only to localhost port 3022", () => {
+    const compose = readFileSync(
+      join(process.cwd(), "docker-compose.release-candidate.yml"),
+      "utf8",
+    );
+    expect(compose).toContain("web-app-rtrda-release-candidate");
+    expect(compose).toContain("127.0.0.1:3022:3000");
+    expect(compose).toContain("rtrda-release-candidate-db-data");
+    expect(compose).not.toContain("web-app-rtrda-test");
+    expect(compose).not.toContain("rtrda-db-data");
+  });
+
+  it("reconstructs an ordered candidate from production and skips an already-present patch", () => {
+    const repo = mkdtempSync(join(tmpdir(), "rtrda-partial-test-"));
+    const git = (...args: string[]) =>
+      execFileSync("git", args, {
+        cwd: repo,
+        encoding: "utf8",
+        env: {
+          ...process.env,
+          GIT_AUTHOR_NAME: "Test",
+          GIT_AUTHOR_EMAIL: "test@example.invalid",
+          GIT_COMMITTER_NAME: "Test",
+          GIT_COMMITTER_EMAIL: "test@example.invalid",
+        },
+      }).trim();
+    try {
+      git("init", "-q");
+      writeFileSync(join(repo, "content.txt"), "base\n");
+      git("add", "content.txt");
+      git("commit", "-q", "-m", "base");
+      const productionSha = git("rev-parse", "HEAD");
+
+      writeFileSync(join(repo, "content.txt"), "base\nfirst\n");
+      git("commit", "-qam", "first");
+      const firstSha = git("rev-parse", "HEAD");
+      writeFileSync(join(repo, "content.txt"), "base\nfirst\nsecond\n");
+      git("commit", "-qam", "second");
+      const secondSha = git("rev-parse", "HEAD");
+      const deployedTestSha = secondSha;
+
+      const result = releaseWorker.buildPartialCandidate?.({
+        repoPath: repo,
+        productionSha,
+        deployedTestSha,
+        selectedCommitShas: [firstSha, secondSha],
+      });
+      expect(result?.selectedCommitShas).toEqual([firstSha, secondSha]);
+      expect(result?.skippedCommitShas).toEqual([]);
+      expect(result?.changedFiles).toEqual(["M\tcontent.txt"]);
+      expect(result?.candidateTree).toMatch(/^[0-9a-f]{40}$/);
+      expect(result?.candidateSha).toMatch(/^[0-9a-f]{40}$/);
+
+      git("checkout", "-q", "--detach", productionSha);
+      writeFileSync(join(repo, "content.txt"), "base\nfirst\n");
+      git("commit", "-qam", "production already has first patch");
+      const advancedProductionSha = git("rev-parse", "HEAD");
+      const withSkip = releaseWorker.buildPartialCandidate?.({
+        repoPath: repo,
+        productionSha: advancedProductionSha,
+        deployedTestSha,
+        selectedCommitShas: [firstSha, secondSha],
+      });
+      expect(withSkip?.skippedCommitShas).toEqual([firstSha]);
+      expect(withSkip?.selectedCommitShas).toEqual([firstSha, secondSha]);
+    } finally {
+      rmSync(repo, { recursive: true, force: true });
+    }
   });
 });
