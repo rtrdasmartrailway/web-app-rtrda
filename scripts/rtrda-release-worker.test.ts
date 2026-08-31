@@ -503,6 +503,11 @@ describe("RTRDA partial promotion", () => {
     expect(workerSource).toMatch(/"down",\s*"--volumes",\s*"--remove-orphans"/);
   });
 
+  it("keeps the Docker builder capable of running Git-backed integration tests", () => {
+    const dockerfile = readFileSync(join(process.cwd(), "Dockerfile"), "utf8");
+    expect(dockerfile).toMatch(/apt-get install[^\n]*git/);
+  });
+
   it("keeps Test isolated and binds RC only to localhost port 3022", () => {
     const compose = readFileSync(
       join(process.cwd(), "docker-compose.release-candidate.yml"),
