@@ -2,20 +2,11 @@ import type { PresentationNavItem } from "./presentation";
 import type { WpLanguage } from "./types";
 
 const labelsByPath = new Map<string, string>([
-  [
-    "/en/วัตถุประสงค์การจัดตั้ง",
-    "Establishment Objectives and Statutory Powers",
-  ],
+  ["/en/วัตถุประสงค์การจัดตั้ง", "Establishment Objectives and Statutory Powers"],
   ["/en/category/ประกาศ", "Announcements"],
-  [
-    "/en/การประเมินคุณธรรมและคว",
-    "Integrity and Transparency Assessment (ITA)",
-  ],
+  ["/en/การประเมินคุณธรรมและคว", "Integrity and Transparency Assessment (ITA)"],
   ["/en/ประชาพิจารณ์", "Public Hearings"],
-  [
-    "/en/ช่องทางการแจ้งเรื่องกา",
-    "Reporting Channels for Corruption and Misconduct",
-  ],
+  ["/en/ช่องทางการแจ้งเรื่องกา", "Reporting Channels for Corruption and Misconduct"],
   ["/en/ช่องทางการแจ้งเรื่องร้", "Complaints and Whistleblowing"],
 ]);
 
