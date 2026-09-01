@@ -308,6 +308,8 @@ const ACTIVE_ENGLISH_DETAILS: Record<string, { aliases: string[]; html: string }
   },
 };
 
+const THAI_DETAILS_ON_ENGLISH_PAGE = new Set(["weeradet", "watcharachan"]);
+
 for (const detail of DETAILS) {
   const localized = ACTIVE_ENGLISH_DETAILS[detail.trigger];
   if (!localized) {
@@ -334,12 +336,17 @@ function detailForLanguage(
   detail: BoardExecutiveDetailDefinition,
   language: WpLanguage,
 ): BoardExecutiveDetailEntry {
+  const detailLanguage =
+    language === "en" && THAI_DETAILS_ON_ENGLISH_PAGE.has(detail.trigger)
+      ? "th"
+      : language;
+
   return {
     ...detail,
     html:
       typeof detail.html === "string"
         ? detail.html
-        : (detail.html[language] ?? detail.html.th ?? ""),
+        : (detail.html[detailLanguage] ?? detail.html.th ?? ""),
   };
 }
 

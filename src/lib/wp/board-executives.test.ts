@@ -180,38 +180,37 @@ describe("board executive parser", () => {
     expect(english?.html).not.toContain("กรรมการและเลขานุการฯ");
   });
 
-  it("selects Thai and English content for Weeradet's popup", () => {
-    const thai = getBoardExecutiveDetailByName("ดร. วีรเดช ชีวาพัฒนานุวงศ์", "th");
-    const english = getBoardExecutiveDetailByName(
-      "Dr. Weeradet Cheevapattananuwong",
-      "en",
-    );
+  it("shows Thai content for Weeradet and Watcharachan popups on the English page", () => {
+    const details = [
+      {
+        trigger: "weeradet",
+        thaiName: "ดร. วีรเดช ชีวาพัฒนานุวงศ์",
+        englishName: "Dr. Weeradet Cheevapattananuwong",
+        thaiText: "มหาวิทยาลัยฮอกไกโด",
+      },
+      {
+        trigger: "watcharachan",
+        thaiName: "วัชรชาญ สิริสุวรรณทัศน์",
+        englishName: "Watcharachan Sirisuwannatash",
+        thaiText: "2565 - 2566 รองผู้ว่าการรถไฟแห่งประเทศไทย",
+      },
+    ];
 
-    expect(thai?.html).toContain("มหาวิทยาลัยฮอกไกโด");
-    expect(thai?.html).toContain("วิศวกรใหญ่ กรมทางหลวงชนบท");
-    expect(english?.html).toContain("Hokkaido University");
-    expect(english?.html).toContain("Chief Engineer, Department of Rural Roads");
-    expect(english?.html).not.toContain("มหาวิทยาลัยฮอกไกโด");
-  });
+    for (const detail of details) {
+      const thai = getBoardExecutiveDetailByName(detail.thaiName, "th");
+      const englishByName = getBoardExecutiveDetailByName(detail.englishName, "en");
+      const englishByTrigger = getBoardExecutiveDetailByTrigger(detail.trigger, "en");
 
-  it("selects the updated Thai content for Watcharachan's popup", () => {
-    const detail = getBoardExecutiveDetailByName("วัชรชาญ สิริสุวรรณทัศน์", "th");
-
-    expect(detail?.html).toContain("กรรมการผู้ทรงคุณวุฒิ");
-    expect(detail?.html).toContain("2565 - 2566 รองผู้ว่าการรถไฟแห่งประเทศไทย");
-    expect(detail?.html).toContain(
-      "2569 - ปัจจุบัน กรรมการผู้ทรงคุณวุฒิ ในคณะกรรมการสถาบันวิจัยและพัฒนาเทคโนโลยีระบบราง",
-    );
-    expect(detail?.html).toContain(
-      "2556 – 2569 ที่ปรึกษาของสถาบันวิจัยและพัฒนาเทคโนโลยีระบบราง",
-    );
+      expect(thai?.html).toContain(detail.thaiText);
+      expect(englishByName?.html).toBe(thai?.html);
+      expect(englishByTrigger?.html).toBe(thai?.html);
+    }
   });
 
   it("localizes every active English board, steering committee and advisor popup", () => {
     const activeEnglishNames = [
       "Chanchao Chaiyanukij",
       "Pattanaphong Phongnsupatsamit",
-      "Watcharachan Sirisuwannatash",
       "Dr. Pichit Akrathit, Ph.D.",
       "Chanin Chaonirattisai",
       "Dr. Chatkaew Hart-Rawung",
