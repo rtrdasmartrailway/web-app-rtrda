@@ -395,4 +395,145 @@ describe("applyBoardExecutiveOverride", () => {
     expect($('img[src*="IMG_2233.png"]').length).toBe(0);
     expect($('img[src*="ชัยวุฒิ"]').length).toBe(2);
   });
+
+  it("orders Thai and English board cards without changing their layout containers", () => {
+    const thaiNames = [
+      "รศ.ดร. โชติชัย เจริญงาม",
+      "ผศ. พิศิษฐ์ แสง-ชูโต",
+      "ดรุณ แสงฉาย",
+      "ชาญเชาวน์ ไชยานุกิจ",
+      "ดร. พิเชฐ คุณาธรรมรักษ์",
+      "พัฒนพงษ์ พงศ์ศุภสมิทธิ์",
+      "นายอนันต์ โพธิ์นิ่มแดง",
+      "ดร. วีรเดช ชีวาพัฒนานุวงศ์",
+      "วัชรชาญ สิริสุวรรณทัศน์",
+      "ผศ.ดร.วีรชัย อาจหาญ",
+      "ดร. เพียงออ เลาหะวิไลย",
+    ];
+    const englishNames = [
+      "Assoc. Prof. Dr. Chotchai Charoenngam",
+      "Asst. Prof. Pisit Saeng-Xuto",
+      "Darun Saengshine",
+      "Chanchao Chaiyanukij",
+      "Dr. Pichet Kunadhamraks",
+      "Pattanaphong Phongsupatsamit",
+      "Anan Pho Nimdaeng",
+      "Dr. Weeradet Cheevapattananuwong",
+      "Watcharachan Sirisuwannatash",
+      "Asst. Prof. Dr. Veerachai Archan",
+      "Dr. Piang-or Loahavilai",
+    ];
+    const board = (title: string, names: string[]) => `
+      <div class="lightweight-accordion"><details><summary class="lightweight-accordion-title">${title}</summary>
+        <div class="lightweight-accordion-body">
+          <div class="wp-block-columns">${names
+            .slice(0, 1)
+            .map(
+              (name) =>
+                `<div class="wp-block-column"><img src="old.jpg" /><h4>${name}</h4><h5>กรรมการ</h5></div>`,
+            )
+            .join("")}</div>
+          <div class="wp-block-columns">${names
+            .slice(1, 4)
+            .map(
+              (name) =>
+                `<div class="wp-block-column"><img src="old.jpg" /><h4>${name}</h4><h5>กรรมการ</h5></div>`,
+            )
+            .join("")}</div>
+          <div class="wp-block-columns">${names
+            .slice(4, 10)
+            .map(
+              (name) =>
+                `<div class="wp-block-column"><img src="old.jpg" /><h4>${name}</h4><h5>กรรมการ</h5></div>`,
+            )
+            .join("")}</div>
+          <div class="wp-block-columns">${names
+            .slice(10)
+            .map(
+              (name) =>
+                `<div class="wp-block-column"><img src="old.jpg" /><h4>${name}</h4><h5>กรรมการ</h5></div>`,
+            )
+            .join("")}</div>
+        </div>
+      </details></div>`;
+    const expectedThai = [
+      "รศ.ดร. โชติชัย เจริญงาม",
+      "ดรุณ แสงฉาย",
+      "ชาญเชาวน์ ไชยานุกิจ",
+      "ผศ. พิศิษฐ์ แสง-ชูโต",
+      "ดร. วีรเดช ชีวาพัฒนานุวงศ์",
+      "วัชรชาญ สิริสุวรรณทัศน์",
+      "ดร. พิเชฐ คุณาธรรมรักษ์",
+      "นายอนันต์ โพธิ์นิ่มแดง",
+      "พัฒนพงษ์ พงศ์ศุภสมิทธิ์",
+      "ผศ.ดร.วีรชัย อาจหาญ",
+      "ดร. เพียงออ เลาหะวิไลย",
+    ];
+    const expectedEnglish = [
+      "Assoc. Prof. Dr. Chotchai Charoenngam",
+      "Darun Saengshine",
+      "Chanchao Chaiyanukij",
+      "Asst. Prof. Pisit Saeng-Xuto",
+      "Dr. Weeradet Cheevapattananuwong",
+      "Watcharachan Sirisuwannatash",
+      "Dr. Pichet Kunadhamraks",
+      "Anan Pho Nimdaeng",
+      "Pattanaphong Phongsupatsamit",
+      "Asst. Prof. Dr. Veerachai Archan",
+      "Dr. Piang-or Loahavilai",
+    ];
+    const sourceThaiNames = thaiNames.map((name) =>
+      name === "วัชรชาญ สิริสุวรรณทัศน์"
+        ? "ผู้แทน กระทรวงการอุดมศึกษา วิทยาศาสตร์ วิจัยและนวัตกรรม"
+        : name,
+    );
+    const sourceEnglishNames = englishNames
+      .filter((name) => name !== "Dr. Weeradet Cheevapattananuwong")
+      .map((name) =>
+        name === "Watcharachan Sirisuwannatash"
+          ? "ผู้แทน กระทรวงการอุดมศึกษา วิทยาศาสตร์ วิจัยและนวัตกรรม"
+          : name === "Anan Pho Nimdaeng"
+            ? "ผู้แทน ผู้ว่าการรถไฟแห่งประเทศไทย"
+            : name,
+      );
+
+    const thai = applyBoardExecutiveOverride(
+      record({
+        contentHtml: board(
+          "คณะกรรมการสถาบันวิจัยและพัฒนาเทคโนโลยีระบบราง",
+          sourceThaiNames,
+        ),
+      }),
+    );
+    const english = applyBoardExecutiveOverride(
+      record({
+        language: "en",
+        path: "/en/เกี่ยวกับ-สทร/คณะกรรมการ-ผู้บริหาร",
+        contentHtml: board("Board of Directors", sourceEnglishNames),
+      }),
+    );
+
+    const boardCases: Array<[string, string[]]> = [
+      [thai.contentHtml, expectedThai],
+      [english.contentHtml, expectedEnglish],
+    ];
+    for (const [contentHtml, expected] of boardCases) {
+      const $ = cheerio.load(contentHtml, null, false);
+      expect(
+        $(".lightweight-accordion .wp-block-column h4")
+          .map((_, element) => $(element).text())
+          .get(),
+      ).toEqual(expected);
+      expect($(".lightweight-accordion .wp-block-columns")).toHaveLength(4);
+    }
+
+    const $thai = cheerio.load(thai.contentHtml, null, false);
+    expect(
+      $thai("h4")
+        .filter((_, element) => $thai(element).text() === "นายอนันต์ โพธิ์นิ่มแดง")
+        .closest(".wp-block-column")
+        .find("img")
+        .attr("src"),
+    ).toBe(ANAN_IMAGE_SRC);
+  });
 });

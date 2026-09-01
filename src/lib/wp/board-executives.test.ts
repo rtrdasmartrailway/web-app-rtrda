@@ -1,4 +1,5 @@
 import { readFile } from "node:fs/promises";
+import * as cheerio from "cheerio";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
@@ -9,6 +10,7 @@ import {
 import type { WpImportManifest } from "./types";
 import {
   applyBoardExecutiveOverride,
+  ANAN_IMAGE_SRC,
   CHAIYUT_IMAGE_SRC,
   CHAIYUT_NAME,
   TACHAKORN_IMAGE_SRC,
@@ -32,6 +34,68 @@ async function boardRecord(path = "/เกี่ยวกับ-สทร/คณ
 }
 
 describe("board executive parser", () => {
+  it("uses the requested board member order and Anan portrait in Thai and English", async () => {
+    const expectedThai = [
+      "รศ.ดร. โชติชัย เจริญงาม",
+      "ดรุณ แสงฉาย",
+      "ชาญเชาวน์ ไชยานุกิจ",
+      "ผศ. พิศิษฐ์ แสง-ชูโต",
+      "ดร. วีรเดช ชีวาพัฒนานุวงศ์",
+      "วัชรชาญ สิริสุวรรณทัศน์",
+      "ดร. พิเชฐ คุณาธรรมรักษ์",
+      "นายอนันต์ โพธิ์นิ่มแดง",
+      "พัฒนพงษ์ พงศ์ศุภสมิทธิ์",
+      "ผศ.ดร.วีรชัย อาจหาญ",
+      "ดร. เพียงออ เลาหะวิไลย",
+    ];
+    const expectedEnglish = [
+      "Assoc. Prof. Dr. Chotchai Charoenngam",
+      "Darun Saengshine",
+      "Chanchao Chaiyanukij",
+      "Asst. Prof. Pisit  Saeng-Xuto",
+      "Dr. Weeradet Cheevapattananuwong",
+      "Watcharachan Sirisuwannatash",
+      "Dr. Pichet Kunadhamraks",
+      "Anan Pho Nimdaeng",
+      "Pattanaphong Phongnsupatsamit",
+      "Asst. Prof. Dr. Veerachai Archan",
+      "Dr. Piang-or Loahavilai",
+    ];
+
+    const boardPages: Array<[string, string[]]> = [
+      ["/เกี่ยวกับ-สทร/คณะกรรมการ-ผู้บริหาร", expectedThai],
+      ["/en/เกี่ยวกับ-สทร/คณะกรรมการ-ผู้บริหาร", expectedEnglish],
+    ];
+    for (const [path, expected] of boardPages) {
+      const record = await boardRecord(path);
+      const $ = cheerio.load(record.contentHtml, null, false);
+      const board = $(".lightweight-accordion")
+        .filter((_, element) =>
+          /คณะกรรมการสถาบันวิจัยและพัฒนาเทคโนโลยีระบบราง|Board of Directors/.test(
+            $(element).find(".lightweight-accordion-title").first().text(),
+          ),
+        )
+        .first();
+
+      expect(
+        board
+          .find(".wp-block-column h4")
+          .map((_, element) => $(element).text())
+          .get(),
+      ).toEqual(expected);
+    }
+
+    const thai = await boardRecord();
+    const $thai = cheerio.load(thai.contentHtml, null, false);
+    expect(
+      $thai("h4")
+        .filter((_, element) => $thai(element).text() === "นายอนันต์ โพธิ์นิ่มแดง")
+        .closest(".wp-block-column")
+        .find("img")
+        .attr("src"),
+    ).toBe(ANAN_IMAGE_SRC);
+  });
+
   it("selects Thai and English content for Chotichai's popup", () => {
     const thai = getBoardExecutiveDetailByTrigger("chotchai", "th");
     const english = getBoardExecutiveDetailByTrigger("chotchai", "en");

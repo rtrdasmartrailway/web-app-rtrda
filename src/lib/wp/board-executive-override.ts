@@ -41,7 +41,8 @@ const REPRESENTATIVE_RAILWAY_NAMES = new Set([
   "ดร. วีรเดช ชีวาพัฒนานุวงศ์",
   "Dr. Weeradet Cheevapattananuwong",
 ]);
-export const ANAN_IMAGE_SRC = "/wp-content/uploads/2026/08/anan-pho-nimdaeng.png";
+export const ANAN_IMAGE_SRC =
+  "/wp-content/uploads/2026/08/anan-pho-nimdaeng.png?v=20260901";
 const REMOVED_BOARD_NAMES = new Set([
   "ดร. จุลเทพ ขจรไชยกูล",
   "ดร.จุลเทพ ขจรไชยกูล",
@@ -55,6 +56,31 @@ export const WEERADET_IMAGE_SRC =
 export const VEERACHAI_IMAGE_SRC = "/wp-content/uploads/2026/08/veerachai-archan.jpg";
 const VEERACHAI_NAME = "ผศ.ดร.วีรชัย อาจหาญ";
 const VEERACHAI_ROLE = "ผู้ว่าการ สถาบันวิจัยวิทยาศาสตร์และเทคโนโลยีแห่งประเทศไทย";
+const BOARD_CARD_ORDER = new Map([
+  ["รศ.ดร. โชติชัย เจริญงาม", 1],
+  ["Assoc. Prof. Dr. Chotchai Charoenngam", 1],
+  ["ดรุณ แสงฉาย", 2],
+  ["Darun Saengshine", 2],
+  ["ชาญเชาวน์ ไชยานุกิจ", 3],
+  ["Chanchao Chaiyanukij", 3],
+  ["ผศ. พิศิษฐ์ แสง-ชูโต", 4],
+  ["Asst. Prof. Pisit Saeng-Xuto", 4],
+  ["ดร. วีรเดช ชีวาพัฒนานุวงศ์", 5],
+  ["Dr. Weeradet Cheevapattananuwong", 5],
+  ["วัชรชาญ สิริสุวรรณทัศน์", 6],
+  ["Watcharachan Sirisuwannatash", 6],
+  ["ดร. พิเชฐ คุณาธรรมรักษ์", 7],
+  ["Dr. Pichet Kunadhamraks", 7],
+  ["นายอนันต์ โพธิ์นิ่มแดง", 8],
+  ["Anan Pho Nimdaeng", 8],
+  ["พัฒนพงษ์ พงศ์ศุภสมิทธิ์", 9],
+  ["Pattanaphong Phongsupatsamit", 9],
+  ["Pattanaphong Phongnsupatsamit", 9],
+  [VEERACHAI_NAME, 10],
+  ["Asst. Prof. Dr. Veerachai Archan", 10],
+  ["ดร. เพียงออ เลาหะวิไลย", 11],
+  ["Dr. Piang-or Loahavilai", 11],
+]);
 
 function compactText(value: string): string {
   return value.replace(/\s+/g, " ").trim();
@@ -297,6 +323,52 @@ function rewriteRailwayRepresentativeColumn(
   return true;
 }
 
+function rewriteAnanColumn($: cheerio.CheerioAPI, element: AnyNode): boolean {
+  const column = $(element);
+  if (
+    !new Set(["นายอนันต์ โพธิ์นิ่มแดง", "Anan Pho Nimdaeng"]).has(
+      compactText(column.find("h4").first().text()),
+    )
+  ) {
+    return false;
+  }
+
+  const image = column.find("img").first();
+  image.attr("src", ANAN_IMAGE_SRC);
+  image.removeAttr("srcset");
+  image.removeAttr("sizes");
+  return true;
+}
+
+function reorderBoardColumns($: cheerio.CheerioAPI): boolean {
+  const board = $(".lightweight-accordion")
+    .filter((_, element) =>
+      /คณะกรรมการสถาบันวิจัยและพัฒนาเทคโนโลยีระบบราง|Board of Directors/.test(
+        $(element).find(".lightweight-accordion-title").first().text(),
+      ),
+    )
+    .first();
+  const cards = board
+    .find(".wp-block-column")
+    .filter((_, element) =>
+      BOARD_CARD_ORDER.has(compactText($(element).find("h4").first().text())),
+    )
+    .toArray();
+  const orderedCards = [...cards].sort(
+    (left, right) =>
+      BOARD_CARD_ORDER.get(compactText($(left).find("h4").first().text()))! -
+      BOARD_CARD_ORDER.get(compactText($(right).find("h4").first().text()))!,
+  );
+
+  if (cards.length !== 11 || cards.every((card, index) => card === orderedCards[index])) {
+    return false;
+  }
+
+  const destinations = cards.map((card) => $(card).parent());
+  orderedCards.forEach((card, index) => destinations[index].append(card));
+  return true;
+}
+
 function addWeeradetColumn(
   $: cheerio.CheerioAPI,
   element: AnyNode,
@@ -515,6 +587,7 @@ export function applyBoardExecutiveOverride(record: WpContentRecord): WpContentR
   const didRewriteRailwayRepresentative = columns.some((element) =>
     rewriteRailwayRepresentativeColumn($, element, record.language),
   );
+  const didRewriteAnan = columns.some((element) => rewriteAnanColumn($, element));
   const didAddWeeradet = columns.some((element) =>
     addWeeradetColumn($, element, record.language),
   );
@@ -535,6 +608,7 @@ export function applyBoardExecutiveOverride(record: WpContentRecord): WpContentR
       didRewriteEnglish = rewriteEnglishMinistryColumn($, element) || didRewriteEnglish;
     }
   }
+  const didReorderBoard = reorderBoardColumns($);
 
   if (
     !didRewritePichet &&
@@ -543,12 +617,14 @@ export function applyBoardExecutiveOverride(record: WpContentRecord): WpContentR
     !didRemoveThavorn &&
     !didRemoveNamedBoardCards &&
     !didRewriteRailwayRepresentative &&
+    !didRewriteAnan &&
     !didAddWeeradet &&
     !didAddVeerachai &&
     !didRewriteMinistryRepresentative &&
     !didRewriteResearch &&
     !didRewriteAdmin &&
-    !didRewriteEnglish
+    !didRewriteEnglish &&
+    !didReorderBoard
   ) {
     return record;
   }
