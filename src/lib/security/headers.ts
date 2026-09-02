@@ -7,7 +7,7 @@ const CSP_BASE_DIRECTIVES = [
   "img-src 'self' data: blob: https:",
   "font-src 'self' data: https:",
   "style-src 'self' 'unsafe-inline' https:",
-  "connect-src 'self' https://cloudflareinsights.com",
+  "connect-src 'self' https://cloudflareinsights.com https://www.google.com",
   "media-src 'self' blob: https:",
   "worker-src 'self' blob:",
   "frame-src 'self' https://www.youtube.com https://www.youtube-nocookie.com https://docs.google.com https://drive.google.com https://www.google.com https://www.enablesurvey.com",
@@ -15,12 +15,12 @@ const CSP_BASE_DIRECTIVES = [
 
 export const CONTENT_SECURITY_POLICY = [
   ...CSP_BASE_DIRECTIVES,
-  "script-src 'self' 'unsafe-inline' https://static.cloudflareinsights.com",
+  "script-src 'self' 'unsafe-inline' https://static.cloudflareinsights.com https://www.google.com https://www.gstatic.com",
 ].join("; ");
 
 export const CONTENT_SECURITY_POLICY_REPORT_ONLY = [
   ...CSP_BASE_DIRECTIVES,
-  "script-src 'self'",
+  "script-src 'self' https://www.google.com https://www.gstatic.com",
 ].join("; ");
 
 export const SAME_ORIGIN_FRAME_HEADERS: ReadonlyArray<{ key: string; value: string }> = [

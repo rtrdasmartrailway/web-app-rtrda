@@ -7,7 +7,7 @@ import { htmlToText, stripImportedChrome } from "./import-wordpress-sanitize.mjs
 const pagePath = "/ผลงานและโครงการเด่น/ยุทธศาสตร์-เทคโนโลยี-ระบ";
 const heading = "ยุทธศาสตร์ด้านเทคโนโลยีระบบรางของประเทศ (พ.ศ. 2571 - พ.ศ. 2575)";
 const pdfPath = "/wp-content/uploads/2026/09/rail-technology-strategy-2571-2575.pdf";
-const pdfHref = `${pdfPath}?v=20260902-2`;
+const pdfHref = "/documents/rail-technology-strategy-2571-2575.pdf";
 const backupKey = "strategy_412_backup_before_2571_2575_document";
 const manifestPath = path.join(process.cwd(), "src/data/wp-content.json");
 
@@ -15,12 +15,17 @@ const documentHtml = `
 <h3 class="wp-block-heading"><strong>${heading}</strong></h3>
 <div class="strategy-document-actions">
   <span class="strategy-document-label">${heading}</span>
-  <a class="strategy-document-preview" href="${pdfHref}">อ่านเพิ่มเติม</a>
-  <a class="simple-download-counter-link" href="${pdfHref}" download="download" data-pdf-reader-ignore="true">ดาวน์โหลด</a>
+  <a class="strategy-document-preview" href="${pdfHref}" data-pdf-reader-ignore="true" data-protected-preview="rail-technology-strategy-2571-2575">อ่านเพิ่มเติม</a>
+  <a class="simple-download-counter-link" href="${pdfHref}" data-pdf-reader-ignore="true" data-protected-download="rail-technology-strategy-2571-2575">ดาวน์โหลด</a>
 </div>`;
 
 function insertDocument(html) {
-  const normalizedHtml = html.replaceAll(`href="${pdfPath}"`, `href="${pdfHref}"`);
+  const normalizedHtml = html
+    .replaceAll(`href="${pdfPath}"`, `href="${pdfHref}"`)
+    .replaceAll(
+      'href="/wp-content/uploads/2026/09/rail-technology-strategy-2571-2575.pdf?v=20260902-2"',
+      `href="${pdfHref}"`,
+    );
 
   if (normalizedHtml.includes(heading)) {
     const $ = load(normalizedHtml, null, false);

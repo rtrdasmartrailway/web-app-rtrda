@@ -21,6 +21,7 @@ src/generated/
 # next.js
 /.next/
 /out/
+private-documents/
 public/wp-content/uploads/*
 !public/wp-content/uploads/ita2569/
 public/wp-content/uploads/ita2569/*

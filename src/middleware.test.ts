@@ -80,6 +80,15 @@ describe("security middleware", () => {
     expect(blocked.status).toBe(405);
   });
 
+  it("allows POST for the protected download CAPTCHA", () => {
+    const response = middleware(
+      request("https://test.rtrda.or.th/api/download-captcha", { method: "POST" }),
+    );
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get("x-middleware-next")).toBe("1");
+  });
+
   it("advertises only POST and OPTIONS for the analytics collector", () => {
     const response = middleware(
       request("https://test.rtrda.or.th/api/analytics/events", { method: "OPTIONS" }),

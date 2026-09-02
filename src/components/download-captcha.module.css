@@ -1,0 +1,70 @@
+.backdrop {
+  align-items: center;
+  background: rgba(5, 16, 35, 0.78);
+  display: flex;
+  inset: 0;
+  justify-content: center;
+  padding: 22px;
+  position: fixed;
+  z-index: 1100;
+}
+
+.modal {
+  background: #fff;
+  border-radius: 16px;
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.32);
+  max-width: 460px;
+  padding: 26px;
+  position: relative;
+  width: 100%;
+}
+
+.modal h2 {
+  color: #062b5f;
+  font-size: 1.35rem;
+  margin: 0 32px 20px 0;
+}
+
+.modal form {
+  display: grid;
+  gap: 12px;
+}
+
+.modal label {
+  color: #18385f;
+  font-weight: 700;
+}
+
+.modal input {
+  border: 1px solid #8ca3c2;
+  border-radius: 8px;
+  font: inherit;
+  padding: 10px 12px;
+}
+
+.modal form button {
+  background: linear-gradient(135deg, #006fc9, #063b80);
+  border: 0;
+  border-radius: 8px;
+  color: #fff;
+  cursor: pointer;
+  font: inherit;
+  font-weight: 700;
+  padding: 11px 16px;
+}
+
+.close {
+  background: transparent;
+  border: 0;
+  color: #355778;
+  cursor: pointer;
+  font: inherit;
+  position: absolute;
+  right: 16px;
+  top: 16px;
+}
+
+.error {
+  color: #b42318;
+  margin: 14px 0 0;
+}
