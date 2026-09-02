@@ -50,6 +50,13 @@ const nextConfig: NextConfig = {
           ...SAME_ORIGIN_FRAME_HEADERS,
         ],
       })),
+      {
+        source: "/documents/:path*",
+        headers: [
+          { key: "Cache-Control", value: "no-store" },
+          ...SAME_ORIGIN_FRAME_HEADERS,
+        ],
+      },
       // Inline download responses are framed only by the same RTRDA origin.
       // This route-specific policy overrides the global clickjacking denial
       // without allowing third-party sites to embed RTRDA documents.

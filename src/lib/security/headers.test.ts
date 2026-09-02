@@ -28,13 +28,15 @@ describe("security headers", () => {
     expect(CONTENT_SECURITY_POLICY).toContain("object-src 'none'");
     expect(CONTENT_SECURITY_POLICY).toContain("frame-ancestors 'none'");
     expect(CONTENT_SECURITY_POLICY).toContain(
-      "script-src 'self' 'unsafe-inline' https://static.cloudflareinsights.com",
+      "script-src 'self' 'unsafe-inline' https://static.cloudflareinsights.com https://www.google.com https://www.gstatic.com",
     );
     expect(CONTENT_SECURITY_POLICY).toContain(
-      "connect-src 'self' https://cloudflareinsights.com",
+      "connect-src 'self' https://cloudflareinsights.com https://www.google.com",
     );
 
-    expect(CONTENT_SECURITY_POLICY_REPORT_ONLY).toContain("script-src 'self'");
+    expect(CONTENT_SECURITY_POLICY_REPORT_ONLY).toContain(
+      "script-src 'self' https://www.google.com https://www.gstatic.com",
+    );
     expect(CONTENT_SECURITY_POLICY_REPORT_ONLY).not.toContain(
       "script-src 'self' 'unsafe-inline'",
     );
@@ -71,6 +73,17 @@ describe("security headers", () => {
       }
       expect(headers.get("Cache-Control")).toBe("public, max-age=14400, s-maxage=86400");
     }
+  });
+
+  it("allows same-origin framing without public caching for protected previews", async () => {
+    const routes = await nextConfig.headers?.();
+    const route = routes?.find((value) => value.source === "/documents/:path*");
+    const headers = new Map(route?.headers.map(({ key, value }) => [key, value]));
+
+    for (const { key, value } of SAME_ORIGIN_FRAME_HEADERS) {
+      expect(headers.get(key)).toBe(value);
+    }
+    expect(headers.get("Cache-Control")).toBe("no-store");
   });
 
   it("wires the shared headers into Next.js and hides the framework banner", async () => {

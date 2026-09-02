@@ -1,6 +1,10 @@
 import { load } from "cheerio";
 import type { WpDownloadAsset } from "./types";
 import { getRtrdaPathFromUrl, normalizeRoutePath } from "./url";
+import {
+  RAIL_STRATEGY_DOCUMENT_ID,
+  RAIL_STRATEGY_PREVIEW_PATH,
+} from "@/lib/documents/protected-documents";
 
 export type PdfReaderTargetKind = "download" | "upload" | "flipbook";
 
@@ -16,6 +20,8 @@ export interface PdfReaderTarget {
   downloadHref: string;
   title: string;
   kind: PdfReaderTargetKind;
+  protectedDownloadId?: string;
+  protectedPreviewId?: string;
 }
 
 interface PdfReaderResolvers {
@@ -70,6 +76,10 @@ function classifyReaderLink(value: string): {
   }
 
   if (path.startsWith("/wp-content/uploads/") && hasPdfExtension(path)) {
+    return { href: path, kind: "upload" };
+  }
+
+  if (path === RAIL_STRATEGY_PREVIEW_PATH) {
     return { href: path, kind: "upload" };
   }
 
@@ -195,6 +205,12 @@ export async function buildPdfReaderTargets(
         downloadHref: link.href,
         title: link.text || fallbackPdfTitle(link.href, "PDF"),
         kind: "upload",
+        ...(link.href === RAIL_STRATEGY_PREVIEW_PATH
+          ? { protectedDownloadId: RAIL_STRATEGY_DOCUMENT_ID }
+          : {}),
+        ...(link.href === RAIL_STRATEGY_PREVIEW_PATH
+          ? { protectedPreviewId: RAIL_STRATEGY_DOCUMENT_ID }
+          : {}),
       });
       continue;
     }
