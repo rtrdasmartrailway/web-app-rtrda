@@ -90,6 +90,11 @@ const OLD_CHROME_SELECTORS =
 const OLD_CONTENT_SELECTORS = [".siteContent", ".mainSection", "main", "article", "body"];
 const NEW_CONTENT_SELECTORS = [".content-main", "main", "body"];
 
+export function detectRenderedPageKind(html) {
+  const $ = cheerio.load(String(html ?? ""));
+  return $(".content-main").length > 0 ? "new" : "old";
+}
+
 /**
  * Extract comparable signals from a rendered HTML page.
  * `kind` is "old" (WordPress theme) or "new" (Next.js app); the two use

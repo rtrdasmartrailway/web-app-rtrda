@@ -3,7 +3,7 @@ WORKDIR /app
 
 # sharp needs libvips and build tooling for its native bindings.
 RUN apt-get update \
-  && apt-get install -y --no-install-recommends libvips-dev build-essential \
+  && apt-get install -y --no-install-recommends libvips-dev build-essential git \
   && rm -rf /var/lib/apt/lists/*
 
 COPY package.json package-lock.json ./

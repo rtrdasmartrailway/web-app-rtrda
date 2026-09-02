@@ -85,6 +85,45 @@ The workflow itself verifies both Git/release markers, direct health, public
 `rtrda.or.th`/`www`, and the RTRDA02 production watchdog. Re-run `check` after
 completion and require production parity.
 
+### Promote selected Test commits
+
+Use partial promotion when only an ordered subset of the deployed Test history is
+approved. Every selected value must be a full, unique, single-parent SHA reachable
+from the deployed Test SHA.
+
+Dry-run and RC verification:
+
+```bash
+node scripts/rtrda-release-worker.mjs promote-partial \
+  --commit <FULL_SHA> \
+  --commit <FULL_SHA> \
+  --repo /srv/workspace/web-app-rtrda
+```
+
+The worker reconstructs the candidate from the audited Production SHA, explicitly
+reports clean empty patches, runs all validation gates, and deploys the candidate
+to the isolated localhost RC runtime on `127.0.0.1:3022`. Test remains unchanged.
+Record the returned full candidate SHA, candidate tree, selected/skipped commits,
+changed files, and RC evidence.
+
+Execute only after owner approval of that exact candidate SHA:
+
+```bash
+node scripts/rtrda-release-worker.mjs promote-partial \
+  --commit <FULL_SHA> \
+  --commit <FULL_SHA> \
+  --approved-candidate-sha <FULL_CANDIDATE_SHA> \
+  --repo /srv/workspace/web-app-rtrda \
+  --execute
+```
+
+Before either Production target is replaced, `deploy-production.yml` creates and
+verifies an RTRDA02 backup containing the database dump, public assets, compose
+configuration, image identity/revision, release manifest, and checksums. Backup
+failure blocks both deployments. The partial release then uses the same verified
+PR, atomic main update, dual-target deployment, recovery identity, and final
+parity checks as exact-Test promotion.
+
 ## Safety
 
 - `check` is permanently read-only.

@@ -2,23 +2,18 @@ import path from "node:path";
 import type { WpDownloadAsset } from "@/lib/wp/types";
 
 export function publicDownloadPath(download: WpDownloadAsset): string | null {
-  if (!download.localPath.startsWith("/sdc-downloads/")) {
-    return null;
-  }
-
-  const fileName = path.basename(download.localPath);
-  if (!fileName) {
-    return null;
-  }
-
-  const downloadRoot = path.join(
-    /*turbopackIgnore: true*/ process.cwd(),
-    "public",
-    "sdc-downloads",
+  const publicRoot = path.join(/*turbopackIgnore: true*/ process.cwd(), "public");
+  const directories = ["/sdc-downloads/", "/wp-content/uploads/"];
+  const directory = directories.find((candidate) =>
+    download.localPath.startsWith(candidate),
   );
-  const resolved = path.join(downloadRoot, fileName);
+  if (!directory) return null;
 
-  return resolved.startsWith(downloadRoot) ? resolved : null;
+  const root = path.resolve(publicRoot, `.${directory}`);
+  const relativePath = download.localPath.slice(directory.length);
+  const resolved = path.resolve(root, relativePath);
+
+  return resolved.startsWith(`${root}${path.sep}`) ? resolved : null;
 }
 
 export function contentDisposition(download: WpDownloadAsset, inline: boolean): string {
