@@ -34,9 +34,10 @@ async function boardRecord(path = "/เกี่ยวกับ-สทร/คณ
 }
 
 describe("board executive parser", () => {
-  it("uses the requested board member order and Anan portrait in Thai and English", async () => {
+  it("uses the requested board order, standalone Thavorn row and Anan portrait", async () => {
     const expectedThai = [
       "รศ.ดร. โชติชัย เจริญงาม",
+      "ถาวร ชลัษเฐียร",
       "ดรุณ แสงฉาย",
       "ชาญเชาวน์ ไชยานุกิจ",
       "ผศ. พิศิษฐ์ แสง-ชูโต",
@@ -50,6 +51,7 @@ describe("board executive parser", () => {
     ];
     const expectedEnglish = [
       "Assoc. Prof. Dr. Chotchai Charoenngam",
+      "Thavorn Chalassathien",
       "Darun Saengshine",
       "Chanchao Chaiyanukij",
       "Asst. Prof. Pisit  Saeng-Xuto",
@@ -83,7 +85,24 @@ describe("board executive parser", () => {
           .map((_, element) => $(element).text())
           .get(),
       ).toEqual(expected);
+
+      const thavornName = path.startsWith("/en/")
+        ? "Thavorn Chalassathien"
+        : "ถาวร ชลัษเฐียร";
+      expect(
+        board
+          .find("h4")
+          .filter((_, element) => $(element).text() === thavornName)
+          .closest(".wp-block-columns")
+          .find("h4")
+          .map((_, element) => $(element).text())
+          .get(),
+      ).toEqual([thavornName]);
     }
+
+    expect(getBoardExecutiveDetailByName("Thavorn Chalassathien", "en")?.html).toContain(
+      "ถาวร ชลัษเฐียร",
+    );
 
     const thai = await boardRecord();
     const $thai = cheerio.load(thai.contentHtml, null, false);

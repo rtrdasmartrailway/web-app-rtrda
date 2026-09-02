@@ -184,7 +184,7 @@ describe("applyBoardExecutiveOverride", () => {
     );
   });
 
-  it("removes Thavorn's card from Thai and English board pages", () => {
+  it("keeps Thavorn's card on Thai and English board pages", () => {
     const source = `<div class="lightweight-accordion"><div class="wp-block-column"><h4>ถาวร ชลัษเฐียร</h4><h5>ที่ปรึกษาคณะกรรมการ</h5></div><div class="wp-block-column"><h4>คนอื่น</h4><h5>กรรมการ</h5></div></div>`;
     const thai = applyBoardExecutiveOverride(record({ contentHtml: source }));
     const english = applyBoardExecutiveOverride(
@@ -201,12 +201,13 @@ describe("applyBoardExecutiveOverride", () => {
       $thai("h4")
         .map((_, element) => $thai(element).text())
         .get(),
-    ).toEqual(["คนอื่น"]);
+    ).toEqual(["ถาวร ชลัษเฐียร", "คนอื่น"]);
     expect(
       $english("h4")
         .map((_, element) => $english(element).text())
         .get(),
-    ).toEqual(["คนอื่น"]);
+    ).toEqual(["Thavorn Chalassathien", "คนอื่น"]);
+    expect($english("h5").first().text()).toBe("Board Advisor");
   });
 
   it("replaces the railway representative card with Weeradet", () => {
@@ -399,6 +400,7 @@ describe("applyBoardExecutiveOverride", () => {
   it("orders Thai and English board cards without changing their layout containers", () => {
     const thaiNames = [
       "รศ.ดร. โชติชัย เจริญงาม",
+      "ถาวร ชลัษเฐียร",
       "ผศ. พิศิษฐ์ แสง-ชูโต",
       "ดรุณ แสงฉาย",
       "ชาญเชาวน์ ไชยานุกิจ",
@@ -412,6 +414,7 @@ describe("applyBoardExecutiveOverride", () => {
     ];
     const englishNames = [
       "Assoc. Prof. Dr. Chotchai Charoenngam",
+      "Thavorn Chalassathien",
       "Asst. Prof. Pisit Saeng-Xuto",
       "Darun Saengshine",
       "Chanchao Chaiyanukij",
@@ -434,21 +437,28 @@ describe("applyBoardExecutiveOverride", () => {
             )
             .join("")}</div>
           <div class="wp-block-columns">${names
-            .slice(1, 4)
+            .slice(1, 2)
             .map(
               (name) =>
                 `<div class="wp-block-column"><img src="old.jpg" /><h4>${name}</h4><h5>กรรมการ</h5></div>`,
             )
             .join("")}</div>
           <div class="wp-block-columns">${names
-            .slice(4, 10)
+            .slice(2, 5)
             .map(
               (name) =>
                 `<div class="wp-block-column"><img src="old.jpg" /><h4>${name}</h4><h5>กรรมการ</h5></div>`,
             )
             .join("")}</div>
           <div class="wp-block-columns">${names
-            .slice(10)
+            .slice(5, 11)
+            .map(
+              (name) =>
+                `<div class="wp-block-column"><img src="old.jpg" /><h4>${name}</h4><h5>กรรมการ</h5></div>`,
+            )
+            .join("")}</div>
+          <div class="wp-block-columns">${names
+            .slice(11)
             .map(
               (name) =>
                 `<div class="wp-block-column"><img src="old.jpg" /><h4>${name}</h4><h5>กรรมการ</h5></div>`,
@@ -458,6 +468,7 @@ describe("applyBoardExecutiveOverride", () => {
       </details></div>`;
     const expectedThai = [
       "รศ.ดร. โชติชัย เจริญงาม",
+      "ถาวร ชลัษเฐียร",
       "ดรุณ แสงฉาย",
       "ชาญเชาวน์ ไชยานุกิจ",
       "ผศ. พิศิษฐ์ แสง-ชูโต",
@@ -471,6 +482,7 @@ describe("applyBoardExecutiveOverride", () => {
     ];
     const expectedEnglish = [
       "Assoc. Prof. Dr. Chotchai Charoenngam",
+      "Thavorn Chalassathien",
       "Darun Saengshine",
       "Chanchao Chaiyanukij",
       "Asst. Prof. Pisit Saeng-Xuto",
@@ -524,7 +536,7 @@ describe("applyBoardExecutiveOverride", () => {
           .map((_, element) => $(element).text())
           .get(),
       ).toEqual(expected);
-      expect($(".lightweight-accordion .wp-block-columns")).toHaveLength(4);
+      expect($(".lightweight-accordion .wp-block-columns")).toHaveLength(5);
     }
 
     const $thai = cheerio.load(thai.contentHtml, null, false);

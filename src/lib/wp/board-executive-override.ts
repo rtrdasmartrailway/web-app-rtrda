@@ -31,7 +31,6 @@ const PIANG_OR_NAMES = new Set([
   "ดร.เพียงออ เลาหะวิไลย",
   "Dr. Piang-or Loahavilai",
 ]);
-const THAVORN_NAMES = new Set(["ถาวร ชลัษเฐียร", "Thavorn Chalassathien"]);
 const REPRESENTATIVE_MINISTRY_NAME =
   "ผู้แทน กระทรวงการอุดมศึกษา วิทยาศาสตร์ วิจัยและนวัตกรรม";
 const REPRESENTATIVE_MINISTRY_NAME_EN =
@@ -59,27 +58,29 @@ const VEERACHAI_ROLE = "ผู้ว่าการ สถาบันวิจ�
 const BOARD_CARD_ORDER = new Map([
   ["รศ.ดร. โชติชัย เจริญงาม", 1],
   ["Assoc. Prof. Dr. Chotchai Charoenngam", 1],
-  ["ดรุณ แสงฉาย", 2],
-  ["Darun Saengshine", 2],
-  ["ชาญเชาวน์ ไชยานุกิจ", 3],
-  ["Chanchao Chaiyanukij", 3],
-  ["ผศ. พิศิษฐ์ แสง-ชูโต", 4],
-  ["Asst. Prof. Pisit Saeng-Xuto", 4],
-  ["ดร. วีรเดช ชีวาพัฒนานุวงศ์", 5],
-  ["Dr. Weeradet Cheevapattananuwong", 5],
-  ["วัชรชาญ สิริสุวรรณทัศน์", 6],
-  ["Watcharachan Sirisuwannatash", 6],
-  ["ดร. พิเชฐ คุณาธรรมรักษ์", 7],
-  ["Dr. Pichet Kunadhamraks", 7],
-  ["นายอนันต์ โพธิ์นิ่มแดง", 8],
-  ["Anan Pho Nimdaeng", 8],
-  ["พัฒนพงษ์ พงศ์ศุภสมิทธิ์", 9],
-  ["Pattanaphong Phongsupatsamit", 9],
-  ["Pattanaphong Phongnsupatsamit", 9],
-  [VEERACHAI_NAME, 10],
-  ["Asst. Prof. Dr. Veerachai Archan", 10],
-  ["ดร. เพียงออ เลาหะวิไลย", 11],
-  ["Dr. Piang-or Loahavilai", 11],
+  ["ถาวร ชลัษเฐียร", 2],
+  ["Thavorn Chalassathien", 2],
+  ["ดรุณ แสงฉาย", 3],
+  ["Darun Saengshine", 3],
+  ["ชาญเชาวน์ ไชยานุกิจ", 4],
+  ["Chanchao Chaiyanukij", 4],
+  ["ผศ. พิศิษฐ์ แสง-ชูโต", 5],
+  ["Asst. Prof. Pisit Saeng-Xuto", 5],
+  ["ดร. วีรเดช ชีวาพัฒนานุวงศ์", 6],
+  ["Dr. Weeradet Cheevapattananuwong", 6],
+  ["วัชรชาญ สิริสุวรรณทัศน์", 7],
+  ["Watcharachan Sirisuwannatash", 7],
+  ["ดร. พิเชฐ คุณาธรรมรักษ์", 8],
+  ["Dr. Pichet Kunadhamraks", 8],
+  ["นายอนันต์ โพธิ์นิ่มแดง", 9],
+  ["Anan Pho Nimdaeng", 9],
+  ["พัฒนพงษ์ พงศ์ศุภสมิทธิ์", 10],
+  ["Pattanaphong Phongsupatsamit", 10],
+  ["Pattanaphong Phongnsupatsamit", 10],
+  [VEERACHAI_NAME, 11],
+  ["Asst. Prof. Dr. Veerachai Archan", 11],
+  ["ดร. เพียงออ เลาหะวิไลย", 12],
+  ["Dr. Piang-or Loahavilai", 12],
 ]);
 
 function compactText(value: string): string {
@@ -159,6 +160,7 @@ function rewriteEnglishBoardColumn($: cheerio.CheerioAPI, element: AnyNode): boo
   const role = compactText(column.find("h5").first().text());
   const nameTranslations = new Map([
     ["ชาญเชาวน์ ไชยานุกิจ", "Chanchao Chaiyanukij"],
+    ["ถาวร ชลัษเฐียร", "Thavorn Chalassathien"],
     ["นายอนันต์ โพธิ์นิ่มแดง", "Anan Pho Nimdaeng"],
     ["ดร. วีรเดช ชีวาพัฒนานุวงศ์", "Dr. Weeradet Cheevapattananuwong"],
     [VEERACHAI_NAME, "Asst. Prof. Dr. Veerachai Archan"],
@@ -174,13 +176,13 @@ function rewriteEnglishBoardColumn($: cheerio.CheerioAPI, element: AnyNode): boo
   ]);
   const roleTranslations = new Map([
     ["กรรมการผู้ทรงคุณวุฒิ", "Expert Committee Member"],
+    ["ที่ปรึกษาคณะกรรมการ", "Board Advisor"],
     ["กรรมการ", "Board Member"],
     [
       VEERACHAI_ROLE,
       "Governor, Thailand Institute of Scientific and Technological Research",
     ],
     ["กรรมการโดยตำแหน่ง ผู้ว่าการรถไฟแห่งประเทศไทย", "Ex Officio Board Member"],
-    ["ที่ปรึกษาคณะกรรมการ", "Board Advisor"],
     ["ผู้จัดการกลุ่มวิจัยและมาตรฐาน", "Research and Standards Group Manager"],
     [
       "ผู้จัดการกลุ่มพัฒนาผู้ประกอบการและธุรกิจใหม่",
@@ -274,16 +276,6 @@ function rewriteEnglishExecutiveColumn($: cheerio.CheerioAPI, element: AnyNode):
   return false;
 }
 
-function removeThavornColumn($: cheerio.CheerioAPI, element: AnyNode): boolean {
-  const column = $(element);
-  if (!THAVORN_NAMES.has(compactText(column.find("h4").first().text()))) {
-    return false;
-  }
-
-  column.remove();
-  return true;
-}
-
 function removeNamedBoardColumn($: cheerio.CheerioAPI, element: AnyNode): boolean {
   const column = $(element);
   if (!REMOVED_BOARD_NAMES.has(compactText(column.find("h4").first().text()))) {
@@ -360,7 +352,7 @@ function reorderBoardColumns($: cheerio.CheerioAPI): boolean {
       BOARD_CARD_ORDER.get(compactText($(right).find("h4").first().text()))!,
   );
 
-  if (cards.length !== 11 || cards.every((card, index) => card === orderedCards[index])) {
+  if (cards.length !== 12 || cards.every((card, index) => card === orderedCards[index])) {
     return false;
   }
 
@@ -583,7 +575,6 @@ export function applyBoardExecutiveOverride(record: WpContentRecord): WpContentR
   const didRewritePiangOr = columns.some((element) =>
     rewritePiangOrColumn($, element, record.language),
   );
-  const didRemoveThavorn = columns.some((element) => removeThavornColumn($, element));
   const didRewriteRailwayRepresentative = columns.some((element) =>
     rewriteRailwayRepresentativeColumn($, element, record.language),
   );
@@ -614,7 +605,6 @@ export function applyBoardExecutiveOverride(record: WpContentRecord): WpContentR
     !didRewritePichet &&
     !didRewritePattanaphong &&
     !didRewritePiangOr &&
-    !didRemoveThavorn &&
     !didRemoveNamedBoardCards &&
     !didRewriteRailwayRepresentative &&
     !didRewriteAnan &&
