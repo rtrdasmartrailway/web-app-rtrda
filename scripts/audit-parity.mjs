@@ -6,6 +6,7 @@ import { createFetchTools, describeFetchError } from "./import-wordpress-fetch.m
 import {
   CATEGORY,
   classifyComparison,
+  detectRenderedPageKind,
   extractFlipbookPdfPath,
   extractPageSignals,
   extractRtrdaUrls,
@@ -267,7 +268,7 @@ async function auditUrl(urlKey, options, assetCache) {
   await sleep(OLD_FETCH_DELAY_MS);
   const newRes = await fetchPage(newUrl);
 
-  const oldSignals = extractPageSignals(oldRes.body, "old");
+  const oldSignals = extractPageSignals(oldRes.body, detectRenderedPageKind(oldRes.body));
   const newSignals = extractPageSignals(newRes.body, "new");
   const bothOk = oldRes.status === 200 && newRes.status === 200;
 
