@@ -487,6 +487,11 @@ describe("RTRDA partial promotion", () => {
     expect(workerSource).toContain('join(sourceRepoPath, "public/wp-content/uploads/")');
     expect(workerSource).toContain('join(sourceRepoPath, "public/sdc-downloads/")');
     expect(workerSource).toContain("--chmod=Du=rwx,Dgo=rx,Fu=rw,Fgo=r");
+    const rcRunnerSource = workerSource.slice(
+      workerSource.indexOf("function runReleaseCandidate("),
+      workerSource.indexOf("function stopReleaseCandidate("),
+    );
+    expect(rcRunnerSource).toContain('run("npm", ["ci"], options);');
     expect(workerSource).toContain("collectReleaseCandidateEvidence(candidate)");
     expect(workerSource).toContain("assertPartialCandidateIdentity(");
     expect(workerSource).toContain("executePartialPromotion(");

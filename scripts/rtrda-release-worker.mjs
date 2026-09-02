@@ -628,6 +628,7 @@ function runReleaseCandidate(candidate, sourceRepoPath) {
     cwd: candidate.candidateRepo,
     env: { ...process.env, RTRDA_RELEASE_SHA: candidate.candidateSha },
   };
+  run("npm", ["ci"], options);
   run("rsync", [
     "-a",
     "--chmod=Du=rwx,Dgo=rx,Fu=rw,Fgo=r",
