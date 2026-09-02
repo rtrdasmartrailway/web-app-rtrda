@@ -3691,6 +3691,38 @@ body:has(.yutth-lightbox) {
   filter: brightness(0.94);
 }
 
+.wp-content .strategy-document-actions {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 10px 0 24px;
+}
+
+.wp-content .strategy-document-label {
+  color: var(--accent-deep);
+  flex: 1 1 360px;
+  font-size: 1.05rem;
+  font-weight: 700;
+}
+
+.wp-content .strategy-document-preview,
+.wp-content .strategy-document-actions .simple-download-counter-link {
+  align-items: center;
+  border-radius: var(--radius-sm);
+  display: inline-flex;
+  font-weight: 700;
+  justify-content: center;
+  min-width: 132px;
+  padding: 10px 16px;
+  text-decoration: none;
+}
+
+.wp-content .strategy-document-preview {
+  background: var(--surface-muted);
+  color: var(--accent-deep);
+}
+
 /* มาตรฐานระบบราง สทร. — document standards catalog.
    The WordPress import nests rows, cards, button groups, and empty columns.
    Scope these rules to the page class so other legacy accordions keep their

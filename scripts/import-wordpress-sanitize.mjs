@@ -48,7 +48,7 @@ const allowedAttributes = {
     "title",
     "width",
   ],
-  a: ["aria-*", "class", "href", "name", "rel", "target", "title"],
+  a: ["aria-*", "class", "download", "href", "name", "rel", "target", "title"],
   col: ["span", "style", "width", "class"],
   colgroup: ["span", "style", "class"],
   img: [
