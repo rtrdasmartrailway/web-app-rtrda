@@ -10,6 +10,7 @@ export interface KnowledgeDocument {
   previewHref: string | null;
   downloadHref: string | null;
   hasUsableTarget: boolean;
+  protectedDocumentId?: string;
 }
 
 export interface KnowledgeDocumentGroup {

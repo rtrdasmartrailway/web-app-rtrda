@@ -74,6 +74,21 @@ describe("PDF reader helpers", () => {
     ]);
   });
 
+  it("marks the rail strategy document target as protected", async () => {
+    const targets = await buildPdfReaderTargets(
+      '<a href="/documents/rail-technology-strategy-2571-2575.pdf">ยุทธศาสตร์</a>',
+      {
+        resolveDownload: async () => null,
+        resolveFlipbookPdf: async () => null,
+      },
+    );
+
+    expect(targets[0]).toMatchObject({
+      protectedDownloadId: "rail-technology-strategy-2571-2575",
+      protectedPreviewId: "rail-technology-strategy-2571-2575",
+    });
+  });
+
   it("resolves a flipbook link to the PDF embedded in the imported flipbook page", async () => {
     const targets = await buildPdfReaderTargets(
       '<a href="/3d-flip-book/6267">อ่านเพิ่มเติม</a>',
