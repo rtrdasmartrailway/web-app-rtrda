@@ -10,7 +10,6 @@ import {
 import type { WpImportManifest } from "./types";
 import {
   applyBoardExecutiveOverride,
-  ANAN_IMAGE_SRC,
   CHAIYUT_IMAGE_SRC,
   CHAIYUT_NAME,
   TACHAKORN_IMAGE_SRC,
@@ -34,41 +33,12 @@ async function boardRecord(path = "/เกี่ยวกับ-สทร/คณ
 }
 
 describe("board executive parser", () => {
-  it("uses the requested board order, standalone Thavorn row and Anan portrait", async () => {
-    const expectedThai = [
-      "รศ.ดร. โชติชัย เจริญงาม",
-      "ถาวร ชลัษเฐียร",
-      "ดรุณ แสงฉาย",
-      "ชาญเชาวน์ ไชยานุกิจ",
-      "ผศ. พิศิษฐ์ แสง-ชูโต",
-      "ดร. วีรเดช ชีวาพัฒนานุวงศ์",
-      "วัชรชาญ สิริสุวรรณทัศน์",
-      "ดร. พิเชฐ คุณาธรรมรักษ์",
-      "อนันต์ โพธิ์นิ่มแดง",
-      "พัฒนพงษ์ พงศ์ศุภสมิทธิ์",
-      "ผศ.ดร.วีรชัย อาจหาญ",
-      "ดร. เพียงออ เลาหะวิไลย",
+  it("keeps empty board cards in the Thai and English layouts", async () => {
+    const boardPages = [
+      "/เกี่ยวกับ-สทร/คณะกรรมการ-ผู้บริหาร",
+      "/en/เกี่ยวกับ-สทร/คณะกรรมการ-ผู้บริหาร",
     ];
-    const expectedEnglish = [
-      "Assoc. Prof. Dr. Chotchai Charoenngam",
-      "Thavorn Chalassathien",
-      "Darun Saengshine",
-      "Chanchao Chaiyanukij",
-      "Asst. Prof. Pisit Saeng-Xuto",
-      "Dr. Weeradet Cheevapattananuwong",
-      "Watcharachan Sirisuwannatash",
-      "Dr. Pichet Kunadhamraks",
-      "Anan Pho Nimdaeng",
-      "Pattanaphong Phongnsupatsamit",
-      "Asst. Prof. Dr. Veerachai Archan",
-      "Dr. Piang-or Loahavilai",
-    ];
-
-    const boardPages: Array<[string, string[]]> = [
-      ["/เกี่ยวกับ-สทร/คณะกรรมการ-ผู้บริหาร", expectedThai],
-      ["/en/เกี่ยวกับ-สทร/คณะกรรมการ-ผู้บริหาร", expectedEnglish],
-    ];
-    for (const [path, expected] of boardPages) {
+    for (const path of boardPages) {
       const record = await boardRecord(path);
       const $ = cheerio.load(record.contentHtml, null, false);
       const board = $(".lightweight-accordion")
@@ -79,75 +49,9 @@ describe("board executive parser", () => {
         )
         .first();
 
-      expect(
-        board
-          .find(".wp-block-column h4")
-          .map((_, element) => $(element).text())
-          .get(),
-      ).toEqual(expected);
-
-      const thavornName = path.startsWith("/en/")
-        ? "Thavorn Chalassathien"
-        : "ถาวร ชลัษเฐียร";
-      expect(
-        board
-          .find("h4")
-          .filter((_, element) => $(element).text() === thavornName)
-          .closest(".wp-block-columns")
-          .find("h4")
-          .map((_, element) => $(element).text())
-          .get(),
-      ).toEqual([thavornName]);
+      expect(board.find("img, h4, h5, .detail-btn")).toHaveLength(0);
+      expect(board.find(".board-card-layout-placeholder")).toHaveLength(12);
     }
-
-    expect(getBoardExecutiveDetailByName("Thavorn Chalassathien", "en")?.html).toContain(
-      "ถาวร ชลัษเฐียร",
-    );
-
-    const thai = await boardRecord();
-    const $thai = cheerio.load(thai.contentHtml, null, false);
-    expect(
-      $thai("h4")
-        .filter((_, element) => $thai(element).text() === "อนันต์ โพธิ์นิ่มแดง")
-        .closest(".wp-block-column")
-        .find("img")
-        .attr("src"),
-    ).toBe(ANAN_IMAGE_SRC);
-    expect(
-      $thai("h4")
-        .filter((_, element) => $thai(element).text() === "ดร. พิเชฐ คุณาธรรมรักษ์")
-        .closest(".wp-block-column")
-        .find("img")
-        .attr("style"),
-    ).toBeUndefined();
-
-    const english = await boardRecord("/en/เกี่ยวกับ-สทร/คณะกรรมการ-ผู้บริหาร");
-    const $english = cheerio.load(english.contentHtml, null, false);
-    expect(
-      $english("h4")
-        .filter(
-          (_, element) => $english(element).text() === "Asst. Prof. Pisit Saeng-Xuto",
-        )
-        .hasClass("pisit-name"),
-    ).toBe(true);
-    expect(
-      $english("h4")
-        .filter((_, element) => $english(element).text() === "Anan Pho Nimdaeng")
-        .closest(".wp-block-column")
-        .find("h5")
-        .html(),
-    ).toBe("Member, Board of Director<br>Governor of the State Railway of Thailand");
-    expect(
-      $english("h4")
-        .filter(
-          (_, element) => $english(element).text() === "Asst. Prof. Dr. Veerachai Archan",
-        )
-        .closest(".wp-block-column")
-        .find("h5")
-        .html(),
-    ).toBe(
-      "Member, Board of Director<br>Governor, Thailand Institute of Scientific and Technological Research",
-    );
   });
 
   it("selects Thai and English content for Chotichai's popup", () => {

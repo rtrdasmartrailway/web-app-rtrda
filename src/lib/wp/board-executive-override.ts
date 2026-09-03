@@ -564,6 +564,27 @@ function reorderBoardColumns($: cheerio.CheerioAPI): boolean {
   return true;
 }
 
+function clearBoardCardContent($: cheerio.CheerioAPI): boolean {
+  const board = $(".lightweight-accordion")
+    .filter((_, element) =>
+      /คณะกรรมการสถาบันวิจัยและพัฒนาเทคโนโลยีระบบราง|Board of Directors/.test(
+        $(element).find(".lightweight-accordion-title").first().text(),
+      ),
+    )
+    .first();
+  const cards = board
+    .find(".wp-block-column")
+    .filter((_, element) => Boolean($(element).find("img, h4, h5, .detail-btn").length));
+  if (!cards.length) {
+    return false;
+  }
+
+  cards
+    .empty()
+    .append('<span class="board-card-layout-placeholder" aria-hidden="true"></span>');
+  return true;
+}
+
 function addWeeradetColumn(
   $: cheerio.CheerioAPI,
   element: AnyNode,
@@ -887,6 +908,7 @@ export function applyBoardExecutiveOverride(record: WpContentRecord): WpContentR
     }
   }
   const didReorderBoard = reorderBoardColumns($);
+  const didClearBoardCardContent = clearBoardCardContent($);
   const didAddAuditCommittee = addAuditCommittee($);
   const didAddPersonnelSubcommittee = addPersonnelSubcommittee($);
   const didAddDirectorEvaluationSubcommittee = addDirectorEvaluationSubcommittee($);
@@ -908,6 +930,7 @@ export function applyBoardExecutiveOverride(record: WpContentRecord): WpContentR
     !didRewriteAdmin &&
     !didRewriteEnglish &&
     !didReorderBoard &&
+    !didClearBoardCardContent &&
     !didAddAuditCommittee &&
     !didAddPersonnelSubcommittee &&
     !didAddDirectorEvaluationSubcommittee &&

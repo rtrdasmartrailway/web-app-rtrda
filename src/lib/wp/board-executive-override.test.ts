@@ -79,6 +79,34 @@ describe("applyBoardExecutiveOverride", () => {
     expect(applyBoardExecutiveOverride(source)).toBe(source);
   });
 
+  it("clears board card content while preserving the card layout", () => {
+    const updated = applyBoardExecutiveOverride(
+      record({
+        contentHtml: `
+          <div class="lightweight-accordion">
+            <details>
+              <summary class="lightweight-accordion-title">คณะกรรมการสถาบันวิจัยและพัฒนาเทคโนโลยีระบบราง</summary>
+              <div class="lightweight-accordion-body"><div class="wp-block-columns"><div class="wp-block-column"><img src="portrait.jpg" /><h4>รศ.ดร. โชติชัย เจริญงาม</h4><h5>ประธานกรรมการ</h5><div class="detail-btn">รายละเอียด</div></div></div></div>
+            </details>
+          </div>`,
+      }),
+    );
+    const $ = cheerio.load(updated.contentHtml, null, false);
+    const board = $(".lightweight-accordion")
+      .filter((_, element) =>
+        $(element)
+          .find("summary")
+          .first()
+          .text()
+          .includes("คณะกรรมการสถาบันวิจัยและพัฒนาเทคโนโลยีระบบราง"),
+      )
+      .first();
+
+    expect(board.find(".wp-block-column")).toHaveLength(1);
+    expect(board.find("img, h4, h5, .detail-btn")).toHaveLength(0);
+    expect(board.find(".board-card-layout-placeholder")).toHaveLength(1);
+  });
+
   it("adds collapsed committee sections after the board and before steering", () => {
     const updated = applyBoardExecutiveOverride(
       record({
@@ -516,7 +544,7 @@ describe("applyBoardExecutiveOverride", () => {
     expect($('img[src*="ชัยวุฒิ"]').length).toBe(2);
   });
 
-  it("orders Thai and English board cards without changing their layout containers", () => {
+  it("keeps Thai and English board card layout containers while clearing their content", () => {
     const thaiNames = [
       "รศ.ดร. โชติชัย เจริญงาม",
       "ถาวร ชลัษเฐียร",
@@ -585,34 +613,6 @@ describe("applyBoardExecutiveOverride", () => {
             .join("")}</div>
         </div>
       </details></div>`;
-    const expectedThai = [
-      "รศ.ดร. โชติชัย เจริญงาม",
-      "ถาวร ชลัษเฐียร",
-      "ดรุณ แสงฉาย",
-      "ชาญเชาวน์ ไชยานุกิจ",
-      "ผศ. พิศิษฐ์ แสง-ชูโต",
-      "ดร. วีรเดช ชีวาพัฒนานุวงศ์",
-      "วัชรชาญ สิริสุวรรณทัศน์",
-      "ดร. พิเชฐ คุณาธรรมรักษ์",
-      "อนันต์ โพธิ์นิ่มแดง",
-      "พัฒนพงษ์ พงศ์ศุภสมิทธิ์",
-      "ผศ.ดร.วีรชัย อาจหาญ",
-      "ดร. เพียงออ เลาหะวิไลย",
-    ];
-    const expectedEnglish = [
-      "Assoc. Prof. Dr. Chotchai Charoenngam",
-      "Thavorn Chalassathien",
-      "Darun Saengshine",
-      "Chanchao Chaiyanukij",
-      "Asst. Prof. Pisit Saeng-Xuto",
-      "Dr. Weeradet Cheevapattananuwong",
-      "Watcharachan Sirisuwannatash",
-      "Dr. Pichet Kunadhamraks",
-      "Anan Pho Nimdaeng",
-      "Pattanaphong Phongsupatsamit",
-      "Asst. Prof. Dr. Veerachai Archan",
-      "Dr. Piang-or Loahavilai",
-    ];
     const sourceThaiNames = thaiNames.map((name) =>
       name === "วัชรชาญ สิริสุวรรณทัศน์"
         ? "ผู้แทน กระทรวงการอุดมศึกษา วิทยาศาสตร์ วิจัยและนวัตกรรม"
@@ -644,27 +644,16 @@ describe("applyBoardExecutiveOverride", () => {
       }),
     );
 
-    const boardCases: Array<[string, string[]]> = [
-      [thai.contentHtml, expectedThai],
-      [english.contentHtml, expectedEnglish],
-    ];
-    for (const [contentHtml, expected] of boardCases) {
+    for (const contentHtml of [thai.contentHtml, english.contentHtml]) {
       const $ = cheerio.load(contentHtml, null, false);
-      expect(
-        $(".lightweight-accordion .wp-block-column h4")
-          .map((_, element) => $(element).text())
-          .get(),
-      ).toEqual(expected);
       expect($(".lightweight-accordion .wp-block-columns")).toHaveLength(5);
+      expect($(".lightweight-accordion .wp-block-column")).toHaveLength(12);
+      expect(
+        $(
+          ".lightweight-accordion .wp-block-column img, .lightweight-accordion .wp-block-column h4, .lightweight-accordion .wp-block-column h5, .lightweight-accordion .wp-block-column .detail-btn",
+        ),
+      ).toHaveLength(0);
+      expect($(".lightweight-accordion .board-card-layout-placeholder")).toHaveLength(12);
     }
-
-    const $thai = cheerio.load(thai.contentHtml, null, false);
-    expect(
-      $thai("h4")
-        .filter((_, element) => $thai(element).text() === "อนันต์ โพธิ์นิ่มแดง")
-        .closest(".wp-block-column")
-        .find("img")
-        .attr("src"),
-    ).toBe(ANAN_IMAGE_SRC);
   });
 });
