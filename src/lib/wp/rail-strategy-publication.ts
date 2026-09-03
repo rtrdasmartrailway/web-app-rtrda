@@ -13,7 +13,7 @@ export const railStrategyPublicationTitle =
 export const railStrategyPublicationGroups: KnowledgeDocumentGroup[] = [
   {
     title: railStrategyPublicationTitle,
-    open: true,
+    open: false,
     compact: true,
     documents: [
       {
