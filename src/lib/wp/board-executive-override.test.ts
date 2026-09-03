@@ -118,10 +118,10 @@ describe("applyBoardExecutiveOverride", () => {
     expect(role.find("a").attr("href")).toBe("mailto:chaiwooth.t@rtrda.or.th");
   });
 
-  it("rewrites Pichet's Thai and English board role", () => {
+  it("rewrites Pichet's Thai and English board role and normalizes the portrait", () => {
     const thai = applyBoardExecutiveOverride(
       record({
-        contentHtml: `<div class="lightweight-accordion"><div class="wp-block-column"><h4>ดร. พิเชฐ คุณาธรรมรักษ์</h4><h5>กรรมการโดยตำแหน่ง อธิบดีกรมการขนส่งทางราง</h5></div></div>`,
+        contentHtml: `<div class="lightweight-accordion"><div class="wp-block-column"><img style="aspect-ratio:0.873;width:190px" /><h4>ดร. พิเชฐ คุณาธรรมรักษ์</h4><h5>กรรมการโดยตำแหน่ง อธิบดีกรมการขนส่งทางราง</h5></div></div>`,
       }),
     );
     const english = applyBoardExecutiveOverride(
@@ -138,6 +138,9 @@ describe("applyBoardExecutiveOverride", () => {
     expect(cheerio.load(english.contentHtml, null, false)("h5").text()).toBe(
       "Member, Board of DirectorDirector-General, Department of Rail Transport",
     );
+    expect(
+      cheerio.load(thai.contentHtml, null, false)("img").attr("style"),
+    ).toBeUndefined();
   });
 
   it("rewrites Pattanaphong's Thai and English board role", () => {
@@ -234,7 +237,7 @@ describe("applyBoardExecutiveOverride", () => {
         .map((_, element) => cheerio.load(thai.contentHtml, null, false)(element).text())
         .get(),
     ).toEqual([
-      "นายอนันต์ โพธิ์นิ่มแดง",
+      "อนันต์ โพธิ์นิ่มแดง",
       "ดร. วีรเดช ชีวาพัฒนานุวงศ์",
       "ผศ.ดร.วีรชัย อาจหาญ",
     ]);
@@ -247,11 +250,7 @@ describe("applyBoardExecutiveOverride", () => {
         )("h5")
         .map((_, element) => cheerio.load(thai.contentHtml, null, false)(element).text())
         .get(),
-    ).toEqual([
-      "กรรมการ",
-      "กรรมการผู้ทรงคุณวุฒิ",
-      "ผู้ว่าการ สถาบันวิจัยวิทยาศาสตร์และเทคโนโลยีแห่งประเทศไทย",
-    ]);
+    ).toEqual(["กรรมการ", "กรรมการผู้ทรงคุณวุฒิ", "กรรมการ"]);
     expect(
       cheerio
         .load(
@@ -285,6 +284,12 @@ describe("applyBoardExecutiveOverride", () => {
     );
     expect(cheerio.load(english.contentHtml, null, false)("img").eq(2).attr("src")).toBe(
       VEERACHAI_IMAGE_SRC,
+    );
+    expect(cheerio.load(english.contentHtml, null, false)("h5").eq(0).html()).toBe(
+      "Member, Board of Director<br>Governor of the State Railway of Thailand",
+    );
+    expect(cheerio.load(english.contentHtml, null, false)("h5").eq(2).html()).toBe(
+      "Member, Board of Director<br>Governor, Thailand Institute of Scientific and Technological Research",
     );
     for (const contentHtml of [thai.contentHtml, english.contentHtml]) {
       const image = cheerio.load(contentHtml, null, false)("img");
@@ -337,9 +342,7 @@ describe("applyBoardExecutiveOverride", () => {
     const veerachai = $thai(".wp-block-column").eq(1);
 
     expect(veerachai.find("h4").text()).toBe("ผศ.ดร.วีรชัย อาจหาญ");
-    expect(veerachai.find("h5").text()).toBe(
-      "ผู้ว่าการ สถาบันวิจัยวิทยาศาสตร์และเทคโนโลยีแห่งประเทศไทย",
-    );
+    expect(veerachai.find("h5").text()).toBe("กรรมการ");
     expect(veerachai.find("img").attr("src")).toBe(VEERACHAI_IMAGE_SRC);
     expect(veerachai.find("img").attr("alt")).toBe("ผศ.ดร.วีรชัย อาจหาญ");
     expect(veerachai.find(".detail-btn").hasClass("detail-btn-disabled")).toBe(true);
@@ -352,6 +355,9 @@ describe("applyBoardExecutiveOverride", () => {
     );
     expect(cheerio.load(thai.contentHtml, null, false)("h4").eq(1).text()).toBe(
       "ผศ.ดร.วีรชัย อาจหาญ",
+    );
+    expect(cheerio.load(english.contentHtml, null, false)("h5").eq(2).html()).toBe(
+      "Member, Board of Director<br>Governor, Thailand Institute of Scientific and Technological Research",
     );
     expect(
       cheerio.load(applyBoardExecutiveOverride(thai).contentHtml, null, false)("h4"),
@@ -406,7 +412,7 @@ describe("applyBoardExecutiveOverride", () => {
       "ชาญเชาวน์ ไชยานุกิจ",
       "ดร. พิเชฐ คุณาธรรมรักษ์",
       "พัฒนพงษ์ พงศ์ศุภสมิทธิ์",
-      "นายอนันต์ โพธิ์นิ่มแดง",
+      "อนันต์ โพธิ์นิ่มแดง",
       "ดร. วีรเดช ชีวาพัฒนานุวงศ์",
       "วัชรชาญ สิริสุวรรณทัศน์",
       "ผศ.ดร.วีรชัย อาจหาญ",
@@ -475,7 +481,7 @@ describe("applyBoardExecutiveOverride", () => {
       "ดร. วีรเดช ชีวาพัฒนานุวงศ์",
       "วัชรชาญ สิริสุวรรณทัศน์",
       "ดร. พิเชฐ คุณาธรรมรักษ์",
-      "นายอนันต์ โพธิ์นิ่มแดง",
+      "อนันต์ โพธิ์นิ่มแดง",
       "พัฒนพงษ์ พงศ์ศุภสมิทธิ์",
       "ผศ.ดร.วีรชัย อาจหาญ",
       "ดร. เพียงออ เลาหะวิไลย",
@@ -542,7 +548,7 @@ describe("applyBoardExecutiveOverride", () => {
     const $thai = cheerio.load(thai.contentHtml, null, false);
     expect(
       $thai("h4")
-        .filter((_, element) => $thai(element).text() === "นายอนันต์ โพธิ์นิ่มแดง")
+        .filter((_, element) => $thai(element).text() === "อนันต์ โพธิ์นิ่มแดง")
         .closest(".wp-block-column")
         .find("img")
         .attr("src"),

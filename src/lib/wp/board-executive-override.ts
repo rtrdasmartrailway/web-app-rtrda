@@ -42,6 +42,7 @@ const REPRESENTATIVE_RAILWAY_NAMES = new Set([
 ]);
 export const ANAN_IMAGE_SRC =
   "/wp-content/uploads/2026/08/anan-pho-nimdaeng.png?v=20260901";
+const ANAN_THAI_NAME = "อนันต์ โพธิ์นิ่มแดง";
 const REMOVED_BOARD_NAMES = new Set([
   "ดร. จุลเทพ ขจรไชยกูล",
   "ดร.จุลเทพ ขจรไชยกูล",
@@ -54,7 +55,7 @@ export const WEERADET_IMAGE_SRC =
   "/wp-content/uploads/2026/08/weeradet-cheevapattananuwong.jpg";
 export const VEERACHAI_IMAGE_SRC = "/wp-content/uploads/2026/08/veerachai-archan.jpg";
 const VEERACHAI_NAME = "ผศ.ดร.วีรชัย อาจหาญ";
-const VEERACHAI_ROLE = "ผู้ว่าการ สถาบันวิจัยวิทยาศาสตร์และเทคโนโลยีแห่งประเทศไทย";
+const VEERACHAI_ROLE = "กรรมการ";
 const BOARD_CARD_ORDER = new Map([
   ["รศ.ดร. โชติชัย เจริญงาม", 1],
   ["Assoc. Prof. Dr. Chotchai Charoenngam", 1],
@@ -72,6 +73,7 @@ const BOARD_CARD_ORDER = new Map([
   ["Watcharachan Sirisuwannatash", 7],
   ["ดร. พิเชฐ คุณาธรรมรักษ์", 8],
   ["Dr. Pichet Kunadhamraks", 8],
+  [ANAN_THAI_NAME, 9],
   ["นายอนันต์ โพธิ์นิ่มแดง", 9],
   ["Anan Pho Nimdaeng", 9],
   ["พัฒนพงษ์ พงศ์ศุภสมิทธิ์", 10],
@@ -111,6 +113,7 @@ function rewritePichetColumn(
   } else {
     role.append("กรรมการ<br>อธิบดีกรมการขนส่งทางราง");
   }
+  column.find("img").first().removeAttr("style");
 
   return true;
 }
@@ -161,6 +164,7 @@ function rewriteEnglishBoardColumn($: cheerio.CheerioAPI, element: AnyNode): boo
   const nameTranslations = new Map([
     ["ชาญเชาวน์ ไชยานุกิจ", "Chanchao Chaiyanukij"],
     ["ถาวร ชลัษเฐียร", "Thavorn Chalassathien"],
+    [ANAN_THAI_NAME, "Anan Pho Nimdaeng"],
     ["นายอนันต์ โพธิ์นิ่มแดง", "Anan Pho Nimdaeng"],
     ["ดร. วีรเดช ชีวาพัฒนานุวงศ์", "Dr. Weeradet Cheevapattananuwong"],
     [VEERACHAI_NAME, "Asst. Prof. Dr. Veerachai Archan"],
@@ -303,32 +307,71 @@ function rewriteRailwayRepresentativeColumn(
   column
     .find("h4")
     .first()
-    .text(language === "en" ? "Anan Pho Nimdaeng" : "นายอนันต์ โพธิ์นิ่มแดง");
+    .text(language === "en" ? "Anan Pho Nimdaeng" : ANAN_THAI_NAME);
   const image = column.find("img").first();
   image.attr("src", ANAN_IMAGE_SRC);
-  image.attr("alt", language === "en" ? "Anan Pho Nimdaeng" : "นายอนันต์ โพธิ์นิ่มแดง");
+  image.attr("alt", language === "en" ? "Anan Pho Nimdaeng" : ANAN_THAI_NAME);
   image.removeAttr("srcset");
   image.removeAttr("sizes");
   const role = column.find("h5").first();
   role.empty();
-  role.append(language === "en" ? "Board Member" : "กรรมการ");
+  role.append(
+    language === "en"
+      ? "Member, Board of Director<br>Governor of the State Railway of Thailand"
+      : "กรรมการ",
+  );
   return true;
 }
 
-function rewriteAnanColumn($: cheerio.CheerioAPI, element: AnyNode): boolean {
+function rewriteAnanColumn(
+  $: cheerio.CheerioAPI,
+  element: AnyNode,
+  language: WpContentRecord["language"],
+): boolean {
   const column = $(element);
   if (
-    !new Set(["นายอนันต์ โพธิ์นิ่มแดง", "Anan Pho Nimdaeng"]).has(
+    !new Set([ANAN_THAI_NAME, "นายอนันต์ โพธิ์นิ่มแดง", "Anan Pho Nimdaeng"]).has(
       compactText(column.find("h4").first().text()),
     )
   ) {
     return false;
   }
 
+  column
+    .find("h4")
+    .first()
+    .text(language === "en" ? "Anan Pho Nimdaeng" : ANAN_THAI_NAME);
   const image = column.find("img").first();
   image.attr("src", ANAN_IMAGE_SRC);
+  image.attr("alt", language === "en" ? "Anan Pho Nimdaeng" : ANAN_THAI_NAME);
   image.removeAttr("srcset");
   image.removeAttr("sizes");
+  const role = column.find("h5").first();
+  role.empty();
+  role.append(
+    language === "en"
+      ? "Member, Board of Director<br>Governor of the State Railway of Thailand"
+      : "กรรมการ",
+  );
+  return true;
+}
+
+function markPisitEnglishName(
+  $: cheerio.CheerioAPI,
+  element: AnyNode,
+  language: WpContentRecord["language"],
+): boolean {
+  if (language !== "en") {
+    return false;
+  }
+
+  const heading = $(element).find("h4").first();
+  if (compactText(heading.text()) !== "Asst. Prof. Pisit Saeng-Xuto") {
+    return false;
+  }
+
+  heading.text("Asst. Prof. Pisit Saeng-Xuto");
+  heading.addClass("pisit-name");
   return true;
 }
 
@@ -377,7 +420,7 @@ function addWeeradetColumn(
 
   const column = $(element);
   if (
-    !new Set(["นายอนันต์ โพธิ์นิ่มแดง", "Anan Pho Nimdaeng"]).has(
+    !new Set([ANAN_THAI_NAME, "นายอนันต์ โพธิ์นิ่มแดง", "Anan Pho Nimdaeng"]).has(
       compactText(column.find("h4").first().text()),
     )
   ) {
@@ -425,6 +468,7 @@ function addVeerachaiColumn(
 
   const source = elements.find((element) =>
     new Set([
+      ANAN_THAI_NAME,
       "นายอนันต์ โพธิ์นิ่มแดง",
       "Anan Pho Nimdaeng",
       "ดร. วีรเดช ชีวาพัฒนานุวงศ์",
@@ -446,7 +490,7 @@ function addVeerachaiColumn(
     .empty()
     .append(
       language === "en"
-        ? "Governor, Thailand Institute of Scientific and Technological Research"
+        ? "Member, Board of Director<br>Governor, Thailand Institute of Scientific and Technological Research"
         : VEERACHAI_ROLE,
     );
   const image = clone.find("img").first();
@@ -578,7 +622,12 @@ export function applyBoardExecutiveOverride(record: WpContentRecord): WpContentR
   const didRewriteRailwayRepresentative = columns.some((element) =>
     rewriteRailwayRepresentativeColumn($, element, record.language),
   );
-  const didRewriteAnan = columns.some((element) => rewriteAnanColumn($, element));
+  const didRewriteAnan = columns.some((element) =>
+    rewriteAnanColumn($, element, record.language),
+  );
+  const didMarkPisitEnglishName = columns.some((element) =>
+    markPisitEnglishName($, element, record.language),
+  );
   const didAddWeeradet = columns.some((element) =>
     addWeeradetColumn($, element, record.language),
   );
@@ -608,6 +657,7 @@ export function applyBoardExecutiveOverride(record: WpContentRecord): WpContentR
     !didRemoveNamedBoardCards &&
     !didRewriteRailwayRepresentative &&
     !didRewriteAnan &&
+    !didMarkPisitEnglishName &&
     !didAddWeeradet &&
     !didAddVeerachai &&
     !didRewriteMinistryRepresentative &&

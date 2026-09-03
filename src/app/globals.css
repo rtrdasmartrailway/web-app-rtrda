@@ -4230,6 +4230,11 @@ body:has(.yutth-lightbox) {
   text-align: center;
 }
 
+.content-board-executives .wp-content .lightweight-accordion-body h4.pisit-name {
+  font-size: calc(13.5px * var(--reader-scale));
+  white-space: nowrap;
+}
+
 .content-board-executives .wp-content .lightweight-accordion-body h5.wp-block-heading {
   color: var(--accent-deep);
   font-size: calc(13.5px * var(--reader-scale));

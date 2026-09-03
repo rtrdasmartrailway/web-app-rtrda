@@ -44,7 +44,7 @@ describe("board executive parser", () => {
       "ดร. วีรเดช ชีวาพัฒนานุวงศ์",
       "วัชรชาญ สิริสุวรรณทัศน์",
       "ดร. พิเชฐ คุณาธรรมรักษ์",
-      "นายอนันต์ โพธิ์นิ่มแดง",
+      "อนันต์ โพธิ์นิ่มแดง",
       "พัฒนพงษ์ พงศ์ศุภสมิทธิ์",
       "ผศ.ดร.วีรชัย อาจหาญ",
       "ดร. เพียงออ เลาหะวิไลย",
@@ -54,7 +54,7 @@ describe("board executive parser", () => {
       "Thavorn Chalassathien",
       "Darun Saengshine",
       "Chanchao Chaiyanukij",
-      "Asst. Prof. Pisit  Saeng-Xuto",
+      "Asst. Prof. Pisit Saeng-Xuto",
       "Dr. Weeradet Cheevapattananuwong",
       "Watcharachan Sirisuwannatash",
       "Dr. Pichet Kunadhamraks",
@@ -108,11 +108,46 @@ describe("board executive parser", () => {
     const $thai = cheerio.load(thai.contentHtml, null, false);
     expect(
       $thai("h4")
-        .filter((_, element) => $thai(element).text() === "นายอนันต์ โพธิ์นิ่มแดง")
+        .filter((_, element) => $thai(element).text() === "อนันต์ โพธิ์นิ่มแดง")
         .closest(".wp-block-column")
         .find("img")
         .attr("src"),
     ).toBe(ANAN_IMAGE_SRC);
+    expect(
+      $thai("h4")
+        .filter((_, element) => $thai(element).text() === "ดร. พิเชฐ คุณาธรรมรักษ์")
+        .closest(".wp-block-column")
+        .find("img")
+        .attr("style"),
+    ).toBeUndefined();
+
+    const english = await boardRecord("/en/เกี่ยวกับ-สทร/คณะกรรมการ-ผู้บริหาร");
+    const $english = cheerio.load(english.contentHtml, null, false);
+    expect(
+      $english("h4")
+        .filter(
+          (_, element) => $english(element).text() === "Asst. Prof. Pisit Saeng-Xuto",
+        )
+        .hasClass("pisit-name"),
+    ).toBe(true);
+    expect(
+      $english("h4")
+        .filter((_, element) => $english(element).text() === "Anan Pho Nimdaeng")
+        .closest(".wp-block-column")
+        .find("h5")
+        .html(),
+    ).toBe("Member, Board of Director<br>Governor of the State Railway of Thailand");
+    expect(
+      $english("h4")
+        .filter(
+          (_, element) => $english(element).text() === "Asst. Prof. Dr. Veerachai Archan",
+        )
+        .closest(".wp-block-column")
+        .find("h5")
+        .html(),
+    ).toBe(
+      "Member, Board of Director<br>Governor, Thailand Institute of Scientific and Technological Research",
+    );
   });
 
   it("selects Thai and English content for Chotichai's popup", () => {
@@ -221,6 +256,7 @@ describe("board executive parser", () => {
       const englishByTrigger = getBoardExecutiveDetailByTrigger(detail.trigger, "en");
 
       expect(thai?.html).toContain(detail.thaiText);
+      expect(thai?.html).not.toContain("<h3><strong>กรรมการผู้ทรงคุณวุฒิ</strong></h3>");
       expect(englishByName?.html).toBe(thai?.html);
       expect(englishByTrigger?.html).toBe(thai?.html);
     }
