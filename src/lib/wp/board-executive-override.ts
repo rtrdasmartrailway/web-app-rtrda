@@ -152,6 +152,31 @@ const PERSONNEL_SUBCOMMITTEE_HTML = `
     </div>
   </details>`;
 
+const DIRECTOR_EVALUATION_SUBCOMMITTEE_HTML = `
+  <details class="lightweight-accordion director-evaluation-subcommittee">
+    <summary>คณะอนุกรรมการประเมินผลการปฏิบัติงานของผู้อำนวยการ</summary>
+    <div class="lightweight-accordion-body">
+      <table>
+        <thead><tr><th>รายชื่อ</th><th>ตำแหน่ง</th></tr></thead>
+        <tbody>
+          <tr><td>1. นายพิศิษฐ์ แสง-ชูโต</td><td>ประธานอนุกรรมการ</td></tr>
+          <tr><td>2. นายดรุณ แสงฉาย</td><td>อนุกรรมการ</td></tr>
+          <tr><td>3. นายทยากร จันทรางศุ</td><td>อนุกรรมการ</td></tr>
+          <tr><td>4. นางสาวอนรรฆิยา ชูคล้าย</td><td>เลขานุการ</td></tr>
+          <tr><td>5. นายณัฎฐ์ อนุกูล</td><td>ผู้ช่วยเลขานุการ</td></tr>
+        </tbody>
+      </table>
+      <h3>อำนาจหน้าที่</h3>
+      <ol>
+        <li>กำหนดหลักเกณฑ์และวิธีการประเมินผลการปฏิบัติงานของผู้อำนวยการสถาบันวิจัยและพัฒนาเทคโนโลยีระบบราง เพื่อใช้ในการประเมินผลการปฏิบัติงาน เสนอต่อคณะกรรมการสถาบันวิจัยและพัฒนาเทคโนโลยีระบบรางเพื่อพิจารณา</li>
+        <li>ประเมินผลการปฏิบัติงานของผู้อำนวยการสถาบันวิจัยและพัฒนาเทคโนโลยีระบบรางตามเป้าหมายและแผนงานที่ตกลง รวมทั้งสรุปผลคะแนนประจำปี เพื่อรายงานผลการประเมินผลการปฏิบัติงานต่อคณะกรรมการสถาบันวิจัยและพัฒนาเทคโนโลยีระบบราง</li>
+        <li>ติดตามและตรวจสอบผลการปฏิบัติงานของผู้อำนวยการสถาบันวิจัยและพัฒนาเทคโนโลยีระบบราง ตามแผนงานและเป้าหมายที่ได้ตกลง</li>
+        <li>ใช้ผลการประเมินมาประกอบการพิจารณาเรื่องสัญญาจ้าง การปรับค่าตอบแทน และกำหนดแนวทางพัฒนาประสิทธิภาพของผู้อำนวยการ เสนอต่อคณะกรรมการสถาบันวิจัยและพัฒนาเทคโนโลยีระบบรางพิจารณา</li>
+        <li>ปฏิบัติงานอื่นตามที่กฎหมายกำหนด หรือตามที่คณะกรรมการสถาบันวิจัยและพัฒนาเทคโนโลยีระบบรางมอบหมาย</li>
+      </ol>
+    </div>
+  </details>`;
+
 function compactText(value: string): string {
   return value.replace(/\s+/g, " ").trim();
 }
@@ -697,6 +722,20 @@ function addPersonnelSubcommittee($: cheerio.CheerioAPI): boolean {
   return true;
 }
 
+function addDirectorEvaluationSubcommittee($: cheerio.CheerioAPI): boolean {
+  if ($(".lightweight-accordion.director-evaluation-subcommittee").length) {
+    return false;
+  }
+
+  const personnelSubcommittee = $(".lightweight-accordion.personnel-subcommittee");
+  if (!personnelSubcommittee.length) {
+    return false;
+  }
+
+  personnelSubcommittee.first().after(DIRECTOR_EVALUATION_SUBCOMMITTEE_HTML);
+  return true;
+}
+
 export function applyBoardExecutiveOverride(record: WpContentRecord): WpContentRecord {
   if (!isBoardExecutivePath(record)) {
     return record;
@@ -750,6 +789,7 @@ export function applyBoardExecutiveOverride(record: WpContentRecord): WpContentR
   const didReorderBoard = reorderBoardColumns($);
   const didAddAuditCommittee = addAuditCommittee($);
   const didAddPersonnelSubcommittee = addPersonnelSubcommittee($);
+  const didAddDirectorEvaluationSubcommittee = addDirectorEvaluationSubcommittee($);
 
   if (
     !didRewritePichet &&
@@ -767,7 +807,8 @@ export function applyBoardExecutiveOverride(record: WpContentRecord): WpContentR
     !didRewriteEnglish &&
     !didReorderBoard &&
     !didAddAuditCommittee &&
-    !didAddPersonnelSubcommittee
+    !didAddPersonnelSubcommittee &&
+    !didAddDirectorEvaluationSubcommittee
   ) {
     return record;
   }

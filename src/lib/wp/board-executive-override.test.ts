@@ -97,6 +97,7 @@ describe("applyBoardExecutiveOverride", () => {
       "คณะกรรมการสถาบันวิจัยและพัฒนาเทคโนโลยีระบบราง",
       "คณะกรรมการตรวจสอบ",
       "คณะอนุกรรมการบริหารงานบุคคล",
+      "คณะอนุกรรมการประเมินผลการปฏิบัติงานของผู้อำนวยการ",
       "คณะกรรมการกำกับทิศทาง",
     ]);
     expect(audit.attr("open")).toBeUndefined();
@@ -112,9 +113,15 @@ describe("applyBoardExecutiveOverride", () => {
     );
     expect(personnel.text()).toContain("8. ผู้จัดการกลุ่มบริหารภายใน");
     expect(personnel.find("ol li")).toHaveLength(8);
+    const directorEvaluation = $(".director-evaluation-subcommittee");
+    expect(directorEvaluation.attr("open")).toBeUndefined();
+    expect(directorEvaluation.find("tbody tr")).toHaveLength(5);
+    expect(directorEvaluation.text()).toContain("1. นายพิศิษฐ์ แสง-ชูโต");
+    expect(directorEvaluation.text()).toContain("5. นายณัฎฐ์ อนุกูล");
+    expect(directorEvaluation.find("ol li")).toHaveLength(5);
   });
 
-  it("adds the same Thai audit committee to the English page", () => {
+  it("adds the same Thai committee sections to the English page", () => {
     const updated = applyBoardExecutiveOverride(
       record({
         language: "en",
@@ -126,6 +133,10 @@ describe("applyBoardExecutiveOverride", () => {
 
     expect(updated.contentHtml).toContain("คณะกรรมการตรวจสอบ");
     expect(updated.contentHtml).toContain("นายชาครีย์ บำรุงวงศ์");
+    expect(updated.contentHtml).toContain(
+      "คณะอนุกรรมการประเมินผลการปฏิบัติงานของผู้อำนวยการ",
+    );
+    expect(updated.contentHtml).toContain("นางสาวอนรรฆิยา ชูคล้าย");
   });
 
   it("fills the internal-admin manager card with Chaiyut Tanchai", () => {
