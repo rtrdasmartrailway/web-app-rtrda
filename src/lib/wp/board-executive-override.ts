@@ -177,6 +177,37 @@ const DIRECTOR_EVALUATION_SUBCOMMITTEE_HTML = `
     </div>
   </details>`;
 
+const RAIL_POLICY_STRATEGY_SUBCOMMITTEE_HTML = `
+  <details class="lightweight-accordion rail-policy-strategy-subcommittee">
+    <summary>คณะอนุกรรมการพิจารณากลั่นกรองนโยบายและยุทธศาสตร์ด้านเทคโนโลยีระบบราง</summary>
+    <div class="lightweight-accordion-body">
+      <table>
+        <thead><tr><th>รายชื่อ</th><th>ตำแหน่ง</th></tr></thead>
+        <tbody>
+          <tr><td>1. นายถาวร ชลัษเฐียร</td><td>ที่ปรึกษา</td></tr>
+          <tr><td>2. นายวีรเดช ชีวาพัฒนานุวงศ์</td><td>ประธานอนุกรรมการ</td></tr>
+          <tr><td>3. นายพิศิษฐ์ แสง-ชูโต</td><td>อนุกรรมการ</td></tr>
+          <tr><td>4. นายวัชรชาญ สิริสุวรรณทัศน์</td><td>อนุกรรมการ</td></tr>
+          <tr><td>5. นายทยากร จันทรางศุ</td><td>อนุกรรมการ</td></tr>
+          <tr><td>6. ผู้ว่าการสถาบันวิจัยวิทยาศาสตร์และเทคโนโลยีแห่งประเทศไทย</td><td>อนุกรรมการ</td></tr>
+          <tr><td>7. ผู้แทนการรถไฟแห่งประเทศไทย</td><td>อนุกรรมการ</td></tr>
+          <tr><td>8. ผู้แทนการรถไฟฟ้าขนส่งมวลชนแห่งประเทศไทย</td><td>อนุกรรมการ</td></tr>
+          <tr><td>9. ผู้อำนวยการสถาบันวิจัยและพัฒนาเทคโนโลยีระบบราง</td><td>อนุกรรมการ</td></tr>
+          <tr><td>10. เจ้าหน้าที่สถาบันวิจัยและพัฒนาเทคโนโลยีระบบราง</td><td>เลขานุการ</td></tr>
+        </tbody>
+      </table>
+      <h3>อำนาจหน้าที่</h3>
+      <ol>
+        <li>พิจารณา กลั่นกรอง และให้ข้อเสนอแนะเกี่ยวกับแผนงานโครงการ ให้สอดคล้องกับนโยบาย ยุทธศาสตร์ด้านเทคโนโลยีระบบราง และวัตถุประสงค์ของการจัดตั้งสถาบันวิจัยและพัฒนาเทคโนโลยีระบบราง ก่อนนำเสนอต่อคณะกรรมการสถาบันวิจัยและพัฒนาเทคโนโลยีระบบรางเพื่อพิจารณาให้ความเห็นชอบต่อไป</li>
+        <li>พิจารณา กลั่นกรอง และให้ข้อเสนอแนะเกี่ยวกับแผนการสื่อสารสาธารณะ เพื่อเสริมสร้างความเข้าใจ ความเชื่อมั่น และความไว้วางใจของประชาชน โดยคำนึงถึงความเชื่อมโยงกับพันธกิจของสถาบัน ความสม่ำเสมอและความต่อเนื่องในการสื่อสาร ตลอดจนการตอบสนองต่อสาธารณะอย่างเหมาะสม ก่อนนำเสนอต่อคณะกรรมการสถาบันวิจัยและพัฒนาเทคโนโลยีระบบรางเพื่อพิจารณาให้ความเห็นชอบต่อไป</li>
+        <li>พิจารณาให้ความเห็นต่อแผนงบประมาณประจำปี แผนการลงทุน รวมถึงแผนการใช้จ่ายเงินนอกงบประมาณ (ถ้ามี) ก่อนนำเสนอต่อคณะกรรมการสถาบันวิจัยและพัฒนาเทคโนโลยีระบบราง เพื่อพิจารณาให้ความเห็นชอบต่อไป</li>
+        <li>กำกับ ติดตาม และให้ข้อเสนอแนะเกี่ยวกับการดำเนินงานของสถาบันฯ เพื่อให้เป็นไปตามแผนงานด้านเทคโนโลยีระบบราง ซึ่งได้รับความเห็นชอบจากคณะกรรมการสถาบันวิจัยและพัฒนาเทคโนโลยีระบบราง โดยเฉพาะงานด้านนวัตกรรมและวิศวกรรม ตลอดจนการปรับปรุงกระบวนการดำเนินงานให้มีความสอดคล้องกับพระราชบัญญัติการขนส่งทางราง พ.ศ. 2568</li>
+        <li>แต่งตั้งที่ปรึกษาของคณะอนุกรรมการและคณะทำงาน เพื่อช่วยเหลือการปฏิบัติงานที่เกี่ยวข้องได้ตามความเหมาะสม</li>
+        <li>ปฏิบัติงานอื่นใดตามที่กฎหมายกำหนด หรือตามที่คณะกรรมการสถาบันวิจัยและพัฒนาเทคโนโลยีระบบรางมอบหมาย</li>
+      </ol>
+    </div>
+  </details>`;
+
 function compactText(value: string): string {
   return value.replace(/\s+/g, " ").trim();
 }
@@ -736,6 +767,22 @@ function addDirectorEvaluationSubcommittee($: cheerio.CheerioAPI): boolean {
   return true;
 }
 
+function addRailPolicyStrategySubcommittee($: cheerio.CheerioAPI): boolean {
+  if ($(".lightweight-accordion.rail-policy-strategy-subcommittee").length) {
+    return false;
+  }
+
+  const directorEvaluationSubcommittee = $(
+    ".lightweight-accordion.director-evaluation-subcommittee",
+  );
+  if (!directorEvaluationSubcommittee.length) {
+    return false;
+  }
+
+  directorEvaluationSubcommittee.first().after(RAIL_POLICY_STRATEGY_SUBCOMMITTEE_HTML);
+  return true;
+}
+
 export function applyBoardExecutiveOverride(record: WpContentRecord): WpContentRecord {
   if (!isBoardExecutivePath(record)) {
     return record;
@@ -790,6 +837,7 @@ export function applyBoardExecutiveOverride(record: WpContentRecord): WpContentR
   const didAddAuditCommittee = addAuditCommittee($);
   const didAddPersonnelSubcommittee = addPersonnelSubcommittee($);
   const didAddDirectorEvaluationSubcommittee = addDirectorEvaluationSubcommittee($);
+  const didAddRailPolicyStrategySubcommittee = addRailPolicyStrategySubcommittee($);
 
   if (
     !didRewritePichet &&
@@ -808,7 +856,8 @@ export function applyBoardExecutiveOverride(record: WpContentRecord): WpContentR
     !didReorderBoard &&
     !didAddAuditCommittee &&
     !didAddPersonnelSubcommittee &&
-    !didAddDirectorEvaluationSubcommittee
+    !didAddDirectorEvaluationSubcommittee &&
+    !didAddRailPolicyStrategySubcommittee
   ) {
     return record;
   }

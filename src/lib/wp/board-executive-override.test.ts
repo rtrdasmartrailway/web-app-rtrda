@@ -98,6 +98,7 @@ describe("applyBoardExecutiveOverride", () => {
       "คณะกรรมการตรวจสอบ",
       "คณะอนุกรรมการบริหารงานบุคคล",
       "คณะอนุกรรมการประเมินผลการปฏิบัติงานของผู้อำนวยการ",
+      "คณะอนุกรรมการพิจารณากลั่นกรองนโยบายและยุทธศาสตร์ด้านเทคโนโลยีระบบราง",
       "คณะกรรมการกำกับทิศทาง",
     ]);
     expect(audit.attr("open")).toBeUndefined();
@@ -119,6 +120,14 @@ describe("applyBoardExecutiveOverride", () => {
     expect(directorEvaluation.text()).toContain("1. นายพิศิษฐ์ แสง-ชูโต");
     expect(directorEvaluation.text()).toContain("5. นายณัฎฐ์ อนุกูล");
     expect(directorEvaluation.find("ol li")).toHaveLength(5);
+    const railPolicyStrategy = $(".rail-policy-strategy-subcommittee");
+    expect(railPolicyStrategy.attr("open")).toBeUndefined();
+    expect(railPolicyStrategy.find("tbody tr")).toHaveLength(10);
+    expect(railPolicyStrategy.text()).toContain("1. นายถาวร ชลัษเฐียร");
+    expect(railPolicyStrategy.text()).toContain(
+      "10. เจ้าหน้าที่สถาบันวิจัยและพัฒนาเทคโนโลยีระบบราง",
+    );
+    expect(railPolicyStrategy.find("ol li")).toHaveLength(6);
   });
 
   it("adds the same Thai committee sections to the English page", () => {
@@ -137,6 +146,10 @@ describe("applyBoardExecutiveOverride", () => {
       "คณะอนุกรรมการประเมินผลการปฏิบัติงานของผู้อำนวยการ",
     );
     expect(updated.contentHtml).toContain("นางสาวอนรรฆิยา ชูคล้าย");
+    expect(updated.contentHtml).toContain(
+      "คณะอนุกรรมการพิจารณากลั่นกรองนโยบายและยุทธศาสตร์ด้านเทคโนโลยีระบบราง",
+    );
+    expect(updated.contentHtml).toContain("นายวีรเดช ชีวาพัฒนานุวงศ์");
   });
 
   it("fills the internal-admin manager card with Chaiyut Tanchai", () => {
