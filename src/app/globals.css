@@ -4306,6 +4306,10 @@ body:has(.yutth-lightbox) {
   .content-board-executives .wp-content .lightweight-accordion-body h5.wp-block-heading {
     min-height: 0;
   }
+
+  .content-board-executives .wp-content .lightweight-accordion-body h4.pisit-name {
+    white-space: normal !important;
+  }
 }
 
 .wp-content .wp-block-latest-posts__list {
