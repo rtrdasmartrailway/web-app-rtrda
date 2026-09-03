@@ -79,6 +79,46 @@ describe("applyBoardExecutiveOverride", () => {
     expect(applyBoardExecutiveOverride(source)).toBe(source);
   });
 
+  it("adds the collapsed Thai audit committee after the board and before steering", () => {
+    const updated = applyBoardExecutiveOverride(
+      record({
+        contentHtml: `
+          <details class="lightweight-accordion"><summary>คณะกรรมการสถาบันวิจัยและพัฒนาเทคโนโลยีระบบราง</summary></details>
+          <details class="lightweight-accordion"><summary>คณะกรรมการกำกับทิศทาง</summary></details>`,
+      }),
+    );
+    const $ = cheerio.load(updated.contentHtml, null, false);
+    const summaries = $(".lightweight-accordion summary")
+      .map((_, element) => $(element).text())
+      .get();
+    const audit = $(".audit-committee");
+
+    expect(summaries).toEqual([
+      "คณะกรรมการสถาบันวิจัยและพัฒนาเทคโนโลยีระบบราง",
+      "คณะกรรมการตรวจสอบ",
+      "คณะกรรมการกำกับทิศทาง",
+    ]);
+    expect(audit.attr("open")).toBeUndefined();
+    expect(audit.find("tbody tr")).toHaveLength(4);
+    expect(audit.text()).toContain("นายพัฒนพงษ์ พงศ์ศุภสมิทธิ์");
+    expect(audit.text()).toContain("หัวหน้าหน่วยงานตรวจสอบภายใน");
+    expect(audit.find("ol li")).toHaveLength(15);
+  });
+
+  it("adds the same Thai audit committee to the English page", () => {
+    const updated = applyBoardExecutiveOverride(
+      record({
+        language: "en",
+        path: "/en/เกี่ยวกับ-สทร/คณะกรรมการ-ผู้บริหาร",
+        contentHtml:
+          '<details class="lightweight-accordion"><summary>คณะกรรมการสถาบันวิจัยและพัฒนาเทคโนโลยีระบบราง</summary></details>',
+      }),
+    );
+
+    expect(updated.contentHtml).toContain("คณะกรรมการตรวจสอบ");
+    expect(updated.contentHtml).toContain("นายชาครีย์ บำรุงวงศ์");
+  });
+
   it("fills the internal-admin manager card with Chaiyut Tanchai", () => {
     const updated = applyBoardExecutiveOverride(
       record({

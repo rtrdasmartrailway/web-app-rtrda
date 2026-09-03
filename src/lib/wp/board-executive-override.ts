@@ -86,6 +86,40 @@ const BOARD_CARD_ORDER = new Map([
   ["Dr. Piang-or Loahavilai", 12],
 ]);
 
+const AUDIT_COMMITTEE_HTML = `
+  <details class="lightweight-accordion audit-committee">
+    <summary>คณะกรรมการตรวจสอบ</summary>
+    <div class="lightweight-accordion-body">
+      <table>
+        <thead><tr><th>รายชื่อ</th><th>ตำแหน่ง</th></tr></thead>
+        <tbody>
+          <tr><td>นายพัฒนพงษ์ พงศ์ศุภสมิทธิ์</td><td>ประธานกรรมการตรวจสอบ</td></tr>
+          <tr><td>นายชาครีย์ บำรุงวงศ์</td><td>กรรมการตรวจสอบ</td></tr>
+          <tr><td>นายธีรชัย อรุณเรืองศิริเลิศ</td><td>กรรมการตรวจสอบ</td></tr>
+          <tr><td>หัวหน้าหน่วยงานตรวจสอบภายใน</td><td>เลขานุการ</td></tr>
+        </tbody>
+      </table>
+      <h3>อำนาจหน้าที่</h3>
+      <ol>
+        <li>สอบทานให้สถาบันวิจัยและพัฒนาเทคโนโลยีระบบราง มีรายงานทางการเงินที่ถูกต้อง และเปิดเผยอย่างเพียงพอ</li>
+        <li>สอบทานให้สถาบันวิจัยและพัฒนาเทคโนโลยีระบบราง มีระบบควบคุมภายใน และระบบตรวจสอบภายในที่เหมาะสมและมีประสิทธิผล</li>
+        <li>สอบทานให้สถาบันวิจัยและพัฒนาเทคโนโลยีระบบราง ปฏิบัติตามกฎหมายและระเบียบของสถาบันวิจัยและพัฒนาเทคโนโลยีระบบราง</li>
+        <li>พิจารณา คัดเลือก เสนอแต่งตั้งบุคคล ซึ่งมีความเป็นอิสระ เพื่อทำหน้าที่เป็นผู้สอบบัญชี และเสนอค่าตอบแทนของบุคคลดังกล่าว รวมทั้งเข้าร่วมประชุมกับผู้สอบบัญชีโดยไม่มีฝ่ายบริหารเข้าร่วมประชุมด้วย อย่างน้อยปีละหนึ่งครั้ง</li>
+        <li>พิจารณารายการที่เกี่ยวโยงกัน หรือรายการที่อาจมีความขัดแย้งทางผลประโยชน์ ให้เป็นไปตามกฎหมายและระเบียบของสถาบันวิจัยและพัฒนาเทคโนโลยีระบบราง ทั้งนี้ เพื่อให้มั่นใจว่ารายการดังกล่าวสมเหตุสมผลและเป็นประโยชน์สูงสุดต่อสถาบันวิจัยและพัฒนาเทคโนโลยีระบบราง</li>
+        <li>จัดทำรายงานของคณะกรรมการตรวจสอบ โดยเปิดเผยไว้ในรายงานประจำปีของสถาบันวิจัยและพัฒนาเทคโนโลยีระบบราง ซึ่งรายงานดังกล่าวต้องลงนามโดยประธานคณะกรรมการตรวจสอบ</li>
+        <li>จัดทำแบบประเมินตนเอง (Self Assessment) อย่างน้อยปีละ 1 ครั้ง และรายงานผลการประเมิน ปัญหา อุปสรรค รวมทั้งข้อเสนอแนะในการปรับปรุงการดำเนินงานต่อคณะกรรมการสถาบันวิจัยและพัฒนาเทคโนโลยีระบบรางเพื่อทราบ</li>
+        <li>พิจารณาแผนงานของหน่วยตรวจสอบภายในของสถาบันวิจัยและพัฒนาเทคโนโลยีระบบราง</li>
+        <li>ประสานงานกับคณะกรรมการตรวจสอบภายในของกระทรวงคมนาคม ในการปฏิบัติหน้าที่ให้เป็นไปตามแนวทางที่คณะกรรมการตรวจสอบภายในของกระทรวงคมนาคมกำหนด</li>
+        <li>อาจขอให้ฝ่ายบริหาร ผู้บริหาร เจ้าหน้าที่ของสถาบันวิจัยและพัฒนาเทคโนโลยีระบบราง หรือผู้ที่เกี่ยวข้องเข้าร่วมประชุม เพื่อชี้แจงและหรือให้ข้อมูลเพิ่มเติม</li>
+        <li>อาจเชิญผู้เชี่ยวชาญเฉพาะด้านของสถาบันวิจัยและพัฒนาเทคโนโลยีระบบราง หรือหน่วยงานภายนอกองค์กร เข้าร่วมประชุม หรือให้ข้อมูลในเรื่องที่เกี่ยวข้อง</li>
+        <li>รายงานผลการดำเนินงานของคณะกรรมการตรวจสอบต่อคณะกรรมการสถาบันวิจัยและพัฒนาเทคโนโลยีระบบราง อย่างน้อยปีละ 2 ครั้ง</li>
+        <li>ดำเนินการอื่นใดตามที่คณะกรรมการสถาบันวิจัยและพัฒนาเทคโนโลยีระบบรางมอบหมาย</li>
+        <li>มีอำนาจเข้าถึงข้อมูล และมีอำนาจเรียกให้ผู้บริหาร ผู้บังคับบัญชา หรือพนักงานของสถาบันวิจัยและพัฒนาเทคโนโลยีระบบราง ที่เกี่ยวข้องมาให้ถ้อยคำ ชี้แจง หรือส่งเอกสารหลักฐานที่เกี่ยวข้อง</li>
+        <li>มีอำนาจเสนอแนะหรือให้ข้อเสนอแนะกับผู้บริหาร เจ้าหน้าที่ หรือพนักงานของสถาบันวิจัยและพัฒนาเทคโนโลยีระบบราง</li>
+      </ol>
+    </div>
+  </details>`;
+
 function compactText(value: string): string {
   return value.replace(/\s+/g, " ").trim();
 }
@@ -599,6 +633,24 @@ function rewriteAdminColumn($: cheerio.CheerioAPI, element: AnyNode): boolean {
   return true;
 }
 
+function addAuditCommittee($: cheerio.CheerioAPI): boolean {
+  if ($(".lightweight-accordion.audit-committee").length) {
+    return false;
+  }
+
+  const board = $(".lightweight-accordion").filter((_, element) =>
+    compactText($(element).find("summary").first().text()).includes(
+      "คณะกรรมการสถาบันวิจัยและพัฒนาเทคโนโลยีระบบราง",
+    ),
+  );
+  if (!board.length) {
+    return false;
+  }
+
+  board.first().after(AUDIT_COMMITTEE_HTML);
+  return true;
+}
+
 export function applyBoardExecutiveOverride(record: WpContentRecord): WpContentRecord {
   if (!isBoardExecutivePath(record)) {
     return record;
@@ -650,6 +702,7 @@ export function applyBoardExecutiveOverride(record: WpContentRecord): WpContentR
     }
   }
   const didReorderBoard = reorderBoardColumns($);
+  const didAddAuditCommittee = addAuditCommittee($);
 
   if (
     !didRewritePichet &&
@@ -665,7 +718,8 @@ export function applyBoardExecutiveOverride(record: WpContentRecord): WpContentR
     !didRewriteResearch &&
     !didRewriteAdmin &&
     !didRewriteEnglish &&
-    !didReorderBoard
+    !didReorderBoard &&
+    !didAddAuditCommittee
   ) {
     return record;
   }
