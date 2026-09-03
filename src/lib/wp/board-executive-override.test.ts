@@ -250,7 +250,17 @@ describe("applyBoardExecutiveOverride", () => {
         )("h5")
         .map((_, element) => cheerio.load(thai.contentHtml, null, false)(element).text())
         .get(),
-    ).toEqual(["กรรมการ", "กรรมการผู้ทรงคุณวุฒิ", "กรรมการ"]);
+    ).toEqual([
+      "กรรมการผู้ว่าการรถไฟแห่งประเทศไทย",
+      "กรรมการผู้ทรงคุณวุฒิ",
+      "กรรมการผู้ว่าการ สถาบันวิจัยวิทยาศาสตร์และเทคโนโลยีแห่งประเทศไทย",
+    ]);
+    expect(cheerio.load(thai.contentHtml, null, false)("h5").eq(0).html()).toBe(
+      "กรรมการ<br>ผู้ว่าการรถไฟแห่งประเทศไทย",
+    );
+    expect(cheerio.load(thai.contentHtml, null, false)("h5").eq(2).html()).toBe(
+      "กรรมการ<br>ผู้ว่าการ สถาบันวิจัยวิทยาศาสตร์และเทคโนโลยีแห่งประเทศไทย",
+    );
     expect(
       cheerio
         .load(
@@ -342,7 +352,12 @@ describe("applyBoardExecutiveOverride", () => {
     const veerachai = $thai(".wp-block-column").eq(1);
 
     expect(veerachai.find("h4").text()).toBe("ผศ.ดร.วีรชัย อาจหาญ");
-    expect(veerachai.find("h5").text()).toBe("กรรมการ");
+    expect(veerachai.find("h5").text()).toBe(
+      "กรรมการผู้ว่าการ สถาบันวิจัยวิทยาศาสตร์และเทคโนโลยีแห่งประเทศไทย",
+    );
+    expect(veerachai.find("h5").html()).toBe(
+      "กรรมการ<br>ผู้ว่าการ สถาบันวิจัยวิทยาศาสตร์และเทคโนโลยีแห่งประเทศไทย",
+    );
     expect(veerachai.find("img").attr("src")).toBe(VEERACHAI_IMAGE_SRC);
     expect(veerachai.find("img").attr("alt")).toBe("ผศ.ดร.วีรชัย อาจหาญ");
     expect(veerachai.find(".detail-btn").hasClass("detail-btn-disabled")).toBe(true);

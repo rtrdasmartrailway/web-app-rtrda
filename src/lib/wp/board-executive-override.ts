@@ -55,7 +55,8 @@ export const WEERADET_IMAGE_SRC =
   "/wp-content/uploads/2026/08/weeradet-cheevapattananuwong.jpg";
 export const VEERACHAI_IMAGE_SRC = "/wp-content/uploads/2026/08/veerachai-archan.jpg";
 const VEERACHAI_NAME = "ผศ.ดร.วีรชัย อาจหาญ";
-const VEERACHAI_ROLE = "กรรมการ";
+const VEERACHAI_ROLE =
+  "กรรมการ<br>ผู้ว่าการ สถาบันวิจัยวิทยาศาสตร์และเทคโนโลยีแห่งประเทศไทย";
 const BOARD_CARD_ORDER = new Map([
   ["รศ.ดร. โชติชัย เจริญงาม", 1],
   ["Assoc. Prof. Dr. Chotchai Charoenngam", 1],
@@ -318,7 +319,7 @@ function rewriteRailwayRepresentativeColumn(
   role.append(
     language === "en"
       ? "Member, Board of Director<br>Governor of the State Railway of Thailand"
-      : "กรรมการ",
+      : "กรรมการ<br>ผู้ว่าการรถไฟแห่งประเทศไทย",
   );
   return true;
 }
@@ -351,7 +352,7 @@ function rewriteAnanColumn(
   role.append(
     language === "en"
       ? "Member, Board of Director<br>Governor of the State Railway of Thailand"
-      : "กรรมการ",
+      : "กรรมการ<br>ผู้ว่าการรถไฟแห่งประเทศไทย",
   );
   return true;
 }
