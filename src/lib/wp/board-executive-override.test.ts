@@ -79,7 +79,7 @@ describe("applyBoardExecutiveOverride", () => {
     expect(applyBoardExecutiveOverride(source)).toBe(source);
   });
 
-  it("removes the steering committee without changing board cards", () => {
+  it("clears steering committee cards without changing board cards", () => {
     const updated = applyBoardExecutiveOverride(
       record({
         contentHtml: `
@@ -90,7 +90,7 @@ describe("applyBoardExecutiveOverride", () => {
             </details>
           </div>
           <div class="lightweight-accordion">
-            <details><summary class="lightweight-accordion-title">คณะกรรมการดำเนินการร่วมมือและประสานงานเกี่ยวกับเทคโนโลยีระบบราง</summary></details>
+            <details><summary class="lightweight-accordion-title">คณะกรรมการดำเนินการร่วมมือและประสานงานเกี่ยวกับเทคโนโลยีระบบราง</summary><div class="wp-block-column"><img src="steering.jpg" /><h4>ดร. พิชิต อัคราทิตย์</h4><h5>ประธานกรรมการ</h5><div class="detail-btn">รายละเอียด</div></div></details>
           </div>`,
       }),
     );
@@ -107,15 +107,18 @@ describe("applyBoardExecutiveOverride", () => {
 
     expect(board.find(".wp-block-column")).toHaveLength(1);
     expect(board.find("img, h4, h5, .detail-btn")).toHaveLength(4);
-    expect(
-      $(".lightweight-accordion").filter((_, element) =>
+    const steering = $(".lightweight-accordion")
+      .filter((_, element) =>
         $(element)
           .find("summary")
           .first()
           .text()
           .includes("คณะกรรมการดำเนินการร่วมมือและประสานงานเกี่ยวกับเทคโนโลยีระบบราง"),
-      ),
-    ).toHaveLength(0);
+      )
+      .first();
+    expect(steering).toHaveLength(1);
+    expect(steering.find("img, h4, h5, .detail-btn")).toHaveLength(0);
+    expect(steering.find(".steering-card-layout-placeholder")).toHaveLength(1);
   });
 
   it("adds collapsed committee sections after the board and before steering", () => {

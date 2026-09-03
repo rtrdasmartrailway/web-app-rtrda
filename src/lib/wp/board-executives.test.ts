@@ -33,7 +33,7 @@ async function boardRecord(path = "/เกี่ยวกับ-สทร/คณ
 }
 
 describe("board executive parser", () => {
-  it("keeps board cards and removes the steering committee in Thai and English", async () => {
+  it("keeps board cards and clears steering committee cards in Thai and English", async () => {
     const boardPages = [
       "/เกี่ยวกับ-สทร/คณะกรรมการ-ผู้บริหาร",
       "/en/เกี่ยวกับ-สทร/คณะกรรมการ-ผู้บริหาร",
@@ -53,13 +53,16 @@ describe("board executive parser", () => {
       expect(board.find(".wp-block-column h4")).toHaveLength(12);
       expect(board.find(".wp-block-column h5")).toHaveLength(12);
       expect(board.find(".wp-block-column .detail-btn")).toHaveLength(12);
-      expect(
-        $(".lightweight-accordion").filter((_, element) =>
+      const steering = $(".lightweight-accordion")
+        .filter((_, element) =>
           /คณะกรรมการดำเนินการร่วมมือและประสานงานเกี่ยวกับเทคโนโลยีระบบราง|Steering Committee for Collaboration and Coordination on Rail System Technology/.test(
             $(element).find(".lightweight-accordion-title").first().text(),
           ),
-        ),
-      ).toHaveLength(0);
+        )
+        .first();
+      expect(steering).toHaveLength(1);
+      expect(steering.find("img, h4, h5, .detail-btn")).toHaveLength(0);
+      expect(steering.find(".steering-card-layout-placeholder")).toHaveLength(11);
     }
   });
 

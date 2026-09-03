@@ -564,7 +564,7 @@ function reorderBoardColumns($: cheerio.CheerioAPI): boolean {
   return true;
 }
 
-function removeSteeringCommittee($: cheerio.CheerioAPI): boolean {
+function clearSteeringCommitteeCards($: cheerio.CheerioAPI): boolean {
   const committee = $(".lightweight-accordion")
     .filter((_, element) =>
       /คณะกรรมการดำเนินการร่วมมือและประสานงานเกี่ยวกับเทคโนโลยีระบบราง|Steering Committee for Collaboration and Coordination on Rail System Technology/.test(
@@ -572,11 +572,17 @@ function removeSteeringCommittee($: cheerio.CheerioAPI): boolean {
       ),
     )
     .first();
-  if (!committee.length) {
+  const cards = committee
+    .find(".wp-block-column")
+    .filter((_, element) => Boolean($(element).find("img, h4, h5, .detail-btn").length));
+  if (!cards.length) {
     return false;
   }
 
-  committee.remove();
+  committee.addClass("steering-committee-cards-cleared");
+  cards
+    .empty()
+    .append('<span class="steering-card-layout-placeholder" aria-hidden="true"></span>');
   return true;
 }
 
@@ -903,7 +909,7 @@ export function applyBoardExecutiveOverride(record: WpContentRecord): WpContentR
     }
   }
   const didReorderBoard = reorderBoardColumns($);
-  const didRemoveSteeringCommittee = removeSteeringCommittee($);
+  const didClearSteeringCommitteeCards = clearSteeringCommitteeCards($);
   const didAddAuditCommittee = addAuditCommittee($);
   const didAddPersonnelSubcommittee = addPersonnelSubcommittee($);
   const didAddDirectorEvaluationSubcommittee = addDirectorEvaluationSubcommittee($);
@@ -925,7 +931,7 @@ export function applyBoardExecutiveOverride(record: WpContentRecord): WpContentR
     !didRewriteAdmin &&
     !didRewriteEnglish &&
     !didReorderBoard &&
-    !didRemoveSteeringCommittee &&
+    !didClearSteeringCommitteeCards &&
     !didAddAuditCommittee &&
     !didAddPersonnelSubcommittee &&
     !didAddDirectorEvaluationSubcommittee &&
