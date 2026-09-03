@@ -79,7 +79,7 @@ describe("applyBoardExecutiveOverride", () => {
     expect(applyBoardExecutiveOverride(source)).toBe(source);
   });
 
-  it("clears board card content while preserving the card layout", () => {
+  it("removes the steering committee without changing board cards", () => {
     const updated = applyBoardExecutiveOverride(
       record({
         contentHtml: `
@@ -88,6 +88,9 @@ describe("applyBoardExecutiveOverride", () => {
               <summary class="lightweight-accordion-title">คณะกรรมการสถาบันวิจัยและพัฒนาเทคโนโลยีระบบราง</summary>
               <div class="lightweight-accordion-body"><div class="wp-block-columns"><div class="wp-block-column"><img src="portrait.jpg" /><h4>รศ.ดร. โชติชัย เจริญงาม</h4><h5>ประธานกรรมการ</h5><div class="detail-btn">รายละเอียด</div></div></div></div>
             </details>
+          </div>
+          <div class="lightweight-accordion">
+            <details><summary class="lightweight-accordion-title">คณะกรรมการดำเนินการร่วมมือและประสานงานเกี่ยวกับเทคโนโลยีระบบราง</summary></details>
           </div>`,
       }),
     );
@@ -103,8 +106,16 @@ describe("applyBoardExecutiveOverride", () => {
       .first();
 
     expect(board.find(".wp-block-column")).toHaveLength(1);
-    expect(board.find("img, h4, h5, .detail-btn")).toHaveLength(0);
-    expect(board.find(".board-card-layout-placeholder")).toHaveLength(1);
+    expect(board.find("img, h4, h5, .detail-btn")).toHaveLength(4);
+    expect(
+      $(".lightweight-accordion").filter((_, element) =>
+        $(element)
+          .find("summary")
+          .first()
+          .text()
+          .includes("คณะกรรมการดำเนินการร่วมมือและประสานงานเกี่ยวกับเทคโนโลยีระบบราง"),
+      ),
+    ).toHaveLength(0);
   });
 
   it("adds collapsed committee sections after the board and before steering", () => {
@@ -544,7 +555,7 @@ describe("applyBoardExecutiveOverride", () => {
     expect($('img[src*="ชัยวุฒิ"]').length).toBe(2);
   });
 
-  it("keeps Thai and English board card layout containers while clearing their content", () => {
+  it("keeps Thai and English board card content and layout containers", () => {
     const thaiNames = [
       "รศ.ดร. โชติชัย เจริญงาม",
       "ถาวร ชลัษเฐียร",
@@ -648,12 +659,9 @@ describe("applyBoardExecutiveOverride", () => {
       const $ = cheerio.load(contentHtml, null, false);
       expect($(".lightweight-accordion .wp-block-columns")).toHaveLength(5);
       expect($(".lightweight-accordion .wp-block-column")).toHaveLength(12);
-      expect(
-        $(
-          ".lightweight-accordion .wp-block-column img, .lightweight-accordion .wp-block-column h4, .lightweight-accordion .wp-block-column h5, .lightweight-accordion .wp-block-column .detail-btn",
-        ),
-      ).toHaveLength(0);
-      expect($(".lightweight-accordion .board-card-layout-placeholder")).toHaveLength(12);
+      expect($(".lightweight-accordion .wp-block-column img")).toHaveLength(12);
+      expect($(".lightweight-accordion .wp-block-column h4")).toHaveLength(12);
+      expect($(".lightweight-accordion .wp-block-column h5")).toHaveLength(12);
     }
   });
 });

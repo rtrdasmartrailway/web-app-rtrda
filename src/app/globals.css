@@ -4186,12 +4186,6 @@ body:has(.yutth-lightbox) {
   transform: translateY(-4px);
 }
 
-.content-board-executives .wp-content .board-card-layout-placeholder {
-  display: block;
-  min-height: 365px;
-  width: 100%;
-}
-
 .content-board-executives .wp-content .lightweight-accordion-body .wp-block-image {
   align-items: center;
   background: linear-gradient(145deg, #e5f2ff 0%, #fafdff 72%);

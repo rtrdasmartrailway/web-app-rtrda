@@ -564,24 +564,19 @@ function reorderBoardColumns($: cheerio.CheerioAPI): boolean {
   return true;
 }
 
-function clearBoardCardContent($: cheerio.CheerioAPI): boolean {
-  const board = $(".lightweight-accordion")
+function removeSteeringCommittee($: cheerio.CheerioAPI): boolean {
+  const committee = $(".lightweight-accordion")
     .filter((_, element) =>
-      /คณะกรรมการสถาบันวิจัยและพัฒนาเทคโนโลยีระบบราง|Board of Directors/.test(
+      /คณะกรรมการดำเนินการร่วมมือและประสานงานเกี่ยวกับเทคโนโลยีระบบราง|Steering Committee for Collaboration and Coordination on Rail System Technology/.test(
         $(element).find(".lightweight-accordion-title").first().text(),
       ),
     )
     .first();
-  const cards = board
-    .find(".wp-block-column")
-    .filter((_, element) => Boolean($(element).find("img, h4, h5, .detail-btn").length));
-  if (!cards.length) {
+  if (!committee.length) {
     return false;
   }
 
-  cards
-    .empty()
-    .append('<span class="board-card-layout-placeholder" aria-hidden="true"></span>');
+  committee.remove();
   return true;
 }
 
@@ -908,7 +903,7 @@ export function applyBoardExecutiveOverride(record: WpContentRecord): WpContentR
     }
   }
   const didReorderBoard = reorderBoardColumns($);
-  const didClearBoardCardContent = clearBoardCardContent($);
+  const didRemoveSteeringCommittee = removeSteeringCommittee($);
   const didAddAuditCommittee = addAuditCommittee($);
   const didAddPersonnelSubcommittee = addPersonnelSubcommittee($);
   const didAddDirectorEvaluationSubcommittee = addDirectorEvaluationSubcommittee($);
@@ -930,7 +925,7 @@ export function applyBoardExecutiveOverride(record: WpContentRecord): WpContentR
     !didRewriteAdmin &&
     !didRewriteEnglish &&
     !didReorderBoard &&
-    !didClearBoardCardContent &&
+    !didRemoveSteeringCommittee &&
     !didAddAuditCommittee &&
     !didAddPersonnelSubcommittee &&
     !didAddDirectorEvaluationSubcommittee &&

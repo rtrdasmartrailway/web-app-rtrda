@@ -33,7 +33,7 @@ async function boardRecord(path = "/เกี่ยวกับ-สทร/คณ
 }
 
 describe("board executive parser", () => {
-  it("keeps empty board cards in the Thai and English layouts", async () => {
+  it("keeps board cards and removes the steering committee in Thai and English", async () => {
     const boardPages = [
       "/เกี่ยวกับ-สทร/คณะกรรมการ-ผู้บริหาร",
       "/en/เกี่ยวกับ-สทร/คณะกรรมการ-ผู้บริหาร",
@@ -49,8 +49,17 @@ describe("board executive parser", () => {
         )
         .first();
 
-      expect(board.find("img, h4, h5, .detail-btn")).toHaveLength(0);
-      expect(board.find(".board-card-layout-placeholder")).toHaveLength(12);
+      expect(board.find(".wp-block-column img")).toHaveLength(12);
+      expect(board.find(".wp-block-column h4")).toHaveLength(12);
+      expect(board.find(".wp-block-column h5")).toHaveLength(12);
+      expect(board.find(".wp-block-column .detail-btn")).toHaveLength(12);
+      expect(
+        $(".lightweight-accordion").filter((_, element) =>
+          /คณะกรรมการดำเนินการร่วมมือและประสานงานเกี่ยวกับเทคโนโลยีระบบราง|Steering Committee for Collaboration and Coordination on Rail System Technology/.test(
+            $(element).find(".lightweight-accordion-title").first().text(),
+          ),
+        ),
+      ).toHaveLength(0);
     }
   });
 
