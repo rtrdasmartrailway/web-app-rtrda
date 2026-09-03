@@ -208,6 +208,33 @@ const RAIL_POLICY_STRATEGY_SUBCOMMITTEE_HTML = `
     </div>
   </details>`;
 
+const VALUE_ASSESSMENT_SUBCOMMITTEE_HTML = `
+  <details class="lightweight-accordion value-assessment-subcommittee">
+    <summary>คณะอนุกรรมการติดตามผลการประเมินความคุ้มค่าสถาบันวิจัยและพัฒนาเทคโนโลยีระบบราง</summary>
+    <div class="lightweight-accordion-body">
+      <table>
+        <thead><tr><th>รายชื่อ</th><th>ตำแหน่ง</th></tr></thead>
+        <tbody>
+          <tr><td>1. นายพิเชฐ คุณาธรรมรักษ์</td><td>ประธานอนุกรรมการ</td></tr>
+          <tr><td>2. นายชาญเชาวน์ ไชยานุกิจ</td><td>อนุกรรมการ</td></tr>
+          <tr><td>3. นายวีรเดช ชีวาพัฒนานุวงศ์</td><td>อนุกรรมการ</td></tr>
+          <tr><td>4. ผู้ว่าการรถไฟแห่งประเทศไทย</td><td>อนุกรรมการ</td></tr>
+          <tr><td>5. ผู้ว่าการการรถไฟฟ้าขนส่งมวลชนแห่งประเทศไทย</td><td>อนุกรรมการ</td></tr>
+          <tr><td>6. ผู้อำนวยการสถาบันวิจัยและพัฒนาเทคโนโลยีระบบราง</td><td>อนุกรรมการและเลขานุการ</td></tr>
+          <tr><td>7. นางสาวอนรรฆิยา ชูคล้าย</td><td>ผู้ช่วยเลขานุการ</td></tr>
+        </tbody>
+      </table>
+      <h3>อำนาจหน้าที่</h3>
+      <ol>
+        <li>ติดตามและตรวจสอบผลการดำเนินงาน ให้เป็นไปตามกรอบและข้อตกลงการประเมินความคุ้มค่าสถาบันวิจัยและพัฒนาเทคโนโลยีระบบราง รวมทั้งตัวชี้วัดและค่าเป้าหมายที่ได้รับความเห็นชอบจากคณะกรรมการพัฒนาและส่งเสริมองค์การมหาชน</li>
+        <li>ให้ข้อเสนอแนะเพื่อปรับปรุงการดำเนินงานของสถาบันฯ เพื่อให้บรรลุตัวชี้วัดและค่าเป้าหมายตามที่กำหนดไว้ในข้อตกลงการประเมินความคุ้มค่าฯ</li>
+        <li>รายงานผลการประเมินความคุ้มค่าต่อคณะกรรมการสถาบันวิจัยและพัฒนาเทคโนโลยีระบบราง</li>
+        <li>แต่งตั้งคณะทำงาน เพื่อช่วยเหลือการปฏิบัติงานที่เกี่ยวข้องได้ตามความเหมาะสม</li>
+        <li>ปฏิบัติงานอื่นใดตามที่กฎหมายกำหนด หรือตามที่คณะกรรมการสถาบันวิจัยและพัฒนาเทคโนโลยีระบบรางมอบหมาย</li>
+      </ol>
+    </div>
+  </details>`;
+
 function compactText(value: string): string {
   return value.replace(/\s+/g, " ").trim();
 }
@@ -783,6 +810,22 @@ function addRailPolicyStrategySubcommittee($: cheerio.CheerioAPI): boolean {
   return true;
 }
 
+function addValueAssessmentSubcommittee($: cheerio.CheerioAPI): boolean {
+  if ($(".lightweight-accordion.value-assessment-subcommittee").length) {
+    return false;
+  }
+
+  const railPolicyStrategySubcommittee = $(
+    ".lightweight-accordion.rail-policy-strategy-subcommittee",
+  );
+  if (!railPolicyStrategySubcommittee.length) {
+    return false;
+  }
+
+  railPolicyStrategySubcommittee.first().after(VALUE_ASSESSMENT_SUBCOMMITTEE_HTML);
+  return true;
+}
+
 export function applyBoardExecutiveOverride(record: WpContentRecord): WpContentRecord {
   if (!isBoardExecutivePath(record)) {
     return record;
@@ -838,6 +881,7 @@ export function applyBoardExecutiveOverride(record: WpContentRecord): WpContentR
   const didAddPersonnelSubcommittee = addPersonnelSubcommittee($);
   const didAddDirectorEvaluationSubcommittee = addDirectorEvaluationSubcommittee($);
   const didAddRailPolicyStrategySubcommittee = addRailPolicyStrategySubcommittee($);
+  const didAddValueAssessmentSubcommittee = addValueAssessmentSubcommittee($);
 
   if (
     !didRewritePichet &&
@@ -857,7 +901,8 @@ export function applyBoardExecutiveOverride(record: WpContentRecord): WpContentR
     !didAddAuditCommittee &&
     !didAddPersonnelSubcommittee &&
     !didAddDirectorEvaluationSubcommittee &&
-    !didAddRailPolicyStrategySubcommittee
+    !didAddRailPolicyStrategySubcommittee &&
+    !didAddValueAssessmentSubcommittee
   ) {
     return record;
   }
