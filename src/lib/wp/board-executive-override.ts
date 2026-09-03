@@ -120,6 +120,38 @@ const AUDIT_COMMITTEE_HTML = `
     </div>
   </details>`;
 
+const PERSONNEL_SUBCOMMITTEE_HTML = `
+  <details class="lightweight-accordion personnel-subcommittee">
+    <summary>คณะอนุกรรมการบริหารงานบุคคล</summary>
+    <div class="lightweight-accordion-body">
+      <table>
+        <thead><tr><th>รายชื่อ</th><th>ตำแหน่ง</th></tr></thead>
+        <tbody>
+          <tr><td>นายถาวร ชลัษเฐียร</td><td>ที่ปรึกษา</td></tr>
+          <tr><td>1. นายดรุณ แสงฉาย</td><td>ประธานอนุกรรมการ</td></tr>
+          <tr><td>2. ผู้อำนวยการสถาบันวิจัยและพัฒนาเทคโนโลยีระบบราง</td><td>รองประธานอนุกรรมการ</td></tr>
+          <tr><td>3. นายชาญเชาวน์ ไชยานุกิจ</td><td>อนุกรรมการ</td></tr>
+          <tr><td>4. นายนาวา จันทนสุรคน</td><td>อนุกรรมการ</td></tr>
+          <tr><td>5. นางสาวสุนทรี สุภาสงวน</td><td>อนุกรรมการ</td></tr>
+          <tr><td>6. นายสันติ จันทโชติ</td><td>อนุกรรมการ</td></tr>
+          <tr><td>7. ผู้แทนเจ้าหน้าที่และลูกจ้างของสถาบันที่มาจากการเลือกตั้ง</td><td>อนุกรรมการ</td></tr>
+          <tr><td>8. ผู้จัดการกลุ่มบริหารภายใน</td><td>อนุกรรมการและเลขานุการ</td></tr>
+        </tbody>
+      </table>
+      <h3>อำนาจหน้าที่</h3>
+      <ol>
+        <li>ให้คำปรึกษาและข้อเสนอแนะเกี่ยวกับการบริหารงานบุคคล เพื่อประกอบการออกระเบียบ ประกาศ หลักเกณฑ์ เงื่อนไข หรือวิธีการที่เกี่ยวกับการบริหารงานบุคคลของสถาบันฯ ตลอดจนสวัสดิการสำหรับเจ้าหน้าที่และลูกจ้างของสถาบัน ก่อนนำเสนอคณะกรรมการสถาบันวิจัยและพัฒนาเทคโนโลยีระบบรางเพื่อพิจารณาให้ความเห็นชอบ</li>
+        <li>ให้คำปรึกษาและข้อเสนอแนะเกี่ยวกับการจัดแบ่งส่วนงานของสถาบันฯ และขอบเขตหน้าที่ของส่วนงานดังกล่าว ก่อนนำเสนอคณะกรรมการสถาบันวิจัยและพัฒนาเทคโนโลยีระบบรางเพื่อพิจารณาให้ความเห็นชอบ</li>
+        <li>พิจารณาและให้ข้อเสนอแนะต่อแผนการบริหารงานบุคคลและแผนการพัฒนาบุคลากรของสถาบันฯ ก่อนนำเสนอคณะกรรมการสถาบันวิจัยและพัฒนาเทคโนโลยีระบบรางเพื่อพิจารณาให้ความเห็นชอบ</li>
+        <li>กำกับ ติดตาม ให้ข้อเสนอแนะต่อสถาบันฯ ในการดำเนินงานให้เป็นไปตามแผนการบริหารงานบุคคล แผนการพัฒนาบุคลากรและแผนการพัฒนาองค์กร ที่ได้รับความเห็นชอบจากคณะกรรมการสถาบันวิจัยและพัฒนาเทคโนโลยีระบบราง</li>
+        <li>พิจารณาและกำหนดหลักเกณฑ์การรับรองคุณวุฒิของผู้ได้รับปริญญา หรือประกาศนียบัตรวิชาชีพ หรือหนังสือรับรองคุณวุฒิอื่น ๆ เพื่อประโยชน์ในการบรรจุ แต่งตั้ง และกำหนดกรอบบัญชีอัตราเงินเดือนที่ได้รับ</li>
+        <li>แต่งตั้งคณะทำงานเพื่อดำเนินการตามอำนาจหน้าที่ของคณะอนุกรรมการบริหารงานบุคคลตามที่ได้รับมอบหมาย</li>
+        <li>รายงานผลการดำเนินงานตามนโยบาย แผนการบริหารงานบุคคล แผนการพัฒนาบุคลากรและแผนการพัฒนาองค์กร ที่ได้รับความเห็นชอบจากคณะกรรมการสถาบันวิจัยและพัฒนาเทคโนโลยีระบบราง</li>
+        <li>ปฏิบัติหน้าที่อื่นตามที่กฎหมายกำหนด หรือตามที่คณะกรรมการสถาบันวิจัยและพัฒนาเทคโนโลยีระบบรางมอบหมาย</li>
+      </ol>
+    </div>
+  </details>`;
+
 function compactText(value: string): string {
   return value.replace(/\s+/g, " ").trim();
 }
@@ -651,6 +683,20 @@ function addAuditCommittee($: cheerio.CheerioAPI): boolean {
   return true;
 }
 
+function addPersonnelSubcommittee($: cheerio.CheerioAPI): boolean {
+  if ($(".lightweight-accordion.personnel-subcommittee").length) {
+    return false;
+  }
+
+  const auditCommittee = $(".lightweight-accordion.audit-committee");
+  if (!auditCommittee.length) {
+    return false;
+  }
+
+  auditCommittee.first().after(PERSONNEL_SUBCOMMITTEE_HTML);
+  return true;
+}
+
 export function applyBoardExecutiveOverride(record: WpContentRecord): WpContentRecord {
   if (!isBoardExecutivePath(record)) {
     return record;
@@ -703,6 +749,7 @@ export function applyBoardExecutiveOverride(record: WpContentRecord): WpContentR
   }
   const didReorderBoard = reorderBoardColumns($);
   const didAddAuditCommittee = addAuditCommittee($);
+  const didAddPersonnelSubcommittee = addPersonnelSubcommittee($);
 
   if (
     !didRewritePichet &&
@@ -719,7 +766,8 @@ export function applyBoardExecutiveOverride(record: WpContentRecord): WpContentR
     !didRewriteAdmin &&
     !didRewriteEnglish &&
     !didReorderBoard &&
-    !didAddAuditCommittee
+    !didAddAuditCommittee &&
+    !didAddPersonnelSubcommittee
   ) {
     return record;
   }

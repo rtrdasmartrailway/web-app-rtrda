@@ -79,7 +79,7 @@ describe("applyBoardExecutiveOverride", () => {
     expect(applyBoardExecutiveOverride(source)).toBe(source);
   });
 
-  it("adds the collapsed Thai audit committee after the board and before steering", () => {
+  it("adds collapsed committee sections after the board and before steering", () => {
     const updated = applyBoardExecutiveOverride(
       record({
         contentHtml: `
@@ -96,6 +96,7 @@ describe("applyBoardExecutiveOverride", () => {
     expect(summaries).toEqual([
       "คณะกรรมการสถาบันวิจัยและพัฒนาเทคโนโลยีระบบราง",
       "คณะกรรมการตรวจสอบ",
+      "คณะอนุกรรมการบริหารงานบุคคล",
       "คณะกรรมการกำกับทิศทาง",
     ]);
     expect(audit.attr("open")).toBeUndefined();
@@ -103,6 +104,14 @@ describe("applyBoardExecutiveOverride", () => {
     expect(audit.text()).toContain("นายพัฒนพงษ์ พงศ์ศุภสมิทธิ์");
     expect(audit.text()).toContain("หัวหน้าหน่วยงานตรวจสอบภายใน");
     expect(audit.find("ol li")).toHaveLength(15);
+    const personnel = $(".personnel-subcommittee");
+    expect(personnel.attr("open")).toBeUndefined();
+    expect(personnel.find("tbody tr")).toHaveLength(9);
+    expect(personnel.find("tbody tr").first().find("td").first().text()).toBe(
+      "นายถาวร ชลัษเฐียร",
+    );
+    expect(personnel.text()).toContain("8. ผู้จัดการกลุ่มบริหารภายใน");
+    expect(personnel.find("ol li")).toHaveLength(8);
   });
 
   it("adds the same Thai audit committee to the English page", () => {
