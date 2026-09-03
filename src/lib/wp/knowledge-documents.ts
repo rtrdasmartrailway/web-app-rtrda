@@ -16,6 +16,7 @@ export interface KnowledgeDocument {
 export interface KnowledgeDocumentGroup {
   title: string;
   open: boolean;
+  compact?: boolean;
   documents: KnowledgeDocument[];
 }
 

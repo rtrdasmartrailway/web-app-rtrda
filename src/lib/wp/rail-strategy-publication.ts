@@ -14,12 +14,14 @@ export const railStrategyPublicationGroups: KnowledgeDocumentGroup[] = [
   {
     title: railStrategyPublicationTitle,
     open: true,
+    compact: true,
     documents: [
       {
         title: railStrategyPublicationTitle,
         description: "",
-        coverImage: null,
-        coverAlt: "",
+        coverImage:
+          "/wp-content/uploads/pdf-covers/rail-technology-strategy-2571-2575/cover.png",
+        coverAlt: "หน้าปกเอกสารยุทธศาสตร์ด้านเทคโนโลยีระบบรางของประเทศ",
         previewHref: RAIL_STRATEGY_PREVIEW_PATH,
         downloadHref: RAIL_STRATEGY_PREVIEW_PATH,
         hasUsableTarget: true,

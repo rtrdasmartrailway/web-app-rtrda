@@ -145,7 +145,11 @@ export function KnowledgeDocuments({
             <summary className={styles.summary}>
               <span>{group.title}</span>
             </summary>
-            <div className={styles.grid}>
+            <div
+              className={
+                group.compact ? `${styles.grid} ${styles.compactGrid}` : styles.grid
+              }
+            >
               {group.documents.map((document, index) => (
                 <KnowledgeDocumentCard
                   key={`${group.title}-${document.title}-${index}`}
