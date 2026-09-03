@@ -230,6 +230,9 @@ export function PdfReader({
           return pageElement;
         });
 
+        // The first page must not depend on an observer callback to make the reader usable.
+        void renderPage(1, pageElements[0]);
+
         if ("IntersectionObserver" in window) {
           observer = new IntersectionObserver(
             (entries) => {
@@ -242,10 +245,10 @@ export function PdfReader({
             },
             { root: pages, rootMargin: "600px" },
           );
-          for (const pageElement of pageElements) observer.observe(pageElement);
+          for (const pageElement of pageElements.slice(1)) observer.observe(pageElement);
         } else {
-          for (const [index, pageElement] of pageElements.slice(0, 3).entries()) {
-            void renderPage(index + 1, pageElement);
+          for (const [index, pageElement] of pageElements.slice(1, 3).entries()) {
+            void renderPage(index + 2, pageElement);
           }
         }
       } catch {

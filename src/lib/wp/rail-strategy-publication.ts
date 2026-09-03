@@ -20,7 +20,7 @@ export const railStrategyPublicationGroups: KnowledgeDocumentGroup[] = [
         title: railStrategyPublicationTitle,
         description: "",
         coverImage:
-          "/wp-content/uploads/pdf-covers/rail-technology-strategy-2571-2575/cover.png",
+          "/wp-content/uploads/pdf-covers/rail-technology-strategy-2571-2575/cover-20260903.png",
         coverAlt: "หน้าปกเอกสารยุทธศาสตร์ด้านเทคโนโลยีระบบรางของประเทศ",
         previewHref: RAIL_STRATEGY_PREVIEW_PATH,
         downloadHref: RAIL_STRATEGY_PREVIEW_PATH,
