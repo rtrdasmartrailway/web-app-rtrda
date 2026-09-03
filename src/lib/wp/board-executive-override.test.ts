@@ -102,13 +102,17 @@ describe("applyBoardExecutiveOverride", () => {
       "คณะอนุกรรมการติดตามผลการประเมินความคุ้มค่าสถาบันวิจัยและพัฒนาเทคโนโลยีระบบราง",
       "คณะกรรมการกำกับทิศทาง",
     ]);
-    expect(audit.attr("open")).toBeUndefined();
+    expect(audit.find("details").attr("open")).toBeUndefined();
+    expect(audit.find("summary").attr("class")).toContain("lightweight-accordion-title");
     expect(audit.find("tbody tr")).toHaveLength(4);
     expect(audit.text()).toContain("นายพัฒนพงษ์ พงศ์ศุภสมิทธิ์");
     expect(audit.text()).toContain("หัวหน้าหน่วยงานตรวจสอบภายใน");
     expect(audit.find("ol li")).toHaveLength(15);
     const personnel = $(".personnel-subcommittee");
-    expect(personnel.attr("open")).toBeUndefined();
+    expect(personnel.find("details").attr("open")).toBeUndefined();
+    expect(personnel.find("summary").attr("class")).toContain(
+      "lightweight-accordion-title",
+    );
     expect(personnel.find("tbody tr")).toHaveLength(9);
     expect(personnel.find("tbody tr").first().find("td").first().text()).toBe(
       "นายถาวร ชลัษเฐียร",
@@ -116,13 +120,19 @@ describe("applyBoardExecutiveOverride", () => {
     expect(personnel.text()).toContain("8. ผู้จัดการกลุ่มบริหารภายใน");
     expect(personnel.find("ol li")).toHaveLength(8);
     const directorEvaluation = $(".director-evaluation-subcommittee");
-    expect(directorEvaluation.attr("open")).toBeUndefined();
+    expect(directorEvaluation.find("details").attr("open")).toBeUndefined();
+    expect(directorEvaluation.find("summary").attr("class")).toContain(
+      "lightweight-accordion-title",
+    );
     expect(directorEvaluation.find("tbody tr")).toHaveLength(5);
     expect(directorEvaluation.text()).toContain("1. นายพิศิษฐ์ แสง-ชูโต");
     expect(directorEvaluation.text()).toContain("5. นายณัฎฐ์ อนุกูล");
     expect(directorEvaluation.find("ol li")).toHaveLength(5);
     const railPolicyStrategy = $(".rail-policy-strategy-subcommittee");
-    expect(railPolicyStrategy.attr("open")).toBeUndefined();
+    expect(railPolicyStrategy.find("details").attr("open")).toBeUndefined();
+    expect(railPolicyStrategy.find("summary").attr("class")).toContain(
+      "lightweight-accordion-title",
+    );
     expect(railPolicyStrategy.find("tbody tr")).toHaveLength(10);
     expect(railPolicyStrategy.text()).toContain("1. นายถาวร ชลัษเฐียร");
     expect(railPolicyStrategy.text()).toContain(
@@ -130,7 +140,10 @@ describe("applyBoardExecutiveOverride", () => {
     );
     expect(railPolicyStrategy.find("ol li")).toHaveLength(6);
     const valueAssessment = $(".value-assessment-subcommittee");
-    expect(valueAssessment.attr("open")).toBeUndefined();
+    expect(valueAssessment.find("details").attr("open")).toBeUndefined();
+    expect(valueAssessment.find("summary").attr("class")).toContain(
+      "lightweight-accordion-title",
+    );
     expect(valueAssessment.find("tbody tr")).toHaveLength(7);
     expect(valueAssessment.text()).toContain("1. นายพิเชฐ คุณาธรรมรักษ์");
     expect(valueAssessment.text()).toContain("7. นางสาวอนรรฆิยา ชูคล้าย");

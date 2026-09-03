@@ -87,8 +87,9 @@ const BOARD_CARD_ORDER = new Map([
 ]);
 
 const AUDIT_COMMITTEE_HTML = `
-  <details class="lightweight-accordion audit-committee">
-    <summary>คณะกรรมการตรวจสอบ</summary>
+  <div class="lightweight-accordion audit-committee">
+    <details>
+      <summary class="lightweight-accordion-title"><h1><strong>คณะกรรมการตรวจสอบ</strong></h1></summary>
     <div class="lightweight-accordion-body">
       <table>
         <thead><tr><th>รายชื่อ</th><th>ตำแหน่ง</th></tr></thead>
@@ -118,11 +119,13 @@ const AUDIT_COMMITTEE_HTML = `
         <li>มีอำนาจเสนอแนะหรือให้ข้อเสนอแนะกับผู้บริหาร เจ้าหน้าที่ หรือพนักงานของสถาบันวิจัยและพัฒนาเทคโนโลยีระบบราง</li>
       </ol>
     </div>
-  </details>`;
+    </details>
+  </div>`;
 
 const PERSONNEL_SUBCOMMITTEE_HTML = `
-  <details class="lightweight-accordion personnel-subcommittee">
-    <summary>คณะอนุกรรมการบริหารงานบุคคล</summary>
+  <div class="lightweight-accordion personnel-subcommittee">
+    <details>
+      <summary class="lightweight-accordion-title"><h1><strong>คณะอนุกรรมการบริหารงานบุคคล</strong></h1></summary>
     <div class="lightweight-accordion-body">
       <table>
         <thead><tr><th>รายชื่อ</th><th>ตำแหน่ง</th></tr></thead>
@@ -150,11 +153,13 @@ const PERSONNEL_SUBCOMMITTEE_HTML = `
         <li>ปฏิบัติหน้าที่อื่นตามที่กฎหมายกำหนด หรือตามที่คณะกรรมการสถาบันวิจัยและพัฒนาเทคโนโลยีระบบรางมอบหมาย</li>
       </ol>
     </div>
-  </details>`;
+    </details>
+  </div>`;
 
 const DIRECTOR_EVALUATION_SUBCOMMITTEE_HTML = `
-  <details class="lightweight-accordion director-evaluation-subcommittee">
-    <summary>คณะอนุกรรมการประเมินผลการปฏิบัติงานของผู้อำนวยการ</summary>
+  <div class="lightweight-accordion director-evaluation-subcommittee">
+    <details>
+      <summary class="lightweight-accordion-title"><h1><strong>คณะอนุกรรมการประเมินผลการปฏิบัติงานของผู้อำนวยการ</strong></h1></summary>
     <div class="lightweight-accordion-body">
       <table>
         <thead><tr><th>รายชื่อ</th><th>ตำแหน่ง</th></tr></thead>
@@ -175,11 +180,13 @@ const DIRECTOR_EVALUATION_SUBCOMMITTEE_HTML = `
         <li>ปฏิบัติงานอื่นตามที่กฎหมายกำหนด หรือตามที่คณะกรรมการสถาบันวิจัยและพัฒนาเทคโนโลยีระบบรางมอบหมาย</li>
       </ol>
     </div>
-  </details>`;
+    </details>
+  </div>`;
 
 const RAIL_POLICY_STRATEGY_SUBCOMMITTEE_HTML = `
-  <details class="lightweight-accordion rail-policy-strategy-subcommittee">
-    <summary>คณะอนุกรรมการพิจารณากลั่นกรองนโยบายและยุทธศาสตร์ด้านเทคโนโลยีระบบราง</summary>
+  <div class="lightweight-accordion rail-policy-strategy-subcommittee">
+    <details>
+      <summary class="lightweight-accordion-title"><h1><strong>คณะอนุกรรมการพิจารณากลั่นกรองนโยบายและยุทธศาสตร์ด้านเทคโนโลยีระบบราง</strong></h1></summary>
     <div class="lightweight-accordion-body">
       <table>
         <thead><tr><th>รายชื่อ</th><th>ตำแหน่ง</th></tr></thead>
@@ -206,11 +213,13 @@ const RAIL_POLICY_STRATEGY_SUBCOMMITTEE_HTML = `
         <li>ปฏิบัติงานอื่นใดตามที่กฎหมายกำหนด หรือตามที่คณะกรรมการสถาบันวิจัยและพัฒนาเทคโนโลยีระบบรางมอบหมาย</li>
       </ol>
     </div>
-  </details>`;
+    </details>
+  </div>`;
 
 const VALUE_ASSESSMENT_SUBCOMMITTEE_HTML = `
-  <details class="lightweight-accordion value-assessment-subcommittee">
-    <summary>คณะอนุกรรมการติดตามผลการประเมินความคุ้มค่าสถาบันวิจัยและพัฒนาเทคโนโลยีระบบราง</summary>
+  <div class="lightweight-accordion value-assessment-subcommittee">
+    <details>
+      <summary class="lightweight-accordion-title"><h1><strong>คณะอนุกรรมการติดตามผลการประเมินความคุ้มค่าสถาบันวิจัยและพัฒนาเทคโนโลยีระบบราง</strong></h1></summary>
     <div class="lightweight-accordion-body">
       <table>
         <thead><tr><th>รายชื่อ</th><th>ตำแหน่ง</th></tr></thead>
@@ -233,7 +242,8 @@ const VALUE_ASSESSMENT_SUBCOMMITTEE_HTML = `
         <li>ปฏิบัติงานอื่นใดตามที่กฎหมายกำหนด หรือตามที่คณะกรรมการสถาบันวิจัยและพัฒนาเทคโนโลยีระบบรางมอบหมาย</li>
       </ol>
     </div>
-  </details>`;
+    </details>
+  </div>`;
 
 function compactText(value: string): string {
   return value.replace(/\s+/g, " ").trim();
