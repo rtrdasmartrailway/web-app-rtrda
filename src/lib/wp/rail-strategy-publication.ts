@@ -29,6 +29,11 @@ export const railStrategyPublicationGroups: KnowledgeDocumentGroup[] = [
       },
     ],
   },
+  {
+    title: "อินโฟกราฟฟิค",
+    open: false,
+    documents: [],
+  },
 ];
 
 export function isRailStrategyPublicationPath(path: string): boolean {
