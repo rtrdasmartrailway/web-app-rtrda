@@ -57,6 +57,11 @@
   padding: 28px;
 }
 
+.compactGrid {
+  grid-template-columns: minmax(220px, 240px);
+  justify-content: start;
+}
+
 .card {
   align-items: stretch;
   background: #fff;
@@ -183,6 +188,10 @@
   .grid {
     grid-template-columns: 1fr;
     padding: 18px;
+  }
+
+  .compactGrid {
+    grid-template-columns: 1fr;
   }
 
   .card {

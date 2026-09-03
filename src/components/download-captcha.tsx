@@ -49,8 +49,13 @@ export function DownloadCaptcha({ siteKey }: { siteKey: string }) {
     const link = window.document.createElement("a");
     link.href = href;
     link.download = "rail-technology-strategy-2571-2575.pdf";
+    window.document.body.append(link);
     link.click();
-    URL.revokeObjectURL(href);
+    // Some browsers begin reading the Blob after click() returns.
+    window.setTimeout(() => {
+      link.remove();
+      URL.revokeObjectURL(href);
+    }, 60_000);
   }
 
   function completePreview(previewUrl: string, document: string) {

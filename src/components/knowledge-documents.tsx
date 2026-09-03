@@ -33,11 +33,13 @@ function DocumentAction({
   children,
   disabledLabel,
   download,
+  protectedDocumentId,
 }: {
   href: string | null;
   children: string;
   disabledLabel: string;
   download?: boolean;
+  protectedDocumentId?: string;
 }) {
   if (!href) {
     return (
@@ -50,8 +52,10 @@ function DocumentAction({
   return (
     <a
       className={download ? `${styles.action} ${styles.download}` : styles.action}
-      data-pdf-reader-ignore={download ? "true" : undefined}
-      download={download ? true : undefined}
+      data-pdf-reader-ignore={download || protectedDocumentId ? "true" : undefined}
+      data-protected-download={download ? protectedDocumentId : undefined}
+      data-protected-preview={download ? undefined : protectedDocumentId}
+      download={download && !protectedDocumentId ? true : undefined}
       href={href}
       rel={isImagePreview(href) ? "noreferrer" : undefined}
       target={isImagePreview(href) ? "_blank" : undefined}
@@ -106,13 +110,18 @@ function KnowledgeDocumentCard({
       </div>
 
       <div className={styles.actions}>
-        <DocumentAction href={document.previewHref} disabledLabel={text.noFile}>
+        <DocumentAction
+          href={document.previewHref}
+          disabledLabel={text.noFile}
+          protectedDocumentId={document.protectedDocumentId}
+        >
           {text.preview}
         </DocumentAction>
         <DocumentAction
           href={document.downloadHref}
           disabledLabel={document.hasUsableTarget ? text.noDownload : text.noFile}
           download
+          protectedDocumentId={document.protectedDocumentId}
         >
           {text.download}
         </DocumentAction>
@@ -136,15 +145,21 @@ export function KnowledgeDocuments({
             <summary className={styles.summary}>
               <span>{group.title}</span>
             </summary>
-            <div className={styles.grid}>
-              {group.documents.map((document, index) => (
-                <KnowledgeDocumentCard
-                  key={`${group.title}-${document.title}-${index}`}
-                  document={document}
-                  language={language}
-                />
-              ))}
-            </div>
+            {group.documents.length > 0 ? (
+              <div
+                className={
+                  group.compact ? `${styles.grid} ${styles.compactGrid}` : styles.grid
+                }
+              >
+                {group.documents.map((document, index) => (
+                  <KnowledgeDocumentCard
+                    key={`${group.title}-${document.title}-${index}`}
+                    document={document}
+                    language={language}
+                  />
+                ))}
+              </div>
+            ) : null}
           </details>
         </section>
       ))}
