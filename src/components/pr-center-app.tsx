@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Image from "next/image";
 import styles from "./pr-center-app.module.css";
 
 type Page =
@@ -101,13 +102,17 @@ function Metric({
   value,
   label: metricLabel,
   trend,
+  tone,
 }: {
   value: string;
   label: string;
   trend: string;
+  tone: "blue" | "green" | "purple" | "gold";
 }) {
   return (
-    <article className={styles.metric}>
+    <article
+      className={`${styles.metric} ${styles[`metric${tone[0].toUpperCase()}${tone.slice(1)}`]}`}
+    >
       <p>{metricLabel}</p>
       <strong>{value}</strong>
       <span>{trend}</span>
@@ -137,7 +142,15 @@ export function PrCenterApp() {
         aria-label="PR Center navigation"
       >
         <div className={styles.brand}>
-          <span className={styles.brandMark}>R</span>
+          <span className={styles.brandMark}>
+            <Image
+              src="/wp-content/uploads/2023/02/cropped-Logo_RTRDA-300x300.png"
+              alt="RTRDA"
+              width={46}
+              height={46}
+              priority
+            />
+          </span>
           <span>
             <b>RTRDA</b>
             <small>PR CENTER</small>
@@ -157,9 +170,9 @@ export function PrCenterApp() {
           ))}
         </nav>
         <div className={styles.sidebarFooter}>
-          V25.1 UI prototype
+          <b>Prototype workspace</b>
           <br />
-          Internal test environment
+          V25.1 UI only
         </div>
       </aside>
 
@@ -172,17 +185,32 @@ export function PrCenterApp() {
           >
             Menu
           </button>
+          <div className={styles.topTitle}>
+            <Image
+              src="/wp-content/uploads/2023/02/cropped-Logo_RTRDA-300x300.png"
+              alt=""
+              width={38}
+              height={38}
+            />
+            <div>
+              <h2>RTRDA PR Center</h2>
+              <p>Corporate communications workspace</p>
+            </div>
+          </div>
           <label className={styles.search}>
             <span>Search</span>
             <input placeholder={t.search} />
           </label>
           <div className={styles.topActions}>
+            <button className={styles.topRequest} onClick={() => setRequestOpen(true)}>
+              + {t.newRequest}
+            </button>
             <button
               className={styles.bell}
               onClick={() => go("notifications")}
               aria-label="Open notifications"
             >
-              3
+              <span>3</span>
             </button>
             <select
               value={language}
@@ -202,7 +230,8 @@ export function PrCenterApp() {
                 )
               }
             >
-              PR
+              <span>PR</span>
+              <i>PR Lead</i>
             </button>
           </div>
         </header>
@@ -280,20 +309,55 @@ function Dashboard({
   return (
     <>
       <section className={styles.hero}>
-        <div>
+        <div className={styles.heroCopy}>
           <p>{t.role}: PR Lead</p>
           <h1>{t.greeting}</h1>
           <span>{t.subheading}</span>
+          <div className={styles.heroChips}>
+            <b>September 2569</b>
+            <b>28 published items</b>
+            <b>6 approvals pending</b>
+          </div>
         </div>
-        <button className={styles.primary} onClick={onOpenRequest}>
-          + {t.newRequest}
-        </button>
+        <div className={styles.heroActions}>
+          <button className={styles.heroSecondary}>View calendar</button>
+          <button className={styles.primary} onClick={onOpenRequest}>
+            + {t.newRequest}
+          </button>
+        </div>
       </section>
       <section className={styles.metrics}>
-        <Metric value="28" label={t.published} trend="+12% from last month" />
-        <Metric value="186.4K" label={t.reach} trend="+18.6% from last month" />
-        <Metric value="14.2K" label={t.engagement} trend="7.6% engagement rate" />
-        <Metric value="6" label={t.pending} trend="Review within 2 days" />
+        <Metric value="28" label={t.published} trend="+12% from last month" tone="blue" />
+        <Metric
+          value="186.4K"
+          label={t.reach}
+          trend="+18.6% from last month"
+          tone="green"
+        />
+        <Metric
+          value="14.2K"
+          label={t.engagement}
+          trend="7.6% engagement rate"
+          tone="purple"
+        />
+        <Metric value="6" label={t.pending} trend="Review within 2 days" tone="gold" />
+      </section>
+      <section className={styles.workflowStrip} aria-label="Workflow health">
+        {[
+          ["Planning", "4", styles.workflowPlan],
+          ["Waiting for information", "3", styles.workflowWait],
+          ["In production", "9", styles.workflowDoing],
+          ["Awaiting approval", "6", styles.workflowApproval],
+        ].map(([name, count, className]) => (
+          <button
+            className={`${styles.workflowCell} ${className}`}
+            key={name}
+            onClick={() => onNavigate("operations")}
+          >
+            <span>{name}</span>
+            <b>{count}</b>
+          </button>
+        ))}
       </section>
       <section className={styles.dashboardGrid}>
         <article className={`${styles.card} ${styles.wideCard}`}>
