@@ -79,7 +79,7 @@ describe("applyBoardExecutiveOverride", () => {
     expect(applyBoardExecutiveOverride(source)).toBe(source);
   });
 
-  it("clears steering committee cards without changing board cards", () => {
+  it("removes the steering committee card grid without changing board cards", () => {
     const updated = applyBoardExecutiveOverride(
       record({
         contentHtml: `
@@ -90,7 +90,7 @@ describe("applyBoardExecutiveOverride", () => {
             </details>
           </div>
           <div class="lightweight-accordion">
-            <details><summary class="lightweight-accordion-title">คณะกรรมการดำเนินการร่วมมือและประสานงานเกี่ยวกับเทคโนโลยีระบบราง</summary><div class="wp-block-column"><img src="steering.jpg" /><h4>ดร. พิชิต อัคราทิตย์</h4><h5>ประธานกรรมการ</h5><div class="detail-btn">รายละเอียด</div></div></details>
+            <details><summary class="lightweight-accordion-title">คณะกรรมการดำเนินการร่วมมือและประสานงานเกี่ยวกับเทคโนโลยีระบบราง</summary><div class="wp-block-columns"><div class="wp-block-column"><img src="steering.jpg" /><h4>ดร. พิชิต อัคราทิตย์</h4><h5>ประธานกรรมการ</h5><div class="detail-btn">รายละเอียด</div></div></div></details>
           </div>`,
       }),
     );
@@ -118,7 +118,7 @@ describe("applyBoardExecutiveOverride", () => {
       .first();
     expect(steering).toHaveLength(1);
     expect(steering.find("img, h4, h5, .detail-btn")).toHaveLength(0);
-    expect(steering.find(".steering-card-layout-placeholder")).toHaveLength(1);
+    expect(steering.find(".wp-block-columns, .wp-block-column")).toHaveLength(0);
   });
 
   it("groups committee tables under one collapsed subcommittees accordion", () => {

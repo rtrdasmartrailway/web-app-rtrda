@@ -564,7 +564,7 @@ function reorderBoardColumns($: cheerio.CheerioAPI): boolean {
   return true;
 }
 
-function clearSteeringCommitteeCards($: cheerio.CheerioAPI): boolean {
+function removeSteeringCommitteeCardGrid($: cheerio.CheerioAPI): boolean {
   const committee = $(".lightweight-accordion")
     .filter((_, element) =>
       /คณะกรรมการดำเนินการร่วมมือและประสานงานเกี่ยวกับเทคโนโลยีระบบราง|Steering Committee for Collaboration and Coordination on Rail System Technology/.test(
@@ -572,17 +572,13 @@ function clearSteeringCommitteeCards($: cheerio.CheerioAPI): boolean {
       ),
     )
     .first();
-  const cards = committee
-    .find(".wp-block-column")
-    .filter((_, element) => Boolean($(element).find("img, h4, h5, .detail-btn").length));
-  if (!cards.length) {
+  const grids = committee.find(".wp-block-columns");
+  if (!grids.length) {
     return false;
   }
 
-  committee.addClass("steering-committee-cards-cleared");
-  cards
-    .empty()
-    .append('<span class="steering-card-layout-placeholder" aria-hidden="true"></span>');
+  grids.remove();
+  committee.find(".wp-block-spacer, p:empty").remove();
   return true;
 }
 
@@ -938,7 +934,7 @@ export function applyBoardExecutiveOverride(record: WpContentRecord): WpContentR
     }
   }
   const didReorderBoard = reorderBoardColumns($);
-  const didClearSteeringCommitteeCards = clearSteeringCommitteeCards($);
+  const didRemoveSteeringCommitteeCardGrid = removeSteeringCommitteeCardGrid($);
   const didAddAuditCommittee = addAuditCommittee($);
   const didAddPersonnelSubcommittee = addPersonnelSubcommittee($);
   const didAddDirectorEvaluationSubcommittee = addDirectorEvaluationSubcommittee($);
@@ -961,7 +957,7 @@ export function applyBoardExecutiveOverride(record: WpContentRecord): WpContentR
     !didRewriteAdmin &&
     !didRewriteEnglish &&
     !didReorderBoard &&
-    !didClearSteeringCommitteeCards &&
+    !didRemoveSteeringCommitteeCardGrid &&
     !didAddAuditCommittee &&
     !didAddPersonnelSubcommittee &&
     !didAddDirectorEvaluationSubcommittee &&

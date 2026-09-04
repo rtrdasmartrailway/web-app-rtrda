@@ -33,7 +33,7 @@ async function boardRecord(path = "/เกี่ยวกับ-สทร/คณ
 }
 
 describe("board executive parser", () => {
-  it("keeps board cards and clears steering committee cards in Thai and English", async () => {
+  it("keeps board cards and removes the steering committee card grid in Thai and English", async () => {
     const boardPages = [
       "/เกี่ยวกับ-สทร/คณะกรรมการ-ผู้บริหาร",
       "/en/เกี่ยวกับ-สทร/คณะกรรมการ-ผู้บริหาร",
@@ -61,8 +61,7 @@ describe("board executive parser", () => {
         )
         .first();
       expect(steering).toHaveLength(1);
-      expect(steering.find("img, h4, h5, .detail-btn")).toHaveLength(0);
-      expect(steering.find(".steering-card-layout-placeholder")).toHaveLength(11);
+      expect(steering.find(".wp-block-columns, .wp-block-column")).toHaveLength(0);
     }
   });
 
