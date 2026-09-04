@@ -4111,10 +4111,14 @@ body:has(.yutth-lightbox) {
   filter: brightness(1.08);
 }
 
+.content-board-executives
+  .wp-content
+  .lightweight-accordion
+  summary.lightweight-accordion-title,
 .content-board-executives .wp-content .lightweight-accordion summary h1,
 .content-board-executives .wp-content .lightweight-accordion summary strong {
   color: inherit !important;
-  font-size: clamp(18px, 1.5vw, 23px);
+  font-size: calc(19px * var(--reader-scale));
   line-height: 1.35;
 }
 
@@ -4196,7 +4200,7 @@ body:has(.yutth-lightbox) {
 
 .content-board-executives .wp-content .subcommittee-section .subcommittee-title {
   background: var(--navy-700);
-  font-size: clamp(16px, 1.2vw, 19px);
+  font-size: calc(19px * var(--reader-scale));
   padding: 15px 18px;
 }
 
