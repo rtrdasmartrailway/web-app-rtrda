@@ -4117,9 +4117,13 @@ body:has(.yutth-lightbox) {
   summary.lightweight-accordion-title,
 .content-board-executives .wp-content .lightweight-accordion summary h1,
 .content-board-executives .wp-content .lightweight-accordion summary strong {
-  color: inherit !important;
   font-size: calc(19px * var(--reader-scale));
   line-height: 1.35;
+}
+
+.content-board-executives .wp-content .lightweight-accordion summary h1,
+.content-board-executives .wp-content .lightweight-accordion summary strong {
+  color: inherit !important;
 }
 
 .content-board-executives .wp-content .lightweight-accordion-body {
