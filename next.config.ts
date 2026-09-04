@@ -100,6 +100,15 @@ const nextConfig: NextConfig = {
       },
     ];
   },
+  async rewrites() {
+    // PR Center uses its own application chrome rather than the intranet portal shell.
+    return [
+      {
+        source: "/rtrdaintranet/prcenter/:path*",
+        destination: "/pr-center-internal/:path*",
+      },
+    ];
+  },
 };
 
 export default nextConfig;

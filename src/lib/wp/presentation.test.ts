@@ -363,4 +363,38 @@ describe("presentation helpers", () => {
     expect(contact?.children).toHaveLength(1);
     expect(contact?.children[0].label).toBe("Contact Information");
   });
+
+  it("translates legacy Thai labels in the English navigation", () => {
+    const wordpressMenu: WpNavigationItem[] = [
+      {
+        label: "News & Activities",
+        href: "#",
+        path: null,
+        external: false,
+        children: [
+          {
+            label: "ประกาศ",
+            href: "/en/category/ประกาศ",
+            path: "/en/category/ประกาศ",
+            external: false,
+            children: [],
+          },
+          {
+            label: "พ.ร.บ. ข้อมูลข่าวสารของราชการ พ.ศ. 2540",
+            href: "https://infocenter.oic.go.th/rtrda/index.php",
+            path: null,
+            external: true,
+            children: [],
+          },
+        ],
+      },
+    ];
+
+    const nav = buildPrimaryNavigation([], "en", "/en", wordpressMenu);
+
+    expect(nav[0].children.map((item) => item.label)).toEqual([
+      "Announcements",
+      "Official Information Act, B.E. 2540 (1997)",
+    ]);
+  });
 });
