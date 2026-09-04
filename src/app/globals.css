@@ -4209,7 +4209,14 @@ body:has(.yutth-lightbox) {
 }
 
 .content-board-executives .wp-content .subcommittee-section h2 {
+  border-bottom: 0;
   margin: 0;
+  padding-bottom: 0;
+  position: static;
+}
+
+.content-board-executives .wp-content .subcommittee-section h2::after {
+  content: none;
 }
 
 .content-board-executives .wp-content .subcommittee-section ol {
