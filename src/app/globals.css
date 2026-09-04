@@ -4192,6 +4192,25 @@ body:has(.yutth-lightbox) {
   width: 100%;
 }
 
+.content-board-executives .wp-content .subcommittee-section {
+  margin-bottom: 42px;
+}
+
+.content-board-executives .wp-content .subcommittee-section:last-child {
+  margin-bottom: 0;
+}
+
+.content-board-executives .wp-content .subcommittee-section h2 {
+  color: var(--navy-900);
+  font-size: clamp(18px, 1.4vw, 22px);
+  margin: 0 0 18px;
+}
+
+.content-board-executives .wp-content .subcommittee-section ol {
+  list-style: decimal;
+  padding-left: 1.5rem;
+}
+
 .content-board-executives .wp-content .lightweight-accordion-body .wp-block-image {
   align-items: center;
   background: linear-gradient(145deg, #e5f2ff 0%, #fafdff 72%);

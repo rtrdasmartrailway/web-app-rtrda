@@ -858,6 +858,35 @@ function addValueAssessmentSubcommittee($: cheerio.CheerioAPI): boolean {
   return true;
 }
 
+function combineCommitteeSections($: cheerio.CheerioAPI): boolean {
+  if ($(".lightweight-accordion.subcommittees").length) {
+    return false;
+  }
+
+  const sections = $(
+    ".audit-committee, .personnel-subcommittee, .director-evaluation-subcommittee, .rail-policy-strategy-subcommittee, .value-assessment-subcommittee",
+  );
+  if (sections.length !== 5) {
+    return false;
+  }
+
+  const combined = $(
+    '<div class="lightweight-accordion subcommittees"><details><summary class="lightweight-accordion-title"><h1><strong>คณะอนุกรรมการ</strong></h1></summary><div class="lightweight-accordion-body"></div></details></div>',
+  );
+  const body = combined.find(".lightweight-accordion-body");
+  sections.each((_, element) => {
+    const section = $(element);
+    const subsection = $('<section class="subcommittee-section"></section>');
+    subsection.append($("<h2></h2>").text(section.find("summary").first().text()));
+    subsection.append(section.find(".lightweight-accordion-body").first().contents());
+    body.append(subsection);
+  });
+
+  sections.first().before(combined);
+  sections.remove();
+  return true;
+}
+
 export function applyBoardExecutiveOverride(record: WpContentRecord): WpContentRecord {
   if (!isBoardExecutivePath(record)) {
     return record;
@@ -915,6 +944,7 @@ export function applyBoardExecutiveOverride(record: WpContentRecord): WpContentR
   const didAddDirectorEvaluationSubcommittee = addDirectorEvaluationSubcommittee($);
   const didAddRailPolicyStrategySubcommittee = addRailPolicyStrategySubcommittee($);
   const didAddValueAssessmentSubcommittee = addValueAssessmentSubcommittee($);
+  const didCombineCommitteeSections = combineCommitteeSections($);
 
   if (
     !didRewritePichet &&
@@ -936,7 +966,8 @@ export function applyBoardExecutiveOverride(record: WpContentRecord): WpContentR
     !didAddPersonnelSubcommittee &&
     !didAddDirectorEvaluationSubcommittee &&
     !didAddRailPolicyStrategySubcommittee &&
-    !didAddValueAssessmentSubcommittee
+    !didAddValueAssessmentSubcommittee &&
+    !didCombineCommitteeSections
   ) {
     return record;
   }
