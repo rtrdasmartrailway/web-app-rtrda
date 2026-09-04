@@ -138,6 +138,11 @@ describe("applyBoardExecutiveOverride", () => {
     expect(summaries).toEqual([
       "คณะกรรมการสถาบันวิจัยและพัฒนาเทคโนโลยีระบบราง",
       "คณะอนุกรรมการ",
+      "คณะกรรมการตรวจสอบ",
+      "คณะอนุกรรมการบริหารงานบุคคล",
+      "คณะอนุกรรมการประเมินผลการปฏิบัติงานของผู้อำนวยการ",
+      "คณะอนุกรรมการพิจารณากลั่นกรองนโยบายและยุทธศาสตร์ด้านเทคโนโลยีระบบราง",
+      "คณะอนุกรรมการติดตามผลการประเมินความคุ้มค่าสถาบันวิจัยและพัฒนาเทคโนโลยีระบบราง",
       "คณะกรรมการกำกับทิศทาง",
     ]);
     expect(subcommittees.find("details").attr("open")).toBeUndefined();
@@ -145,12 +150,17 @@ describe("applyBoardExecutiveOverride", () => {
       "lightweight-accordion-title",
     );
     expect(subcommittees.find(".subcommittee-section")).toHaveLength(5);
+    expect(subcommittees.find(".subcommittee-section > details")).toHaveLength(5);
+    expect(subcommittees.find(".subcommittee-section > details[open]")).toHaveLength(0);
+    expect(subcommittees.find(".subcommittee-section > details > summary")).toHaveLength(
+      5,
+    );
     expect(subcommittees.find("table")).toHaveLength(5);
     expect(subcommittees.find("ol")).toHaveLength(5);
     expect(subcommittees.find("ol li")).toHaveLength(39);
     expect($(".audit-committee, .personnel-subcommittee")).toHaveLength(0);
     const sections = subcommittees.find(".subcommittee-section");
-    expect(sections.eq(0).find("h2").text()).toBe("คณะกรรมการตรวจสอบ");
+    expect(sections.eq(0).find("summary h2").text()).toBe("คณะกรรมการตรวจสอบ");
     expect(sections.eq(0).find("tbody tr")).toHaveLength(4);
     expect(sections.eq(0).text()).toContain("นายพัฒนพงษ์ พงศ์ศุภสมิทธิ์");
     expect(sections.eq(1).find("tbody tr")).toHaveLength(9);

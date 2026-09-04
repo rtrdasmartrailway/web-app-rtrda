@@ -4190,14 +4190,26 @@ body:has(.yutth-lightbox) {
   margin-bottom: 42px;
 }
 
+.content-board-executives .wp-content .subcommittee-section details {
+  box-shadow: none;
+}
+
+.content-board-executives .wp-content .subcommittee-section .subcommittee-title {
+  background: var(--navy-700);
+  font-size: clamp(16px, 1.2vw, 19px);
+  padding: 15px 18px;
+}
+
+.content-board-executives .wp-content .subcommittee-section .lightweight-accordion-body {
+  padding: 18px 22px 22px;
+}
+
 .content-board-executives .wp-content .subcommittee-section:last-child {
   margin-bottom: 0;
 }
 
 .content-board-executives .wp-content .subcommittee-section h2 {
-  color: var(--navy-900);
-  font-size: clamp(18px, 1.4vw, 22px);
-  margin: 0 0 18px;
+  margin: 0;
 }
 
 .content-board-executives .wp-content .subcommittee-section ol {

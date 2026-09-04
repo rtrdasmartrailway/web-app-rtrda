@@ -872,9 +872,15 @@ function combineCommitteeSections($: cheerio.CheerioAPI): boolean {
   const body = combined.find(".lightweight-accordion-body");
   sections.each((_, element) => {
     const section = $(element);
-    const subsection = $('<section class="subcommittee-section"></section>');
-    subsection.append($("<h2></h2>").text(section.find("summary").first().text()));
-    subsection.append(section.find(".lightweight-accordion-body").first().contents());
+    const subsection = $(
+      '<section class="subcommittee-section"><details><summary class="lightweight-accordion-title subcommittee-title"></summary><div class="lightweight-accordion-body"></div></details></section>',
+    );
+    subsection
+      .find("summary")
+      .append($("<h2></h2>").text(section.find("summary").first().text()));
+    subsection
+      .find(".lightweight-accordion-body")
+      .append(section.find(".lightweight-accordion-body").first().contents());
     body.append(subsection);
   });
 
