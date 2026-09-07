@@ -78,23 +78,19 @@
   padding: 10px;
   text-align: left;
 }
-.nav button span {
-  background: rgba(255, 255, 255, 0.09);
-  border-radius: 4px;
-  color: #a9c5ee;
-  font-size: 9px;
-  font-weight: 800;
-  padding: 3px 4px;
-  text-align: center;
+.navIcon {
+  display: inline-grid;
+  font-size: 17px;
+  line-height: 1;
+  place-items: center;
   width: 25px;
+}
+.navLabel {
+  min-width: 0;
 }
 .nav button:hover,
 .nav .navActive {
   background: #1b3d70;
-  color: #fff;
-}
-.nav .navActive span {
-  background: #3f89f2;
   color: #fff;
 }
 .sidebarFooter {
@@ -1105,15 +1101,9 @@
   border-radius: 12px;
   padding: 11px 12px;
 }
-.nav button span {
-  border-radius: 8px;
-}
 .nav button:hover,
 .nav .navActive {
   background: rgba(255, 255, 255, 0.14);
-}
-.nav .navActive span {
-  background: rgba(255, 255, 255, 0.2);
 }
 .sidebarFooter {
   background: rgba(255, 255, 255, 0.1);
@@ -1400,15 +1390,17 @@
     padding: 16px 10px;
   }
   .brand > span:last-child,
-  .workspace,
-  .nav button {
+  .workspace {
     font-size: 0;
   }
   .nav button {
     justify-content: center;
   }
-  .nav button span {
-    font-size: 9px;
+  .navLabel {
+    display: none;
+  }
+  .navIcon {
+    font-size: 17px;
   }
   .topTitle {
     min-width: 0;
@@ -1422,12 +1414,14 @@
     flex-basis: 260px;
   }
   .brand > span:last-child,
-  .workspace,
-  .nav button {
+  .workspace {
     font-size: inherit;
   }
   .nav button {
     justify-content: flex-start;
+  }
+  .navLabel {
+    display: inline;
   }
   .topbar {
     min-height: 64px;

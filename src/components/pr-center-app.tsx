@@ -6,6 +6,9 @@ import styles from "./pr-center-app.module.css";
 
 type Page =
   | "home"
+  | "executive"
+  | "new-request"
+  | "my-requests"
   | "requests"
   | "operations"
   | "calendar"
@@ -17,24 +20,29 @@ type Page =
   | "history"
   | "directory"
   | "settings"
+  | "system-data"
   | "help";
 
 type Language = "th" | "en";
 
-const pages: { id: Page; th: string; en: string; short: string }[] = [
-  { id: "home", th: "ภาพรวม", en: "Dashboard", short: "DB" },
-  { id: "requests", th: "คำขอ", en: "Requests", short: "RQ" },
-  { id: "operations", th: "การดำเนินงานเนื้อหา", en: "Content Operations", short: "OP" },
-  { id: "calendar", th: "ปฏิทิน", en: "Calendar", short: "CA" },
-  { id: "approvals", th: "รออนุมัติ", en: "Approval Queue", short: "AP" },
-  { id: "library", th: "คลังเนื้อหา", en: "Content Library", short: "LB" },
-  { id: "ideas", th: "แนวคิดเนื้อหา", en: "Content Ideas", short: "ID" },
-  { id: "message-house", th: "Message House", en: "Message House", short: "MH" },
-  { id: "notifications", th: "การแจ้งเตือน", en: "Notifications", short: "NT" },
-  { id: "history", th: "ประวัติ", en: "History", short: "HI" },
-  { id: "directory", th: "รายชื่อผู้ใช้", en: "User Directory", short: "UD" },
-  { id: "settings", th: "การตั้งค่า", en: "Settings", short: "ST" },
-  { id: "help", th: "คู่มือการใช้งาน", en: "How to Use", short: "?" },
+const pages: { id: Page; th: string; en: string; icon: string }[] = [
+  { id: "home", th: "หน้าหลัก", en: "Home", icon: "🏠" },
+  { id: "executive", th: "ภาพรวมผู้บริหาร", en: "Executive Dashboard", icon: "📊" },
+  { id: "new-request", th: "ส่งคำขอ", en: "Submit Request", icon: "➕" },
+  { id: "my-requests", th: "คำขอของฉัน", en: "My Requests", icon: "📥" },
+  { id: "requests", th: "คำขอทั้งหมด", en: "All Requests", icon: "📋" },
+  { id: "operations", th: "Content Operations", en: "Content Operations", icon: "🧩" },
+  { id: "calendar", th: "ปฏิทิน", en: "Calendar", icon: "🗓️" },
+  { id: "approvals", th: "คิวอนุมัติ", en: "Approval Queue", icon: "✅" },
+  { id: "library", th: "คลัง Content", en: "Content Library", icon: "🗂️" },
+  { id: "ideas", th: "เสนอ Content Ideas", en: "Content Ideas", icon: "💡" },
+  { id: "message-house", th: "Message House", en: "Message House", icon: "🏛️" },
+  { id: "notifications", th: "การแจ้งเตือน", en: "Notifications", icon: "🔔" },
+  { id: "help", th: "วิธีใช้งาน", en: "How to Use", icon: "❓" },
+  { id: "history", th: "ประวัติ", en: "History", icon: "🕘" },
+  { id: "directory", th: "User Directory", en: "User Directory", icon: "👥" },
+  { id: "settings", th: "Permission Settings", en: "Permission Settings", icon: "⚙️" },
+  { id: "system-data", th: "System Data", en: "System Data", icon: "🗄️" },
 ];
 
 const copy = {
@@ -164,8 +172,10 @@ export function PrCenterApp() {
               className={page === item.id ? styles.navActive : ""}
               onClick={() => go(item.id)}
             >
-              <span>{item.short}</span>
-              {label(item, language)}
+              <span className={styles.navIcon} aria-hidden="true">
+                {item.icon}
+              </span>
+              <span className={styles.navLabel}>{label(item, language)}</span>
             </button>
           ))}
         </nav>
@@ -241,8 +251,15 @@ export function PrCenterApp() {
           {page === "home" && (
             <Dashboard t={t} onNavigate={go} onOpenRequest={() => setRequestOpen(true)} />
           )}
+          {page === "executive" && <ExecutiveDashboard t={t} onNavigate={go} />}
+          {page === "new-request" && (
+            <NewRequest t={t} onOpenRequest={() => setRequestOpen(true)} />
+          )}
+          {page === "my-requests" && (
+            <Requests t={t} onOpenRequest={() => setRequestOpen(true)} mode="mine" />
+          )}
           {page === "requests" && (
-            <Requests t={t} onOpenRequest={() => setRequestOpen(true)} />
+            <Requests t={t} onOpenRequest={() => setRequestOpen(true)} mode="all" />
           )}
           {page === "operations" && <Operations />}
           {page === "calendar" && <Calendar />}
@@ -272,6 +289,9 @@ export function PrCenterApp() {
           {page === "history" && <History />}
           {page === "directory" && <Directory />}
           {page === "settings" && <Settings />}
+          {page === "system-data" && (
+            <SystemData onExport={() => announce("Exported demo system data")} />
+          )}
           {page === "help" && <Help />}
         </main>
       </section>
@@ -493,7 +513,50 @@ function Table({ headers, rows }: { headers: string[]; rows: string[][] }) {
     </div>
   );
 }
-function Requests({
+function ExecutiveDashboard({
+  t,
+  onNavigate,
+}: {
+  t: (typeof copy)[Language];
+  onNavigate: (page: Page) => void;
+}) {
+  return (
+    <>
+      <SectionHeading eyebrow="EXECUTIVE OVERVIEW" title="Executive Dashboard" />
+      <section className={styles.metrics}>
+        <Metric value="28" label={t.published} trend="+12% from last month" tone="blue" />
+        <Metric
+          value="186.4K"
+          label={t.reach}
+          trend="+18.6% from last month"
+          tone="green"
+        />
+        <Metric
+          value="14.2K"
+          label={t.engagement}
+          trend="7.6% engagement rate"
+          tone="purple"
+        />
+        <Metric value="6" label={t.pending} trend="Review within 2 days" tone="gold" />
+      </section>
+      <article className={styles.card}>
+        <h2>Content pipeline</h2>
+        <Table
+          headers={["Stage", "Items", "Status"]}
+          rows={[
+            ["Planning", "4", "In production"],
+            ["Review", "6", "Awaiting approval"],
+            ["Scheduled", "5", "Scheduled"],
+          ]}
+        />
+        <button className={styles.primary} onClick={() => onNavigate("operations")}>
+          View content operations
+        </button>
+      </article>
+    </>
+  );
+}
+function NewRequest({
   t,
   onOpenRequest,
 }: {
@@ -504,7 +567,38 @@ function Requests({
     <>
       <SectionHeading
         eyebrow="WORK INTAKE"
-        title={t.recentRequests}
+        title={t.newRequest}
+        action={
+          <button className={styles.primary} onClick={onOpenRequest}>
+            + {t.newRequest}
+          </button>
+        }
+      />
+      <article className={styles.card}>
+        <h2>Start a PR work request</h2>
+        <p>
+          Provide the project details, objectives, source information, and requested date.
+        </p>
+      </article>
+    </>
+  );
+}
+function Requests({
+  t,
+  onOpenRequest,
+  mode,
+}: {
+  t: (typeof copy)[Language];
+  onOpenRequest: () => void;
+  mode: "all" | "mine";
+}) {
+  const title = mode === "mine" ? "My Requests" : "All Requests";
+  const visibleRequests = mode === "mine" ? requests.slice(0, 1) : requests;
+  return (
+    <>
+      <SectionHeading
+        eyebrow="WORK INTAKE"
+        title={title}
         action={
           <button className={styles.primary} onClick={onOpenRequest}>
             + {t.newRequest}
@@ -523,7 +617,7 @@ function Requests({
       <article className={styles.card}>
         <Table
           headers={["Request", "Project / activity", "Status", "Requested date"]}
-          rows={requests}
+          rows={visibleRequests}
         />
       </article>
     </>
@@ -828,6 +922,34 @@ function Settings() {
             "Website, Facebook, TikTok, YouTube, X, LinkedIn and Internal",
           ],
           ["System data", "Content types, pillars and departments"],
+        ].map(([title, description]) => (
+          <button key={title}>
+            <b>{title}</b>
+            <span>{description}</span>
+            <i>Open</i>
+          </button>
+        ))}
+      </section>
+    </>
+  );
+}
+function SystemData({ onExport }: { onExport: () => void }) {
+  return (
+    <>
+      <SectionHeading
+        eyebrow="ADMINISTRATION"
+        title="System Data"
+        action={
+          <button className={styles.primary} onClick={onExport}>
+            Export data
+          </button>
+        }
+      />
+      <section className={styles.settings}>
+        {[
+          ["Content types", "Manage content formats and delivery requirements"],
+          ["Content pillars", "Maintain strategic communication pillars"],
+          ["Departments", "Manage requestor departments and teams"],
         ].map(([title, description]) => (
           <button key={title}>
             <b>{title}</b>
