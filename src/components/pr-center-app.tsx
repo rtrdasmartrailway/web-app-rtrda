@@ -314,7 +314,7 @@ const STATUS_TRANSITIONS: Record<StatusId, StatusId[]> = {
 
 const ROLE_PAGES: Record<Role, Page[]> = {
   admin: pages.map(({ id }) => id),
-  pr: pages.filter(({ id }) => id !== "system-data").map(({ id }) => id),
+  pr: pages.map(({ id }) => id),
   executive: ["home", "executive", "approvals", "library", "notifications", "help"],
   project_owner: [
     "home",
@@ -400,6 +400,15 @@ const defaultState: PrCenterState = {
       requestedDate: "2026-09-08",
       taskIds: ["TASK-040"],
     },
+    {
+      id: "REQ-023",
+      title: "มาตรฐานความปลอดภัยระบบราง",
+      type: "pr",
+      requesterId: "u-requester",
+      department: "Communications Office",
+      requestedDate: "2026-09-02",
+      taskIds: ["TASK-039", "TASK-038"],
+    },
   ],
   tasks: [
     {
@@ -428,6 +437,24 @@ const defaultState: PrCenterState = {
       status: "scheduled",
       ownerId: "u-approver",
       dueDate: "2026-09-08",
+    },
+    {
+      id: "TASK-039",
+      requestId: "REQ-023",
+      type: "Website News",
+      title: "ประกาศมาตรฐานความปลอดภัยระบบราง",
+      status: "published",
+      ownerId: "u-writer",
+      dueDate: "2026-09-02",
+    },
+    {
+      id: "TASK-038",
+      requestId: "REQ-023",
+      type: "Facebook Post",
+      title: "เบื้องหลังมาตรฐานความปลอดภัย",
+      status: "closed",
+      ownerId: "u-pr",
+      dueDate: "2026-09-03",
     },
   ],
   notifications: [
