@@ -162,7 +162,12 @@ describe("applyBoardExecutiveOverride", () => {
     const sections = subcommittees.find(".subcommittee-section");
     expect(sections.eq(0).find("summary h2").text()).toBe("คณะกรรมการตรวจสอบ");
     expect(sections.eq(0).find("tbody tr")).toHaveLength(4);
-    expect(sections.eq(0).text()).toContain("นายพัฒนพงษ์ พงศ์ศุภสมิทธิ์");
+    expect(sections.eq(0).find("tbody tr").first().find("td").first().text()).toBe(
+      "1. นายพัฒนพงษ์ พงศ์ศุภสมิทธิ์",
+    );
+    expect(sections.eq(0).find("tbody tr").last().find("td").first().text()).toBe(
+      "4. หัวหน้าหน่วยงานตรวจสอบภายใน",
+    );
     expect(sections.eq(1).find("tbody tr")).toHaveLength(9);
     expect(sections.eq(1).find("tbody tr").first().find("td").first().text()).toBe(
       "นายถาวร ชลัษเฐียร",
