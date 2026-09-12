@@ -61,6 +61,7 @@ export function buildPrCenterApi(
   const app = Fastify({ logger: true, requestIdHeader: "x-correlation-id" });
   app.setErrorHandler((error, request, reply) => {
     const known = error instanceof PrCenterError;
+    if (!known) request.log.error({ err: error }, "Unhandled PR Center API error");
     reply.status(known ? error.statusCode : 500).send({
       error: known ? error.code : "INTERNAL_ERROR",
       message: known ? error.message : "The request could not be completed",
