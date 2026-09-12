@@ -159,7 +159,12 @@ export async function listRequests(actor: PrCenterActor, take = 25, cursor?: str
     take: limit + 1,
     ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
     orderBy: { createdAt: "desc" },
-    include: { requester: { select: { displayName: true } }, tasks: true },
+    include: {
+      department: { select: { name: true } },
+      requester: { select: { displayName: true } },
+      sources: { select: { url: true } },
+      tasks: true,
+    },
   });
 }
 

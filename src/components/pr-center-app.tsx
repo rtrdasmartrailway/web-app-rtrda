@@ -219,8 +219,6 @@ const copy = {
   },
 };
 
-const STORAGE_KEY = "rtrda-pr-center-state-v1";
-
 const STATUS_LABELS: Record<StatusId, string> = {
   draft: "Draft",
   waiting_for_information: "Waiting for information",
@@ -688,7 +686,6 @@ function Metric({
 export function PrCenterApp() {
   const [page, setPage] = useState<Page>("home");
   const [state, setState] = useState<PrCenterState>(cloneDefaultState);
-  const [hydrated, setHydrated] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [requestOpen, setRequestOpen] = useState(false);
   const [requestDraft, setRequestDraft] = useState<RequestDraft>(() =>
@@ -696,53 +693,55 @@ export function PrCenterApp() {
   );
   const [notice, setNotice] = useState<string | null>(null);
   useEffect(() => {
-    let restored = cloneDefaultState();
-    try {
-      const saved = window.localStorage.getItem(STORAGE_KEY);
-      if (saved) {
-        const parsed: unknown = JSON.parse(saved);
-        if (isPrCenterState(parsed)) {
-          restored = {
-            ...cloneDefaultState(),
-            ...parsed,
-            ideas: Array.isArray((parsed as Partial<PrCenterState>).ideas)
-              ? (parsed as PrCenterState).ideas
-              : cloneDefaultState().ideas,
-            messageHouse: {
-              ...cloneDefaultState().messageHouse,
-              ...(parsed as Partial<PrCenterState>).messageHouse,
-              pillarByTask: {
-                ...cloneDefaultState().messageHouse.pillarByTask,
-                ...(parsed as Partial<PrCenterState>).messageHouse?.pillarByTask,
-              },
-            },
-            masterData:
-              (parsed as Partial<PrCenterState>).masterData ??
-              cloneDefaultState().masterData,
-            snapshots: Array.isArray((parsed as Partial<PrCenterState>).snapshots)
-              ? (parsed as PrCenterState).snapshots
-              : [],
-          };
-        }
-      }
-    } catch {
-      // Invalid browser data should not prevent the demo workspace from loading.
-    }
-    startTransition(() => {
-      setState(restored);
-      setHydrated(true);
-    });
-    // Browser storage is read only after hydration, so server and client markup match.
+    fetch("/api/pr-center/requests?take=100", { credentials: "same-origin" })
+      .then(async (response) => {
+        if (!response.ok) throw new Error("Request list unavailable");
+        const records = (await response.json()) as Array<{
+          id: string;
+          title: string;
+          type: "PR" | "OFFSITE";
+          requestedFor: string | null;
+          department: { name: string };
+          requesterId: string;
+          sources: { url: string }[];
+          tasks: Array<{
+            id: string;
+            title: string;
+            contentType: string;
+            status: string;
+            ownerId: string | null;
+            dueAt: string | null;
+          }>;
+        }>;
+        startTransition(() =>
+          setState((previous) => ({
+            ...previous,
+            requests: records.map((request) => ({
+              id: request.id,
+              title: request.title,
+              type: request.type.toLowerCase() as RequestType,
+              requesterId: request.requesterId,
+              department: request.department.name,
+              requestedDate: request.requestedFor?.slice(0, 10) || "",
+              taskIds: request.tasks.map((task) => task.id),
+              source: request.sources[0]?.url,
+            })),
+            tasks: records.flatMap((request) =>
+              request.tasks.map((task) => ({
+                id: task.id,
+                requestId: request.id,
+                type: task.contentType,
+                title: task.title,
+                status: task.status.toLowerCase() as StatusId,
+                ownerId: task.ownerId || "u-pr",
+                dueDate: task.dueAt?.slice(0, 10) || "",
+              })),
+            ),
+          })),
+        );
+      })
+      .catch(() => setNotice("Unable to load server requests"));
   }, []);
-
-  useEffect(() => {
-    if (!hydrated) return;
-    try {
-      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-    } catch {
-      // Continue in-memory when browser storage is unavailable.
-    }
-  }, [hydrated, state]);
 
   const currentUser = getUser(state.currentUserId) ?? users[0];
   const visiblePages = pages.filter((item) =>
@@ -790,57 +789,29 @@ export function PrCenterApp() {
       },
     ],
   });
-  const createRequest = (draft: RequestDraft) => {
-    updateState((previous) => {
-      const id = `REQ-${String(previous.requests.length + 24).padStart(3, "0")}`;
-      const taskId = `TASK-${String(previous.tasks.length + 40).padStart(3, "0")}`;
-      const request: Request = {
-        id,
-        title: draft.title.trim(),
-        type: draft.type,
-        requesterId: currentUser.id,
-        department: draft.department.trim(),
-        requestedDate: draft.requestedDate,
-        taskIds: [taskId],
-        source: draft.source.trim(),
-        objective: draft.objective.trim(),
-        audience: draft.audience.trim(),
-        startTime: draft.startTime,
-        travel: draft.travel,
-      };
-      const task: Task = {
-        id: taskId,
-        requestId: id,
-        type: draft.type === "pr" ? "PR Content" : "Off-site Support",
-        title: request.title,
-        status: "draft",
-        ownerId: users.find((user) => user.name === draft.owner)?.id ?? currentUser.id,
-        dueDate: request.requestedDate,
-      };
-      const notification: Notification = {
-        id: `N-${previous.notifications.length + 1}`,
-        userId: "u-pr",
-        title: "New request",
-        message: `${id} was submitted by ${currentUser.name}`,
-        target: "requests",
-        createdAt: new Date().toISOString(),
-        read: false,
-      };
-      return addAudit(
-        {
-          ...previous,
-          requests: [request, ...previous.requests],
-          tasks: [task, ...previous.tasks],
-          notifications: [notification, ...previous.notifications],
-        },
-        "request",
-        id,
-        "created",
-        "",
-        request.title,
+  const createRequest = async (draft: RequestDraft) => {
+    try {
+      const response = await fetch("/api/pr-center/requests", {
+        method: "POST",
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          type: draft.type.toUpperCase(),
+          title: draft.title,
+          objective: draft.objective,
+          audience: draft.audience,
+          requestedFor: draft.requestedDate || undefined,
+          sourceUrls: draft.source ? [draft.source] : [],
+        }),
+      });
+      if (!response.ok) throw new Error("Request was rejected");
+      announce(state.language === "th" ? "บันทึกคำขอแล้ว" : "Request saved");
+      setPage("my-requests");
+    } catch {
+      announce(
+        state.language === "th" ? "ไม่สามารถบันทึกคำขอได้" : "Request could not be saved",
       );
-    });
-    announce(state.language === "th" ? "บันทึกคำขอแล้ว" : "Request saved");
+    }
   };
   const transitionTask = (taskId: string, nextStatus: StatusId) => {
     updateState((previous) => {
