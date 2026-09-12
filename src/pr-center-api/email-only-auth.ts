@@ -8,6 +8,31 @@ const SESSION_TTL_SECONDS = 8 * 60 * 60;
 
 type Session = { actor: PrCenterActor; expiresAt: number };
 type LoginResult = { actor: PrCenterActor; cookie: string };
+type TemporaryTestAccess = {
+  displayName: string;
+  departmentCode: string;
+  departmentName: string;
+  role: PrCenterActor["role"];
+};
+
+const TEMPORARY_TEST_ACCESS: Record<string, TemporaryTestAccess> = {
+  "nattapol.y@rtrda.or.th": {
+    displayName: "Nattapol Y.",
+    departmentCode: "ADMIN",
+    departmentName: "Administration",
+    role: "SCOPED_ADMINISTRATOR",
+  },
+  "panissa.t@rtrda.or.th": {
+    displayName: "Panissa T.",
+    departmentCode: "PR",
+    departmentName: "Public Relations",
+    role: "PR_OPERATIONS",
+  },
+};
+
+export function temporaryTestAccessForEmail(email: string): TemporaryTestAccess | null {
+  return TEMPORARY_TEST_ACCESS[email.trim().toLowerCase()] ?? null;
+}
 
 function cookies(request: FastifyRequest): Record<string, string> {
   return Object.fromEntries(
@@ -57,7 +82,10 @@ export function createEmailOnlyAuth() {
     });
   }
 
-  async function administrator(email: string): Promise<PrCenterActor> {
+  async function provisionTemporaryUser(
+    email: string,
+    access: TemporaryTestAccess,
+  ): Promise<PrCenterActor> {
     return prisma.$transaction(async (tx) => {
       const organization = await tx.prOrganization.upsert({
         where: { code: "RTRDA" },
@@ -69,13 +97,16 @@ export function createEmailOnlyAuth() {
       });
       const department = await tx.prDepartment.upsert({
         where: {
-          organizationId_code: { organizationId: organization.id, code: "ADMIN" },
+          organizationId_code: {
+            organizationId: organization.id,
+            code: access.departmentCode,
+          },
         },
         update: { active: true },
         create: {
           organizationId: organization.id,
-          code: "ADMIN",
-          name: "Administration",
+          code: access.departmentCode,
+          name: access.departmentName,
         },
       });
       const user = await tx.prCenterUser.upsert({
@@ -84,21 +115,21 @@ export function createEmailOnlyAuth() {
           active: true,
           organizationId: organization.id,
           departmentId: department.id,
-          displayName: "Nattapol Y.",
+          displayName: access.displayName,
         },
         create: {
           organizationId: organization.id,
           departmentId: department.id,
           ssoSubject: `email-only:${email}`,
           email,
-          displayName: "Nattapol Y.",
+          displayName: access.displayName,
           active: true,
         },
       });
       const existingRole = await tx.prUserRole.findFirst({
         where: {
           userId: user.id,
-          role: "SCOPED_ADMINISTRATOR",
+          role: access.role,
           organizationId: organization.id,
         },
       });
@@ -106,7 +137,7 @@ export function createEmailOnlyAuth() {
         await tx.prUserRole.create({
           data: {
             userId: user.id,
-            role: "SCOPED_ADMINISTRATOR",
+            role: access.role,
             organizationId: organization.id,
           },
         });
@@ -115,7 +146,7 @@ export function createEmailOnlyAuth() {
         id: user.id,
         organizationId: organization.id,
         departmentId: department.id,
-        role: "SCOPED_ADMINISTRATOR" as const,
+        role: access.role,
       };
       const correlationId = randomBytes(16).toString("hex");
       await Promise.all([
@@ -159,7 +190,8 @@ export function createEmailOnlyAuth() {
       if (!enabled)
         throw new PrCenterError("Email-only access is disabled", 503, "AUTH_UNAVAILABLE");
       const email = rawEmail.trim().toLowerCase();
-      if (!allowedEmails.has(email)) {
+      const access = temporaryTestAccessForEmail(email);
+      if (!allowedEmails.has(email) || !access) {
         await auditDenied(email);
         throw new PrCenterError(
           "This email is not authorized for PR Center",
@@ -167,7 +199,7 @@ export function createEmailOnlyAuth() {
           "FORBIDDEN",
         );
       }
-      const actor = await administrator(email);
+      const actor = await provisionTemporaryUser(email, access);
       const token = randomBytes(32).toString("base64url");
       sessions.set(token, { actor, expiresAt: Date.now() + SESSION_TTL_SECONDS * 1000 });
       return { actor, cookie: cookie(token) };

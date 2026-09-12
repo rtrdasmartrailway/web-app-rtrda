@@ -5,6 +5,10 @@ import { PrCenterApp } from "./pr-center-app";
 import styles from "./pr-center-workspace.module.css";
 
 type SessionState = "loading" | "sign-in-required" | "authenticated" | "unavailable";
+type PrCenterSession = {
+  userId: string;
+  role: "PR_OPERATIONS" | "SCOPED_ADMINISTRATOR";
+};
 type Page =
   | "Home"
   | "Submit Request"
@@ -48,6 +52,7 @@ function requestDate(value: string) {
 
 export function PrCenterWorkspace() {
   const [sessionState, setSessionState] = useState<SessionState>("loading");
+  const [session, setSession] = useState<PrCenterSession | null>(null);
   const [page, setPage] = useState<Page>("Home");
   const [email, setEmail] = useState("");
   const [loginError, setLoginError] = useState<string | null>(null);
@@ -57,9 +62,11 @@ export function PrCenterWorkspace() {
 
   useEffect(() => {
     fetch("/api/pr-center/session", { credentials: "same-origin" })
-      .then((response) => {
-        if (response.ok) setSessionState("authenticated");
-        else
+      .then(async (response) => {
+        if (response.ok) {
+          setSession((await response.json()) as PrCenterSession);
+          setSessionState("authenticated");
+        } else
           setSessionState(response.status === 401 ? "sign-in-required" : "unavailable");
       })
       .catch(() => setSessionState("unavailable"));
@@ -104,6 +111,11 @@ export function PrCenterWorkspace() {
         setLoginError(payload?.message || "ไม่สามารถเข้าสู่ระบบได้");
         return;
       }
+      const sessionResponse = await fetch("/api/pr-center/session", {
+        credentials: "same-origin",
+      });
+      if (!sessionResponse.ok) throw new Error("Unable to load session");
+      setSession((await sessionResponse.json()) as PrCenterSession);
       setSessionState("authenticated");
     } catch {
       setLoginError("ไม่สามารถเชื่อมต่อระบบ PR Center ได้");
@@ -150,7 +162,8 @@ export function PrCenterWorkspace() {
   const isRequestList = ["Home", "My Requests", "All Requests"].includes(page);
 
   // Preserve the established PR Center visual workspace once access is granted.
-  if (signedIn) return <PrCenterApp />;
+  if (signedIn && session)
+    return <PrCenterApp actor={{ id: session.userId, role: session.role }} />;
 
   return (
     <main className={styles.shell}>

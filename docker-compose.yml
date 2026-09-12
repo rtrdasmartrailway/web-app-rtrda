@@ -63,7 +63,7 @@ services:
       PR_CENTER_API_HOST: 0.0.0.0
       PR_CENTER_API_PORT: 3100
       PR_CENTER_EMAIL_ONLY_ENABLED: "true"
-      PR_CENTER_EMAIL_ONLY_ALLOWLIST: nattapol.y@rtrda.or.th
+      PR_CENTER_EMAIL_ONLY_ALLOWLIST: nattapol.y@rtrda.or.th,panissa.t@rtrda.or.th
     depends_on:
       db:
         condition: service_healthy

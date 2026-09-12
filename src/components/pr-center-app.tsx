@@ -695,7 +695,11 @@ function Metric({
   );
 }
 
-export function PrCenterApp() {
+export function PrCenterApp({
+  actor,
+}: {
+  actor?: { id: string; role: "PR_OPERATIONS" | "SCOPED_ADMINISTRATOR" };
+}) {
   const [page, setPage] = useState<Page>("home");
   const [state, setState] = useState<PrCenterState>(cloneDefaultState);
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -757,7 +761,16 @@ export function PrCenterApp() {
       .catch(() => setNotice("Unable to load server requests"));
   }, []);
 
-  const currentUser = getUser(state.currentUserId) ?? users[0];
+  const currentUser: User = actor
+    ? {
+        id: actor.id,
+        name: actor.role === "PR_OPERATIONS" ? "Panissa T." : "Nattapol Y.",
+        role: actor.role === "PR_OPERATIONS" ? "pr" : "admin",
+        department:
+          actor.role === "PR_OPERATIONS" ? "Public Relations" : "Administration",
+        active: true,
+      }
+    : (getUser(state.currentUserId) ?? users[0]);
   const visiblePages = pages.filter(
     (item) =>
       PHASE_1_PAGES.has(item.id) && ROLE_PAGES[currentUser.role].includes(item.id),
