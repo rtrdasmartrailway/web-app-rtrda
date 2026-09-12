@@ -52,6 +52,10 @@ export type PrTaskStatus = keyof typeof TASK_TRANSITIONS;
 
 const WRITE_ROLES: PrCenterRole[] = ["PR_OPERATIONS", "SCOPED_ADMINISTRATOR"];
 
+export function canManageTasks(role: PrCenterRole): boolean {
+  return WRITE_ROLES.includes(role);
+}
+
 export function canTransitionTask(
   role: PrCenterRole,
   from: PrTaskStatus,

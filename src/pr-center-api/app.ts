@@ -2,11 +2,15 @@ import Fastify, { type FastifyInstance, type FastifyRequest } from "fastify";
 import {
   createRequest,
   createIdea,
+  addTaskComment,
   convertIdea,
   currentMessageHouse,
   listIdeas,
+  listNotifications,
   listRequests,
   transitionIdea,
+  taskHistory,
+  updateTaskAssignment,
   PrCenterError,
   transitionTask,
   type PrCenterActor,
@@ -126,6 +130,7 @@ export function buildPrCenterApi(
   app.get("/message-house/current", async (request) =>
     currentMessageHouse(request.prCenterActor!),
   );
+  app.get("/notifications", async (request) => listNotifications(request.prCenterActor!));
   app.get("/session", async (request) => ({
     userId: request.prCenterActor!.id,
     organizationId: request.prCenterActor!.organizationId,
@@ -180,6 +185,36 @@ export function buildPrCenterApi(
       typeof input.reason === "string" ? input.reason : undefined,
       correlationId(request),
     );
+  });
+  app.patch("/tasks/:taskId", async (request) => {
+    const input = await body(request);
+    const dueAt =
+      typeof input.dueAt === "string" && input.dueAt ? new Date(input.dueAt) : null;
+    if (dueAt && Number.isNaN(dueAt.getTime()))
+      throw new PrCenterError("Due date is invalid", 422, "INVALID_DUE_DATE");
+    return updateTaskAssignment(
+      request.prCenterActor!,
+      taskId((request.params as { taskId: string }).taskId),
+      expectedVersion(request),
+      { ownerId: typeof input.ownerId === "string" ? input.ownerId : null, dueAt },
+      correlationId(request),
+    );
+  });
+  app.get("/tasks/:taskId/history", async (request) =>
+    taskHistory(
+      request.prCenterActor!,
+      taskId((request.params as { taskId: string }).taskId),
+    ),
+  );
+  app.post("/tasks/:taskId/comments", async (request, reply) => {
+    const input = await body(request);
+    const comment = await addTaskComment(
+      request.prCenterActor!,
+      taskId((request.params as { taskId: string }).taskId),
+      typeof input.body === "string" ? input.body : "",
+      correlationId(request),
+    );
+    return reply.status(201).send(comment);
   });
   return app;
 }

@@ -969,6 +969,38 @@ export function PrCenterApp({
       );
     }
   };
+  const assignTaskToMe = async (taskId: string, dueDate: string) => {
+    const task = state.tasks.find((item) => item.id === taskId);
+    if (!task) return;
+    const response = await fetch(`/api/pr-center/tasks/${taskId}`, {
+      method: "PATCH",
+      credentials: "same-origin",
+      headers: {
+        "Content-Type": "application/json",
+        "If-Match": String(task.version ?? 0),
+      },
+      body: JSON.stringify({ ownerId: currentUser.id, dueAt: dueDate || null }),
+    });
+    if (!response.ok) return announce("Task assignment failed");
+    const updated = (await response.json()) as {
+      ownerId: string | null;
+      dueAt: string | null;
+      version: number;
+    };
+    setState((previous) => ({
+      ...previous,
+      tasks: previous.tasks.map((item) =>
+        item.id === taskId
+          ? {
+              ...item,
+              ownerId: updated.ownerId || "",
+              dueDate: updated.dueAt?.slice(0, 10) || "",
+              version: updated.version,
+            }
+          : item,
+      ),
+    }));
+  };
   const createIdea = async (title: string, summary: string) => {
     const response = await fetch("/api/pr-center/ideas", {
       method: "POST",
@@ -1296,7 +1328,11 @@ export function PrCenterApp({
             />
           )}
           {page === "operations" && (
-            <Operations tasks={state.tasks} onTransition={transitionTask} />
+            <Operations
+              tasks={state.tasks}
+              onTransition={transitionTask}
+              onAssign={assignTaskToMe}
+            />
           )}
           {page === "calendar" && (
             <Calendar tasks={state.tasks} language={state.language} onNavigate={go} />
@@ -1883,14 +1919,17 @@ function Requests({
 function Operations({
   tasks: taskItems,
   onTransition,
+  onAssign,
 }: {
   tasks: Task[];
   onTransition: (taskId: string, status: StatusId) => void;
+  onAssign: (taskId: string, dueDate: string) => void;
 }) {
   const [view, setView] = useState<"board" | "table">("board");
   const [status, setStatus] = useState<"all" | StatusId>("all");
   const [ownerId, setOwnerId] = useState("all");
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [dueDate, setDueDate] = useState("");
   const visibleTasks = taskItems.filter(
     (task) =>
       (status === "all" || task.status === status) &&
@@ -1968,7 +2007,14 @@ function Operations({
                       {getUser(task.ownerId)?.name ?? "Unassigned"}
                       <span>{task.dueDate}</span>
                     </footer>
-                    <button onClick={() => setSelectedId(task.id)}>Details</button>
+                    <button
+                      onClick={() => {
+                        setSelectedId(task.id);
+                        setDueDate(task.dueDate);
+                      }}
+                    >
+                      Details
+                    </button>
                   </article>
                 ))}
             </section>
@@ -1991,6 +2037,17 @@ function Operations({
           </p>
           <h2>{selected.title}</h2>
           <p>Owner: {getUser(selected.ownerId)?.name ?? "Unassigned"}</p>
+          <label>
+            Due date{" "}
+            <input
+              type="date"
+              value={dueDate || selected.dueDate}
+              onChange={(event) => setDueDate(event.target.value)}
+            />
+          </label>
+          <button onClick={() => onAssign(selected.id, dueDate || selected.dueDate)}>
+            Assign to me and save due date
+          </button>
           {STATUS_TRANSITIONS[selected.status].length > 0 && (
             <label>
               Move to{" "}

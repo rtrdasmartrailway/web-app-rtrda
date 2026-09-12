@@ -9,6 +9,7 @@ import {
   canApprove,
   canCreateRequest,
   canCreateIdea,
+  canManageTasks,
   canReadAllRequests,
   canReviewIdeas,
   canTransitionTask,
@@ -394,6 +395,140 @@ export async function currentMessageHouse(actor: PrCenterActor) {
       effectiveAt: { lte: new Date() },
     },
     orderBy: [{ effectiveAt: "desc" }, { versionNumber: "desc" }],
+  });
+}
+
+export async function updateTaskAssignment(
+  actor: PrCenterActor,
+  taskId: string,
+  fromVersion: number,
+  input: { ownerId: string | null; dueAt: Date | null },
+  correlationId: string = randomUUID(),
+) {
+  if (!canManageTasks(actor.role))
+    throw new PrCenterError("You cannot assign a task", 403, "FORBIDDEN");
+  const task = await prisma.prTask.findFirst({
+    where: { id: taskId, request: { organizationId: actor.organizationId } },
+  });
+  if (!task) throw new PrCenterError("Task not found", 404, "NOT_FOUND");
+  if (task.version !== fromVersion)
+    throw new PrCenterError(
+      "This task has changed. Refresh and try again.",
+      409,
+      "STALE_UPDATE",
+    );
+  if (input.ownerId) {
+    const owner = await prisma.prCenterUser.findFirst({
+      where: { id: input.ownerId, organizationId: actor.organizationId, active: true },
+    });
+    if (!owner)
+      throw new PrCenterError("Task owner is not available", 422, "INVALID_OWNER");
+  }
+  return prisma.$transaction(async (tx) => {
+    const updated = await tx.prTask.updateMany({
+      where: { id: task.id, version: fromVersion },
+      data: { ownerId: input.ownerId, dueAt: input.dueAt, version: { increment: 1 } },
+    });
+    if (updated.count !== 1)
+      throw new PrCenterError(
+        "This task has changed. Refresh and try again.",
+        409,
+        "STALE_UPDATE",
+      );
+    if (input.ownerId && input.ownerId !== task.ownerId)
+      await tx.prNotification.create({
+        data: {
+          userId: input.ownerId,
+          title: "PR Center task assigned",
+          body: task.title,
+          target: "operations",
+        },
+      });
+    await auditAndOutbox(tx, {
+      actor,
+      action: "task.assigned",
+      entityType: "task",
+      entityId: task.id,
+      after: {
+        ownerId: input.ownerId,
+        dueAt: input.dueAt?.toISOString() || null,
+        version: fromVersion + 1,
+      },
+      eventType: "pr.task.assigned",
+      correlationId,
+    });
+    return tx.prTask.findUniqueOrThrow({ where: { id: task.id } });
+  });
+}
+
+export async function addTaskComment(
+  actor: PrCenterActor,
+  taskId: string,
+  body: string,
+  correlationId: string = randomUUID(),
+) {
+  const task = await prisma.prTask.findFirst({
+    where: { id: taskId, request: { organizationId: actor.organizationId } },
+    include: { request: true },
+  });
+  if (!task || (!canReadAllRequests(actor.role) && task.request.requesterId !== actor.id))
+    throw new PrCenterError("Task not found", 404, "NOT_FOUND");
+  const text = body.trim();
+  if (text.length < 1 || text.length > 5000)
+    throw new PrCenterError(
+      "Comment must contain 1 to 5000 characters",
+      422,
+      "INVALID_COMMENT",
+    );
+  return prisma.$transaction(async (tx) => {
+    const comment = await tx.prComment.create({
+      data: { taskId: task.id, authorId: actor.id, body: text },
+      include: { author: { select: { displayName: true } } },
+    });
+    await auditAndOutbox(tx, {
+      actor,
+      action: "task.comment_added",
+      entityType: "task",
+      entityId: task.id,
+      after: { commentId: comment.id },
+      eventType: "pr.task.comment_added",
+      correlationId,
+    });
+    return comment;
+  });
+}
+
+export async function taskHistory(actor: PrCenterActor, taskId: string) {
+  const task = await prisma.prTask.findFirst({
+    where: { id: taskId, request: { organizationId: actor.organizationId } },
+    include: { request: true },
+  });
+  if (!task || (!canReadAllRequests(actor.role) && task.request.requesterId !== actor.id))
+    throw new PrCenterError("Task not found", 404, "NOT_FOUND");
+  const [comments, statuses, audit] = await Promise.all([
+    prisma.prComment.findMany({
+      where: { taskId },
+      include: { author: { select: { displayName: true } } },
+      orderBy: { createdAt: "asc" },
+    }),
+    prisma.prStatusHistory.findMany({ where: { taskId }, orderBy: { createdAt: "asc" } }),
+    prisma.prAuditEvent.findMany({
+      where: {
+        organizationId: actor.organizationId,
+        entityType: "task",
+        entityId: taskId,
+      },
+      orderBy: { createdAt: "asc" },
+    }),
+  ]);
+  return { comments, statuses, audit };
+}
+
+export async function listNotifications(actor: PrCenterActor) {
+  return prisma.prNotification.findMany({
+    where: { userId: actor.id },
+    orderBy: { createdAt: "desc" },
+    take: 100,
   });
 }
 
