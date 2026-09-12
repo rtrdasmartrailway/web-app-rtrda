@@ -4,6 +4,7 @@ import {
   type FixedWindowLimiter,
 } from "@/lib/security/rate-limit";
 import { isObviousBot, parseAnalyticsEvent } from "@/lib/analytics/event-contract";
+import { isSameOriginAnalyticsRequest } from "@/lib/analytics/origin-policy";
 import { anonymousHashes, storeAnalyticsEvent } from "@/lib/analytics/store";
 
 export const dynamic = "force-dynamic";
@@ -30,23 +31,6 @@ function requestIp(request: NextRequest): string | null {
     first(request.headers.get("x-forwarded-for")) ||
     first(request.headers.get("x-real-ip"))
   );
-}
-
-export function isSameOriginAnalyticsRequest(request: NextRequest): boolean {
-  const fetchSite = request.headers.get("sec-fetch-site");
-  if (fetchSite && fetchSite !== "same-origin") return false;
-  const origin = request.headers.get("origin");
-  if (!origin) return fetchSite === "same-origin";
-  try {
-    const originHost = new URL(origin).hostname.toLowerCase();
-    const requestHost =
-      first(request.headers.get("x-forwarded-host")) ||
-      first(request.headers.get("host")) ||
-      request.nextUrl.hostname;
-    return originHost === requestHost.split(":")[0].toLowerCase();
-  } catch {
-    return false;
-  }
 }
 
 export async function POST(request: NextRequest): Promise<NextResponse> {
