@@ -25,6 +25,16 @@ RUN npm run lint
 RUN npm run typecheck
 RUN npm run build
 
+FROM deps AS pr-center-api
+WORKDIR /app
+COPY . .
+RUN DATABASE_URL="postgresql://build:build@localhost:5432/build" npx prisma generate
+ENV NODE_ENV=production
+ENV PR_CENTER_API_HOST=0.0.0.0
+ENV PR_CENTER_API_PORT=3100
+EXPOSE 3100
+CMD ["npm", "run", "pr-center:api"]
+
 FROM node:22-bookworm-slim AS runner
 WORKDIR /app
 ENV NODE_ENV=production

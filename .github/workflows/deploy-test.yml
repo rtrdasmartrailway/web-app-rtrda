@@ -89,7 +89,7 @@ jobs:
         run: |
           set -euo pipefail
           cd /srv/workspace/web-app-rtrda
-          RTRDA_RELEASE_SHA="${GITHUB_SHA}" docker compose up -d --build web-app-rtrda-test
+          RTRDA_RELEASE_SHA="${GITHUB_SHA}" docker compose up -d --build web-app-rtrda-test pr-center-api
           deployed_sha="$(docker inspect web-app-rtrda-test --format '{{ index .Config.Labels "org.opencontainers.image.revision" }}')"
           test "$deployed_sha" = "${GITHUB_SHA}"
 
@@ -103,6 +103,8 @@ jobs:
             fi
             sleep 3
           done
+          docker compose exec -T pr-center-api node -e "fetch('http://127.0.0.1:3100/healthz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
           curl -fsS https://test.rtrda.or.th/healthz
+          test "$(curl -sS -o /dev/null -w '%{http_code}' https://test.rtrda.or.th/api/pr-center/session)" = "401"
           curl -fsSI https://test.rtrda.or.th/ | sed -n '1,20p'
           node scripts/check-live-security.mjs https://test.rtrda.or.th

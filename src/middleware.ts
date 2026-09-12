@@ -16,6 +16,7 @@ const ANALYTICS_METHODS = "POST, OPTIONS";
 const DOWNLOAD_CAPTCHA_METHODS = "GET, POST, OPTIONS";
 const ANALYTICS_EVENT_PATH = "/api/analytics/events";
 const DOWNLOAD_CAPTCHA_PATH = "/api/download-captcha";
+const PR_CENTER_API_PREFIX = "/api/pr-center/";
 const HEALTH_PATHS = new Set(["/healthz", "/api/health"]);
 const PUBLIC_HOSTS = new Set(["rtrda.or.th", "www.rtrda.or.th", "test.rtrda.or.th"]);
 
@@ -49,21 +50,27 @@ function methodPolicy(request: NextRequest): NextResponse | null {
   const path = new URL(request.url).pathname;
   const analyticsRequest = path === ANALYTICS_EVENT_PATH;
   const downloadCaptchaRequest = path === DOWNLOAD_CAPTCHA_PATH;
+  const prCenterApiRequest = path.startsWith(PR_CENTER_API_PREFIX);
 
   if (request.method === "OPTIONS") {
     return new NextResponse(null, {
       status: 204,
       headers: {
-        Allow: analyticsRequest
-          ? ANALYTICS_METHODS
-          : downloadCaptchaRequest
-            ? DOWNLOAD_CAPTCHA_METHODS
-            : ALLOWED_METHODS,
+        Allow: prCenterApiRequest
+          ? "GET, POST, OPTIONS"
+          : analyticsRequest
+            ? ANALYTICS_METHODS
+            : downloadCaptchaRequest
+              ? DOWNLOAD_CAPTCHA_METHODS
+              : ALLOWED_METHODS,
       },
     });
   }
 
-  if ((analyticsRequest || downloadCaptchaRequest) && request.method === "POST")
+  if (
+    (analyticsRequest || downloadCaptchaRequest || prCenterApiRequest) &&
+    request.method === "POST"
+  )
     return null;
 
   if (request.method !== "GET" && request.method !== "HEAD") {
@@ -72,11 +79,13 @@ function methodPolicy(request: NextRequest): NextResponse | null {
       {
         status: 405,
         headers: {
-          Allow: analyticsRequest
-            ? ANALYTICS_METHODS
-            : downloadCaptchaRequest
-              ? DOWNLOAD_CAPTCHA_METHODS
-              : ALLOWED_METHODS,
+          Allow: prCenterApiRequest
+            ? "GET, POST, OPTIONS"
+            : analyticsRequest
+              ? ANALYTICS_METHODS
+              : downloadCaptchaRequest
+                ? DOWNLOAD_CAPTCHA_METHODS
+                : ALLOWED_METHODS,
         },
       },
     );

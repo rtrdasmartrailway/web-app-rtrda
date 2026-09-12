@@ -4,6 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
+    "pr-center:api": "tsx src/pr-center-api/server.ts",
     "import:wordpress": "node scripts/import-wordpress.mjs",
     "audit:parity": "node scripts/audit-parity.mjs",
     "audit:divergence": "node scripts/audit-divergence.mjs",
@@ -23,13 +24,14 @@
     "@prisma/adapter-pg": "^7.9.0",
     "@prisma/client": "^7.9.0",
     "cheerio": "^1.2.0",
-    "next": "^16.2.11",
+    "fastify": "^5.12.4",
+    "next": "^16.3.3",
     "pdfjs-dist": "^6.3.289",
     "pg": "^8.21.0",
     "react": "19.2.4",
     "react-dom": "19.2.4",
     "sanitize-html": "^2.17.7",
-    "sharp": "^0.35.3",
+    "sharp": "^0.35.4",
     "undici": "^7.28.0"
   },
   "devDependencies": {
@@ -41,10 +43,11 @@
     "@types/sanitize-html": "^2.16.1",
     "babel-plugin-react-compiler": "1.0.0",
     "eslint": "^9",
-    "eslint-config-next": "^16.2.11",
+    "eslint-config-next": "^16.3.3",
     "prettier": "3.8.4",
     "prisma": "^7.9.0",
     "tailwindcss": "^4",
+    "tsx": "^4.23.13",
     "typescript": "^5",
     "vitest": "^4.1.8"
   },

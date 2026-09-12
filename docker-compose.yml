@@ -22,6 +22,8 @@ services:
     depends_on:
       db:
         condition: service_healthy
+      pr-center-api:
+        condition: service_healthy
     ports:
       - "127.0.0.1:3020:3000"
     volumes:
@@ -40,6 +42,33 @@ services:
         [
           "CMD-SHELL",
           'node -e "fetch(''http://127.0.0.1:3000'').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"',
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+
+  pr-center-api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: pr-center-api
+    image: web-app-rtrda:pr-center-api-test
+    container_name: web-app-rtrda-pr-center-api-test
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgresql://rtrda:${POSTGRES_PASSWORD}@db:5432/rtrda
+      PR_CENTER_API_HOST: 0.0.0.0
+      PR_CENTER_API_PORT: 3100
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          'node -e "fetch(\"http://127.0.0.1:3100/healthz\").then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"',
         ]
       interval: 30s
       timeout: 10s

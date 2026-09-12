@@ -1,0 +1,108 @@
+.shell {
+  background: #f5f7fb;
+  color: #152744;
+  display: grid;
+  grid-template-columns: 250px minmax(0, 1fr);
+  min-height: 100vh;
+}
+
+.sidebar {
+  background: #082849;
+  color: #dceafb;
+  padding: 2rem 1.25rem;
+}
+
+.brand {
+  color: #ffffff;
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  margin: 0 0 2rem;
+}
+
+.sidebar nav {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.sidebar span {
+  border-radius: 0.4rem;
+  font-size: 0.95rem;
+  padding: 0.7rem 0.8rem;
+}
+
+.sidebar span:first-child {
+  background: #164a78;
+  color: #ffffff;
+}
+
+.content {
+  align-self: center;
+  margin: 0 auto;
+  max-width: 760px;
+  padding: 3rem 2rem;
+  width: 100%;
+}
+
+.eyebrow {
+  color: #58708c;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  margin: 0;
+}
+
+.content h1 {
+  font-size: clamp(2.25rem, 5vw, 4rem);
+  line-height: 1;
+  margin: 0.45rem 0 1rem;
+}
+
+.lead {
+  font-size: 1.15rem;
+  line-height: 1.75;
+  max-width: 48rem;
+}
+
+.security {
+  background: #ffffff;
+  border: 1px solid #d7e1ed;
+  border-radius: 0.7rem;
+  margin-top: 2rem;
+  padding: 1.5rem;
+}
+
+.security h2 {
+  font-size: 1.1rem;
+  margin: 0;
+}
+
+.security ul {
+  line-height: 1.7;
+  margin: 0.8rem 0 0;
+  padding-left: 1.3rem;
+}
+
+.note {
+  color: #58708c;
+  font-size: 0.9rem;
+  margin-top: 1.5rem;
+}
+
+@media (max-width: 700px) {
+  .shell {
+    grid-template-columns: 1fr;
+  }
+  .sidebar {
+    padding: 1.25rem;
+  }
+  .sidebar nav {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .brand {
+    margin-bottom: 1rem;
+  }
+  .content {
+    padding: 2rem 1.25rem;
+  }
+}
