@@ -25,15 +25,27 @@
   gap: 0.35rem;
 }
 
-.sidebar span {
+.sidebar nav button {
+  background: transparent;
+  border: 0;
   border-radius: 0.4rem;
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
   font-size: 0.95rem;
+  text-align: left;
   padding: 0.7rem 0.8rem;
 }
 
-.sidebar span:first-child {
+.sidebar nav button:hover:not(:disabled),
+.sidebar nav button.activeNav {
   background: #164a78;
   color: #ffffff;
+}
+
+.sidebar nav button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
 }
 
 .content {
@@ -110,6 +122,84 @@
   color: #a02424;
   font-size: 0.9rem;
   margin: 0.55rem 0 0;
+}
+
+.requestForm {
+  background: #ffffff;
+  border: 1px solid #d7e1ed;
+  border-radius: 0.7rem;
+  display: grid;
+  gap: 1rem;
+  margin-top: 1.5rem;
+  padding: 1.5rem;
+}
+
+.requestForm .lead {
+  margin: 0;
+}
+
+.requestForm label {
+  display: grid;
+  font-size: 0.9rem;
+  font-weight: 700;
+  gap: 0.4rem;
+}
+
+.requestForm input,
+.requestForm select,
+.requestForm textarea {
+  border: 1px solid #aebdcc;
+  border-radius: 0.4rem;
+  font: inherit;
+  font-weight: 400;
+  padding: 0.65rem 0.75rem;
+}
+
+.requestForm button {
+  background: #0c4f82;
+  border: 0;
+  border-radius: 0.45rem;
+  color: #ffffff;
+  cursor: pointer;
+  font: inherit;
+  font-weight: 700;
+  justify-self: start;
+  padding: 0.7rem 1rem;
+}
+
+.requests {
+  display: grid;
+  gap: 0.75rem;
+  margin-top: 1.5rem;
+}
+
+.requestCard {
+  background: #ffffff;
+  border: 1px solid #d7e1ed;
+  border-radius: 0.6rem;
+  display: grid;
+  gap: 0.35rem;
+  padding: 1rem;
+}
+
+.requestCard strong {
+  font-size: 1rem;
+}
+
+.requestCard p,
+.requestCard small {
+  color: #58708c;
+  margin: 0.2rem 0 0;
+}
+
+.requestCard span {
+  background: #e4f0fa;
+  border-radius: 99px;
+  color: #0c4f82;
+  font-size: 0.78rem;
+  font-weight: 700;
+  justify-self: start;
+  padding: 0.25rem 0.55rem;
 }
 
 .security {
