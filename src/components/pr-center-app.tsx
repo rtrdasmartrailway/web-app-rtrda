@@ -121,6 +121,7 @@ type Idea = {
   status: IdeaStatus;
   createdAt: string;
   requestId?: string;
+  version?: number;
 };
 type MessageHouseData = {
   vision: string;
@@ -760,6 +761,52 @@ export function PrCenterApp({
       })
       .catch(() => setNotice("Unable to load server requests"));
   }, []);
+  useEffect(() => {
+    fetch("/api/pr-center/ideas", { credentials: "same-origin" })
+      .then(async (response) => {
+        if (!response.ok) throw new Error("Idea list unavailable");
+        const ideas = (await response.json()) as Array<{
+          id: string;
+          title: string;
+          rationale: string;
+          proposerId: string;
+          status: string;
+          createdAt: string;
+          convertedRequestId: string | null;
+          version: number;
+        }>;
+        setState((previous) => ({
+          ...previous,
+          ideas: ideas.map((idea) => ({
+            id: idea.id,
+            title: idea.title,
+            summary: idea.rationale,
+            authorId: idea.proposerId,
+            status: idea.status.toLowerCase() as IdeaStatus,
+            createdAt: idea.createdAt,
+            requestId: idea.convertedRequestId || undefined,
+            version: idea.version,
+          })),
+        }));
+      })
+      .catch(() => undefined);
+    fetch("/api/pr-center/message-house/current", { credentials: "same-origin" })
+      .then(async (response) => {
+        if (!response.ok) throw new Error("Message house unavailable");
+        const messageHouse = (await response.json()) as {
+          vision: string;
+          positioning: string;
+          pillars: string[];
+          foundation: string;
+        } | null;
+        if (!messageHouse) return;
+        setState((previous) => ({
+          ...previous,
+          messageHouse: { ...previous.messageHouse, ...messageHouse },
+        }));
+      })
+      .catch(() => undefined);
+  }, []);
 
   const currentUser: User = actor
     ? {
@@ -922,86 +969,86 @@ export function PrCenterApp({
       );
     }
   };
-  const createIdea = (title: string, summary: string) => {
-    updateState((previous) => {
-      const idea: Idea = {
-        id: `IDEA-${String(previous.ideas.length + 1).padStart(3, "0")}`,
-        title,
-        summary,
-        authorId: currentUser.id,
-        status: "proposed",
-        createdAt: new Date().toISOString(),
-      };
-      return addAudit(
-        { ...previous, ideas: [idea, ...previous.ideas] },
-        "system",
-        idea.id,
-        "idea_created",
-        "",
-        title,
-      );
+  const createIdea = async (title: string, summary: string) => {
+    const response = await fetch("/api/pr-center/ideas", {
+      method: "POST",
+      credentials: "same-origin",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ title, rationale: summary }),
     });
+    if (!response.ok) return announce("Idea could not be saved");
+    const idea = (await response.json()) as {
+      id: string;
+      status: string;
+      version: number;
+      createdAt: string;
+    };
+    setState((previous) => ({
+      ...previous,
+      ideas: [
+        {
+          id: idea.id,
+          title,
+          summary,
+          authorId: currentUser.id,
+          status: idea.status.toLowerCase() as IdeaStatus,
+          createdAt: idea.createdAt,
+          version: idea.version,
+        },
+        ...previous.ideas,
+      ],
+    }));
   };
-  const updateIdeaStatus = (id: string, status: IdeaStatus) =>
-    updateState((previous) => {
-      const idea = previous.ideas.find((item) => item.id === id);
-      if (!idea) return previous;
-      return addAudit(
-        {
-          ...previous,
-          ideas: previous.ideas.map((item) =>
-            item.id === id ? { ...item, status } : item,
-          ),
-        },
-        "system",
-        id,
-        "idea_status_changed",
-        idea.status,
-        status,
-      );
+  const updateIdeaStatus = async (id: string, status: IdeaStatus) => {
+    const idea = state.ideas.find((item) => item.id === id);
+    if (!idea?.version) return;
+    const response = await fetch(`/api/pr-center/ideas/${id}/transitions`, {
+      method: "POST",
+      credentials: "same-origin",
+      headers: { "Content-Type": "application/json", "If-Match": String(idea.version) },
+      body: JSON.stringify({ to: status.toUpperCase() }),
     });
-  const convertIdea = (id: string) => {
-    updateState((previous) => {
-      const idea = previous.ideas.find((item) => item.id === id);
-      if (!idea || idea.status !== "accepted") return previous;
-      const requestId = `REQ-${String(previous.requests.length + 24).padStart(3, "0")}`;
-      const taskId = `TASK-${String(previous.tasks.length + 40).padStart(3, "0")}`;
-      const request: Request = {
-        id: requestId,
-        title: idea.title,
-        type: "pr",
-        requesterId: idea.authorId,
-        department: getUser(idea.authorId)?.department ?? "Communications Office",
-        requestedDate: new Date().toISOString().slice(0, 10),
-        taskIds: [taskId],
-        objective: idea.summary,
-        audience: "To be defined during communication planning",
-      };
-      const task: Task = {
-        id: taskId,
-        requestId,
-        type: "PR Content",
-        title: idea.title,
-        status: "communication_planning",
-        ownerId: "u-pr",
-        dueDate: request.requestedDate,
-      };
-      return addAudit(
-        {
-          ...previous,
-          requests: [request, ...previous.requests],
-          tasks: [task, ...previous.tasks],
-          ideas: previous.ideas.map((item) =>
-            item.id === id ? { ...item, status: "converted", requestId } : item,
-          ),
-        },
-        "request",
-        requestId,
-        "idea_converted",
-        idea.id,
-        idea.title,
-      );
+    if (!response.ok) return announce("Idea transition failed");
+    const updated = (await response.json()) as { status: string; version: number };
+    setState((previous) => ({
+      ...previous,
+      ideas: previous.ideas.map((item) =>
+        item.id === id
+          ? {
+              ...item,
+              status: updated.status.toLowerCase() as IdeaStatus,
+              version: updated.version,
+            }
+          : item,
+      ),
+    }));
+  };
+  const convertIdea = async (id: string) => {
+    const idea = state.ideas.find((item) => item.id === id);
+    if (!idea?.version) return;
+    const response = await fetch(`/api/pr-center/ideas/${id}/convert`, {
+      method: "POST",
+      credentials: "same-origin",
+      headers: { "If-Match": String(idea.version) },
     });
+    if (!response.ok) return announce("Idea conversion failed");
+    const result = (await response.json()) as {
+      request: { id: string };
+      task: { id: string } | null;
+    };
+    setState((previous) => ({
+      ...previous,
+      ideas: previous.ideas.map((item) =>
+        item.id === id
+          ? {
+              ...item,
+              status: "converted",
+              requestId: result.request.id,
+              version: (item.version || 0) + 1,
+            }
+          : item,
+      ),
+    }));
     announce(
       state.language === "th" ? "แปลงแนวคิดเป็นคำขอแล้ว" : "Idea converted to request",
     );
@@ -1277,7 +1324,7 @@ export function PrCenterApp({
           {page === "message-house" && (
             <MessageHouse
               data={state.messageHouse}
-              editable={currentUser.role === "pr" || currentUser.role === "admin"}
+              editable={false}
               onSave={saveMessageHouse}
               tasks={state.tasks}
               language={state.language}
