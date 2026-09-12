@@ -64,6 +64,54 @@
   max-width: 48rem;
 }
 
+.loginForm {
+  margin-top: 1.5rem;
+  max-width: 34rem;
+}
+
+.loginForm label {
+  display: block;
+  font-size: 0.9rem;
+  font-weight: 700;
+  margin-bottom: 0.45rem;
+}
+
+.loginRow {
+  display: flex;
+  gap: 0.65rem;
+}
+
+.loginRow input {
+  border: 1px solid #aebdcc;
+  border-radius: 0.45rem;
+  flex: 1;
+  font: inherit;
+  min-width: 0;
+  padding: 0.7rem 0.8rem;
+}
+
+.loginRow button {
+  background: #0c4f82;
+  border: 0;
+  border-radius: 0.45rem;
+  color: #ffffff;
+  cursor: pointer;
+  font: inherit;
+  font-weight: 700;
+  padding: 0.7rem 1rem;
+}
+
+.loginRow button:disabled {
+  cursor: wait;
+  opacity: 0.7;
+}
+
+.loginError {
+  color: #a02424;
+  font-size: 0.9rem;
+  margin: 0.55rem 0 0;
+}
+
 .security {
   background: #ffffff;
   border: 1px solid #d7e1ed;
@@ -104,5 +152,8 @@
   }
   .content {
     padding: 2rem 1.25rem;
+  }
+  .loginRow {
+    flex-direction: column;
   }
 }

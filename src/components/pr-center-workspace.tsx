@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import styles from "./pr-center-workspace.module.css";
 
-type SessionState = "loading" | "sign-in-required" | "unavailable";
+type SessionState = "loading" | "sign-in-required" | "authenticated" | "unavailable";
 
 const navigation = [
   "Home",
@@ -19,22 +19,54 @@ const navigation = [
 
 export function PrCenterWorkspace() {
   const [sessionState, setSessionState] = useState<SessionState>("loading");
+  const [email, setEmail] = useState("");
+  const [loginError, setLoginError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
-    // The BFF supplies this endpoint only after Entra OIDC is configured.
     fetch("/api/pr-center/session", { credentials: "same-origin" })
-      .then((response) =>
-        setSessionState(response.status === 401 ? "sign-in-required" : "unavailable"),
-      )
+      .then((response) => {
+        if (response.ok) setSessionState("authenticated");
+        else
+          setSessionState(response.status === 401 ? "sign-in-required" : "unavailable");
+      })
       .catch(() => setSessionState("unavailable"));
   }, []);
+
+  async function signIn(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setSubmitting(true);
+    setLoginError(null);
+    try {
+      const response = await fetch("/api/pr-center/session/email", {
+        method: "POST",
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email }),
+      });
+      if (!response.ok) {
+        const payload = (await response.json().catch(() => null)) as {
+          message?: string;
+        } | null;
+        setLoginError(payload?.message || "ไม่สามารถเข้าสู่ระบบได้");
+        return;
+      }
+      setSessionState("authenticated");
+    } catch {
+      setLoginError("ไม่สามารถเชื่อมต่อระบบ PR Center ได้");
+    } finally {
+      setSubmitting(false);
+    }
+  }
 
   const message =
     sessionState === "loading"
       ? "กำลังตรวจสอบ session..."
       : sessionState === "sign-in-required"
-        ? "กรุณาเข้าสู่ระบบด้วยบัญชีองค์กรเพื่อใช้งาน PR Center"
-        : "PR Center กำลังรอการตั้งค่า Entra SSO และ API สำหรับสภาพแวดล้อมนี้";
+        ? "กรอก email ที่ได้รับอนุญาตเพื่อเข้าใช้งาน PR Center บน Test"
+        : sessionState === "authenticated"
+          ? "เข้าสู่ระบบแล้วในฐานะ Scoped Administrator"
+          : "PR Center กำลังรอการตั้งค่า Entra SSO และ API สำหรับสภาพแวดล้อมนี้";
 
   return (
     <main className={styles.shell}>
@@ -50,6 +82,26 @@ export function PrCenterWorkspace() {
         <p className={styles.eyebrow}>INTERNAL WORKSPACE</p>
         <h1>PR Center</h1>
         <p className={styles.lead}>{message}</p>
+        {sessionState === "sign-in-required" && (
+          <form className={styles.loginForm} onSubmit={signIn}>
+            <label htmlFor="pr-center-email">Email</label>
+            <div className={styles.loginRow}>
+              <input
+                id="pr-center-email"
+                type="email"
+                autoComplete="email"
+                value={email}
+                onChange={(event) => setEmail(event.target.value)}
+                placeholder="name@rtrda.or.th"
+                required
+              />
+              <button type="submit" disabled={submitting}>
+                {submitting ? "กำลังตรวจสอบ" : "เข้าสู่ระบบ"}
+              </button>
+            </div>
+            {loginError && <p className={styles.loginError}>{loginError}</p>}
+          </form>
+        )}
         <section className={styles.security}>
           <h2>Secure workflow controls</h2>
           <ul>
@@ -59,8 +111,8 @@ export function PrCenterWorkspace() {
           </ul>
         </section>
         <p className={styles.note}>
-          Demo roles, browser import/export and localStorage are not used by this
-          workspace.
+          Test-only temporary email access. This will be replaced by Entra OIDC. Demo
+          roles, browser import/export and localStorage are not used by this workspace.
         </p>
       </section>
     </main>

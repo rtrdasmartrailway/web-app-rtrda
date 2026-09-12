@@ -9,6 +9,13 @@ import {
 import { TASK_TRANSITIONS, type PrTaskStatus } from "@/lib/pr-center/workflow";
 
 export type ActorResolver = (request: FastifyRequest) => Promise<PrCenterActor | null>;
+export type EmailOnlyAuth = {
+  signIn: (
+    request: FastifyRequest,
+    email: string,
+  ) => Promise<{ actor: PrCenterActor; cookie: string }>;
+  signOut: (request: FastifyRequest) => string;
+};
 
 function correlationId(request: FastifyRequest): string {
   return request.headers["x-correlation-id"]?.toString().slice(0, 128) || request.id;
@@ -42,7 +49,10 @@ function taskId(value: string): `${string}-${string}-${string}-${string}-${strin
   return value as `${string}-${string}-${string}-${string}-${string}`;
 }
 
-export function buildPrCenterApi(resolveActor: ActorResolver): FastifyInstance {
+export function buildPrCenterApi(
+  resolveActor: ActorResolver,
+  emailOnlyAuth?: EmailOnlyAuth,
+): FastifyInstance {
   const app = Fastify({ logger: true, requestIdHeader: "x-correlation-id" });
   app.setErrorHandler((error, request, reply) => {
     const known = error instanceof PrCenterError;
@@ -55,7 +65,11 @@ export function buildPrCenterApi(resolveActor: ActorResolver): FastifyInstance {
   app.get("/healthz", async () => ({ ok: true, service: "pr-center-api" }));
 
   app.addHook("preHandler", async (request) => {
-    if (request.routeOptions.url === "/healthz") return;
+    if (
+      request.routeOptions.url === "/healthz" ||
+      request.routeOptions.url === "/session/email"
+    )
+      return;
     const actor = await resolveActor(request);
     if (!actor)
       throw new PrCenterError("Authentication is required", 401, "UNAUTHENTICATED");
@@ -72,6 +86,20 @@ export function buildPrCenterApi(resolveActor: ActorResolver): FastifyInstance {
     departmentId: request.prCenterActor!.departmentId,
     role: request.prCenterActor!.role,
   }));
+  app.post("/session/email", async (request, reply) => {
+    if (!emailOnlyAuth)
+      throw new PrCenterError("Email-only access is disabled", 503, "AUTH_UNAVAILABLE");
+    const input = await body(request);
+    const login = await emailOnlyAuth.signIn(
+      request,
+      typeof input.email === "string" ? input.email : "",
+    );
+    return reply.header("Set-Cookie", login.cookie).send({ role: login.actor.role });
+  });
+  app.delete("/session", async (request, reply) => {
+    if (!emailOnlyAuth) return reply.status(204).send();
+    return reply.header("Set-Cookie", emailOnlyAuth.signOut(request)).status(204).send();
+  });
   app.post("/requests", async (request, reply) => {
     const input = await body(request);
     const result = await createRequest(
