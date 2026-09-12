@@ -52,7 +52,6 @@ export function PrCenterWorkspace() {
   const [loginError, setLoginError] = useState<string | null>(null);
   const [requests, setRequests] = useState<RequestRow[]>([]);
   const [requestsError, setRequestsError] = useState<string | null>(null);
-  const [loadingRequests, setLoadingRequests] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
@@ -71,8 +70,6 @@ export function PrCenterWorkspace() {
       !["Home", "My Requests", "All Requests"].includes(page)
     )
       return;
-    setLoadingRequests(true);
-    setRequestsError(null);
     fetch("/api/pr-center/requests?take=25", { credentials: "same-origin" })
       .then(async (response) => {
         if (!response.ok) throw new Error("ไม่สามารถโหลดคำขอได้");
@@ -80,9 +77,13 @@ export function PrCenterWorkspace() {
       })
       .catch((error: unknown) =>
         setRequestsError(error instanceof Error ? error.message : "ไม่สามารถโหลดคำขอได้"),
-      )
-      .finally(() => setLoadingRequests(false));
+      );
   }, [page, sessionState]);
+
+  function navigate(nextPage: Page) {
+    setRequestsError(null);
+    setPage(nextPage);
+  }
 
   async function signIn(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -157,7 +158,7 @@ export function PrCenterWorkspace() {
               className={page === item ? styles.activeNav : undefined}
               key={item}
               type="button"
-              onClick={() => setPage(item)}
+              onClick={() => navigate(item)}
               disabled={!signedIn}
             >
               {item}
@@ -165,10 +166,7 @@ export function PrCenterWorkspace() {
           ))}
         </nav>
       </aside>
-      <section
-        className={styles.content}
-        aria-busy={sessionState === "loading" || loadingRequests}
-      >
+      <section className={styles.content} aria-busy={sessionState === "loading"}>
         <p className={styles.eyebrow}>INTERNAL WORKSPACE</p>
         <h1>{page}</h1>
         {sessionState === "loading" && (
@@ -243,7 +241,7 @@ export function PrCenterWorkspace() {
                 : "คำขอที่อยู่ใน scope ของคุณ"}
             </p>
             {requestsError && <p className={styles.loginError}>{requestsError}</p>}
-            {!loadingRequests && !requestsError && requests.length === 0 && (
+            {!requestsError && requests.length === 0 && (
               <p>ยังไม่มีคำขอ เลือก Submit Request เพื่อสร้างรายการแรก</p>
             )}
             {requests.map((request) => (
