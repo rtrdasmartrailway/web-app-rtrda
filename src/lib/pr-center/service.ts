@@ -1,10 +1,16 @@
 import { randomUUID } from "node:crypto";
-import type { Prisma, PrTaskStatus } from "@/generated/prisma/client";
+import type {
+  Prisma,
+  PrContentIdeaStatus,
+  PrTaskStatus,
+} from "@/generated/prisma/client";
 import { prisma } from "@/lib/db/client";
 import {
   canApprove,
   canCreateRequest,
+  canCreateIdea,
   canReadAllRequests,
+  canReviewIdeas,
   canTransitionTask,
   type PrCenterRole,
   type PrTaskStatus as WorkflowStatus,
@@ -34,6 +40,15 @@ type CreateRequestInput = {
   audience?: string;
   requestedFor?: Date;
   sourceUrls: string[];
+};
+type IdeaStatus = "PROPOSED" | "UNDER_REVIEW" | "ACCEPTED" | "CONVERTED" | "ARCHIVED";
+
+const IDEA_TRANSITIONS: Record<IdeaStatus, IdeaStatus[]> = {
+  PROPOSED: ["UNDER_REVIEW", "ARCHIVED"],
+  UNDER_REVIEW: ["ACCEPTED", "ARCHIVED"],
+  ACCEPTED: ["ARCHIVED"],
+  CONVERTED: ["ARCHIVED"],
+  ARCHIVED: [],
 };
 
 function assertUrl(value: string): string {
@@ -173,6 +188,212 @@ export async function listRequests(actor: PrCenterActor, take = 25, cursor?: str
       sources: { select: { url: true } },
       tasks: true,
     },
+  });
+}
+
+export async function listIdeas(actor: PrCenterActor) {
+  return prisma.prContentIdea.findMany({
+    where: canReadAllRequests(actor.role)
+      ? {
+          organizationId: actor.organizationId,
+          ...(actor.role === "SCOPED_ADMINISTRATOR" || !actor.departmentId
+            ? {}
+            : { departmentId: actor.departmentId }),
+        }
+      : { organizationId: actor.organizationId, proposerId: actor.id },
+    orderBy: { createdAt: "desc" },
+  });
+}
+
+export async function createIdea(
+  actor: PrCenterActor,
+  input: { title: string; rationale: string },
+  correlationId: string = randomUUID(),
+) {
+  if (!canCreateIdea(actor.role) || !actor.departmentId)
+    throw new PrCenterError("You cannot create an idea", 403, "FORBIDDEN");
+  const title = input.title.trim();
+  const rationale = input.rationale.trim();
+  if (
+    title.length < 3 ||
+    title.length > 300 ||
+    rationale.length < 3 ||
+    rationale.length > 5000
+  )
+    throw new PrCenterError(
+      "Idea title and rationale must be between 3 and 5000 characters",
+      422,
+      "INVALID_IDEA",
+    );
+  return prisma.$transaction(async (tx) => {
+    const idea = await tx.prContentIdea.create({
+      data: {
+        organizationId: actor.organizationId,
+        departmentId: actor.departmentId!,
+        proposerId: actor.id,
+        title,
+        rationale,
+      },
+    });
+    await auditAndOutbox(tx, {
+      actor,
+      action: "idea.created",
+      entityType: "content_idea",
+      entityId: idea.id,
+      after: { status: idea.status, version: idea.version },
+      eventType: "pr.idea.created",
+      correlationId,
+    });
+    return idea;
+  });
+}
+
+export async function transitionIdea(
+  actor: PrCenterActor,
+  ideaId: string,
+  fromVersion: number,
+  to: IdeaStatus,
+  reason: string | undefined,
+  correlationId: string = randomUUID(),
+) {
+  if (!canReviewIdeas(actor.role))
+    throw new PrCenterError("You cannot review an idea", 403, "FORBIDDEN");
+  const idea = await prisma.prContentIdea.findFirst({
+    where: { id: ideaId, organizationId: actor.organizationId },
+  });
+  if (!idea) throw new PrCenterError("Idea not found", 404, "NOT_FOUND");
+  if (idea.version !== fromVersion)
+    throw new PrCenterError(
+      "This idea has changed. Refresh and try again.",
+      409,
+      "STALE_UPDATE",
+    );
+  if (!IDEA_TRANSITIONS[idea.status as IdeaStatus].includes(to))
+    throw new PrCenterError(
+      "This idea transition is not allowed",
+      422,
+      "INVALID_TRANSITION",
+    );
+  return prisma.$transaction(async (tx) => {
+    const updated = await tx.prContentIdea.updateMany({
+      where: { id: idea.id, version: fromVersion },
+      data: {
+        status: to as PrContentIdeaStatus,
+        reviewerId: actor.id,
+        decisionReason: reason?.trim() || null,
+        version: { increment: 1 },
+      },
+    });
+    if (updated.count !== 1)
+      throw new PrCenterError(
+        "This idea has changed. Refresh and try again.",
+        409,
+        "STALE_UPDATE",
+      );
+    await auditAndOutbox(tx, {
+      actor,
+      action: "idea.transitioned",
+      entityType: "content_idea",
+      entityId: idea.id,
+      after: { from: idea.status, to, version: fromVersion + 1 },
+      eventType: "pr.idea.transitioned",
+      correlationId,
+    });
+    return tx.prContentIdea.findUniqueOrThrow({ where: { id: idea.id } });
+  });
+}
+
+export async function convertIdea(
+  actor: PrCenterActor,
+  ideaId: string,
+  fromVersion: number,
+  correlationId: string = randomUUID(),
+) {
+  if (!canReviewIdeas(actor.role))
+    throw new PrCenterError("You cannot convert an idea", 403, "FORBIDDEN");
+  const idea = await prisma.prContentIdea.findFirst({
+    where: { id: ideaId, organizationId: actor.organizationId },
+  });
+  if (!idea) throw new PrCenterError("Idea not found", 404, "NOT_FOUND");
+  if (idea.version !== fromVersion)
+    throw new PrCenterError(
+      "This idea has changed. Refresh and try again.",
+      409,
+      "STALE_UPDATE",
+    );
+  if (idea.status !== "ACCEPTED")
+    throw new PrCenterError(
+      "Only accepted ideas can be converted",
+      422,
+      "INVALID_TRANSITION",
+    );
+  return prisma.$transaction(async (tx) => {
+    const request = await tx.prRequest.create({
+      data: {
+        organizationId: idea.organizationId,
+        departmentId: idea.departmentId,
+        requesterId: idea.proposerId,
+        requestNumber: requestNumber("PR"),
+        type: "PR",
+        title: idea.title,
+        revisions: {
+          create: {
+            revisionNumber: 1,
+            title: idea.title,
+            objective: idea.rationale,
+            audience: idea.audience,
+          },
+        },
+        tasks: {
+          create: {
+            title: idea.title,
+            contentType: "PR Content",
+            ownerId: actor.id,
+          },
+        },
+      },
+      include: { tasks: true },
+    });
+    const updated = await tx.prContentIdea.updateMany({
+      where: { id: idea.id, status: "ACCEPTED", version: fromVersion },
+      data: {
+        status: "CONVERTED",
+        reviewerId: actor.id,
+        convertedRequestId: request.id,
+        version: { increment: 1 },
+      },
+    });
+    if (updated.count !== 1)
+      throw new PrCenterError(
+        "This idea has changed. Refresh and try again.",
+        409,
+        "STALE_UPDATE",
+      );
+    await auditAndOutbox(tx, {
+      actor,
+      action: "idea.converted",
+      entityType: "content_idea",
+      entityId: idea.id,
+      after: {
+        requestId: request.id,
+        taskId: request.tasks[0]?.id,
+        version: fromVersion + 1,
+      },
+      eventType: "pr.idea.converted",
+      correlationId,
+    });
+    return { ideaId: idea.id, request, task: request.tasks[0] };
+  });
+}
+
+export async function currentMessageHouse(actor: PrCenterActor) {
+  return prisma.prMessageHouseVersion.findFirst({
+    where: {
+      organizationId: actor.organizationId,
+      status: "APPROVED",
+      effectiveAt: { lte: new Date() },
+    },
+    orderBy: [{ effectiveAt: "desc" }, { versionNumber: "desc" }],
   });
 }
 

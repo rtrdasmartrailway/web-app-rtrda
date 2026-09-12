@@ -1,7 +1,12 @@
 import Fastify, { type FastifyInstance, type FastifyRequest } from "fastify";
 import {
   createRequest,
+  createIdea,
+  convertIdea,
+  currentMessageHouse,
+  listIdeas,
   listRequests,
+  transitionIdea,
   PrCenterError,
   transitionTask,
   type PrCenterActor,
@@ -80,6 +85,46 @@ export function buildPrCenterApi(
     const query = request.query as { take?: string; cursor?: string };
     return listRequests(request.prCenterActor!, Number(query.take || 25), query.cursor);
   });
+  app.get("/ideas", async (request) => listIdeas(request.prCenterActor!));
+  app.post("/ideas", async (request, reply) => {
+    const input = await body(request);
+    const idea = await createIdea(
+      request.prCenterActor!,
+      {
+        title: typeof input.title === "string" ? input.title : "",
+        rationale: typeof input.rationale === "string" ? input.rationale : "",
+      },
+      correlationId(request),
+    );
+    return reply.status(201).send(idea);
+  });
+  app.post("/ideas/:ideaId/transitions", async (request) => {
+    const input = await body(request);
+    if (
+      typeof input.to !== "string" ||
+      !["UNDER_REVIEW", "ACCEPTED", "ARCHIVED"].includes(input.to)
+    )
+      throw new PrCenterError("Unknown idea status", 422, "INVALID_STATUS");
+    return transitionIdea(
+      request.prCenterActor!,
+      taskId((request.params as { ideaId: string }).ideaId),
+      expectedVersion(request),
+      input.to as "UNDER_REVIEW" | "ACCEPTED" | "ARCHIVED",
+      typeof input.reason === "string" ? input.reason : undefined,
+      correlationId(request),
+    );
+  });
+  app.post("/ideas/:ideaId/convert", async (request) =>
+    convertIdea(
+      request.prCenterActor!,
+      taskId((request.params as { ideaId: string }).ideaId),
+      expectedVersion(request),
+      correlationId(request),
+    ),
+  );
+  app.get("/message-house/current", async (request) =>
+    currentMessageHouse(request.prCenterActor!),
+  );
   app.get("/session", async (request) => ({
     userId: request.prCenterActor!.id,
     organizationId: request.prCenterActor!.organizationId,

@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { canApprove, canTransitionTask, publicationGate } from "./workflow";
+import {
+  canApprove,
+  canCreateIdea,
+  canReviewIdeas,
+  canTransitionTask,
+  publicationGate,
+} from "./workflow";
 
 describe("PR Center workflow policy", () => {
   it("does not trust requester role to move a task", () => {
@@ -12,6 +18,13 @@ describe("PR Center workflow policy", () => {
   it("limits approvals to approval authorities", () => {
     expect(canApprove("APPROVER")).toBe(true);
     expect(canApprove("EXECUTIVE_READ_ONLY")).toBe(false);
+  });
+
+  it("allows idea proposals but restricts review and conversion authority", () => {
+    expect(canCreateIdea("REQUESTER")).toBe(true);
+    expect(canCreateIdea("EXECUTIVE_READ_ONLY")).toBe(false);
+    expect(canReviewIdeas("PR_OPERATIONS")).toBe(true);
+    expect(canReviewIdeas("REQUESTER")).toBe(false);
   });
 
   it("blocks publishing until every Phase 1 gate is complete", () => {

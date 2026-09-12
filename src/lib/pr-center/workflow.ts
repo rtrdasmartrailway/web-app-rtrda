@@ -72,6 +72,16 @@ export function canCreateRequest(role: PrCenterRole): boolean {
   return role === "REQUESTER" || role === "SCOPED_ADMINISTRATOR";
 }
 
+export function canCreateIdea(role: PrCenterRole): boolean {
+  return (
+    role === "REQUESTER" || role === "PR_OPERATIONS" || role === "SCOPED_ADMINISTRATOR"
+  );
+}
+
+export function canReviewIdeas(role: PrCenterRole): boolean {
+  return role === "PR_OPERATIONS" || role === "SCOPED_ADMINISTRATOR";
+}
+
 export function publicationGate(input: {
   approved: boolean;
   ownerId: string | null;

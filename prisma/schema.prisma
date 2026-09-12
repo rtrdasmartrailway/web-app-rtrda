@@ -132,6 +132,21 @@ enum PrFileScanStatus {
   FAILED
 }
 
+enum PrContentIdeaStatus {
+  PROPOSED
+  UNDER_REVIEW
+  ACCEPTED
+  CONVERTED
+  ARCHIVED
+}
+
+enum PrMessageHouseStatus {
+  DRAFT
+  IN_REVIEW
+  APPROVED
+  SUPERSEDED
+}
+
 enum PrOutboxStatus {
   PENDING
   PROCESSING
@@ -166,69 +181,117 @@ model PrDepartment {
 }
 
 model PrCenterUser {
-  id             String            @id @default(uuid()) @db.Uuid
-  organizationId String            @db.Uuid
-  departmentId   String?           @db.Uuid
-  ssoSubject     String            @unique
-  email          String            @unique
+  id             String           @id @default(uuid()) @db.Uuid
+  organizationId String           @db.Uuid
+  departmentId   String?          @db.Uuid
+  ssoSubject     String           @unique
+  email          String           @unique
   displayName    String
   position       String?
-  active         Boolean           @default(true)
-  organization   PrOrganization    @relation(fields: [organizationId], references: [id], onDelete: Restrict)
-  department     PrDepartment?     @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+  active         Boolean          @default(true)
+  organization   PrOrganization   @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  department     PrDepartment?    @relation(fields: [departmentId], references: [id], onDelete: SetNull)
   roles          PrUserRole[]
-  requests       PrRequest[]       @relation("PrRequester")
-  assignedTasks  PrTask[]          @relation("PrTaskOwner")
+  requests       PrRequest[]      @relation("PrRequester")
+  assignedTasks  PrTask[]         @relation("PrTaskOwner")
   comments       PrComment[]
   approvals      PrApproval[]
   notifications  PrNotification[]
   auditEvents    PrAuditEvent[]
-  createdAt      DateTime          @default(now())
-  updatedAt      DateTime          @updatedAt
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
 
   @@index([organizationId, departmentId, active])
 }
 
 model PrUserRole {
-  id           String           @id @default(uuid()) @db.Uuid
-  userId       String           @db.Uuid
-  role         PrCenterRoleCode
-  organizationId String          @db.Uuid
-  departmentId String?          @db.Uuid
-  user         PrCenterUser     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  createdAt    DateTime         @default(now())
+  id             String           @id @default(uuid()) @db.Uuid
+  userId         String           @db.Uuid
+  role           PrCenterRoleCode
+  organizationId String           @db.Uuid
+  departmentId   String?          @db.Uuid
+  user           PrCenterUser     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt      DateTime         @default(now())
 
   @@unique([userId, role, organizationId, departmentId])
   @@index([organizationId, departmentId, role])
 }
 
 model PrRequest {
-  id             String          @id @default(uuid()) @db.Uuid
-  organizationId String          @db.Uuid
-  departmentId   String          @db.Uuid
-  requesterId    String          @db.Uuid
-  requestNumber  String          @unique
+  id             String              @id @default(uuid()) @db.Uuid
+  organizationId String              @db.Uuid
+  departmentId   String              @db.Uuid
+  requesterId    String              @db.Uuid
+  requestNumber  String              @unique
   type           PrRequestType
-  status         PrRequestStatus @default(DRAFT)
+  status         PrRequestStatus     @default(DRAFT)
   title          String
-  priority       String          @default("NORMAL")
+  priority       String              @default("NORMAL")
   priorityReason String?
   requestedFor   DateTime?
-  version        Int             @default(1)
-  organization   PrOrganization  @relation(fields: [organizationId], references: [id], onDelete: Restrict)
-  department     PrDepartment    @relation(fields: [departmentId], references: [id], onDelete: Restrict)
-  requester      PrCenterUser    @relation("PrRequester", fields: [requesterId], references: [id], onDelete: Restrict)
+  version        Int                 @default(1)
+  organization   PrOrganization      @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  department     PrDepartment        @relation(fields: [departmentId], references: [id], onDelete: Restrict)
+  requester      PrCenterUser        @relation("PrRequester", fields: [requesterId], references: [id], onDelete: Restrict)
   revisions      PrRequestRevision[]
   sources        PrRequestSource[]
   tasks          PrTask[]
   comments       PrComment[]
   attachments    PrAttachment[]
   statusHistory  PrStatusHistory[]
-  createdAt      DateTime        @default(now())
-  updatedAt      DateTime        @updatedAt
+  convertedIdeas PrContentIdea[]     @relation("PrIdeaConversion")
+  createdAt      DateTime            @default(now())
+  updatedAt      DateTime            @updatedAt
 
   @@index([organizationId, departmentId, status, createdAt])
   @@index([requesterId, createdAt])
+}
+
+model PrContentIdea {
+  id                 String              @id @default(uuid()) @db.Uuid
+  organizationId     String              @db.Uuid
+  departmentId       String              @db.Uuid
+  proposerId         String              @db.Uuid
+  title              String
+  rationale          String
+  audience           String?
+  pillar             String?
+  channel            String?
+  priority           String?
+  campaign           String?
+  evidenceUrls       Json?
+  status             PrContentIdeaStatus @default(PROPOSED)
+  reviewerId         String?             @db.Uuid
+  decisionReason     String?
+  convertedRequestId String?             @unique @db.Uuid
+  version            Int                 @default(1)
+  convertedRequest   PrRequest?          @relation("PrIdeaConversion", fields: [convertedRequestId], references: [id], onDelete: Restrict)
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+
+  @@index([organizationId, departmentId, status, createdAt])
+  @@index([proposerId, createdAt])
+}
+
+model PrMessageHouseVersion {
+  id              String               @id @default(uuid()) @db.Uuid
+  organizationId  String               @db.Uuid
+  versionNumber   Int
+  status          PrMessageHouseStatus @default(DRAFT)
+  vision          String
+  positioning     String
+  pillars         Json
+  foundation      String
+  sourceRationale String?
+  ownerId         String?              @db.Uuid
+  reviewerId      String?              @db.Uuid
+  approverId      String?              @db.Uuid
+  effectiveAt     DateTime?
+  createdAt       DateTime             @default(now())
+  updatedAt       DateTime             @updatedAt
+
+  @@unique([organizationId, versionNumber])
+  @@index([organizationId, status, effectiveAt])
 }
 
 model PrRequestRevision {
@@ -257,71 +320,71 @@ model PrRequestSource {
 }
 
 model PrTask {
-  id             String       @id @default(uuid()) @db.Uuid
-  requestId      String       @db.Uuid
-  ownerId        String?      @db.Uuid
-  title          String
-  contentType    String
-  channel        String?
-  status         PrTaskStatus @default(DRAFT)
-  dueAt          DateTime?
-  version        Int          @default(1)
-  request        PrRequest    @relation(fields: [requestId], references: [id], onDelete: Cascade)
-  owner          PrCenterUser? @relation("PrTaskOwner", fields: [ownerId], references: [id], onDelete: SetNull)
-  revisions      PrTaskRevision[]
-  approvals      PrApproval[]
-  schedules      PrSchedule[]
-  comments       PrComment[]
-  attachments    PrAttachment[]
-  statusHistory  PrStatusHistory[]
-  createdAt      DateTime     @default(now())
-  updatedAt      DateTime     @updatedAt
+  id            String            @id @default(uuid()) @db.Uuid
+  requestId     String            @db.Uuid
+  ownerId       String?           @db.Uuid
+  title         String
+  contentType   String
+  channel       String?
+  status        PrTaskStatus      @default(DRAFT)
+  dueAt         DateTime?
+  version       Int               @default(1)
+  request       PrRequest         @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  owner         PrCenterUser?     @relation("PrTaskOwner", fields: [ownerId], references: [id], onDelete: SetNull)
+  revisions     PrTaskRevision[]
+  approvals     PrApproval[]
+  schedules     PrSchedule[]
+  comments      PrComment[]
+  attachments   PrAttachment[]
+  statusHistory PrStatusHistory[]
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
 
   @@index([requestId, status])
   @@index([ownerId, status, dueAt])
 }
 
 model PrTaskRevision {
-  id             String   @id @default(uuid()) @db.Uuid
-  taskId         String   @db.Uuid
+  id             String    @id @default(uuid()) @db.Uuid
+  taskId         String    @db.Uuid
   revisionNumber Int
   body           String?
   keyMessage     String?
-  finalAssetId   String?  @db.Uuid
+  finalAssetId   String?   @db.Uuid
   immutableAt    DateTime?
-  task           PrTask   @relation(fields: [taskId], references: [id], onDelete: Cascade)
-  createdAt      DateTime @default(now())
+  task           PrTask    @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  createdAt      DateTime  @default(now())
 
   @@unique([taskId, revisionNumber])
 }
 
 model PrApproval {
-  id             String             @id @default(uuid()) @db.Uuid
-  taskId         String             @db.Uuid
-  taskRevision   Int
-  stage          String
-  decision       PrApprovalDecision
-  comment        String?
-  decidedById    String             @db.Uuid
-  decidedAt      DateTime           @default(now())
-  task           PrTask             @relation(fields: [taskId], references: [id], onDelete: Cascade)
-  decidedBy      PrCenterUser       @relation(fields: [decidedById], references: [id], onDelete: Restrict)
+  id           String             @id @default(uuid()) @db.Uuid
+  taskId       String             @db.Uuid
+  taskRevision Int
+  stage        String
+  decision     PrApprovalDecision
+  comment      String?
+  decidedById  String             @db.Uuid
+  decidedAt    DateTime           @default(now())
+  task         PrTask             @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  decidedBy    PrCenterUser       @relation(fields: [decidedById], references: [id], onDelete: Restrict)
 
   @@index([taskId, taskRevision, stage])
 }
 
 model PrSchedule {
-  id                  String    @id @default(uuid()) @db.Uuid
-  taskId              String    @db.Uuid
-  channel             String
-  scheduledFor        DateTime
-  idempotencyKey      String    @unique
-  publishedUrl        String?
-  publishedReference  String?
-  publishedAt         DateTime?
-  task                PrTask    @relation(fields: [taskId], references: [id], onDelete: Cascade)
-  createdAt           DateTime  @default(now())
-  updatedAt           DateTime  @updatedAt
+  id                 String    @id @default(uuid()) @db.Uuid
+  taskId             String    @db.Uuid
+  channel            String
+  scheduledFor       DateTime
+  idempotencyKey     String    @unique
+  publishedUrl       String?
+  publishedReference String?
+  publishedAt        DateTime?
+  task               PrTask    @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
 
   @@index([channel, scheduledFor])
 }
@@ -372,16 +435,16 @@ model PrComment {
 }
 
 model PrStatusHistory {
-  id        String       @id @default(uuid()) @db.Uuid
-  requestId String?      @db.Uuid
-  taskId    String?      @db.Uuid
+  id        String     @id @default(uuid()) @db.Uuid
+  requestId String?    @db.Uuid
+  taskId    String?    @db.Uuid
   fromState String?
   toState   String
   reason    String?
-  actorId   String       @db.Uuid
-  request   PrRequest?   @relation(fields: [requestId], references: [id], onDelete: Cascade)
-  task      PrTask?      @relation(fields: [taskId], references: [id], onDelete: Cascade)
-  createdAt DateTime     @default(now())
+  actorId   String     @db.Uuid
+  request   PrRequest? @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  task      PrTask?    @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  createdAt DateTime   @default(now())
 }
 
 model PrNotification {
@@ -398,35 +461,35 @@ model PrNotification {
 }
 
 model PrAuditEvent {
-  id            String       @id @default(uuid()) @db.Uuid
-  organizationId String       @db.Uuid
-  actorId       String?      @db.Uuid
-  action        String
-  entityType    String
-  entityId      String
-  correlationId String
-  before        Json?
-  after         Json?
-  createdAt     DateTime     @default(now())
-  actor         PrCenterUser? @relation(fields: [actorId], references: [id], onDelete: SetNull)
+  id             String        @id @default(uuid()) @db.Uuid
+  organizationId String        @db.Uuid
+  actorId        String?       @db.Uuid
+  action         String
+  entityType     String
+  entityId       String
+  correlationId  String
+  before         Json?
+  after          Json?
+  createdAt      DateTime      @default(now())
+  actor          PrCenterUser? @relation(fields: [actorId], references: [id], onDelete: SetNull)
 
   @@index([organizationId, entityType, entityId, createdAt])
   @@index([correlationId])
 }
 
 model PrOutboxEvent {
-  id             String        @id @default(uuid()) @db.Uuid
+  id             String         @id @default(uuid()) @db.Uuid
   aggregateType  String
   aggregateId    String
   eventType      String
   payload        Json
-  idempotencyKey String        @unique
+  idempotencyKey String         @unique
   status         PrOutboxStatus @default(PENDING)
-  attempts       Int           @default(0)
-  availableAt    DateTime      @default(now())
+  attempts       Int            @default(0)
+  availableAt    DateTime       @default(now())
   processedAt    DateTime?
   lastError      String?
-  createdAt      DateTime      @default(now())
+  createdAt      DateTime       @default(now())
 
   @@index([status, availableAt])
 }
