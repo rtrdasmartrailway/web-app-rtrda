@@ -94,6 +94,7 @@ type Task = {
   status: StatusId;
   ownerId: string;
   dueDate: string;
+  version?: number;
 };
 type Notification = {
   id: string;
@@ -183,6 +184,17 @@ const pages: { id: Page; th: string; en: string; icon: string }[] = [
   { id: "settings", th: "Permission Settings", en: "Permission Settings", icon: "⚙️" },
   { id: "system-data", th: "System Data", en: "System Data", icon: "🗄️" },
 ];
+const PHASE_1_PAGES = new Set<Page>([
+  "home",
+  "new-request",
+  "my-requests",
+  "requests",
+  "operations",
+  "calendar",
+  "approvals",
+  "notifications",
+  "history",
+]);
 
 const copy = {
   th: {
@@ -190,7 +202,7 @@ const copy = {
     subheading: "ภาพรวมงานประชาสัมพันธ์และการสื่อสารของ สทร.",
     newRequest: "ส่งคำขอใหม่",
     search: "ค้นหางาน คำขอ หรือเนื้อหา",
-    prototype: "Prototype UI only · ข้อมูลในหน้านี้เป็นข้อมูลจำลอง",
+    prototype: "Phase 1 Test · ข้อมูลคำขอและงานมาจากระบบ PR Center",
     published: "เผยแพร่แล้ว",
     reach: "จำนวนการเข้าถึง",
     engagement: "การมีส่วนร่วม",
@@ -206,7 +218,7 @@ const copy = {
     subheading: "RTRDA public relations and communications overview.",
     newRequest: "New request",
     search: "Search work, requests, or content",
-    prototype: "Prototype UI only · all data on this page is simulated",
+    prototype: "Phase 1 Test · requests and tasks are served by PR Center",
     published: "Published",
     reach: "Total reach",
     engagement: "Engagement",
@@ -711,6 +723,7 @@ export function PrCenterApp() {
             status: string;
             ownerId: string | null;
             dueAt: string | null;
+            version: number;
           }>;
         }>;
         startTransition(() =>
@@ -735,6 +748,7 @@ export function PrCenterApp() {
                 status: task.status.toLowerCase() as StatusId,
                 ownerId: task.ownerId || "u-pr",
                 dueDate: task.dueAt?.slice(0, 10) || "",
+                version: task.version,
               })),
             ),
           })),
@@ -744,8 +758,9 @@ export function PrCenterApp() {
   }, []);
 
   const currentUser = getUser(state.currentUserId) ?? users[0];
-  const visiblePages = pages.filter((item) =>
-    ROLE_PAGES[currentUser.role].includes(item.id),
+  const visiblePages = pages.filter(
+    (item) =>
+      PHASE_1_PAGES.has(item.id) && ROLE_PAGES[currentUser.role].includes(item.id),
   );
   const t = copy[state.language];
   const userNotifications = state.notifications.filter(
@@ -805,6 +820,52 @@ export function PrCenterApp() {
         }),
       });
       if (!response.ok) throw new Error("Request was rejected");
+      const created = (await response.json()) as {
+        id: string;
+        title: string;
+        type: "PR" | "OFFSITE";
+        requesterId: string;
+        requestedFor: string | null;
+        sources: { url: string }[];
+        tasks: Array<{
+          id: string;
+          title: string;
+          contentType: string;
+          status: string;
+          ownerId: string | null;
+          dueAt: string | null;
+          version: number;
+        }>;
+      };
+      setState((previous) => ({
+        ...previous,
+        requests: [
+          {
+            id: created.id,
+            title: created.title,
+            type: created.type.toLowerCase() as RequestType,
+            requesterId: created.requesterId,
+            department: "RTRDA",
+            requestedDate: created.requestedFor?.slice(0, 10) || "",
+            taskIds: created.tasks.map((task) => task.id),
+            source: created.sources[0]?.url,
+          },
+          ...previous.requests,
+        ],
+        tasks: [
+          ...created.tasks.map((task) => ({
+            id: task.id,
+            requestId: created.id,
+            type: task.contentType,
+            title: task.title,
+            status: task.status.toLowerCase() as StatusId,
+            ownerId: task.ownerId || currentUser.id,
+            dueDate: task.dueAt?.slice(0, 10) || "",
+            version: task.version,
+          })),
+          ...previous.tasks,
+        ],
+      }));
       announce(state.language === "th" ? "บันทึกคำขอแล้ว" : "Request saved");
       setPage("my-requests");
     } catch {
@@ -813,24 +874,40 @@ export function PrCenterApp() {
       );
     }
   };
-  const transitionTask = (taskId: string, nextStatus: StatusId) => {
-    updateState((previous) => {
-      const task = previous.tasks.find((item) => item.id === taskId);
-      if (!task || !STATUS_TRANSITIONS[task.status].includes(nextStatus)) return previous;
-      return addAudit(
-        {
-          ...previous,
-          tasks: previous.tasks.map((item) =>
-            item.id === taskId ? { ...item, status: nextStatus } : item,
-          ),
+  const transitionTask = async (taskId: string, nextStatus: StatusId) => {
+    const task = state.tasks.find((item) => item.id === taskId);
+    if (!task) return;
+    try {
+      const response = await fetch(`/api/pr-center/tasks/${taskId}/transitions`, {
+        method: "POST",
+        credentials: "same-origin",
+        headers: {
+          "Content-Type": "application/json",
+          "If-Match": String(task.version ?? 0),
         },
-        "task",
-        taskId,
-        "status_changed",
-        STATUS_LABELS[task.status],
-        STATUS_LABELS[nextStatus],
+        body: JSON.stringify({ to: nextStatus.toUpperCase() }),
+      });
+      if (!response.ok) throw new Error("Transition rejected");
+      const updated = (await response.json()) as { status: string; version: number };
+      setState((previous) => ({
+        ...previous,
+        tasks: previous.tasks.map((item) =>
+          item.id === taskId
+            ? {
+                ...item,
+                status: updated.status.toLowerCase() as StatusId,
+                version: updated.version,
+              }
+            : item,
+        ),
+      }));
+    } catch {
+      announce(
+        state.language === "th"
+          ? "ไม่สามารถเปลี่ยนสถานะงานได้"
+          : "Task transition failed",
       );
-    });
+    }
   };
   const createIdea = (title: string, summary: string) => {
     updateState((previous) => {

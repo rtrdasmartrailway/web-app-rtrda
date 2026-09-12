@@ -128,8 +128,16 @@ export async function createRequest(
           },
         },
         sources: { create: sourceUrls.map((url) => ({ url })) },
+        tasks: {
+          create: {
+            title,
+            contentType: input.type === "PR" ? "PR Content" : "Off-site Support",
+            ownerId: actor.id,
+            dueAt: input.requestedFor,
+          },
+        },
       },
-      include: { revisions: true, sources: true },
+      include: { revisions: true, sources: true, tasks: true },
     });
     await auditAndOutbox(tx, {
       actor,
