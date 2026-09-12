@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, type FormEvent } from "react";
+import { PrCenterApp } from "./pr-center-app";
 import styles from "./pr-center-workspace.module.css";
 
 type SessionState = "loading" | "sign-in-required" | "authenticated" | "unavailable";
@@ -147,6 +148,9 @@ export function PrCenterWorkspace() {
 
   const signedIn = sessionState === "authenticated";
   const isRequestList = ["Home", "My Requests", "All Requests"].includes(page);
+
+  // Preserve the established PR Center visual workspace once access is granted.
+  if (signedIn) return <PrCenterApp />;
 
   return (
     <main className={styles.shell}>
