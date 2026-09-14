@@ -5,6 +5,8 @@ import { applyContactMapOverride, RTRDA_CONTACT_MAP_EMBED_URL } from "./contact-
 
 const CONTACT_FORM_URL =
   "https://docs.google.com/forms/d/e/1FAIpQLSd8nY4Dt-vjvl6Ag4Jnwq_Ko5zEUT7FgKH8DB-wql74KAVe5w/viewform";
+const DATA_REQUEST_FORM_URL =
+  "https://docs.google.com/forms/d/e/1FAIpQLScrePVLCQoUuYCxa28oOmfU1MUNQG8dMPkC8KzSbxgkAt6oGw/viewform?usp=heade";
 
 function record(overrides: Partial<WpContentRecord>): WpContentRecord {
   return {
@@ -46,6 +48,42 @@ describe("applyContactMapOverride", () => {
     expect(updated.contentHtml).toContain("contact-map-place-card");
     expect(updated.contentHtml).toContain("เปิดใน Google Maps");
     expect(updated.contentHtml).toContain("0x30e29f004355d1b7:0xd97ebac98e579c96");
+  });
+
+  it("adds the RTRDA data request CTA immediately after the phone number", () => {
+    const updated = applyContactMapOverride(
+      record({
+        contentHtml:
+          "<p>Email: info@rtrda.or.th</p><p>โทรศัพท์: 082 204 2998 หรือ 02 248 2988</p><p>Map follows</p>",
+      }),
+    );
+    const $ = cheerio.load(updated.contentHtml, null, false);
+    const phone = $("p")
+      .filter((_index, element) => $(element).text().includes("โทรศัพท์:"))
+      .first();
+    const cta = phone.next(".contact-data-request-cta");
+
+    expect(cta).toHaveLength(1);
+    expect(cta.find("a").text()).toBe("ขอใช้บริการข้อมูลของ RTRDA");
+    expect(cta.find("a").attr("href")).toBe(DATA_REQUEST_FORM_URL);
+    expect(cta.find("a").attr("target")).toBe("_blank");
+    expect(cta.find("a").attr("rel")).toBe("noreferrer");
+    expect(cta.next("p").text()).toBe("Map follows");
+  });
+
+  it("keeps the existing contact form CTA when adding the data request CTA", () => {
+    const updated = applyContactMapOverride(
+      record({
+        contentHtml:
+          '<div class="elementor-widget-button"><a href="https://forms.gle/z7bMYh5qMdHBoG2HA">ช่องทางการติดต่อ</a></div><p>โทรศัพท์: 082 204 2998</p>',
+      }),
+    );
+    const $ = cheerio.load(updated.contentHtml, null, false);
+
+    expect($(".contact-data-request-cta a").attr("href")).toBe(DATA_REQUEST_FORM_URL);
+    expect(
+      $(".contact-form-cta").not(".contact-data-request-cta").find("a").attr("href"),
+    ).toBe(CONTACT_FORM_URL);
   });
 
   it("promotes the Google contact form link to a visible CTA", () => {
