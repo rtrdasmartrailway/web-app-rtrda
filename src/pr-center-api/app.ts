@@ -26,6 +26,12 @@ export type EmailOnlyAuth = {
   ) => Promise<{ actor: PrCenterActor; cookie: string }>;
   signOut: (request: FastifyRequest) => string;
 };
+export type EntraAuth = {
+  resolve: (request: FastifyRequest) => Promise<PrCenterActor | null>;
+  begin: () => Promise<{ url: string; cookie: string }>;
+  callback: (request: FastifyRequest) => Promise<{ cookie: string[]; redirect: string }>;
+  signOut: (request: FastifyRequest) => string;
+};
 
 function correlationId(request: FastifyRequest): string {
   return request.headers["x-correlation-id"]?.toString().slice(0, 128) || request.id;
@@ -62,6 +68,7 @@ function taskId(value: string): `${string}-${string}-${string}-${string}-${strin
 export function buildPrCenterApi(
   resolveActor: ActorResolver,
   emailOnlyAuth?: EmailOnlyAuth,
+  entraAuth?: EntraAuth | null,
 ): FastifyInstance {
   const app = Fastify({ logger: true, requestIdHeader: "x-correlation-id" });
   app.setErrorHandler((error, request, reply) => {
@@ -78,7 +85,9 @@ export function buildPrCenterApi(
   app.addHook("preHandler", async (request) => {
     if (
       request.routeOptions.url === "/healthz" ||
-      request.routeOptions.url === "/session/email"
+      request.routeOptions.url === "/session/email" ||
+      request.routeOptions.url === "/auth/login" ||
+      request.routeOptions.url === "/auth/callback"
     )
       return;
     const actor = await resolveActor(request);
@@ -133,6 +142,35 @@ export function buildPrCenterApi(
   );
   app.get("/notifications", async (request) => listNotifications(request.prCenterActor!));
   app.get("/session", async (request) => sessionProfile(request.prCenterActor!));
+  app.get("/auth/login", async (_request, reply) => {
+    if (!entraAuth)
+      throw new PrCenterError(
+        "Microsoft sign-in is unavailable",
+        503,
+        "AUTH_UNAVAILABLE",
+      );
+    const login = await entraAuth.begin();
+    return reply.header("Set-Cookie", login.cookie).redirect(login.url);
+  });
+  app.get("/auth/callback", async (request, reply) => {
+    if (!entraAuth)
+      throw new PrCenterError(
+        "Microsoft sign-in is unavailable",
+        503,
+        "AUTH_UNAVAILABLE",
+      );
+    const login = await entraAuth.callback(request);
+    return reply.header("Set-Cookie", login.cookie).redirect(login.redirect);
+  });
+  app.post("/auth/logout", async (request, reply) => {
+    if (!entraAuth)
+      throw new PrCenterError(
+        "Microsoft sign-in is unavailable",
+        503,
+        "AUTH_UNAVAILABLE",
+      );
+    return reply.header("Set-Cookie", entraAuth.signOut(request)).status(204).send();
+  });
   app.post("/session/email", async (request, reply) => {
     if (!emailOnlyAuth)
       throw new PrCenterError("Email-only access is disabled", 503, "AUTH_UNAVAILABLE");

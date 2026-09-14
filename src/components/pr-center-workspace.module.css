@@ -81,6 +81,16 @@
   max-width: 34rem;
 }
 
+.primaryAction {
+  background: #0c4f82;
+  border-radius: 0.45rem;
+  color: #ffffff;
+  display: inline-block;
+  font-weight: 700;
+  padding: 0.7rem 1rem;
+  text-decoration: none;
+}
+
 .loginForm label {
   display: block;
   font-size: 0.9rem;

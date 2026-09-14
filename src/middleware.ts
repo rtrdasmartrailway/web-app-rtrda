@@ -57,7 +57,7 @@ function methodPolicy(request: NextRequest): NextResponse | null {
       status: 204,
       headers: {
         Allow: prCenterApiRequest
-          ? "GET, POST, DELETE, OPTIONS"
+          ? "GET, POST, PATCH, DELETE, OPTIONS"
           : analyticsRequest
             ? ANALYTICS_METHODS
             : downloadCaptchaRequest
@@ -69,7 +69,9 @@ function methodPolicy(request: NextRequest): NextResponse | null {
 
   if (
     (analyticsRequest || downloadCaptchaRequest || prCenterApiRequest) &&
-    (request.method === "POST" || request.method === "DELETE")
+    (request.method === "POST" ||
+      request.method === "PATCH" ||
+      request.method === "DELETE")
   )
     return null;
 
@@ -80,7 +82,7 @@ function methodPolicy(request: NextRequest): NextResponse | null {
         status: 405,
         headers: {
           Allow: prCenterApiRequest
-            ? "GET, POST, DELETE, OPTIONS"
+            ? "GET, POST, PATCH, DELETE, OPTIONS"
             : analyticsRequest
               ? ANALYTICS_METHODS
               : downloadCaptchaRequest

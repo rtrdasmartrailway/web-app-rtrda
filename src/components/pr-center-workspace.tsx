@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, type FormEvent } from "react";
+import Link from "next/link";
 import { PrCenterApp } from "./pr-center-app";
 import styles from "./pr-center-workspace.module.css";
 
@@ -199,27 +200,31 @@ export function PrCenterWorkspace() {
           <p className={styles.lead}>PR Center ไม่พร้อมใช้งานในขณะนี้</p>
         )}
         {sessionState === "sign-in-required" && (
-          <form className={styles.loginForm} onSubmit={signIn}>
-            <p className={styles.lead}>
-              กรอก email ที่ได้รับอนุญาตเพื่อเข้าใช้งาน PR Center บน Test
-            </p>
-            <label htmlFor="pr-center-email">Email</label>
-            <div className={styles.loginRow}>
-              <input
-                id="pr-center-email"
-                type="email"
-                autoComplete="email"
-                value={email}
-                onChange={(event) => setEmail(event.target.value)}
-                placeholder="name@rtrda.or.th"
-                required
-              />
-              <button type="submit" disabled={submitting}>
-                {submitting ? "กำลังตรวจสอบ" : "เข้าสู่ระบบ"}
-              </button>
-            </div>
-            {loginError && <p className={styles.loginError}>{loginError}</p>}
-          </form>
+          <section className={styles.loginForm}>
+            <p className={styles.lead}>เข้าสู่ระบบ PR Center ด้วยบัญชี Microsoft RTRDA</p>
+            <Link className={styles.primaryAction} href="/api/pr-center/auth/login">
+              Sign in with Microsoft
+            </Link>
+            <p className={styles.lead}>Test fallback: กรอก email ที่ได้รับอนุญาต</p>
+            <form onSubmit={signIn}>
+              <label htmlFor="pr-center-email">Email</label>
+              <div className={styles.loginRow}>
+                <input
+                  id="pr-center-email"
+                  type="email"
+                  autoComplete="email"
+                  value={email}
+                  onChange={(event) => setEmail(event.target.value)}
+                  placeholder="name@rtrda.or.th"
+                  required
+                />
+                <button type="submit" disabled={submitting}>
+                  {submitting ? "กำลังตรวจสอบ" : "เข้าสู่ระบบ"}
+                </button>
+              </div>
+              {loginError && <p className={styles.loginError}>{loginError}</p>}
+            </form>
+          </section>
         )}
         {signedIn && page === "Submit Request" && (
           <form className={styles.requestForm} onSubmit={submitRequest}>
