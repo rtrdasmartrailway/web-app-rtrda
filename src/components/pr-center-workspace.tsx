@@ -7,7 +7,14 @@ import styles from "./pr-center-workspace.module.css";
 type SessionState = "loading" | "sign-in-required" | "authenticated" | "unavailable";
 type PrCenterSession = {
   userId: string;
-  role: "PR_OPERATIONS" | "SCOPED_ADMINISTRATOR";
+  displayName: string;
+  departmentName: string;
+  role:
+    | "REQUESTER"
+    | "PR_OPERATIONS"
+    | "APPROVER"
+    | "EXECUTIVE_READ_ONLY"
+    | "SCOPED_ADMINISTRATOR";
 };
 type Page =
   | "Home"
@@ -162,8 +169,7 @@ export function PrCenterWorkspace() {
   const isRequestList = ["Home", "My Requests", "All Requests"].includes(page);
 
   // Preserve the established PR Center visual workspace once access is granted.
-  if (signedIn && session)
-    return <PrCenterApp actor={{ id: session.userId, role: session.role }} />;
+  if (signedIn && session) return <PrCenterApp actor={session} />;
 
   return (
     <main className={styles.shell}>

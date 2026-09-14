@@ -326,7 +326,7 @@ const STATUS_TRANSITIONS: Record<StatusId, StatusId[]> = {
 const ROLE_PAGES: Record<Role, Page[]> = {
   admin: pages.map(({ id }) => id),
   pr: pages.map(({ id }) => id),
-  executive: ["home", "executive", "approvals", "library", "notifications", "help"],
+  executive: ["home", "requests", "calendar", "notifications"],
   project_owner: [
     "home",
     "new-request",
@@ -337,7 +337,7 @@ const ROLE_PAGES: Record<Role, Page[]> = {
     "notifications",
     "help",
   ],
-  approver: ["home", "approvals", "calendar", "library", "notifications", "help"],
+  approver: ["home", "approvals", "calendar", "notifications"],
   writer: [
     "home",
     "new-request",
@@ -699,7 +699,17 @@ function Metric({
 export function PrCenterApp({
   actor,
 }: {
-  actor?: { id: string; role: "PR_OPERATIONS" | "SCOPED_ADMINISTRATOR" };
+  actor?: {
+    userId: string;
+    displayName: string;
+    departmentName: string;
+    role:
+      | "REQUESTER"
+      | "PR_OPERATIONS"
+      | "APPROVER"
+      | "EXECUTIVE_READ_ONLY"
+      | "SCOPED_ADMINISTRATOR";
+  };
 }) {
   const [page, setPage] = useState<Page>("home");
   const [state, setState] = useState<PrCenterState>(cloneDefaultState);
@@ -810,11 +820,18 @@ export function PrCenterApp({
 
   const currentUser: User = actor
     ? {
-        id: actor.id,
-        name: actor.role === "PR_OPERATIONS" ? "Panissa T." : "Nattapol Y.",
-        role: actor.role === "PR_OPERATIONS" ? "pr" : "admin",
-        department:
-          actor.role === "PR_OPERATIONS" ? "Public Relations" : "Administration",
+        id: actor.userId,
+        name: actor.displayName,
+        role: (
+          {
+            REQUESTER: "requester",
+            PR_OPERATIONS: "pr",
+            APPROVER: "approver",
+            EXECUTIVE_READ_ONLY: "executive",
+            SCOPED_ADMINISTRATOR: "admin",
+          } as const
+        )[actor.role],
+        department: actor.departmentName,
         active: true,
       }
     : (getUser(state.currentUserId) ?? users[0]);

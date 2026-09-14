@@ -8,6 +8,7 @@ import {
   listIdeas,
   listNotifications,
   listRequests,
+  sessionProfile,
   transitionIdea,
   taskHistory,
   updateTaskAssignment,
@@ -131,12 +132,7 @@ export function buildPrCenterApi(
     currentMessageHouse(request.prCenterActor!),
   );
   app.get("/notifications", async (request) => listNotifications(request.prCenterActor!));
-  app.get("/session", async (request) => ({
-    userId: request.prCenterActor!.id,
-    organizationId: request.prCenterActor!.organizationId,
-    departmentId: request.prCenterActor!.departmentId,
-    role: request.prCenterActor!.role,
-  }));
+  app.get("/session", async (request) => sessionProfile(request.prCenterActor!));
   app.post("/session/email", async (request, reply) => {
     if (!emailOnlyAuth)
       throw new PrCenterError("Email-only access is disabled", 503, "AUTH_UNAVAILABLE");

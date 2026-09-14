@@ -34,6 +34,23 @@ export class PrCenterError extends Error {
   }
 }
 
+export async function sessionProfile(actor: PrCenterActor) {
+  const user = await prisma.prCenterUser.findFirst({
+    where: { id: actor.id, organizationId: actor.organizationId, active: true },
+    include: { department: { select: { name: true } } },
+  });
+  if (!user)
+    throw new PrCenterError("Your account is no longer active", 401, "UNAUTHENTICATED");
+  return {
+    userId: actor.id,
+    organizationId: actor.organizationId,
+    departmentId: actor.departmentId,
+    displayName: user.displayName,
+    departmentName: user.department?.name || "",
+    role: actor.role,
+  };
+}
+
 type CreateRequestInput = {
   type: "PR" | "OFFSITE";
   title: string;
