@@ -218,6 +218,40 @@ describe("presentation helpers", () => {
     });
   });
 
+  it("hides the temporarily unavailable governance publication menu item", () => {
+    const wordpressMenu: WpNavigationItem[] = [
+      {
+        label: "เอกสารเผยแพร่",
+        href: "#",
+        path: null,
+        external: false,
+        children: [
+          {
+            label: "คลังความรู้",
+            href: "/คลังความรู้",
+            path: "/คลังความรู้",
+            external: false,
+            children: [],
+          },
+          {
+            label: "เผยแพร่ข้อมูลตามหลักธรรมาภิบาล",
+            href: "#",
+            path: null,
+            external: false,
+            children: [],
+          },
+        ],
+      },
+    ];
+
+    const nav = buildPrimaryNavigation([], "th", "/", wordpressMenu);
+
+    expect(nav[0].children.map((item) => item.label)).not.toContain(
+      "เผยแพร่ข้อมูลตามหลักธรรมาภิบาล",
+    );
+    expect(nav[0].children.map((item) => item.label)).toContain("คลังความรู้");
+  });
+
   it("returns an imported image media path for records with valid featured media", () => {
     const media: WpMediaAsset[] = [
       {

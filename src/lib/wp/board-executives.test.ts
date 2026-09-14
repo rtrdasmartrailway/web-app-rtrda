@@ -1,4 +1,5 @@
 import { readFile } from "node:fs/promises";
+import * as cheerio from "cheerio";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
@@ -17,6 +18,10 @@ import {
   buildBoardExecutivePresentation,
   isBoardExecutivePath,
 } from "./board-executives";
+import {
+  getBoardExecutiveDetailByName,
+  getBoardExecutiveDetailByTrigger,
+} from "./board-executive-details";
 
 async function boardRecord(path = "/เกี่ยวกับ-สทร/คณะกรรมการ-ผู้บริหาร") {
   const manifest = JSON.parse(
@@ -28,6 +33,181 @@ async function boardRecord(path = "/เกี่ยวกับ-สทร/คณ
 }
 
 describe("board executive parser", () => {
+  it("keeps board cards and removes the steering committee card grid in Thai and English", async () => {
+    const boardPages = [
+      "/เกี่ยวกับ-สทร/คณะกรรมการ-ผู้บริหาร",
+      "/en/เกี่ยวกับ-สทร/คณะกรรมการ-ผู้บริหาร",
+    ];
+    for (const path of boardPages) {
+      const record = await boardRecord(path);
+      const $ = cheerio.load(record.contentHtml, null, false);
+      const board = $(".lightweight-accordion")
+        .filter((_, element) =>
+          /คณะกรรมการสถาบันวิจัยและพัฒนาเทคโนโลยีระบบราง|Board of Directors/.test(
+            $(element).find(".lightweight-accordion-title").first().text(),
+          ),
+        )
+        .first();
+
+      expect(board.find(".wp-block-column img")).toHaveLength(12);
+      expect(board.find(".wp-block-column h4")).toHaveLength(12);
+      expect(board.find(".wp-block-column h5")).toHaveLength(12);
+      expect(board.find(".wp-block-column .detail-btn")).toHaveLength(12);
+      const steering = $(".lightweight-accordion")
+        .filter((_, element) =>
+          /คณะกรรมการดำเนินการร่วมมือและประสานงานเกี่ยวกับเทคโนโลยีระบบราง|Steering Committee for Collaboration and Coordination on Rail System Technology/.test(
+            $(element).find(".lightweight-accordion-title").first().text(),
+          ),
+        )
+        .first();
+      expect(steering).toHaveLength(1);
+      expect(steering.find(".wp-block-columns, .wp-block-column")).toHaveLength(0);
+    }
+  });
+
+  it("selects Thai and English content for Chotichai's popup", () => {
+    const thai = getBoardExecutiveDetailByTrigger("chotchai", "th");
+    const english = getBoardExecutiveDetailByTrigger("chotchai", "en");
+
+    expect(thai?.html).toContain("ประวัติการศึกษา");
+    expect(thai?.html).toContain("รศ.ดร. โชติชัย เจริญงาม");
+    expect(english?.html).toContain("Education");
+    expect(english?.html).toContain("Assoc. Prof. Dr. Chotchai Charoenngam");
+    expect(english?.html).not.toContain("ประวัติการศึกษา");
+    expect(
+      getBoardExecutiveDetailByName("Assoc. Prof. Dr. Chotchai Charoenngam", "en")?.html,
+    ).toBe(english?.html);
+  });
+
+  it("selects Thai and English content for Darun's popup", () => {
+    const thai = getBoardExecutiveDetailByName("ดรุณ แสงฉาย", "th");
+    const english = getBoardExecutiveDetailByName("Darun Saengshine", "en");
+
+    expect(thai?.html).toContain("วิศวกรรมสาธารณสุขเขตร้อน");
+    expect(thai?.html).toContain("อธิบดีกรมท่าอากาศยาน");
+    expect(english?.html).toContain("Tropical Public Health Engineering");
+    expect(english?.html).toContain("Director General, Department of Airports");
+    expect(english?.html).not.toContain("วิศวกรรมสาธารณสุขเขตร้อน");
+  });
+
+  it("selects Thai and English content for Chanchao's popup", () => {
+    const thai = getBoardExecutiveDetailByName("ชาญเชาวน์ ไชยานุกิจ", "th");
+    const english = getBoardExecutiveDetailByName("ชาญเชาวน์ ไชยานุกิจ", "en");
+
+    expect(thai?.html).toContain("เนติบัณฑิตไทย");
+    expect(thai?.html).toContain("กรมคุมประพฤติ");
+    expect(english?.html).toContain("Thai Barrister-at-Law");
+    expect(english?.html).toContain("Director General, Department of Probation");
+    expect(english?.html).not.toContain("เนติบัณฑิตไทย");
+  });
+
+  it("selects Thai and English content for Pisit's popup", () => {
+    const thai = getBoardExecutiveDetailByName("ผศ. พิศิษฐ์ แสง-ชูโต", "th");
+    const english = getBoardExecutiveDetailByName("Asst. Prof. Pisit Saeng-Xuto", "en");
+
+    expect(thai?.html).toContain("ประธานสาขาวิศวกรรมอุตสาหการ");
+    expect(thai?.html).toContain(
+      "กรรมการบริหารกองทุนสมเด็จพระบรมโอรสาธิราชสยามมกุฎราชกุมาร",
+    );
+    expect(english?.html).toContain("Directorships and Committees");
+    expect(english?.html).toContain("Director, e-Testing Bureau");
+    expect(english?.html).not.toContain("ประธานสาขาวิศวกรรมอุตสาหการ");
+  });
+
+  it("selects Thai and English content for Pichet's popup", () => {
+    const thai = getBoardExecutiveDetailByName("ดร. พิเชฐ คุณาธรรมรักษ์", "th");
+    const english = getBoardExecutiveDetailByName("Dr. Pichet Kunadhamraks", "en");
+
+    expect(thai?.html).toContain("วิศวกรรมขนส่ง");
+    expect(thai?.html).toContain("อธิบดีกรมการขนส่งทางราง");
+    expect(english?.html).toContain("Transportation Engineering");
+    expect(english?.html).toContain("Director General, Department of Rail Transport");
+    expect(english?.html).not.toContain("วิศวกรรมขนส่ง");
+  });
+
+  it("selects Thai and English content for Pattanaphong's popup", () => {
+    const thai = getBoardExecutiveDetailByName("พัฒนพงษ์ พงศ์ศุภสมิทธิ์", "th");
+    const english = getBoardExecutiveDetailByName("Pattanaphong Phongsupatsamit", "en");
+
+    expect(thai?.html).toContain("วิศวกรรมการก่อสร้างและการจัดการ");
+    expect(thai?.html).toContain("รองผู้ว่าการการรถไฟขนส่งมวลชนแห่งประเทศไทย");
+    expect(english?.html).toContain("Construction Engineering and Management");
+    expect(english?.html).toContain("Deputy Governor (Administration)");
+    expect(english?.html).not.toContain("วิศวกรรมการก่อสร้างและการจัดการ");
+  });
+
+  it("selects Thai and English content for Piang-or's popup", () => {
+    const thai = getBoardExecutiveDetailByName("ดร. เพียงออ เลาหะวิไลย", "th");
+    const english = getBoardExecutiveDetailByName("Dr. Piang-or Loahavilai", "en");
+
+    expect(thai?.html).toContain("กรรมการและเลขานุการฯ");
+    expect(thai?.html).toContain("ศูนย์ Sister Cities Research Center");
+    expect(english?.html).toContain("Member &amp; Secretary");
+    expect(english?.html).toContain(
+      "President, Rail Technology Research and Development Agency",
+    );
+    expect(english?.html).not.toContain("กรรมการและเลขานุการฯ");
+  });
+
+  it("shows Thai content for Weeradet and Watcharachan popups on the English page", () => {
+    const details = [
+      {
+        trigger: "weeradet",
+        thaiName: "ดร. วีรเดช ชีวาพัฒนานุวงศ์",
+        englishName: "Dr. Weeradet Cheevapattananuwong",
+        thaiText: "มหาวิทยาลัยฮอกไกโด",
+      },
+      {
+        trigger: "watcharachan",
+        thaiName: "วัชรชาญ สิริสุวรรณทัศน์",
+        englishName: "Watcharachan Sirisuwannatash",
+        thaiText: "2565 - 2566 รองผู้ว่าการรถไฟแห่งประเทศไทย",
+      },
+    ];
+
+    for (const detail of details) {
+      const thai = getBoardExecutiveDetailByName(detail.thaiName, "th");
+      const englishByName = getBoardExecutiveDetailByName(detail.englishName, "en");
+      const englishByTrigger = getBoardExecutiveDetailByTrigger(detail.trigger, "en");
+
+      expect(thai?.html).toContain(detail.thaiText);
+      expect(thai?.html).not.toContain("<h3><strong>กรรมการผู้ทรงคุณวุฒิ</strong></h3>");
+      expect(englishByName?.html).toBe(thai?.html);
+      expect(englishByTrigger?.html).toBe(thai?.html);
+    }
+  });
+
+  it("localizes every active English board, steering committee and advisor popup", () => {
+    const activeEnglishNames = [
+      "Chanchao Chaiyanukij",
+      "Pattanaphong Phongnsupatsamit",
+      "Dr. Pichit Akrathit, Ph.D.",
+      "Chanin Chaonirattisai",
+      "Dr. Chatkaew Hart-Rawung",
+      "Dr. Poovadol Sirirangsi",
+      "Dr. Kitipong Promwong",
+      "Dr. Tiranee Achalakul",
+      "Dr. Tayakorn Chandrangsu",
+      "Natthaphat Unhakhongkha",
+      "Sucheep Suksawang",
+      "Prof. Dr. Sukit Limpijumnong",
+      "Dr. Sathian Charoenrien",
+      "Yaowalux Champeeratana",
+      "Chunhachit Sungmai",
+      "Assoc. Prof. Dr. Nualnoi Treerat",
+    ];
+
+    for (const name of activeEnglishNames) {
+      const detail = getBoardExecutiveDetailByName(name, "en");
+      expect(detail?.html).toContain(name);
+      expect(detail?.html).not.toMatch(/[\u0E00-\u0E7F]/);
+    }
+  });
+
+  it("does not provide a popup for Anan's card", () => {
+    expect(getBoardExecutiveDetailByName("นายอนันต์ โพธิ์นิ่มแดง", "th")).toBeNull();
+  });
+
   it("detects the Thai and English board executive routes", () => {
     expect(isBoardExecutivePath("/เกี่ยวกับ-สทร/คณะกรรมการ-ผู้บริหาร")).toBe(true);
     expect(isBoardExecutivePath("/en/เกี่ยวกับ-สทร/คณะกรรมการ-ผู้บริหาร")).toBe(true);
@@ -113,6 +293,34 @@ describe("board executive parser", () => {
     });
 
     expect(generalManagers.map((person) => person.name)).not.toContain("ชัชวาล พานวงษ์");
+  });
+
+  it("mirrors Thai executive card data in English", async () => {
+    const record = await boardRecord("/en/เกี่ยวกับ-สทร/คณะกรรมการ-ผู้บริหาร");
+    const presentation = buildBoardExecutivePresentation(record.path, record.contentHtml);
+    const generalManagers = presentation?.chart.generalManagers ?? [];
+    const gmByRole = new Map(generalManagers.map((person) => [person.role, person]));
+
+    expect(gmByRole.get("Research and Standards Group Manager")).toMatchObject({
+      name: "Touchakorn Thanawatdamrong",
+      imageSrc: TACHAKORN_IMAGE_SRC,
+      email: "touchakorn.t@rtrda.or.th",
+      vacant: false,
+    });
+    expect(
+      gmByRole.get("New Entrepreneurs and Business Development Group Manager"),
+    ).toMatchObject({
+      name: "Chaiyut Tanchai",
+      imageSrc: CHAIYUT_IMAGE_SRC,
+      email: "chaiwooth.t@rtrda.or.th",
+      vacant: false,
+    });
+    expect(gmByRole.get("Internal Administration Group Manager (Acting)")).toMatchObject({
+      name: "Chaiyut Tanchai",
+      imageSrc: CHAIYUT_IMAGE_SRC,
+      email: "chaiwooth.t@rtrda.or.th",
+      vacant: false,
+    });
   });
 
   it("renders the executive chart with detail buttons only for people that have imported details", async () => {

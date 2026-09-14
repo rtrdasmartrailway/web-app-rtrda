@@ -57,6 +57,10 @@ const nextConfig: NextConfig = {
           ...SAME_ORIGIN_FRAME_HEADERS,
         ],
       },
+      {
+        source: "/api/pr-center/:path*",
+        headers: [{ key: "Cache-Control", value: "no-store" }, ...SECURITY_HEADERS],
+      },
       // Inline download responses are framed only by the same RTRDA origin.
       // This route-specific policy overrides the global clickjacking denial
       // without allowing third-party sites to embed RTRDA documents.
@@ -106,6 +110,11 @@ const nextConfig: NextConfig = {
       {
         source: "/rtrdaintranet/prcenter/:path*",
         destination: "/pr-center-internal/:path*",
+      },
+      {
+        // Keep the browser on the existing intranet origin; Fastify is never exposed directly.
+        source: "/api/pr-center/:path*",
+        destination: "http://pr-center-api:3100/:path*",
       },
     ];
   },

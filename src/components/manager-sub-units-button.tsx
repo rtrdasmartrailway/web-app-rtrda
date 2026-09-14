@@ -105,7 +105,7 @@ export function ManagerSubUnitsButton({
               ×
             </button>
             <h2 className="manager-sub-units-title" id={dialog?.titleId}>
-              {MANAGER_SUB_UNITS_HEADING}
+              {language === "th" ? MANAGER_SUB_UNITS_HEADING : "Sub-units"}
             </h2>
             <p className="manager-sub-units-role">{role}</p>
             <ol className="manager-sub-units-list">

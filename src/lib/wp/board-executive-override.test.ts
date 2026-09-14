@@ -5,7 +5,11 @@ import {
   applyBoardExecutiveOverride,
   CHAIYUT_IMAGE_SRC,
   CHAIYUT_NAME,
+  ANAN_IMAGE_SRC,
   TACHAKORN_IMAGE_SRC,
+  WATCHARACHAN_IMAGE_SRC,
+  VEERACHAI_IMAGE_SRC,
+  WEERADET_IMAGE_SRC,
 } from "./board-executive-override";
 
 function record(overrides: Partial<WpContentRecord>): WpContentRecord {
@@ -75,6 +79,134 @@ describe("applyBoardExecutiveOverride", () => {
     expect(applyBoardExecutiveOverride(source)).toBe(source);
   });
 
+  it("removes the steering committee card grid without changing board cards", () => {
+    const updated = applyBoardExecutiveOverride(
+      record({
+        contentHtml: `
+          <div class="lightweight-accordion">
+            <details>
+              <summary class="lightweight-accordion-title">คณะกรรมการสถาบันวิจัยและพัฒนาเทคโนโลยีระบบราง</summary>
+              <div class="lightweight-accordion-body"><div class="wp-block-columns"><div class="wp-block-column"><img src="portrait.jpg" /><h4>รศ.ดร. โชติชัย เจริญงาม</h4><h5>ประธานกรรมการ</h5><div class="detail-btn">รายละเอียด</div></div></div></div>
+            </details>
+          </div>
+          <div class="lightweight-accordion">
+            <details><summary class="lightweight-accordion-title">คณะกรรมการดำเนินการร่วมมือและประสานงานเกี่ยวกับเทคโนโลยีระบบราง</summary><div class="wp-block-columns"><div class="wp-block-column"><img src="steering.jpg" /><h4>ดร. พิชิต อัคราทิตย์</h4><h5>ประธานกรรมการ</h5><div class="detail-btn">รายละเอียด</div></div></div></details>
+          </div>`,
+      }),
+    );
+    const $ = cheerio.load(updated.contentHtml, null, false);
+    const board = $(".lightweight-accordion")
+      .filter((_, element) =>
+        $(element)
+          .find("summary")
+          .first()
+          .text()
+          .includes("คณะกรรมการสถาบันวิจัยและพัฒนาเทคโนโลยีระบบราง"),
+      )
+      .first();
+
+    expect(board.find(".wp-block-column")).toHaveLength(1);
+    expect(board.find("img, h4, h5, .detail-btn")).toHaveLength(4);
+    const steering = $(".lightweight-accordion")
+      .filter((_, element) =>
+        $(element)
+          .find("summary")
+          .first()
+          .text()
+          .includes("คณะกรรมการดำเนินการร่วมมือและประสานงานเกี่ยวกับเทคโนโลยีระบบราง"),
+      )
+      .first();
+    expect(steering).toHaveLength(1);
+    expect(steering.find("img, h4, h5, .detail-btn")).toHaveLength(0);
+    expect(steering.find(".wp-block-columns, .wp-block-column")).toHaveLength(0);
+  });
+
+  it("groups committee tables under one collapsed subcommittees accordion", () => {
+    const updated = applyBoardExecutiveOverride(
+      record({
+        contentHtml: `
+          <details class="lightweight-accordion"><summary>คณะกรรมการสถาบันวิจัยและพัฒนาเทคโนโลยีระบบราง</summary></details>
+          <details class="lightweight-accordion"><summary>คณะกรรมการกำกับทิศทาง</summary></details>`,
+      }),
+    );
+    const $ = cheerio.load(updated.contentHtml, null, false);
+    const summaries = $(".lightweight-accordion summary")
+      .map((_, element) => $(element).text())
+      .get();
+    const subcommittees = $(".subcommittees");
+
+    expect(summaries).toEqual([
+      "คณะกรรมการสถาบันวิจัยและพัฒนาเทคโนโลยีระบบราง",
+      "คณะอนุกรรมการ",
+      "คณะกรรมการตรวจสอบ",
+      "คณะอนุกรรมการบริหารงานบุคคล",
+      "คณะอนุกรรมการประเมินผลการปฏิบัติงานของผู้อำนวยการ",
+      "คณะอนุกรรมการพิจารณากลั่นกรองนโยบายและยุทธศาสตร์ด้านเทคโนโลยีระบบราง",
+      "คณะอนุกรรมการติดตามผลการประเมินความคุ้มค่าสถาบันวิจัยและพัฒนาเทคโนโลยีระบบราง",
+      "คณะกรรมการกำกับทิศทาง",
+    ]);
+    expect(subcommittees.find("details").attr("open")).toBeUndefined();
+    expect(subcommittees.find("summary").attr("class")).toContain(
+      "lightweight-accordion-title",
+    );
+    expect(subcommittees.find(".subcommittee-section")).toHaveLength(5);
+    expect(subcommittees.find(".subcommittee-section > details")).toHaveLength(5);
+    expect(subcommittees.find(".subcommittee-section > details[open]")).toHaveLength(0);
+    expect(subcommittees.find(".subcommittee-section > details > summary")).toHaveLength(
+      5,
+    );
+    expect(subcommittees.find("table")).toHaveLength(5);
+    expect(subcommittees.find("ol")).toHaveLength(5);
+    expect(subcommittees.find("ol li")).toHaveLength(39);
+    expect($(".audit-committee, .personnel-subcommittee")).toHaveLength(0);
+    const sections = subcommittees.find(".subcommittee-section");
+    expect(sections.eq(0).find("summary h2").text()).toBe("คณะกรรมการตรวจสอบ");
+    expect(sections.eq(0).find("tbody tr")).toHaveLength(4);
+    expect(sections.eq(0).find("tbody tr").first().find("td").first().text()).toBe(
+      "1. นายพัฒนพงษ์ พงศ์ศุภสมิทธิ์",
+    );
+    expect(sections.eq(0).find("tbody tr").last().find("td").first().text()).toBe(
+      "4. หัวหน้าหน่วยงานตรวจสอบภายใน",
+    );
+    expect(sections.eq(1).find("tbody tr")).toHaveLength(9);
+    expect(sections.eq(1).find("tbody tr").first().find("td").first().text()).toBe(
+      "นายถาวร ชลัษเฐียร",
+    );
+    expect(sections.eq(2).find("tbody tr")).toHaveLength(5);
+    expect(sections.eq(3).find("tbody tr")).toHaveLength(10);
+    expect(sections.eq(3).text()).toContain(
+      "10. เจ้าหน้าที่สถาบันวิจัยและพัฒนาเทคโนโลยีระบบราง",
+    );
+    expect(sections.eq(4).find("tbody tr")).toHaveLength(7);
+    expect(sections.eq(4).text()).toContain("7. นางสาวอนรรฆิยา ชูคล้าย");
+  });
+
+  it("adds the same Thai committee sections to the English page", () => {
+    const updated = applyBoardExecutiveOverride(
+      record({
+        language: "en",
+        path: "/en/เกี่ยวกับ-สทร/คณะกรรมการ-ผู้บริหาร",
+        contentHtml:
+          '<details class="lightweight-accordion"><summary>คณะกรรมการสถาบันวิจัยและพัฒนาเทคโนโลยีระบบราง</summary></details>',
+      }),
+    );
+
+    expect(updated.contentHtml).toContain("คณะกรรมการตรวจสอบ");
+    expect(updated.contentHtml).toContain("นายชาครีย์ บำรุงวงศ์");
+    expect(updated.contentHtml).toContain(
+      "คณะอนุกรรมการประเมินผลการปฏิบัติงานของผู้อำนวยการ",
+    );
+    expect(updated.contentHtml).toContain("นางสาวอนรรฆิยา ชูคล้าย");
+    expect(updated.contentHtml).toContain(
+      "คณะอนุกรรมการพิจารณากลั่นกรองนโยบายและยุทธศาสตร์ด้านเทคโนโลยีระบบราง",
+    );
+    expect(updated.contentHtml).toContain("นายวีรเดช ชีวาพัฒนานุวงศ์");
+    expect(updated.contentHtml).toContain(
+      "คณะอนุกรรมการติดตามผลการประเมินความคุ้มค่าสถาบันวิจัยและพัฒนาเทคโนโลยีระบบราง",
+    );
+    expect(updated.contentHtml).toContain("นายพิเชฐ คุณาธรรมรักษ์");
+  });
+
   it("fills the internal-admin manager card with Chaiyut Tanchai", () => {
     const updated = applyBoardExecutiveOverride(
       record({
@@ -114,6 +246,284 @@ describe("applyBoardExecutiveOverride", () => {
     expect(role.find("a").attr("href")).toBe("mailto:chaiwooth.t@rtrda.or.th");
   });
 
+  it("rewrites Pichet's Thai and English board role and normalizes the portrait", () => {
+    const thai = applyBoardExecutiveOverride(
+      record({
+        contentHtml: `<div class="lightweight-accordion"><div class="wp-block-column"><img style="aspect-ratio:0.873;width:190px" /><h4>ดร. พิเชฐ คุณาธรรมรักษ์</h4><h5>กรรมการโดยตำแหน่ง อธิบดีกรมการขนส่งทางราง</h5></div></div>`,
+      }),
+    );
+    const english = applyBoardExecutiveOverride(
+      record({
+        language: "en",
+        path: "/en/เกี่ยวกับ-สทร/คณะกรรมการ-ผู้บริหาร",
+        contentHtml: `<div class="lightweight-accordion"><div class="wp-block-column"><h4>ดร. พิเชฐ คุณาธรรมรักษ์</h4><h5>กรรมการโดยตำแหน่ง อธิบดีกรมการขนส่งทางราง</h5></div></div>`,
+      }),
+    );
+
+    expect(cheerio.load(thai.contentHtml, null, false)("h5").text()).toBe(
+      "กรรมการอธิบดีกรมการขนส่งทางราง",
+    );
+    expect(cheerio.load(english.contentHtml, null, false)("h5").text()).toBe(
+      "Member, Board of DirectorDirector-General, Department of Rail Transport",
+    );
+    expect(
+      cheerio.load(thai.contentHtml, null, false)("img").attr("style"),
+    ).toBeUndefined();
+  });
+
+  it("rewrites Pattanaphong's Thai and English board role", () => {
+    const thai = applyBoardExecutiveOverride(
+      record({
+        contentHtml: `<div class="lightweight-accordion"><div class="wp-block-column"><h4>พัฒนพงษ์ พงศ์ศุภสมิทธิ์</h4><h5>กรรมการโดยตำแหน่ง ผู้แทนผู้ว่าการการรถไฟฟ้าขนส่งมวลชนแห่งประเทศไทย</h5></div></div>`,
+      }),
+    );
+    const english = applyBoardExecutiveOverride(
+      record({
+        language: "en",
+        path: "/en/เกี่ยวกับ-สทร/คณะกรรมการ-ผู้บริหาร",
+        contentHtml: `<div class="lightweight-accordion"><div class="wp-block-column"><h4>Pattanaphong Phongsupatsamit</h4><h5>กรรมการโดยตำแหน่ง</h5></div></div>`,
+      }),
+    );
+
+    expect(cheerio.load(thai.contentHtml, null, false)("h5").text()).toBe(
+      "กรรมการรองผู้ว่าการ รฟม. (บริหาร)ผู้แทนผู้ว่าการ รฟม.",
+    );
+    expect(cheerio.load(english.contentHtml, null, false)("h5").text()).toBe(
+      "Member, Board of DirectorDeputy Governor (Administration)Mass Transit Railway Authority of Thailand",
+    );
+  });
+
+  it("shows the Thai secretary suffix on Piang-or's board role", () => {
+    const thai = applyBoardExecutiveOverride(
+      record({
+        contentHtml: `<div class="lightweight-accordion"><div class="wp-block-column"><h4>ดร. เพียงออ เลาหะวิไลย</h4><h5>กรรมการและเลขานุการ</h5></div></div>`,
+      }),
+    );
+    const english = applyBoardExecutiveOverride(
+      record({
+        language: "en",
+        path: "/en/เกี่ยวกับ-สทร/คณะกรรมการ-ผู้บริหาร",
+        contentHtml: `<div class="lightweight-accordion"><div class="wp-block-column"><h4>Dr. Piang-or Loahavilai</h4><h5>Member &amp; Secretary</h5></div></div>`,
+      }),
+    );
+
+    expect(cheerio.load(thai.contentHtml, null, false)("h5").text()).toBe(
+      "กรรมการและเลขานุการฯ",
+    );
+    expect(cheerio.load(english.contentHtml, null, false)("h5").text()).toBe(
+      "Member & Secretary",
+    );
+  });
+
+  it("keeps Thavorn's card on Thai and English board pages", () => {
+    const source = `<div class="lightweight-accordion"><div class="wp-block-column"><h4>ถาวร ชลัษเฐียร</h4><h5>ที่ปรึกษาคณะกรรมการ</h5></div><div class="wp-block-column"><h4>คนอื่น</h4><h5>กรรมการ</h5></div></div>`;
+    const thai = applyBoardExecutiveOverride(record({ contentHtml: source }));
+    const english = applyBoardExecutiveOverride(
+      record({
+        language: "en",
+        path: "/en/เกี่ยวกับ-สทร/คณะกรรมการ-ผู้บริหาร",
+        contentHtml: source.replace("ถาวร ชลัษเฐียร", "Thavorn Chalassathien"),
+      }),
+    );
+    const $thai = cheerio.load(thai.contentHtml, null, false);
+    const $english = cheerio.load(english.contentHtml, null, false);
+
+    expect(
+      $thai("h4")
+        .map((_, element) => $thai(element).text())
+        .get(),
+    ).toEqual(["ถาวร ชลัษเฐียร", "คนอื่น"]);
+    expect(
+      $english("h4")
+        .map((_, element) => $english(element).text())
+        .get(),
+    ).toEqual(["Thavorn Chalassathien", "คนอื่น"]);
+    expect($english("h5").first().text()).toBe("Board Advisor");
+  });
+
+  it("replaces the railway representative card with Weeradet", () => {
+    const thai = applyBoardExecutiveOverride(
+      record({
+        contentHtml: `<div class="lightweight-accordion"><div class="wp-block-column"><img src="old.jpg" srcset="old.jpg 400w" sizes="auto" alt="" /><h4>ผู้แทน ผู้ว่าการรถไฟแห่งประเทศไทย</h4><h5>กรรมการโดยตำแหน่ง ผู้ว่าการรถไฟแห่งประเทศไทย</h5></div></div>`,
+      }),
+    );
+    const english = applyBoardExecutiveOverride(
+      record({
+        language: "en",
+        path: "/en/เกี่ยวกับ-สทร/คณะกรรมการ-ผู้บริหาร",
+        contentHtml: `<div class="lightweight-accordion"><div class="wp-block-column"><img src="old.jpg" srcset="old.jpg 400w" sizes="auto" alt="" /><h4>ผู้แทน ผู้ว่าการรถไฟแห่งประเทศไทย</h4><h5>กรรมการโดยตำแหน่ง ผู้ว่าการรถไฟแห่งประเทศไทย</h5></div></div>`,
+      }),
+    );
+
+    expect(
+      cheerio
+        .load(
+          thai.contentHtml,
+          null,
+          false,
+        )("h4")
+        .map((_, element) => cheerio.load(thai.contentHtml, null, false)(element).text())
+        .get(),
+    ).toEqual([
+      "อนันต์ โพธิ์นิ่มแดง",
+      "ดร. วีรเดช ชีวาพัฒนานุวงศ์",
+      "ผศ.ดร.วีรชัย อาจหาญ",
+    ]);
+    expect(
+      cheerio
+        .load(
+          thai.contentHtml,
+          null,
+          false,
+        )("h5")
+        .map((_, element) => cheerio.load(thai.contentHtml, null, false)(element).text())
+        .get(),
+    ).toEqual([
+      "กรรมการผู้ว่าการรถไฟแห่งประเทศไทย",
+      "กรรมการผู้ทรงคุณวุฒิ",
+      "กรรมการผู้ว่าการ สถาบันวิจัยวิทยาศาสตร์และเทคโนโลยีแห่งประเทศไทย",
+    ]);
+    expect(cheerio.load(thai.contentHtml, null, false)("h5").eq(0).html()).toBe(
+      "กรรมการ<br>ผู้ว่าการรถไฟแห่งประเทศไทย",
+    );
+    expect(cheerio.load(thai.contentHtml, null, false)("h5").eq(2).html()).toBe(
+      "กรรมการ<br>ผู้ว่าการ สถาบันวิจัยวิทยาศาสตร์และเทคโนโลยีแห่งประเทศไทย",
+    );
+    expect(
+      cheerio
+        .load(
+          english.contentHtml,
+          null,
+          false,
+        )("h4")
+        .map((_, element) =>
+          cheerio.load(english.contentHtml, null, false)(element).text(),
+        )
+        .get(),
+    ).toEqual([
+      "Anan Pho Nimdaeng",
+      "Dr. Weeradet Cheevapattananuwong",
+      "Asst. Prof. Dr. Veerachai Archan",
+    ]);
+    expect(cheerio.load(thai.contentHtml, null, false)("img").eq(0).attr("src")).toBe(
+      ANAN_IMAGE_SRC,
+    );
+    expect(cheerio.load(thai.contentHtml, null, false)("img").eq(1).attr("src")).toBe(
+      WEERADET_IMAGE_SRC,
+    );
+    expect(cheerio.load(thai.contentHtml, null, false)("img").eq(2).attr("src")).toBe(
+      VEERACHAI_IMAGE_SRC,
+    );
+    expect(cheerio.load(english.contentHtml, null, false)("img").eq(0).attr("src")).toBe(
+      ANAN_IMAGE_SRC,
+    );
+    expect(cheerio.load(english.contentHtml, null, false)("img").eq(1).attr("src")).toBe(
+      WEERADET_IMAGE_SRC,
+    );
+    expect(cheerio.load(english.contentHtml, null, false)("img").eq(2).attr("src")).toBe(
+      VEERACHAI_IMAGE_SRC,
+    );
+    expect(cheerio.load(english.contentHtml, null, false)("h5").eq(0).html()).toBe(
+      "Member, Board of Director<br>Governor of the State Railway of Thailand",
+    );
+    expect(cheerio.load(english.contentHtml, null, false)("h5").eq(2).html()).toBe(
+      "Member, Board of Director<br>Governor, Thailand Institute of Scientific and Technological Research",
+    );
+    for (const contentHtml of [thai.contentHtml, english.contentHtml]) {
+      const image = cheerio.load(contentHtml, null, false)("img");
+      expect(image.attr("srcset")).toBeUndefined();
+      expect(image.attr("sizes")).toBeUndefined();
+    }
+    const repeated = applyBoardExecutiveOverride(thai);
+    expect(cheerio.load(repeated.contentHtml, null, false)("h4")).toHaveLength(3);
+  });
+
+  it("replaces the ministry representative card with Watcharachan in Thai and English", () => {
+    const source = `<div class="lightweight-accordion"><div class="wp-block-column"><img src="old.jpg" srcset="old.jpg 400w" sizes="auto" alt="" /><h4>ผู้แทน กระทรวงการอุดมศึกษา วิทยาศาสตร์ วิจัยและนวัตกรรม</h4><h5>กรรมการโดยตำแหน่ง ผู้แทนกระทรวงการอุดมศึกษา วิทยาศาสตร์ วิจัยและนวัตกรรม</h5><div class="detail-btn"><a href="#">รายละเอียด</a></div></div></div>`;
+    const updated = applyBoardExecutiveOverride(
+      record({
+        contentHtml: source,
+      }),
+    );
+    const english = applyBoardExecutiveOverride(
+      record({
+        language: "en",
+        path: "/en/เกี่ยวกับ-สทร/คณะกรรมการ-ผู้บริหาร",
+        contentHtml: source,
+      }),
+    );
+    const $ = cheerio.load(updated.contentHtml, null, false);
+    const $english = cheerio.load(english.contentHtml, null, false);
+
+    expect($("h4").text()).toBe("วัชรชาญ สิริสุวรรณทัศน์");
+    expect($("h5").text()).toBe("กรรมการผู้ทรงคุณวุฒิ");
+    expect($("img").attr("src")).toBe(WATCHARACHAN_IMAGE_SRC);
+    expect($("img").attr("alt")).toBe("วัชรชาญ สิริสุวรรณทัศน์");
+    expect($("img").attr("srcset")).toBeUndefined();
+    expect($("img").attr("sizes")).toBeUndefined();
+    expect($english("h4").text()).toBe("Watcharachan Sirisuwannatash");
+    expect($english("h5").text()).toBe("Expert Committee Member");
+    expect($english("img").attr("src")).toBe(WATCHARACHAN_IMAGE_SRC);
+  });
+
+  it("adds a non-clickable Veerachai card to Thai and English boards", () => {
+    const source = `<div class="lightweight-accordion"><div class="wp-block-column"><img src="weeradet.jpg" alt="" /><h4>ดร. วีรเดช ชีวาพัฒนานุวงศ์</h4><h5>กรรมการผู้ทรงคุณวุฒิ</h5><div class="detail-btn"><a href="#">รายละเอียด</a></div></div></div>`;
+    const thai = applyBoardExecutiveOverride(record({ contentHtml: source }));
+    const english = applyBoardExecutiveOverride(
+      record({
+        language: "en",
+        path: "/en/เกี่ยวกับ-สทร/คณะกรรมการ-ผู้บริหาร",
+        contentHtml: source,
+      }),
+    );
+    const $thai = cheerio.load(thai.contentHtml, null, false);
+    const veerachai = $thai(".wp-block-column").eq(1);
+
+    expect(veerachai.find("h4").text()).toBe("ผศ.ดร.วีรชัย อาจหาญ");
+    expect(veerachai.find("h5").text()).toBe(
+      "กรรมการผู้ว่าการ สถาบันวิจัยวิทยาศาสตร์และเทคโนโลยีแห่งประเทศไทย",
+    );
+    expect(veerachai.find("h5").html()).toBe(
+      "กรรมการ<br>ผู้ว่าการ สถาบันวิจัยวิทยาศาสตร์และเทคโนโลยีแห่งประเทศไทย",
+    );
+    expect(veerachai.find("img").attr("src")).toBe(VEERACHAI_IMAGE_SRC);
+    expect(veerachai.find("img").attr("alt")).toBe("ผศ.ดร.วีรชัย อาจหาญ");
+    expect(veerachai.find(".detail-btn").hasClass("detail-btn-disabled")).toBe(true);
+    expect(veerachai.find("a").attr("href")).toBeUndefined();
+    expect(veerachai.find("a").attr("aria-disabled")).toBe("true");
+    expect($thai("h4")).toHaveLength(2);
+    expect(cheerio.load(english.contentHtml, null, false)("h4")).toHaveLength(3);
+    expect(cheerio.load(english.contentHtml, null, false)("h4").eq(2).text()).toBe(
+      "Asst. Prof. Dr. Veerachai Archan",
+    );
+    expect(cheerio.load(thai.contentHtml, null, false)("h4").eq(1).text()).toBe(
+      "ผศ.ดร.วีรชัย อาจหาญ",
+    );
+    expect(cheerio.load(english.contentHtml, null, false)("h5").eq(2).html()).toBe(
+      "Member, Board of Director<br>Governor, Thailand Institute of Scientific and Technological Research",
+    );
+    expect(
+      cheerio.load(applyBoardExecutiveOverride(thai).contentHtml, null, false)("h4"),
+    ).toHaveLength(2);
+  });
+
+  it("removes Chulatep and Watcharachan cards from the board tables", () => {
+    const source = `<div class="lightweight-accordion"><div class="wp-block-column"><h4>ดร. จุลเทพ ขจรไชยกูล</h4><h5>ที่ปรึกษาคณะกรรมการ</h5></div><div class="wp-block-column"><h4>วัชรชาญ สิริสุวรรณทัศน์</h4><h5>ที่ปรึกษา</h5></div><div class="wp-block-column"><h4>คนอื่น</h4><h5>กรรมการ</h5></div></div>`;
+    const thai = applyBoardExecutiveOverride(record({ contentHtml: source }));
+    const english = applyBoardExecutiveOverride(
+      record({
+        language: "en",
+        path: "/en/เกี่ยวกับ-สทร/คณะกรรมการ-ผู้บริหาร",
+        contentHtml: source
+          .replace("ดร. จุลเทพ ขจรไชยกูล", "ดร. จุลเทพ ขจรไชยกูล")
+          .replace("วัชรชาญ สิริสุวรรณทัศน์", "Watcharachan Sirisuwannatash"),
+      }),
+    );
+
+    expect(cheerio.load(thai.contentHtml, null, false)("h4").text()).toBe("คนอื่น");
+    expect(cheerio.load(english.contentHtml, null, false)("h4").text()).toBe("คนอื่น");
+  });
+
   it("does not duplicate Chaiyut on the entrepreneur card", () => {
     const source = `
       <div class="lightweight-accordion">
@@ -134,5 +544,115 @@ describe("applyBoardExecutiveOverride", () => {
 
     expect($('img[src*="IMG_2233.png"]').length).toBe(0);
     expect($('img[src*="ชัยวุฒิ"]').length).toBe(2);
+  });
+
+  it("keeps Thai and English board card content and layout containers", () => {
+    const thaiNames = [
+      "รศ.ดร. โชติชัย เจริญงาม",
+      "ถาวร ชลัษเฐียร",
+      "ผศ. พิศิษฐ์ แสง-ชูโต",
+      "ดรุณ แสงฉาย",
+      "ชาญเชาวน์ ไชยานุกิจ",
+      "ดร. พิเชฐ คุณาธรรมรักษ์",
+      "พัฒนพงษ์ พงศ์ศุภสมิทธิ์",
+      "อนันต์ โพธิ์นิ่มแดง",
+      "ดร. วีรเดช ชีวาพัฒนานุวงศ์",
+      "วัชรชาญ สิริสุวรรณทัศน์",
+      "ผศ.ดร.วีรชัย อาจหาญ",
+      "ดร. เพียงออ เลาหะวิไลย",
+    ];
+    const englishNames = [
+      "Assoc. Prof. Dr. Chotchai Charoenngam",
+      "Thavorn Chalassathien",
+      "Asst. Prof. Pisit Saeng-Xuto",
+      "Darun Saengshine",
+      "Chanchao Chaiyanukij",
+      "Dr. Pichet Kunadhamraks",
+      "Pattanaphong Phongsupatsamit",
+      "Anan Pho Nimdaeng",
+      "Dr. Weeradet Cheevapattananuwong",
+      "Watcharachan Sirisuwannatash",
+      "Asst. Prof. Dr. Veerachai Archan",
+      "Dr. Piang-or Loahavilai",
+    ];
+    const board = (title: string, names: string[]) => `
+      <div class="lightweight-accordion"><details><summary class="lightweight-accordion-title">${title}</summary>
+        <div class="lightweight-accordion-body">
+          <div class="wp-block-columns">${names
+            .slice(0, 1)
+            .map(
+              (name) =>
+                `<div class="wp-block-column"><img src="old.jpg" /><h4>${name}</h4><h5>กรรมการ</h5></div>`,
+            )
+            .join("")}</div>
+          <div class="wp-block-columns">${names
+            .slice(1, 2)
+            .map(
+              (name) =>
+                `<div class="wp-block-column"><img src="old.jpg" /><h4>${name}</h4><h5>กรรมการ</h5></div>`,
+            )
+            .join("")}</div>
+          <div class="wp-block-columns">${names
+            .slice(2, 5)
+            .map(
+              (name) =>
+                `<div class="wp-block-column"><img src="old.jpg" /><h4>${name}</h4><h5>กรรมการ</h5></div>`,
+            )
+            .join("")}</div>
+          <div class="wp-block-columns">${names
+            .slice(5, 11)
+            .map(
+              (name) =>
+                `<div class="wp-block-column"><img src="old.jpg" /><h4>${name}</h4><h5>กรรมการ</h5></div>`,
+            )
+            .join("")}</div>
+          <div class="wp-block-columns">${names
+            .slice(11)
+            .map(
+              (name) =>
+                `<div class="wp-block-column"><img src="old.jpg" /><h4>${name}</h4><h5>กรรมการ</h5></div>`,
+            )
+            .join("")}</div>
+        </div>
+      </details></div>`;
+    const sourceThaiNames = thaiNames.map((name) =>
+      name === "วัชรชาญ สิริสุวรรณทัศน์"
+        ? "ผู้แทน กระทรวงการอุดมศึกษา วิทยาศาสตร์ วิจัยและนวัตกรรม"
+        : name,
+    );
+    const sourceEnglishNames = englishNames
+      .filter((name) => name !== "Dr. Weeradet Cheevapattananuwong")
+      .map((name) =>
+        name === "Watcharachan Sirisuwannatash"
+          ? "ผู้แทน กระทรวงการอุดมศึกษา วิทยาศาสตร์ วิจัยและนวัตกรรม"
+          : name === "Anan Pho Nimdaeng"
+            ? "ผู้แทน ผู้ว่าการรถไฟแห่งประเทศไทย"
+            : name,
+      );
+
+    const thai = applyBoardExecutiveOverride(
+      record({
+        contentHtml: board(
+          "คณะกรรมการสถาบันวิจัยและพัฒนาเทคโนโลยีระบบราง",
+          sourceThaiNames,
+        ),
+      }),
+    );
+    const english = applyBoardExecutiveOverride(
+      record({
+        language: "en",
+        path: "/en/เกี่ยวกับ-สทร/คณะกรรมการ-ผู้บริหาร",
+        contentHtml: board("Board of Directors", sourceEnglishNames),
+      }),
+    );
+
+    for (const contentHtml of [thai.contentHtml, english.contentHtml]) {
+      const $ = cheerio.load(contentHtml, null, false);
+      expect($(".lightweight-accordion .wp-block-columns")).toHaveLength(5);
+      expect($(".lightweight-accordion .wp-block-column")).toHaveLength(12);
+      expect($(".lightweight-accordion .wp-block-column img")).toHaveLength(12);
+      expect($(".lightweight-accordion .wp-block-column h4")).toHaveLength(12);
+      expect($(".lightweight-accordion .wp-block-column h5")).toHaveLength(12);
+    }
   });
 });
