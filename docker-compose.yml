@@ -56,8 +56,6 @@ services:
     image: web-app-rtrda:pr-center-api-test
     container_name: web-app-rtrda-pr-center-api-test
     restart: unless-stopped
-    env_file:
-      - /srv/workspace/rtrda.env
     environment:
       NODE_ENV: production
       DATABASE_URL: postgresql://rtrda:${POSTGRES_PASSWORD}@db:5432/rtrda
@@ -66,9 +64,12 @@ services:
       PR_CENTER_API_PORT: 3100
       PR_CENTER_EMAIL_ONLY_ENABLED: "true"
       PR_CENTER_EMAIL_ONLY_ALLOWLIST: nattapol.y@rtrda.or.th,panissa.t@rtrda.or.th
+      ENTRA_ENV_FILE: /run/secrets/rtrda.env
     depends_on:
       db:
         condition: service_healthy
+    volumes:
+      - /srv/workspace/rtrda.env:/run/secrets/rtrda.env:ro
     healthcheck:
       test:
         [
