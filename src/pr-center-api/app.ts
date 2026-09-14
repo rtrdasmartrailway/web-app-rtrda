@@ -30,7 +30,7 @@ export type EntraAuth = {
   resolve: (request: FastifyRequest) => Promise<PrCenterActor | null>;
   begin: () => Promise<{ url: string; cookie: string }>;
   callback: (request: FastifyRequest) => Promise<{ cookie: string[]; redirect: string }>;
-  signOut: (request: FastifyRequest) => string;
+  signOut: (request: FastifyRequest) => string[];
 };
 
 function correlationId(request: FastifyRequest): string {
@@ -147,7 +147,7 @@ export function buildPrCenterApi(
   );
   app.get("/notifications", async (request) => listNotifications(request.prCenterActor!));
   app.get("/session", async (request) => sessionProfile(request.prCenterActor!));
-  app.get("/auth/login", async (_request, reply) => {
+  app.get("/auth/login", async (request, reply) => {
     if (!entraAuth)
       throw new PrCenterError(
         "Microsoft sign-in is unavailable",
@@ -155,7 +155,10 @@ export function buildPrCenterApi(
         "AUTH_UNAVAILABLE",
       );
     const login = await entraAuth.begin();
-    return reply.header("Set-Cookie", login.cookie).redirect(login.url);
+    // A Microsoft sign-in attempt supersedes Test-only email access.
+    const cookies = [login.cookie];
+    if (emailOnlyAuth) cookies.push(emailOnlyAuth.signOut(request));
+    return reply.header("Set-Cookie", cookies).redirect(login.url);
   });
   app.get("/auth/callback", async (request, reply) => {
     if (!entraAuth)
@@ -166,13 +169,19 @@ export function buildPrCenterApi(
       );
     try {
       const login = await entraAuth.callback(request);
-      return reply.header("Set-Cookie", login.cookie).redirect(login.redirect);
+      const cookies = [...login.cookie];
+      if (emailOnlyAuth) cookies.push(emailOnlyAuth.signOut(request));
+      return reply.header("Set-Cookie", cookies).redirect(login.redirect);
     } catch (error) {
       request.log.warn(
         { error: error instanceof Error ? error.name : "unknown" },
         "OIDC callback failed",
       );
-      return reply.redirect("/rtrdaintranet/prcenter?signin=failed");
+      const cookies = [...entraAuth.signOut(request)];
+      if (emailOnlyAuth) cookies.push(emailOnlyAuth.signOut(request));
+      return reply
+        .header("Set-Cookie", cookies)
+        .redirect("/rtrdaintranet/prcenter?signin=failed");
     }
   });
   app.post("/auth/logout", async (request, reply) => {

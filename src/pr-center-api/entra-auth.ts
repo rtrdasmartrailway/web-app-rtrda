@@ -229,7 +229,10 @@ export function createEntraAuth() {
     signOut(request: FastifyRequest) {
       const token = cookies(request)[SESSION_COOKIE];
       if (token) sessions.delete(token);
-      return cookie(SESSION_COOKIE, "", 0, "Strict");
+      return [
+        cookie(SESSION_COOKIE, "", 0, "Strict"),
+        cookie(STATE_COOKIE, "", 0, "Lax"),
+      ];
     },
   };
 }

@@ -168,6 +168,9 @@ export function PrCenterWorkspace() {
 
   const signedIn = sessionState === "authenticated";
   const isRequestList = ["Home", "My Requests", "All Requests"].includes(page);
+  const signInFailed =
+    typeof window !== "undefined" &&
+    new URLSearchParams(window.location.search).get("signin") === "failed";
 
   // Preserve the established PR Center visual workspace once access is granted.
   if (signedIn && session) return <PrCenterApp actor={session} />;
@@ -222,7 +225,12 @@ export function PrCenterWorkspace() {
                   {submitting ? "กำลังตรวจสอบ" : "เข้าสู่ระบบ"}
                 </button>
               </div>
-              {loginError && <p className={styles.loginError}>{loginError}</p>}
+              {(loginError || signInFailed) && (
+                <p className={styles.loginError}>
+                  {loginError ||
+                    "Microsoft sign-in ไม่สำเร็จ กรุณาลองใหม่ หรือติดต่อผู้ดูแลระบบ"}
+                </p>
+              )}
             </form>
           </section>
         )}
