@@ -70,7 +70,12 @@ export function buildPrCenterApi(
   emailOnlyAuth?: EmailOnlyAuth,
   entraAuth?: EntraAuth | null,
 ): FastifyInstance {
-  const app = Fastify({ logger: true, requestIdHeader: "x-correlation-id" });
+  const app = Fastify({
+    logger: {
+      redact: { paths: ["req.url", "req.headers.cookie"], censor: "[REDACTED]" },
+    },
+    requestIdHeader: "x-correlation-id",
+  });
   app.setErrorHandler((error, request, reply) => {
     const known = error instanceof PrCenterError;
     if (!known) request.log.error({ err: error }, "Unhandled PR Center API error");
@@ -159,8 +164,16 @@ export function buildPrCenterApi(
         503,
         "AUTH_UNAVAILABLE",
       );
-    const login = await entraAuth.callback(request);
-    return reply.header("Set-Cookie", login.cookie).redirect(login.redirect);
+    try {
+      const login = await entraAuth.callback(request);
+      return reply.header("Set-Cookie", login.cookie).redirect(login.redirect);
+    } catch (error) {
+      request.log.warn(
+        { error: error instanceof Error ? error.name : "unknown" },
+        "OIDC callback failed",
+      );
+      return reply.redirect("/rtrdaintranet/prcenter?signin=failed");
+    }
   });
   app.post("/auth/logout", async (request, reply) => {
     if (!entraAuth)

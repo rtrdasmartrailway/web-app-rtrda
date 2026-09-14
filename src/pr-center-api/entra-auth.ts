@@ -192,12 +192,23 @@ export function createEntraAuth() {
       const callback = new URL(settings.redirectUri);
       for (const [key, value] of Object.entries(query))
         if (value) callback.searchParams.set(key, value);
-      const tokens = await oidc.authorizationCodeGrant(await discovery, callback, {
-        pkceCodeVerifier: login.verifier,
-        expectedState: state,
-        expectedNonce: login.nonce,
-      });
-      const claims = tokens.claims();
+      let tokens: oidc.TokenEndpointResponse;
+      try {
+        tokens = await oidc.authorizationCodeGrant(await discovery, callback, {
+          pkceCodeVerifier: login.verifier,
+          expectedState: state,
+          expectedNonce: login.nonce,
+        });
+      } catch {
+        throw new PrCenterError(
+          "Microsoft sign-in could not be completed. Try again or contact an administrator.",
+          401,
+          "OIDC_LOGIN_FAILED",
+        );
+      }
+      const claims = (
+        tokens as oidc.TokenEndpointResponse & oidc.TokenEndpointResponseHelpers
+      ).claims();
       if (!claims)
         throw new PrCenterError(
           "Entra did not return an ID token",
