@@ -54,11 +54,13 @@ describe("applyContactMapOverride", () => {
     const updated = applyContactMapOverride(
       record({
         contentHtml:
-          '<p>Email: info@rtrda.or.th</p><p>โทรศัพท์: 082 204 2998 หรือ 02 248 2988</p><p>Map follows</p>',
+          "<p>Email: info@rtrda.or.th</p><p>โทรศัพท์: 082 204 2998 หรือ 02 248 2988</p><p>Map follows</p>",
       }),
     );
     const $ = cheerio.load(updated.contentHtml, null, false);
-    const phone = $("p").filter((_index, element) => $(element).text().includes("โทรศัพท์:")).first();
+    const phone = $("p")
+      .filter((_index, element) => $(element).text().includes("โทรศัพท์:"))
+      .first();
     const cta = phone.next(".contact-data-request-cta");
 
     expect(cta).toHaveLength(1);
@@ -79,9 +81,9 @@ describe("applyContactMapOverride", () => {
     const $ = cheerio.load(updated.contentHtml, null, false);
 
     expect($(".contact-data-request-cta a").attr("href")).toBe(DATA_REQUEST_FORM_URL);
-    expect($(".contact-form-cta").not(".contact-data-request-cta").find("a").attr("href")).toBe(
-      CONTACT_FORM_URL,
-    );
+    expect(
+      $(".contact-form-cta").not(".contact-data-request-cta").find("a").attr("href"),
+    ).toBe(CONTACT_FORM_URL);
   });
 
   it("promotes the Google contact form link to a visible CTA", () => {
