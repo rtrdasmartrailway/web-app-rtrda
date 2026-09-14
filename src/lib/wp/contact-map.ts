@@ -22,6 +22,9 @@ export const RTRDA_CONTACT_MAP_EMBED_URL =
 const CONTACT_FORM_LINK_SELECTOR = 'a[href*="forms.gle/"]';
 const CONTACT_FORM_URL =
   "https://docs.google.com/forms/d/e/1FAIpQLSd8nY4Dt-vjvl6Ag4Jnwq_Ko5zEUT7FgKH8DB-wql74KAVe5w/viewform";
+const DATA_REQUEST_FORM_URL =
+  "https://docs.google.com/forms/d/e/1FAIpQLScrePVLCQoUuYCxa28oOmfU1MUNQG8dMPkC8KzSbxgkAt6oGw/viewform?usp=heade";
+const PHONE_NUMBER_LABEL = "โทรศัพท์:";
 
 const RTRDA_SOCIAL_LINKS = [
   {
@@ -114,7 +117,22 @@ export function applyContactMapOverride(record: WpContentRecord): WpContentRecor
     }
   }
 
-  if (contactFormLink.length > 0 && $(".contact-form-cta").length === 0) {
+  const phoneParagraph = $("p")
+    .filter((_index, element) => $(element).text().includes(PHONE_NUMBER_LABEL))
+    .first();
+  if (phoneParagraph.length > 0 && $(".contact-data-request-cta").length === 0) {
+    phoneParagraph.after(
+      `<div class="contact-data-request-cta contact-form-cta">` +
+        `<a href="${DATA_REQUEST_FORM_URL}" target="_blank" rel="noreferrer">ขอใช้บริการข้อมูลของ RTRDA</a>` +
+        `</div>`,
+    );
+    changed = true;
+  }
+
+  if (
+    contactFormLink.length > 0 &&
+    $(".contact-form-cta").not(".contact-data-request-cta").length === 0
+  ) {
     const label = record.language === "th" ? "ช่องทางการติดต่อ" : "Contact Form";
 
     contactFormLink.closest(".elementor-widget-button").remove();
