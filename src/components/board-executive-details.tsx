@@ -6,6 +6,7 @@ import {
   getBoardExecutiveDetailByName,
   getBoardExecutiveDetailByTrigger,
 } from "@/lib/wp/board-executive-details";
+import type { WpLanguage } from "@/lib/wp/types";
 import styles from "./board-executive-org-chart.module.css";
 
 const LEGACY_IGNORED_CLASSES = new Set([
@@ -18,10 +19,12 @@ function BoardExecutiveDetailModal({
   detail,
   labelledBy,
   onClose,
+  language,
 }: {
   detail: BoardExecutiveDetailEntry;
   labelledBy: string;
   onClose: () => void;
+  language: WpLanguage;
 }) {
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {
@@ -49,7 +52,7 @@ function BoardExecutiveDetailModal({
         onClick={(event) => event.stopPropagation()}
       >
         <button
-          aria-label="ปิดรายละเอียด"
+          aria-label={language === "th" ? "ปิดรายละเอียด" : "Close details"}
           className={styles.detailClose}
           type="button"
           onClick={onClose}
@@ -66,15 +69,21 @@ function BoardExecutiveDetailModal({
   );
 }
 
-export function BoardExecutiveDetailButton({ name }: { name: string }) {
-  const detail = getDetailByDisplayedName(name);
+export function BoardExecutiveDetailButton({
+  name,
+  language,
+}: {
+  name: string;
+  language: WpLanguage;
+}) {
+  const detail = getDetailByDisplayedName(name, language);
   const [open, setOpen] = useState(false);
   const headingId = useId();
 
   if (!detail) {
     return (
       <button className={styles.detailButtonDisabled} disabled type="button">
-        รายละเอียด
+        {language === "th" ? "รายละเอียด" : "Details"}
       </button>
     );
   }
@@ -89,26 +98,30 @@ export function BoardExecutiveDetailButton({ name }: { name: string }) {
         type="button"
         onClick={() => setOpen(true)}
       >
-        รายละเอียด
+        {language === "th" ? "รายละเอียด" : "Details"}
       </button>
       {open ? (
         <BoardExecutiveDetailModal
           detail={detail}
           labelledBy={headingId}
           onClose={() => setOpen(false)}
+          language={language}
         />
       ) : null}
     </>
   );
 }
 
-function legacyDetailFromElement(element: Element): BoardExecutiveDetailEntry | null {
+function legacyDetailFromElement(
+  element: Element,
+  language: WpLanguage,
+): BoardExecutiveDetailEntry | null {
   for (const className of Array.from(element.classList)) {
     if (LEGACY_IGNORED_CLASSES.has(className)) {
       continue;
     }
 
-    const detail = getBoardExecutiveDetailByTrigger(className);
+    const detail = getBoardExecutiveDetailByTrigger(className, language);
     if (detail) {
       return detail;
     }
@@ -117,19 +130,26 @@ function legacyDetailFromElement(element: Element): BoardExecutiveDetailEntry | 
   return null;
 }
 
-function getDetailByDisplayedName(name: string): BoardExecutiveDetailEntry | null {
+function getDetailByDisplayedName(
+  name: string,
+  language: WpLanguage,
+): BoardExecutiveDetailEntry | null {
   if (name.includes("เพียงออ") && name.includes("เลาหะวิไลย")) {
     return (
-      getBoardExecutiveDetailByTrigger("peangau") ?? getBoardExecutiveDetailByName(name)
+      getBoardExecutiveDetailByTrigger("peangau", language) ??
+      getBoardExecutiveDetailByName(name, language)
     );
   }
 
-  return getBoardExecutiveDetailByName(name);
+  return getBoardExecutiveDetailByName(name, language);
 }
 
-function findLegacyDetailForColumn(column: Element): BoardExecutiveDetailEntry | null {
+function findLegacyDetailForColumn(
+  column: Element,
+  language: WpLanguage,
+): BoardExecutiveDetailEntry | null {
   const name = column.querySelector("h4")?.textContent ?? "";
-  return getDetailByDisplayedName(name);
+  return getDetailByDisplayedName(name, language);
 }
 
 function enableLegacyButton(element: Element) {
@@ -151,14 +171,28 @@ function disableLegacyButton(element: Element) {
   link?.setAttribute("tabindex", "-1");
 }
 
-function legacyButtonMarkup(enabled: boolean): string {
+function setLegacyButtonLabel(element: Element, language: WpLanguage) {
+  const label = language === "th" ? "รายละเอียด" : "Details";
+  const wrapper = element.closest(".wp-block-button") ?? element;
+  const link = wrapper.querySelector("a");
+  if (link) {
+    link.textContent = label;
+  }
+}
+
+function legacyButtonMarkup(enabled: boolean, language: WpLanguage): string {
   const disabledAttributes = enabled ? "" : ' aria-disabled="true" tabindex="-1"';
   const disabledClass = enabled ? "" : " detail-btn-disabled";
 
-  return `<div class="wp-block-buttons is-content-justification-center is-layout-flex board-detail-button-injected"><div class="wp-block-button detail-btn${disabledClass}"><a class="wp-block-button__link wp-element-button"${disabledAttributes}>รายละเอียด</a></div></div>`;
+  const label = language === "th" ? "รายละเอียด" : "Details";
+  return `<div class="wp-block-buttons is-content-justification-center is-layout-flex board-detail-button-injected"><div class="wp-block-button detail-btn${disabledClass}"><a class="wp-block-button__link wp-element-button"${disabledAttributes}>${label}</a></div></div>`;
 }
 
-export function BoardExecutiveLegacyDetailsHydrator() {
+export function BoardExecutiveLegacyDetailsHydrator({
+  language,
+}: {
+  language: WpLanguage;
+}) {
   const [activeDetail, setActiveDetail] = useState<BoardExecutiveDetailEntry | null>(
     null,
   );
@@ -177,8 +211,8 @@ export function BoardExecutiveLegacyDetailsHydrator() {
 
       const button = column.querySelector(".detail-btn");
       const detail =
-        (button ? legacyDetailFromElement(button) : null) ??
-        findLegacyDetailForColumn(column);
+        (button ? legacyDetailFromElement(button, language) : null) ??
+        findLegacyDetailForColumn(column, language);
 
       if (button && detail) {
         enableLegacyButton(button);
@@ -188,8 +222,15 @@ export function BoardExecutiveLegacyDetailsHydrator() {
         disableLegacyButton(button);
       }
 
+      if (button) {
+        setLegacyButtonLabel(button, language);
+      }
+
       if (!button) {
-        column.insertAdjacentHTML("beforeend", legacyButtonMarkup(Boolean(detail)));
+        column.insertAdjacentHTML(
+          "beforeend",
+          legacyButtonMarkup(Boolean(detail), language),
+        );
       }
     }
 
@@ -202,8 +243,8 @@ export function BoardExecutiveLegacyDetailsHydrator() {
 
       const column = button.closest(".wp-block-column");
       const detail =
-        legacyDetailFromElement(button) ??
-        (column ? findLegacyDetailForColumn(column) : null);
+        legacyDetailFromElement(button, language) ??
+        (column ? findLegacyDetailForColumn(column, language) : null);
       if (!detail) {
         event.preventDefault();
         return;
@@ -215,13 +256,14 @@ export function BoardExecutiveLegacyDetailsHydrator() {
 
     document.addEventListener("click", onClick);
     return () => document.removeEventListener("click", onClick);
-  }, []);
+  }, [language]);
 
   return activeDetail ? (
     <BoardExecutiveDetailModal
       detail={activeDetail}
       labelledBy={headingId}
       onClose={() => setActiveDetail(null)}
+      language={language}
     />
   ) : null;
 }

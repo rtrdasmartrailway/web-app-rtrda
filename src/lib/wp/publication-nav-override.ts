@@ -10,6 +10,7 @@ const publicationsLabel: Record<WpLanguage, string> = {
   th: "เอกสารเผยแพร่",
   en: "Publications",
 };
+const temporarilyHiddenThaiLabels = new Set(["เผยแพร่ข้อมูลตามหลักธรรมาภิบาล"]);
 
 export function applyPublicationNavOverride(
   items: PresentationNavItem[],
@@ -21,12 +22,17 @@ export function applyPublicationNavOverride(
   return items.map((item) => {
     if (item.label !== publicationsLabel[language]) return item;
 
+    const visibleChildren = item.children.filter(
+      (child) => !temporarilyHiddenThaiLabels.has(child.label),
+    );
     const additions = [
       { label: moralityReportTitle, path: moralityReportPath },
       { label: railStrategyPublicationTitle, path: railStrategyPublicationPath },
-    ].filter((addition) => !item.children.some((child) => child.path === addition.path));
+    ].filter(
+      (addition) => !visibleChildren.some((child) => child.path === addition.path),
+    );
     const children = [
-      ...item.children,
+      ...visibleChildren,
       ...additions.map((addition) => ({
         ...addition,
         href: addition.path,

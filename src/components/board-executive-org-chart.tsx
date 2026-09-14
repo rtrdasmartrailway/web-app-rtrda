@@ -82,7 +82,7 @@ function PersonCard({
       ) : null}
       {!person.vacant ? (
         <div className={styles.detailButtonWrap}>
-          <BoardExecutiveDetailButton name={person.name} />
+          <BoardExecutiveDetailButton language={language} name={person.name} />
         </div>
       ) : null}
       {showSubUnitsButton && !person.vacant ? (
@@ -183,7 +183,7 @@ export function BoardExecutiveContent({
           />
         ),
       )}
-      <BoardExecutiveLegacyDetailsHydrator />
+      <BoardExecutiveLegacyDetailsHydrator language={presentation.language} />
     </div>
   );
 }

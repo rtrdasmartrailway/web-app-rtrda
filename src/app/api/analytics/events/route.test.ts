@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { NextRequest } from "next/server";
-import { isSameOriginAnalyticsRequest } from "./route";
+import { isSameOriginAnalyticsRequest } from "@/lib/analytics/origin-policy";
 
 function request(
   origin: string | null,

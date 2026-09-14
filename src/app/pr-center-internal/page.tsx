@@ -1,11 +1,11 @@
 import type { Metadata } from "next";
-import { PrCenterApp } from "@/components/pr-center-app";
+import { PrCenterWorkspace } from "@/components/pr-center-workspace";
 
 export const metadata: Metadata = {
   title: "RTRDA PR Center",
-  description: "RTRDA internal public relations workspace prototype",
+  description: "RTRDA internal public relations workflow workspace",
 };
 
 export default function PrCenterPage() {
-  return <PrCenterApp />;
+  return <PrCenterWorkspace />;
 }
