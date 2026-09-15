@@ -26,14 +26,14 @@ function record(overrides: Partial<WpContentRecord> = {}): WpContentRecord {
 }
 
 describe("applyEServicesContactOverride", () => {
-  it("adds the contact and complaint reporting links from the navigation", () => {
+  it("adds only complaint reporting links from the navigation", () => {
     const updated = applyEServicesContactOverride(record());
     const $ = cheerio.load(updated.contentHtml, null, false);
 
     expect($(".e-services-contact-table")).toHaveLength(1);
-    expect($(".e-services-contact-table tbody tr")).toHaveLength(5);
+    expect($(".e-services-contact-table tbody tr")).toHaveLength(4);
     expect($(".e-services-contact-table thead")).toHaveLength(0);
-    expect($(".e-services-contact-table").text()).toContain("ช่องทางการติดต่อ");
+    expect($(".e-services-contact-table").text()).not.toContain("ช่องทางการติดต่อ");
     expect($(".e-services-contact-table").text()).toContain(
       "ช่องทางการแจ้งเรื่องการทุจริตและประพฤติมิชอบ",
     );
@@ -58,10 +58,11 @@ describe("applyEServicesContactOverride", () => {
       }),
     );
 
+    const $ = cheerio.load(updated.contentHtml, null, false);
     expect(updated.contentHtml).toContain(
       "Reporting Channels for Corruption and Misconduct",
     );
-    expect(updated.contentHtml).toContain("Contact Information");
+    expect($(".e-services-contact-table").text()).not.toContain("Contact Information");
     expect(updated.contentHtml).toContain("Complaints and Whistleblowing");
     expect(updated.contentHtml).toContain(NACC_COMPLAINT_URL);
     expect(updated.contentHtml).toContain(PACC_COMPLAINT_URL);
