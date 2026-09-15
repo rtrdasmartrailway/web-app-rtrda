@@ -3416,23 +3416,6 @@ body:has(.yutth-lightbox) {
   table-layout: fixed;
 }
 
-.wp-content .e-services-contact-table th {
-  width: auto;
-  border: 0;
-  border-bottom: 1px solid #d7e2ef;
-  background: #f1f6fc;
-  color: var(--navy-900);
-  font-weight: 700;
-  vertical-align: top;
-  white-space: normal;
-}
-
-.wp-content .e-services-contact-table thead th:first-child,
-.wp-content .e-services-contact-table tbody th {
-  width: 88px;
-  text-align: center;
-}
-
 .wp-content .e-services-contact-table td {
   border: 0;
   border-bottom: 1px solid #d7e2ef;
@@ -3440,13 +3423,12 @@ body:has(.yutth-lightbox) {
   vertical-align: top;
 }
 
-.wp-content .e-services-contact-table td:last-child {
+.wp-content .lightweight-accordion-body .e-services-contact-table td:last-child {
   text-align: left;
   white-space: normal;
   width: auto;
 }
 
-.wp-content .e-services-contact-table tr:last-child th,
 .wp-content .e-services-contact-table tr:last-child td {
   border-bottom: 0;
 }
@@ -3488,11 +3470,6 @@ body:has(.yutth-lightbox) {
     display: block;
     min-width: 0;
     width: 100% !important;
-  }
-
-  .wp-content .e-services-contact-table th {
-    border-bottom: 0;
-    padding-bottom: 6px;
   }
 
   .wp-content .e-services-contact-table td {
@@ -7679,7 +7656,6 @@ a.calendar-cell.has-posts:hover {
   .wp-content .lightweight-accordion-body .e-services-contact-table,
   .wp-content .lightweight-accordion-body .e-services-contact-table tbody,
   .wp-content .lightweight-accordion-body .e-services-contact-table tr,
-  .wp-content .lightweight-accordion-body .e-services-contact-table th,
   .wp-content .lightweight-accordion-body .e-services-contact-table td {
     display: block;
     min-width: 0;

@@ -13,9 +13,8 @@ function buildContactTableHtml(language: WpContentRecord["language"]): string {
   const isThai = language === "th";
   const links = isThai
     ? {
-        number: "ลำดับ",
-        channel: "ช่องทางแจ้งเรื่องร้องเรียน",
         items: [
+          { label: "ช่องทางการติดต่อ", href: "/ติดต่อเรา/ช่องทางการติดต่อ" },
           {
             label: "ช่องทางการแจ้งเรื่องการทุจริตและประพฤติมิชอบ",
             href: "/ช่องทางการแจ้งเรื่องกา",
@@ -35,9 +34,8 @@ function buildContactTableHtml(language: WpContentRecord["language"]): string {
         ],
       }
     : {
-        number: "No.",
-        channel: "Complaint reporting channels",
         items: [
+          { label: "Contact Information", href: "/en/ติดต่อเรา/ช่องทางการติดต่อ" },
           {
             label: "Reporting Channels for Corruption and Misconduct",
             href: "/en/ช่องทางการแจ้งเรื่องกา",
@@ -54,18 +52,14 @@ function buildContactTableHtml(language: WpContentRecord["language"]): string {
         ],
       };
   const rows = links.items
-    .map((item, index) => {
+    .map((item) => {
       const external = item.href.startsWith("http");
       const target = external ? ' target="_blank" rel="noreferrer noopener"' : "";
-      return `<tr><th scope="row">${index + 1}</th><td><a href="${item.href}"${target}>${item.label}</a></td></tr>`;
+      return `<tr><td><a href="${item.href}"${target}>${item.label}</a></td></tr>`;
     })
     .join("");
 
-  return (
-    `<div class="e-services-contact-table-wrap"><table class="e-services-contact-table"><thead><tr>` +
-    `<th scope="col">${links.number}</th><th scope="col">${links.channel}</th>` +
-    `</tr></thead><tbody>${rows}</tbody></table></div>`
-  );
+  return `<div class="e-services-contact-table-wrap"><table class="e-services-contact-table"><tbody>${rows}</tbody></table></div>`;
 }
 
 export function applyEServicesContactOverride(record: WpContentRecord): WpContentRecord {
@@ -89,6 +83,7 @@ export function applyEServicesContactOverride(record: WpContentRecord): WpConten
   const body = contactAccordion.find(".lightweight-accordion-body").first();
   if (body.length === 0) return record;
 
+  body.find('a[href*="ติดต่อเรา/ช่องทางการติดต่อ"]').closest("p").remove();
   body.append(buildContactTableHtml(record.language));
   return { ...record, contentHtml: $.html() };
 }
