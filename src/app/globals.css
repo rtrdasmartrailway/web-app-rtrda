@@ -3417,7 +3417,7 @@ body:has(.yutth-lightbox) {
 }
 
 .wp-content .e-services-contact-table th {
-  width: 32%;
+  width: auto;
   border: 0;
   border-bottom: 1px solid #d7e2ef;
   background: #f1f6fc;
@@ -3425,6 +3425,12 @@ body:has(.yutth-lightbox) {
   font-weight: 700;
   vertical-align: top;
   white-space: normal;
+}
+
+.wp-content .e-services-contact-table thead th:first-child,
+.wp-content .e-services-contact-table tbody th {
+  width: 88px;
+  text-align: center;
 }
 
 .wp-content .e-services-contact-table td {
@@ -3438,13 +3444,6 @@ body:has(.yutth-lightbox) {
   text-align: left;
   white-space: normal;
   width: auto;
-}
-
-.wp-content .e-services-contact-table iframe {
-  display: block;
-  margin-bottom: 12px;
-  min-height: 0;
-  height: 300px;
 }
 
 .wp-content .e-services-contact-table tr:last-child th,
@@ -3476,22 +3475,6 @@ body:has(.yutth-lightbox) {
   transform: none;
 }
 
-.wp-content .e-services-contact-table .e-services-contact-map-link {
-  align-items: center;
-  background: #0066b3;
-  border-radius: 8px;
-  color: #fff !important;
-  display: inline-flex;
-  font-size: 14px;
-  padding: 9px 14px;
-  text-decoration: none;
-}
-
-.wp-content .e-services-contact-table .e-services-contact-map-link:hover {
-  background: #004f8a;
-  text-decoration: none;
-}
-
 @media (max-width: 680px) {
   .wp-content .e-services-contact-table-wrap {
     overflow: visible;
@@ -3516,10 +3499,6 @@ body:has(.yutth-lightbox) {
     border-bottom: 1px solid #d7e2ef;
     border-top: 0;
     padding-top: 6px;
-  }
-
-  .wp-content .e-services-contact-table iframe {
-    height: 220px;
   }
 }
 
@@ -7711,9 +7690,5 @@ a.calendar-cell.has-posts:hover {
     padding: 6px 16px 14px;
     text-align: left;
     vertical-align: top;
-  }
-
-  .wp-content .lightweight-accordion-body .e-services-contact-table iframe {
-    height: 220px;
   }
 }

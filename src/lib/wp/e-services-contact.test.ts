@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import * as cheerio from "cheerio";
-import { RTRDA_CONTACT_MAP_EMBED_URL } from "./contact-map";
+import { NACC_COMPLAINT_URL, PACC_COMPLAINT_URL } from "./contact-nav-override";
 import { applyEServicesContactOverride } from "./e-services-contact";
 import type { WpContentRecord } from "./types";
 
@@ -26,19 +26,22 @@ function record(overrides: Partial<WpContentRecord> = {}): WpContentRecord {
 }
 
 describe("applyEServicesContactOverride", () => {
-  it("adds the requested Thai contact details and Google map to e-services", () => {
+  it("adds Thai complaint reporting links from the navigation", () => {
     const updated = applyEServicesContactOverride(record());
     const $ = cheerio.load(updated.contentHtml, null, false);
 
     expect($(".e-services-contact-table")).toHaveLength(1);
-    expect($(".e-services-contact-table").text()).toContain("อาคารศูนย์บริหารทางพิเศษ");
-    expect($(".e-services-contact-table").text()).toContain("saraban@rtrda.or.th");
-    expect($(".e-services-contact-table").text()).toContain("info@rtrda.or.th");
-    expect($(".e-services-contact-table").text()).toContain("082 204 2998");
-    expect($(".e-services-contact-table iframe").attr("src")).toBe(
-      RTRDA_CONTACT_MAP_EMBED_URL,
+    expect($(".e-services-contact-table tbody tr")).toHaveLength(4);
+    expect($(".e-services-contact-table").text()).toContain(
+      "ช่องทางการแจ้งเรื่องการทุจริตและประพฤติมิชอบ",
     );
-    expect($(".e-services-contact-map-link").attr("target")).toBe("_blank");
+    expect($(".e-services-contact-table").text()).toContain(
+      "การรับเรื่องร้องเรียน / แจ้งเบาะแส",
+    );
+    expect($("a[href='" + NACC_COMPLAINT_URL + "']").attr("target")).toBe("_blank");
+    expect($("a[href='" + PACC_COMPLAINT_URL + "']").attr("target")).toBe("_blank");
+    expect(updated.contentHtml).not.toContain("saraban@rtrda.or.th");
+    expect($(".e-services-contact-table iframe")).toHaveLength(0);
   });
 
   it("adds an English table to the English e-services page", () => {
@@ -52,8 +55,12 @@ describe("applyEServicesContactOverride", () => {
       }),
     );
 
-    expect(updated.contentHtml).toContain("Official correspondence email");
-    expect(updated.contentHtml).toContain("Open in Google Maps");
+    expect(updated.contentHtml).toContain(
+      "Reporting Channels for Corruption and Misconduct",
+    );
+    expect(updated.contentHtml).toContain("Complaints and Whistleblowing");
+    expect(updated.contentHtml).toContain(NACC_COMPLAINT_URL);
+    expect(updated.contentHtml).toContain(PACC_COMPLAINT_URL);
   });
 
   it("leaves unrelated pages unchanged and is idempotent", () => {
