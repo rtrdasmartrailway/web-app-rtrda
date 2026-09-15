@@ -32,6 +32,7 @@ import {
 } from "@/lib/wp/board-executives";
 import { applyBoardExecutiveOverride } from "@/lib/wp/board-executive-override";
 import { applyContactMapOverride } from "@/lib/wp/contact-map";
+import { applyEServicesContactOverride } from "@/lib/wp/e-services-contact";
 import { applyItaHeadingsOverride } from "@/lib/wp/ita-headings-override";
 import { getStaticDownloadOverride } from "@/lib/wp/static-download-overrides";
 import { getSupplementalKnowledgePage } from "@/lib/wp/knowledge-supplemental-documents";
@@ -434,7 +435,9 @@ export const getPageData = cache(async (path: string): Promise<PageData | null> 
   }
   const record = applyItaHeadingsOverride(
     applyBoardExecutiveOverride(
-      applyProcurementPlanOverride(applyContactMapOverride(importedRecord)),
+      applyProcurementPlanOverride(
+        applyEServicesContactOverride(applyContactMapOverride(importedRecord)),
+      ),
     ),
   );
   const overriddenRecord = applyProcurementTableOverrides(

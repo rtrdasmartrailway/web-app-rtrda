@@ -3400,6 +3400,52 @@ body:has(.yutth-lightbox) {
   display: inline-block;
 }
 
+.wp-content .e-services-contact-table-wrap {
+  margin-top: 24px;
+  overflow-x: auto;
+}
+
+.wp-content .e-services-contact-table {
+  margin: 0;
+  table-layout: fixed;
+}
+
+.wp-content .e-services-contact-table th {
+  width: 32%;
+  white-space: normal;
+}
+
+.wp-content .e-services-contact-table td:last-child {
+  text-align: left;
+  white-space: normal;
+  width: auto;
+}
+
+.wp-content .e-services-contact-table iframe {
+  display: block;
+  margin-bottom: 12px;
+  min-height: 300px;
+}
+
+@media (max-width: 640px) {
+  .wp-content .e-services-contact-table,
+  .wp-content .e-services-contact-table tbody,
+  .wp-content .e-services-contact-table tr,
+  .wp-content .e-services-contact-table th,
+  .wp-content .e-services-contact-table td {
+    display: block;
+    width: 100%;
+  }
+
+  .wp-content .e-services-contact-table th {
+    border-bottom: 0;
+  }
+
+  .wp-content .e-services-contact-table td {
+    border-top: 0;
+  }
+}
+
 /* กฏหมาย/ระเบียบ/ข้อบังคับ page — keep long Thai titles readable while the
    download action remains a consistent button column. */
 .wp-content .lightweight-accordion.legislation {
