@@ -15,7 +15,7 @@ function record(overrides: Partial<WpContentRecord> = {}): WpContentRecord {
     title: "e-Services",
     excerpt: "",
     contentHtml:
-      '<div class="lightweight-accordion"><details><summary>ข้อมูลการติดต่อ</summary><div class="lightweight-accordion-body"><p><a href="/ติดต่อเรา/ช่องทางการติดต่อ">ช่องทางการติดต่อ</a></p></div></details></div>',
+      '<div class="lightweight-accordion"><details><summary>ข้อมูลการติดต่อ</summary><div class="lightweight-accordion-body"><ul class="wp-block-list"><li><a href="https://infocenter.oic.go.th/rtrda/index.php"></a><a href="/ติดต่อเรา/ช่องทางการติดต่อ">ช่องทางการติดต่อ</a></li></ul></div></details></div>',
     modified: "2025-01-01T00:00:00",
     date: "2025-01-01T00:00:00",
     parentPath: null,
@@ -26,14 +26,14 @@ function record(overrides: Partial<WpContentRecord> = {}): WpContentRecord {
 }
 
 describe("applyEServicesContactOverride", () => {
-  it("adds only complaint reporting links from the navigation", () => {
+  it("replaces the original contact list item with table links", () => {
     const updated = applyEServicesContactOverride(record());
     const $ = cheerio.load(updated.contentHtml, null, false);
 
     expect($(".e-services-contact-table")).toHaveLength(1);
-    expect($(".e-services-contact-table tbody tr")).toHaveLength(4);
+    expect($(".e-services-contact-table tbody tr")).toHaveLength(5);
     expect($(".e-services-contact-table thead")).toHaveLength(0);
-    expect($(".e-services-contact-table").text()).not.toContain("ช่องทางการติดต่อ");
+    expect($(".e-services-contact-table").text()).toContain("ช่องทางการติดต่อ");
     expect($(".e-services-contact-table").text()).toContain(
       "ช่องทางการแจ้งเรื่องการทุจริตและประพฤติมิชอบ",
     );
@@ -44,7 +44,7 @@ describe("applyEServicesContactOverride", () => {
     expect($("a[href='" + PACC_COMPLAINT_URL + "']").attr("target")).toBe("_blank");
     expect(updated.contentHtml).not.toContain("saraban@rtrda.or.th");
     expect($(".e-services-contact-table iframe")).toHaveLength(0);
-    expect($(".lightweight-accordion-body > p")).toHaveLength(0);
+    expect($(".lightweight-accordion-body > .wp-block-list")).toHaveLength(0);
   });
 
   it("adds an English table to the English e-services page", () => {
@@ -62,7 +62,7 @@ describe("applyEServicesContactOverride", () => {
     expect(updated.contentHtml).toContain(
       "Reporting Channels for Corruption and Misconduct",
     );
-    expect($(".e-services-contact-table").text()).not.toContain("Contact Information");
+    expect($(".e-services-contact-table").text()).toContain("Contact Information");
     expect(updated.contentHtml).toContain("Complaints and Whistleblowing");
     expect(updated.contentHtml).toContain(NACC_COMPLAINT_URL);
     expect(updated.contentHtml).toContain(PACC_COMPLAINT_URL);

@@ -14,6 +14,7 @@ function buildContactTableHtml(language: WpContentRecord["language"]): string {
   const links = isThai
     ? {
         items: [
+          { label: "ช่องทางการติดต่อ", href: "/ติดต่อเรา/ช่องทางการติดต่อ" },
           {
             label: "ช่องทางการแจ้งเรื่องการทุจริตและประพฤติมิชอบ",
             href: "/ช่องทางการแจ้งเรื่องกา",
@@ -34,6 +35,7 @@ function buildContactTableHtml(language: WpContentRecord["language"]): string {
       }
     : {
         items: [
+          { label: "Contact Information", href: "/en/ติดต่อเรา/ช่องทางการติดต่อ" },
           {
             label: "Reporting Channels for Corruption and Misconduct",
             href: "/en/ช่องทางการแจ้งเรื่องกา",
@@ -81,7 +83,10 @@ export function applyEServicesContactOverride(record: WpContentRecord): WpConten
   const body = contactAccordion.find(".lightweight-accordion-body").first();
   if (body.length === 0) return record;
 
-  body.find('a[href*="ติดต่อเรา/ช่องทางการติดต่อ"]').closest("p").remove();
+  const originalContactLink = body.find('a[href*="ติดต่อเรา/ช่องทางการติดต่อ"]').first();
+  const parentList = originalContactLink.closest("ul");
+  originalContactLink.closest("p, li").remove();
+  if (parentList.find("li").length === 0) parentList.remove();
   body.append(buildContactTableHtml(record.language));
   return { ...record, contentHtml: $.html() };
 }
