@@ -15,7 +15,7 @@ function record(overrides: Partial<WpContentRecord> = {}): WpContentRecord {
     title: "e-Services",
     excerpt: "",
     contentHtml:
-      '<div class="lightweight-accordion"><details><summary>ข้อมูลการติดต่อ</summary><div class="lightweight-accordion-body"><ul class="wp-block-list"><li><a href="https://infocenter.oic.go.th/rtrda/index.php"></a><a href="/ติดต่อเรา/ช่องทางการติดต่อ">ช่องทางการติดต่อ</a></li></ul></div></details></div>',
+      '<div class="lightweight-accordion"><details><summary>คลังความรู้</summary><div class="lightweight-accordion-body"><ul class="wp-block-list"><li><a href="/คลังความรู้">คลังความรู้ สทร.</a></li></ul></div></details></div><div class="lightweight-accordion"><details><summary>ข้อมูลการติดต่อ</summary><div class="lightweight-accordion-body"><ul class="wp-block-list"><li><a href="https://infocenter.oic.go.th/rtrda/index.php"></a><a href="/ติดต่อเรา/ช่องทางการติดต่อ">ช่องทางการติดต่อ</a></li></ul></div></details></div>',
     modified: "2025-01-01T00:00:00",
     date: "2025-01-01T00:00:00",
     parentPath: null,
@@ -44,7 +44,8 @@ describe("applyEServicesContactOverride", () => {
     expect($("a[href='" + PACC_COMPLAINT_URL + "']").attr("target")).toBe("_blank");
     expect(updated.contentHtml).not.toContain("saraban@rtrda.or.th");
     expect($(".e-services-contact-table iframe")).toHaveLength(0);
-    expect($(".lightweight-accordion-body > .wp-block-list")).toHaveLength(0);
+    expect($(".e-services-link-accordion")).toHaveLength(1);
+    expect($(".e-services-link-accordion .wp-block-list")).toHaveLength(1);
   });
 
   it("adds an English table to the English e-services page", () => {

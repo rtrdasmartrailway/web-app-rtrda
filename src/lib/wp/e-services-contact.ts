@@ -66,12 +66,22 @@ export function applyEServicesContactOverride(record: WpContentRecord): WpConten
   if (!isEServicesPath(record.path)) return record;
 
   const $ = cheerio.load(record.contentHtml, null, false);
-  const contactAccordion = $(".lightweight-accordion")
+  const eServicesAccordions = $(".lightweight-accordion");
+  const contactAccordion = eServicesAccordions
     .filter((_index, element) => {
       const label = $(element).find("summary").first().text().trim();
       return label.includes("ข้อมูลการติดต่อ") || label.includes("Contact Information");
     })
     .first();
+
+  eServicesAccordions
+    .not(contactAccordion)
+    .filter(
+      (_index, element) =>
+        $(element).find("> details > .lightweight-accordion-body > ul.wp-block-list")
+          .length > 0,
+    )
+    .addClass("e-services-link-accordion");
 
   if (
     contactAccordion.length === 0 ||
