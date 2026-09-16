@@ -14,6 +14,8 @@ import {
   listApprovalQueue,
   recordApprovalDecision,
   requestDetail,
+  recordPublishingEvidence,
+  scheduleTask,
   transitionRequest,
   updateRequestDraft,
   sessionProfile,
@@ -341,6 +343,38 @@ export function buildPrCenterApi(
       {
         decision: input.decision as "APPROVED" | "REVISION_REQUIRED" | "REJECTED",
         comment: typeof input.comment === "string" ? input.comment : undefined,
+      },
+      correlationId(request),
+    );
+  });
+  app.post("/tasks/:taskId/schedule", async (request) => {
+    const input = await body(request);
+    return scheduleTask(
+      request.prCenterActor!,
+      taskId((request.params as { taskId: string }).taskId),
+      expectedVersion(request),
+      {
+        channel: typeof input.channel === "string" ? input.channel : "",
+        scheduledFor:
+          typeof input.scheduledFor === "string"
+            ? new Date(input.scheduledFor)
+            : new Date("invalid"),
+        idempotencyKey:
+          typeof input.idempotencyKey === "string" ? input.idempotencyKey : "",
+      },
+      correlationId(request),
+    );
+  });
+  app.post("/tasks/:taskId/publishing-evidence", async (request) => {
+    const input = await body(request);
+    return recordPublishingEvidence(
+      request.prCenterActor!,
+      taskId((request.params as { taskId: string }).taskId),
+      expectedVersion(request),
+      {
+        publishedUrl: typeof input.publishedUrl === "string" ? input.publishedUrl : "",
+        publishedReference:
+          typeof input.publishedReference === "string" ? input.publishedReference : "",
       },
       correlationId(request),
     );

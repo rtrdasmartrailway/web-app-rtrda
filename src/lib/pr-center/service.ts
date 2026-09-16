@@ -15,6 +15,7 @@ import {
   canReadAllRequests,
   canReviewIdeas,
   canTransitionTask,
+  publicationGate,
   type PrCenterRole,
   type PrTaskStatus as WorkflowStatus,
 } from "./workflow";
@@ -1008,5 +1009,199 @@ export async function recordApprovalDecision(
       correlationId,
     });
     return approval;
+  });
+}
+
+export async function scheduleTask(
+  actor: PrCenterActor,
+  taskId: string,
+  fromVersion: number,
+  input: { channel: string; scheduledFor: Date; idempotencyKey: string },
+  correlationId: string = randomUUID(),
+) {
+  if (!canManageTasks(actor.role))
+    throw new PrCenterError("You cannot schedule this task", 403, "FORBIDDEN");
+  const channel = input.channel.trim();
+  const idempotencyKey = input.idempotencyKey.trim();
+  if (!channel || channel.length > 100)
+    throw new PrCenterError("A publication channel is required", 422, "INVALID_CHANNEL");
+  if (Number.isNaN(input.scheduledFor.getTime()))
+    throw new PrCenterError("Schedule time is invalid", 422, "INVALID_SCHEDULE");
+  if (idempotencyKey.length < 8 || idempotencyKey.length > 128)
+    throw new PrCenterError("Idempotency key is invalid", 422, "INVALID_IDEMPOTENCY_KEY");
+  const existing = await prisma.prSchedule.findUnique({ where: { idempotencyKey } });
+  if (existing) {
+    if (existing.taskId !== taskId)
+      throw new PrCenterError(
+        "Idempotency key is already in use",
+        409,
+        "IDEMPOTENCY_CONFLICT",
+      );
+    return existing;
+  }
+  const task = await prisma.prTask.findFirst({
+    where: { id: taskId, request: { organizationId: actor.organizationId } },
+    include: {
+      request: { include: { sources: true } },
+      revisions: { orderBy: { revisionNumber: "desc" }, take: 1 },
+    },
+  });
+  if (!task) throw new PrCenterError("Task not found", 404, "NOT_FOUND");
+  if (task.version !== fromVersion)
+    throw new PrCenterError(
+      "This task has changed. Refresh and try again.",
+      409,
+      "STALE_UPDATE",
+    );
+  const revision = task.revisions[0];
+  const cleanFinalAsset = revision?.finalAssetId
+    ? Boolean(
+        await prisma.prFileObject.findFirst({
+          where: { id: revision.finalAssetId, scanStatus: "CLEAN" },
+          select: { id: true },
+        }),
+      )
+    : false;
+  const missing = publicationGate({
+    approved: task.status === "APPROVED",
+    ownerId: task.ownerId,
+    channel,
+    hasSource: task.request.sources.length > 0,
+    hasKeyMessage: Boolean(revision?.keyMessage?.trim()),
+    hasCleanFinalAsset: cleanFinalAsset,
+    scheduledFor: input.scheduledFor,
+  });
+  if (missing.length)
+    throw new PrCenterError(
+      `Publication gate is incomplete: ${missing.join(", ")}`,
+      422,
+      "PUBLICATION_GATE_INCOMPLETE",
+    );
+  return prisma.$transaction(async (tx) => {
+    const updated = await tx.prTask.updateMany({
+      where: { id: task.id, version: fromVersion, status: "APPROVED" },
+      data: { status: "SCHEDULED", channel, version: { increment: 1 } },
+    });
+    if (updated.count !== 1)
+      throw new PrCenterError(
+        "This task has changed. Refresh and try again.",
+        409,
+        "STALE_UPDATE",
+      );
+    const schedule = await tx.prSchedule.create({
+      data: {
+        taskId: task.id,
+        channel,
+        scheduledFor: input.scheduledFor,
+        idempotencyKey,
+      },
+    });
+    await tx.prStatusHistory.create({
+      data: {
+        taskId: task.id,
+        fromState: "APPROVED",
+        toState: "SCHEDULED",
+        actorId: actor.id,
+      },
+    });
+    await auditAndOutbox(tx, {
+      actor,
+      action: "task.scheduled",
+      entityType: "task",
+      entityId: task.id,
+      after: {
+        scheduleId: schedule.id,
+        channel,
+        scheduledFor: input.scheduledFor.toISOString(),
+        version: fromVersion + 1,
+      },
+      eventType: "pr.task.scheduled",
+      correlationId,
+    });
+    return schedule;
+  });
+}
+
+export async function recordPublishingEvidence(
+  actor: PrCenterActor,
+  taskId: string,
+  fromVersion: number,
+  input: { publishedUrl: string; publishedReference: string },
+  correlationId: string = randomUUID(),
+) {
+  if (!canManageTasks(actor.role))
+    throw new PrCenterError("You cannot publish this task", 403, "FORBIDDEN");
+  const publishedUrl = assertUrl(input.publishedUrl.trim());
+  const publishedReference = input.publishedReference.trim();
+  if (!publishedReference || publishedReference.length > 300)
+    throw new PrCenterError(
+      "A publication reference is required",
+      422,
+      "INVALID_PUBLICATION_EVIDENCE",
+    );
+  const task = await prisma.prTask.findFirst({
+    where: { id: taskId, request: { organizationId: actor.organizationId } },
+    include: {
+      schedules: {
+        where: { publishedAt: null },
+        orderBy: { scheduledFor: "desc" },
+        take: 1,
+      },
+    },
+  });
+  if (!task) throw new PrCenterError("Task not found", 404, "NOT_FOUND");
+  if (task.version !== fromVersion)
+    throw new PrCenterError(
+      "This task has changed. Refresh and try again.",
+      409,
+      "STALE_UPDATE",
+    );
+  const schedule = task.schedules[0];
+  if (task.status !== "SCHEDULED" || !schedule)
+    throw new PrCenterError(
+      "This task has no pending schedule",
+      422,
+      "INVALID_TRANSITION",
+    );
+  return prisma.$transaction(async (tx) => {
+    const updated = await tx.prTask.updateMany({
+      where: { id: task.id, version: fromVersion, status: "SCHEDULED" },
+      data: { status: "PUBLISHED", version: { increment: 1 } },
+    });
+    if (updated.count !== 1)
+      throw new PrCenterError(
+        "This task has changed. Refresh and try again.",
+        409,
+        "STALE_UPDATE",
+      );
+    const publishedAt = new Date();
+    await tx.prSchedule.update({
+      where: { id: schedule.id },
+      data: { publishedUrl, publishedReference, publishedAt },
+    });
+    await tx.prStatusHistory.create({
+      data: {
+        taskId: task.id,
+        fromState: "SCHEDULED",
+        toState: "PUBLISHED",
+        actorId: actor.id,
+      },
+    });
+    await auditAndOutbox(tx, {
+      actor,
+      action: "task.published",
+      entityType: "task",
+      entityId: task.id,
+      after: {
+        scheduleId: schedule.id,
+        publishedUrl,
+        publishedReference,
+        publishedAt: publishedAt.toISOString(),
+        version: fromVersion + 1,
+      },
+      eventType: "pr.task.published",
+      correlationId,
+    });
+    return { id: schedule.id, publishedUrl, publishedReference, publishedAt };
   });
 }
