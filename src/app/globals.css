@@ -1724,6 +1724,7 @@ a.language-toggle-item:hover {
   background: transparent;
   border: 0;
   border-radius: 0;
+  box-sizing: border-box;
   box-shadow: none;
   display: flex;
   height: auto;
@@ -3398,6 +3399,197 @@ body:has(.yutth-lightbox) {
 
 .wp-content .lightweight-accordion-body a {
   display: inline-block;
+}
+
+.wp-content .e-services-contact-table-wrap {
+  margin-top: 20px;
+  overflow: hidden;
+  border: 1px solid #d7e2ef;
+  border-radius: 14px;
+  background: #fff;
+}
+
+.wp-content .e-services-contact-table {
+  margin: 0;
+  border: 0;
+  border-collapse: separate;
+  border-spacing: 0;
+  table-layout: fixed;
+}
+
+.wp-content .e-services-contact-table td {
+  border: 0;
+  border-bottom: 1px solid #d7e2ef;
+  background: #fff;
+  padding: 0;
+  vertical-align: top;
+}
+
+.wp-content .lightweight-accordion-body .e-services-contact-table td:last-child {
+  text-align: left;
+  white-space: normal;
+  width: auto;
+}
+
+.wp-content .e-services-contact-table tr:last-child td {
+  border-bottom: 0;
+}
+
+.wp-content .e-services-contact-table a {
+  align-items: center;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  color: #0066b3 !important;
+  display: flex;
+  font-size: inherit;
+  font-weight: 700;
+  gap: 16px;
+  justify-content: space-between;
+  letter-spacing: normal;
+  line-height: 1.5;
+  min-height: 56px;
+  padding: 14px 18px;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  white-space: normal;
+  width: 100%;
+}
+
+.wp-content .e-services-contact-table a:hover {
+  background: #edf6ff;
+  box-shadow: none;
+  filter: none;
+  text-decoration: underline;
+  transform: none;
+}
+
+.wp-content .e-services-contact-table a::after {
+  color: #1d4ed8;
+  content: "→";
+  flex: 0 0 auto;
+  font-size: 20px;
+  line-height: 1;
+}
+
+.wp-content .e-services-contact-table a[target="_blank"]::after {
+  content: "↗";
+}
+
+.wp-content .e-services-contact-table a:focus-visible {
+  background: #edf6ff;
+  outline: 2px solid #2563eb;
+  outline-offset: -2px;
+}
+
+.wp-content .e-services-link-accordion .lightweight-accordion-body {
+  padding: 12px;
+}
+
+.wp-content .e-services-link-accordion .lightweight-accordion-body > .wp-block-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  overflow: hidden;
+  border: 1px solid #d7e2ef;
+  border-radius: 12px;
+  background: #fff;
+}
+
+.wp-content .e-services-link-accordion .lightweight-accordion-body > .wp-block-list li {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.wp-content
+  .e-services-link-accordion
+  .lightweight-accordion-body
+  > .wp-block-list
+  li
+  + li {
+  border-top: 1px solid #d7e2ef;
+}
+
+.wp-content .e-services-link-accordion .lightweight-accordion-body > .wp-block-list a {
+  align-items: center;
+  box-sizing: border-box;
+  color: #0066b3;
+  display: flex;
+  font-weight: 700;
+  gap: 16px;
+  justify-content: space-between;
+  line-height: 1.5;
+  min-height: 56px;
+  padding: 14px 18px;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  width: 100%;
+}
+
+.wp-content
+  .e-services-link-accordion
+  .lightweight-accordion-body
+  > .wp-block-list
+  a::after {
+  color: #1d4ed8;
+  content: "→";
+  flex: 0 0 auto;
+  font-size: 20px;
+  line-height: 1;
+}
+
+.wp-content
+  .e-services-link-accordion
+  .lightweight-accordion-body
+  > .wp-block-list
+  a[target="_blank"]::after {
+  content: "↗";
+}
+
+.wp-content
+  .e-services-link-accordion
+  .lightweight-accordion-body
+  > .wp-block-list
+  a:hover,
+.wp-content
+  .e-services-link-accordion
+  .lightweight-accordion-body
+  > .wp-block-list
+  a:focus-visible {
+  background: #edf6ff;
+}
+
+.wp-content
+  .e-services-link-accordion
+  .lightweight-accordion-body
+  > .wp-block-list
+  a:focus-visible {
+  outline: 2px solid #2563eb;
+  outline-offset: -2px;
+}
+
+@media (max-width: 680px) {
+  .wp-content .e-services-contact-table-wrap {
+    overflow: visible;
+  }
+
+  .wp-content .e-services-contact-table,
+  .wp-content .e-services-contact-table tbody,
+  .wp-content .e-services-contact-table tr,
+  .wp-content .e-services-contact-table th,
+  .wp-content .e-services-contact-table td {
+    display: block;
+    min-width: 0;
+    width: 100% !important;
+  }
+
+  .wp-content .e-services-contact-table td {
+    border-bottom: 1px solid #d7e2ef;
+    border-top: 0;
+    padding: 0;
+  }
 }
 
 /* กฏหมาย/ระเบียบ/ข้อบังคับ page — keep long Thai titles readable while the
@@ -7569,5 +7761,38 @@ a.calendar-cell.has-posts:hover {
   .home-hero-slide,
   .home-hero-nav {
     transition: none;
+  }
+}
+
+/* Keep the e-services contact table independent from compact document-table rules. */
+@media (max-width: 680px) {
+  .wp-content .lightweight-accordion-body .e-services-contact-table,
+  .wp-content .lightweight-accordion-body .e-services-contact-table tbody,
+  .wp-content .lightweight-accordion-body .e-services-contact-table tr,
+  .wp-content .lightweight-accordion-body .e-services-contact-table td {
+    display: block;
+    min-width: 0;
+    width: 100% !important;
+  }
+
+  .wp-content .lightweight-accordion-body .e-services-contact-table td:last-child {
+    padding: 0;
+    text-align: left;
+    vertical-align: top;
+  }
+
+  .wp-content .lightweight-accordion-body .e-services-contact-table a {
+    align-items: center;
+    display: flex;
+    flex-direction: row;
+    font-size: 15px;
+    height: auto;
+    justify-content: space-between;
+    line-height: 1.5;
+    min-height: 52px;
+    padding: 12px 16px;
+    text-align: left;
+    white-space: normal;
+    width: 100%;
   }
 }

@@ -62,6 +62,35 @@
   justify-content: start;
 }
 
+.infographics {
+  background: linear-gradient(180deg, #f8fbff 0%, #fff 100%);
+  display: grid;
+  gap: 28px;
+  padding: 28px;
+}
+
+.infographic {
+  margin: 0;
+}
+
+.infographic img {
+  cursor: zoom-in;
+  display: block;
+  height: auto;
+  max-width: 1920px;
+  object-fit: contain;
+  width: 100%;
+}
+
+.infographic figcaption {
+  color: var(--text-muted);
+  font-size: calc(15px * var(--reader-scale));
+  font-weight: 700;
+  line-height: 1.5;
+  margin-top: 10px;
+  text-align: center;
+}
+
 .card {
   align-items: stretch;
   background: #fff;
@@ -192,6 +221,11 @@
 
   .compactGrid {
     grid-template-columns: 1fr;
+  }
+
+  .infographics {
+    gap: 20px;
+    padding: 18px;
   }
 
   .card {
