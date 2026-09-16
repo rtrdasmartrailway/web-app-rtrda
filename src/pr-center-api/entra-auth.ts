@@ -29,7 +29,8 @@ function cookie(name: string, value: string, maxAge: number, sameSite: "Lax" | "
 function config() {
   const tenantId = process.env.ENTRA_TENANT_ID;
   const clientId = process.env.ENTRA_CLIENT_ID;
-  const clientSecret = process.env.ENTRA_CLIENT_SECRET;
+  const clientSecret =
+    process.env.ENTRA_CLIENT_SECRET_VALUE || process.env.ENTRA_CLIENT_SECRET;
   const issuer = process.env.ENTRA_ISSUER;
   const redirectUri = process.env.ENTRA_REDIRECT_URI;
   const postLogoutRedirectUri = process.env.ENTRA_POST_LOGOUT_REDIRECT_URI;
