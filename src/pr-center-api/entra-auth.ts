@@ -86,11 +86,23 @@ export function createEntraAuth() {
       (value): value is PrCenterRole =>
         typeof value === "string" && PR_CENTER_ROLES.includes(value as PrCenterRole),
     );
-    if (!oid || tid !== oidcSettings.tenantId || !role)
+    if (!oid)
+      throw new PrCenterError(
+        "Your Entra account has no stable subject identifier",
+        403,
+        "OIDC_MISSING_SUBJECT",
+      );
+    if (tid !== oidcSettings.tenantId)
+      throw new PrCenterError(
+        "Your Entra account belongs to a different tenant",
+        403,
+        "OIDC_TENANT_MISMATCH",
+      );
+    if (!role)
       throw new PrCenterError(
         "Your account is not assigned a PR Center role",
         403,
-        "ACCESS_DENIED",
+        "OIDC_ROLE_NOT_ASSIGNED",
       );
     const email =
       typeof claims.preferred_username === "string" ? claims.preferred_username : "";
@@ -100,7 +112,7 @@ export function createEntraAuth() {
       throw new PrCenterError(
         "Your Entra account has no organization email",
         403,
-        "ACCESS_DENIED",
+        "OIDC_MISSING_EMAIL",
       );
     return prisma.$transaction(async (tx) => {
       const organization = await tx.prOrganization.upsert({
