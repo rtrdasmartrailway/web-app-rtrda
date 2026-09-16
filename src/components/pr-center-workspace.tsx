@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState, type FormEvent } from "react";
-import Link from "next/link";
 import { PrCenterApp } from "./pr-center-app";
 import styles from "./pr-center-workspace.module.css";
 
@@ -49,6 +48,7 @@ const navigation: Page[] = [
   "Notifications",
   "History",
 ];
+const MICROSOFT_LOGIN_URL = "/api/pr-center/auth/login";
 
 function requestDate(value: string) {
   return new Date(value).toLocaleDateString("th-TH-u-ca-buddhist", {
@@ -205,9 +205,9 @@ export function PrCenterWorkspace() {
         {sessionState === "sign-in-required" && (
           <section className={styles.loginForm}>
             <p className={styles.lead}>เข้าสู่ระบบ PR Center ด้วยบัญชี Microsoft RTRDA</p>
-            <Link className={styles.primaryAction} href="/api/pr-center/auth/login">
+            <a className={styles.primaryAction} href={MICROSOFT_LOGIN_URL}>
               Sign in with Microsoft
-            </Link>
+            </a>
             <p className={styles.lead}>Test fallback: กรอก email ที่ได้รับอนุญาต</p>
             <form onSubmit={signIn}>
               <label htmlFor="pr-center-email">Email</label>
