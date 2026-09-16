@@ -718,6 +718,7 @@ export function PrCenterApp({
   const [requestDraft, setRequestDraft] = useState<RequestDraft>(() =>
     emptyRequestDraft(users[0]),
   );
+  const [approvalTasks, setApprovalTasks] = useState<Task[]>([]);
   const [notice, setNotice] = useState<string | null>(null);
   useEffect(() => {
     fetch("/api/pr-center/requests?take=100", { credentials: "same-origin" })
@@ -772,6 +773,36 @@ export function PrCenterApp({
       .catch(() => setNotice("Unable to load server requests"));
   }, []);
   useEffect(() => {
+    if (actor?.role !== "APPROVER" && actor?.role !== "SCOPED_ADMINISTRATOR") return;
+    fetch("/api/pr-center/approvals", { credentials: "same-origin" })
+      .then(async (response) => {
+        if (!response.ok) throw new Error("Approval queue unavailable");
+        const items = (await response.json()) as Array<{
+          id: string;
+          requestId: string;
+          title: string;
+          contentType: string;
+          status: string;
+          ownerId: string | null;
+          dueAt: string | null;
+          version: number;
+        }>;
+        setApprovalTasks(
+          items.map((task) => ({
+            id: task.id,
+            requestId: task.requestId,
+            title: task.title,
+            type: task.contentType,
+            status: task.status.toLowerCase() as StatusId,
+            ownerId: task.ownerId || "",
+            dueDate: task.dueAt?.slice(0, 10) || "",
+            version: task.version,
+          })),
+        );
+      })
+      .catch(() => setNotice("Unable to load approval queue"));
+  }, [actor?.role]);
+  useEffect(() => {
     fetch("/api/pr-center/ideas", { credentials: "same-origin" })
       .then(async (response) => {
         if (!response.ok) throw new Error("Idea list unavailable");
@@ -817,6 +848,64 @@ export function PrCenterApp({
       })
       .catch(() => undefined);
   }, []);
+  useEffect(() => {
+    fetch("/api/pr-center/notifications", { credentials: "same-origin" })
+      .then(async (response) => {
+        if (!response.ok) throw new Error("Notifications unavailable");
+        const notifications = (await response.json()) as Array<{
+          id: string;
+          userId: string;
+          title: string;
+          body: string;
+          target: string | null;
+          readAt: string | null;
+          createdAt: string;
+        }>;
+        setState((previous) => ({
+          ...previous,
+          notifications: notifications.map((notification) => ({
+            id: notification.id,
+            userId: notification.userId,
+            title: notification.title,
+            message: notification.body,
+            target: PHASE_1_PAGES.has(notification.target as Page)
+              ? (notification.target as Page)
+              : "home",
+            createdAt: notification.createdAt,
+            read: Boolean(notification.readAt),
+          })),
+        }));
+      })
+      .catch(() => setNotice("Unable to load notifications"));
+    fetch("/api/pr-center/audit?take=100", { credentials: "same-origin" })
+      .then(async (response) => {
+        if (!response.ok) throw new Error("Audit history unavailable");
+        const audit = (await response.json()) as Array<{
+          id: string;
+          actorId: string | null;
+          entityType: string;
+          entityId: string;
+          action: string;
+          createdAt: string;
+        }>;
+        setState((previous) => ({
+          ...previous,
+          audit: audit.map((entry) => ({
+            id: entry.id,
+            actorId: entry.actorId || "system",
+            entity: ["request", "task", "notification"].includes(entry.entityType)
+              ? (entry.entityType as AuditEntry["entity"])
+              : "system",
+            entityId: entry.entityId,
+            action: entry.action,
+            before: "",
+            after: "",
+            createdAt: entry.createdAt,
+          })),
+        }));
+      })
+      .catch(() => setNotice("Unable to load audit history"));
+  }, []);
 
   const currentUser: User = actor
     ? {
@@ -845,7 +934,7 @@ export function PrCenterApp({
   );
   const unreadCount = userNotifications.filter((item) => !item.read).length;
   const go = (next: Page) => {
-    if (!ROLE_PAGES[currentUser.role].includes(next)) return;
+    if (!PHASE_1_PAGES.has(next) || !ROLE_PAGES[currentUser.role].includes(next)) return;
     setPage(next);
     setSidebarOpen(false);
   };
@@ -986,6 +1075,77 @@ export function PrCenterApp({
       );
     }
   };
+  const recordApproval = async (
+    taskId: string,
+    decision: "APPROVED" | "REVISION_REQUIRED" | "REJECTED",
+  ) => {
+    const task = approvalTasks.find((item) => item.id === taskId);
+    if (!task?.version) return;
+    const response = await fetch(`/api/pr-center/tasks/${taskId}/approvals`, {
+      method: "POST",
+      credentials: "same-origin",
+      headers: { "Content-Type": "application/json", "If-Match": String(task.version) },
+      body: JSON.stringify({ decision }),
+    });
+    if (!response.ok) return announce("Approval decision failed");
+    setApprovalTasks((previous) => previous.filter((item) => item.id !== taskId));
+    announce("Approval decision saved");
+  };
+  const scheduleTask = async (taskId: string, channel: string, scheduledFor: string) => {
+    const task = state.tasks.find((item) => item.id === taskId);
+    if (!task) return;
+    const response = await fetch(`/api/pr-center/tasks/${taskId}/schedule`, {
+      method: "POST",
+      credentials: "same-origin",
+      headers: {
+        "Content-Type": "application/json",
+        "If-Match": String(task.version ?? 0),
+      },
+      body: JSON.stringify({
+        channel,
+        scheduledFor,
+        idempotencyKey: `schedule:${taskId}:${channel}:${scheduledFor}`,
+      }),
+    });
+    if (!response.ok)
+      return announce("Scheduling failed. Complete the publication gate first.");
+    setState((previous) => ({
+      ...previous,
+      tasks: previous.tasks.map((item) =>
+        item.id === taskId
+          ? { ...item, status: "scheduled", version: (item.version || 0) + 1 }
+          : item,
+      ),
+    }));
+    announce("Task scheduled");
+  };
+  const publishTask = async (
+    taskId: string,
+    publishedUrl: string,
+    publishedReference: string,
+  ) => {
+    const task = state.tasks.find((item) => item.id === taskId);
+    if (!task) return;
+    const response = await fetch(`/api/pr-center/tasks/${taskId}/publishing-evidence`, {
+      method: "POST",
+      credentials: "same-origin",
+      headers: {
+        "Content-Type": "application/json",
+        "If-Match": String(task.version ?? 0),
+      },
+      body: JSON.stringify({ publishedUrl, publishedReference }),
+    });
+    if (!response.ok) return announce("Publishing evidence could not be saved");
+    setState((previous) => ({
+      ...previous,
+      tasks: previous.tasks.map((item) =>
+        item.id === taskId
+          ? { ...item, status: "published", version: (item.version || 0) + 1 }
+          : item,
+      ),
+    }));
+    announce("Publishing evidence saved");
+  };
   const assignTaskToMe = async (taskId: string, dueDate: string) => {
     const task = state.tasks.find((item) => item.id === taskId);
     if (!task) return;
@@ -1124,45 +1284,22 @@ export function PrCenterApp({
         "Master data updated",
       ),
     );
-  const saveSnapshot = (name: string) =>
-    updateState((previous) => ({
+  const readNotifications = async (ids: string[]) => {
+    if (ids.length === 0) return;
+    const response = await fetch("/api/pr-center/notifications/read", {
+      method: "POST",
+      credentials: "same-origin",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ids }),
+    });
+    if (!response.ok) return announce("Notification update failed");
+    setState((previous) => ({
       ...previous,
-      snapshots: [
-        {
-          id: `SNAP-${previous.snapshots.length + 1}`,
-          name,
-          createdAt: new Date().toISOString(),
-          state: structuredClone({ ...previous, snapshots: [] }),
-        },
-        ...previous.snapshots,
-      ],
-    }));
-  const recoverSnapshot = (snapshot: Snapshot) => {
-    if (
-      !window.confirm(
-        `Recover “${snapshot.name}”? Current demo changes will be replaced.`,
-      )
-    )
-      return;
-    setState({ ...structuredClone(snapshot.state), snapshots: state.snapshots });
-    announce("Snapshot recovered");
-  };
-  const readNotifications = (ids: string[]) =>
-    updateState((previous) =>
-      addAudit(
-        {
-          ...previous,
-          notifications: previous.notifications.map((item) =>
-            ids.includes(item.id) ? { ...item, read: true } : item,
-          ),
-        },
-        "notification",
-        ids.join(","),
-        "marked_read",
-        "unread",
-        "read",
+      notifications: previous.notifications.map((item) =>
+        ids.includes(item.id) ? { ...item, read: true } : item,
       ),
-    );
+    }));
+  };
   const switchUser = (userId: string) => {
     const next = getUser(userId);
     if (!next) return;
@@ -1297,7 +1434,11 @@ export function PrCenterApp({
               <option value="th">ไทย</option>
               <option value="en">EN</option>
             </select>
-            <button className={styles.profile} onClick={() => go("directory")}>
+            <button
+              className={styles.profile}
+              type="button"
+              aria-label="Current PR Center role"
+            >
               <span>{currentUser.name.slice(0, 2)}</span>
               <i>{currentUser.role}</i>
             </button>
@@ -1349,6 +1490,8 @@ export function PrCenterApp({
               tasks={state.tasks}
               onTransition={transitionTask}
               onAssign={assignTaskToMe}
+              onSchedule={scheduleTask}
+              onPublish={publishTask}
             />
           )}
           {page === "calendar" && (
@@ -1356,9 +1499,9 @@ export function PrCenterApp({
           )}
           {page === "approvals" && (
             <Approvals
-              tasks={state.tasks}
+              tasks={approvalTasks}
               role={currentUser.role}
-              onTransition={transitionTask}
+              onDecision={recordApproval}
             />
           )}
           {page === "library" && (
@@ -1392,13 +1535,7 @@ export function PrCenterApp({
             />
           )}
           {page === "history" && (
-            <History
-              audit={state.audit}
-              snapshots={state.snapshots}
-              language={state.language}
-              onSaveSnapshot={saveSnapshot}
-              onRecoverSnapshot={recoverSnapshot}
-            />
+            <History audit={state.audit} language={state.language} />
           )}
           {page === "directory" && (
             <Directory
@@ -1937,16 +2074,24 @@ function Operations({
   tasks: taskItems,
   onTransition,
   onAssign,
+  onSchedule,
+  onPublish,
 }: {
   tasks: Task[];
   onTransition: (taskId: string, status: StatusId) => void;
   onAssign: (taskId: string, dueDate: string) => void;
+  onSchedule: (taskId: string, channel: string, scheduledFor: string) => void;
+  onPublish: (taskId: string, publishedUrl: string, publishedReference: string) => void;
 }) {
   const [view, setView] = useState<"board" | "table">("board");
   const [status, setStatus] = useState<"all" | StatusId>("all");
   const [ownerId, setOwnerId] = useState("all");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [dueDate, setDueDate] = useState("");
+  const [channel, setChannel] = useState("");
+  const [scheduledFor, setScheduledFor] = useState("");
+  const [publishedUrl, setPublishedUrl] = useState("");
+  const [publishedReference, setPublishedReference] = useState("");
   const visibleTasks = taskItems.filter(
     (task) =>
       (status === "all" || task.status === status) &&
@@ -2065,7 +2210,9 @@ function Operations({
           <button onClick={() => onAssign(selected.id, dueDate || selected.dueDate)}>
             Assign to me and save due date
           </button>
-          {STATUS_TRANSITIONS[selected.status].length > 0 && (
+          {STATUS_TRANSITIONS[selected.status].filter(
+            (next) => next !== "scheduled" && next !== "published",
+          ).length > 0 && (
             <label>
               Move to{" "}
               <select
@@ -2076,13 +2223,61 @@ function Operations({
                 }}
               >
                 <option value="">Choose a legal next state</option>
-                {STATUS_TRANSITIONS[selected.status].map((next) => (
-                  <option key={next} value={next}>
-                    {STATUS_LABELS[next]}
-                  </option>
-                ))}
+                {STATUS_TRANSITIONS[selected.status]
+                  .filter((next) => next !== "scheduled" && next !== "published")
+                  .map((next) => (
+                    <option key={next} value={next}>
+                      {STATUS_LABELS[next]}
+                    </option>
+                  ))}
               </select>
             </label>
+          )}
+          {selected.status === "approved" && (
+            <>
+              <label>
+                Channel{" "}
+                <input
+                  value={channel}
+                  onChange={(event) => setChannel(event.target.value)}
+                />
+              </label>
+              <label>
+                Schedule time{" "}
+                <input
+                  type="datetime-local"
+                  value={scheduledFor}
+                  onChange={(event) => setScheduledFor(event.target.value)}
+                />
+              </label>
+              <button onClick={() => onSchedule(selected.id, channel, scheduledFor)}>
+                Schedule after gate check
+              </button>
+            </>
+          )}
+          {selected.status === "scheduled" && (
+            <>
+              <label>
+                Published URL{" "}
+                <input
+                  type="url"
+                  value={publishedUrl}
+                  onChange={(event) => setPublishedUrl(event.target.value)}
+                />
+              </label>
+              <label>
+                Publication reference{" "}
+                <input
+                  value={publishedReference}
+                  onChange={(event) => setPublishedReference(event.target.value)}
+                />
+              </label>
+              <button
+                onClick={() => onPublish(selected.id, publishedUrl, publishedReference)}
+              >
+                Record publishing evidence
+              </button>
+            </>
           )}
         </article>
       )}
@@ -2206,17 +2401,16 @@ function Calendar({
 function Approvals({
   tasks: taskItems,
   role,
-  onTransition,
+  onDecision,
 }: {
   tasks: Task[];
   role: Role;
-  onTransition: (taskId: string, status: StatusId) => void;
+  onDecision: (
+    taskId: string,
+    decision: "APPROVED" | "REVISION_REQUIRED" | "REJECTED",
+  ) => void;
 }) {
-  const reviewStatuses: StatusId[] =
-    role === "executive"
-      ? ["management_approval"]
-      : ["pr_editorial_review", "management_approval"];
-  const pendingTasks = taskItems.filter((task) => reviewStatuses.includes(task.status));
+  const pendingTasks = taskItems;
   return (
     <>
       <SectionHeading eyebrow="REVIEW AND APPROVAL" title="Approval Queue" />
@@ -2232,17 +2426,14 @@ function Approvals({
             </div>
             <div>
               <Status>Awaiting approval</Status>
-              {(role === "admin" &&
-                ["pr_editorial_review", "management_approval"].includes(task.status)) ||
-              (role === "executive" && task.status === "management_approval") ||
-              (role === "pr" && task.status === "pr_editorial_review") ? (
+              {role === "admin" || role === "approver" ? (
                 <>
-                  <button onClick={() => onTransition(task.id, "revision_required")}>
+                  <button onClick={() => onDecision(task.id, "REVISION_REQUIRED")}>
                     Request revision
                   </button>
                   <button
                     className={styles.primary}
-                    onClick={() => onTransition(task.id, "approved")}
+                    onClick={() => onDecision(task.id, "APPROVED")}
                   >
                     Approve
                   </button>
@@ -2657,70 +2848,13 @@ function Notifications({
     </>
   );
 }
-function History({
-  audit,
-  snapshots,
-  language,
-  onSaveSnapshot,
-  onRecoverSnapshot,
-}: {
-  audit: AuditEntry[];
-  snapshots: Snapshot[];
-  language: Language;
-  onSaveSnapshot: (name: string) => void;
-  onRecoverSnapshot: (snapshot: Snapshot) => void;
-}) {
-  const [name, setName] = useState("");
+function History({ audit, language }: { audit: AuditEntry[]; language: Language }) {
   return (
     <>
       <SectionHeading
-        eyebrow="AUDIT AND RECOVERY"
-        title={language === "th" ? "ประวัติและการกู้คืน" : "Activity History"}
-        action={
-          <form
-            onSubmit={(event) => {
-              event.preventDefault();
-              onSaveSnapshot(name.trim() || "Manual snapshot");
-              setName("");
-            }}
-          >
-            <input
-              value={name}
-              onChange={(event) => setName(event.target.value)}
-              placeholder={language === "th" ? "ชื่อจุดคืนค่า" : "Snapshot name"}
-            />
-            <button className={styles.primary} type="submit">
-              {language === "th" ? "บันทึกจุดคืนค่า" : "Save snapshot"}
-            </button>
-          </form>
-        }
+        eyebrow="AUDIT"
+        title={language === "th" ? "ประวัติกิจกรรม" : "Activity History"}
       />
-      <section className={styles.list}>
-        {snapshots.map((snapshot) => (
-          <article key={snapshot.id} className={styles.listItem}>
-            <div>
-              <h2>{snapshot.name}</h2>
-              <span>
-                {new Date(snapshot.createdAt).toLocaleString(
-                  language === "th" ? "th-TH-u-ca-buddhist" : "en-GB",
-                )}
-              </span>
-            </div>
-            <button onClick={() => onRecoverSnapshot(snapshot)}>
-              {language === "th" ? "กู้คืน" : "Recover"}
-            </button>
-          </article>
-        ))}
-        {snapshots.length === 0 && (
-          <article className={styles.card}>
-            <p>
-              {language === "th"
-                ? "ยังไม่มีจุดคืนค่าที่บันทึกไว้"
-                : "No saved snapshots yet."}
-            </p>
-          </article>
-        )}
-      </section>
       <article className={styles.card}>
         <Table
           headers={["Time", "Actor", "Action", "Entity"]}

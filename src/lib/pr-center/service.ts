@@ -2,6 +2,8 @@ import { randomUUID } from "node:crypto";
 import type {
   Prisma,
   PrContentIdeaStatus,
+  PrApprovalDecision,
+  PrRequestStatus,
   PrTaskStatus,
 } from "@/generated/prisma/client";
 import { prisma } from "@/lib/db/client";
@@ -13,6 +15,7 @@ import {
   canReadAllRequests,
   canReviewIdeas,
   canTransitionTask,
+  publicationGate,
   type PrCenterRole,
   type PrTaskStatus as WorkflowStatus,
 } from "./workflow";
@@ -58,6 +61,8 @@ type CreateRequestInput = {
   audience?: string;
   requestedFor?: Date;
   sourceUrls: string[];
+  priority?: string;
+  priorityReason?: string;
 };
 type IdeaStatus = "PROPOSED" | "UNDER_REVIEW" | "ACCEPTED" | "CONVERTED" | "ARCHIVED";
 
@@ -151,6 +156,8 @@ export async function createRequest(
         requestNumber: requestNumber(input.type),
         type: input.type,
         title,
+        priority: input.priority || "NORMAL",
+        priorityReason: input.priorityReason?.trim() || null,
         requestedFor: input.requestedFor,
         revisions: {
           create: {
@@ -206,6 +213,163 @@ export async function listRequests(actor: PrCenterActor, take = 25, cursor?: str
       sources: { select: { url: true } },
       tasks: true,
     },
+  });
+}
+
+async function requestInScope(actor: PrCenterActor, requestId: string) {
+  const request = await prisma.prRequest.findFirst({
+    where: {
+      id: requestId,
+      organizationId: actor.organizationId,
+      ...(canReadAllRequests(actor.role) ? {} : { requesterId: actor.id }),
+    },
+    include: {
+      revisions: { orderBy: { revisionNumber: "desc" } },
+      sources: true,
+      tasks: true,
+    },
+  });
+  if (!request) throw new PrCenterError("Request not found", 404, "NOT_FOUND");
+  return request;
+}
+
+export async function requestDetail(actor: PrCenterActor, requestId: string) {
+  return requestInScope(actor, requestId);
+}
+
+export async function updateRequestDraft(
+  actor: PrCenterActor,
+  requestId: string,
+  fromVersion: number,
+  input: CreateRequestInput,
+  correlationId: string = randomUUID(),
+) {
+  const request = await requestInScope(actor, requestId);
+  if (request.requesterId !== actor.id && actor.role !== "SCOPED_ADMINISTRATOR")
+    throw new PrCenterError("You cannot amend this request", 403, "FORBIDDEN");
+  if (request.status !== "DRAFT" && request.status !== "SUBMITTED")
+    throw new PrCenterError(
+      "This request can no longer be amended",
+      422,
+      "INVALID_TRANSITION",
+    );
+  if (request.version !== fromVersion)
+    throw new PrCenterError(
+      "This request has changed. Refresh and try again.",
+      409,
+      "STALE_UPDATE",
+    );
+  const title = input.title.trim();
+  if (title.length < 3 || title.length > 300)
+    throw new PrCenterError(
+      "Title must contain 3 to 300 characters",
+      422,
+      "INVALID_TITLE",
+    );
+  const sourceUrls = [...new Set(input.sourceUrls.map(assertUrl))];
+  return prisma.$transaction(async (tx) => {
+    const revisionNumber = (request.revisions[0]?.revisionNumber || 0) + 1;
+    const updated = await tx.prRequest.updateMany({
+      where: { id: request.id, version: fromVersion },
+      data: {
+        title,
+        priority: input.priority || request.priority,
+        priorityReason: input.priorityReason?.trim() || null,
+        requestedFor: input.requestedFor,
+        version: { increment: 1 },
+      },
+    });
+    if (updated.count !== 1)
+      throw new PrCenterError(
+        "This request has changed. Refresh and try again.",
+        409,
+        "STALE_UPDATE",
+      );
+    await tx.prRequestRevision.create({
+      data: {
+        requestId: request.id,
+        revisionNumber,
+        title,
+        objective: input.objective?.trim() || null,
+        audience: input.audience?.trim() || null,
+        changeSummary: "Requester amendment",
+      },
+    });
+    await tx.prRequestSource.deleteMany({ where: { requestId: request.id } });
+    if (sourceUrls.length)
+      await tx.prRequestSource.createMany({
+        data: sourceUrls.map((url) => ({ requestId: request.id, url })),
+      });
+    await auditAndOutbox(tx, {
+      actor,
+      action: "request.amended",
+      entityType: "request",
+      entityId: request.id,
+      after: { revisionNumber, version: fromVersion + 1 },
+      eventType: "pr.request.amended",
+      correlationId,
+    });
+    return tx.prRequest.findUniqueOrThrow({
+      where: { id: request.id },
+      include: { revisions: true, sources: true, tasks: true },
+    });
+  });
+}
+
+export async function transitionRequest(
+  actor: PrCenterActor,
+  requestId: string,
+  fromVersion: number,
+  status: "SUBMITTED" | "WITHDRAWN",
+  correlationId: string = randomUUID(),
+) {
+  const request = await requestInScope(actor, requestId);
+  if (request.requesterId !== actor.id && actor.role !== "SCOPED_ADMINISTRATOR")
+    throw new PrCenterError("You cannot update this request", 403, "FORBIDDEN");
+  const allowed =
+    (status === "SUBMITTED" && request.status === "DRAFT") ||
+    (status === "WITHDRAWN" && ["DRAFT", "SUBMITTED"].includes(request.status));
+  if (!allowed)
+    throw new PrCenterError(
+      "This request transition is not allowed",
+      422,
+      "INVALID_TRANSITION",
+    );
+  if (request.version !== fromVersion)
+    throw new PrCenterError(
+      "This request has changed. Refresh and try again.",
+      409,
+      "STALE_UPDATE",
+    );
+  return prisma.$transaction(async (tx) => {
+    const updated = await tx.prRequest.updateMany({
+      where: { id: request.id, version: fromVersion },
+      data: { status: status as PrRequestStatus, version: { increment: 1 } },
+    });
+    if (updated.count !== 1)
+      throw new PrCenterError(
+        "This request has changed. Refresh and try again.",
+        409,
+        "STALE_UPDATE",
+      );
+    await tx.prStatusHistory.create({
+      data: {
+        requestId: request.id,
+        fromState: request.status,
+        toState: status,
+        actorId: actor.id,
+      },
+    });
+    await auditAndOutbox(tx, {
+      actor,
+      action: `request.${status.toLowerCase()}`,
+      entityType: "request",
+      entityId: request.id,
+      after: { status, version: fromVersion + 1 },
+      eventType: `pr.request.${status.toLowerCase()}`,
+      correlationId,
+    });
+    return tx.prRequest.findUniqueOrThrow({ where: { id: request.id } });
   });
 }
 
@@ -549,6 +713,44 @@ export async function listNotifications(actor: PrCenterActor) {
   });
 }
 
+export async function markNotificationsRead(
+  actor: PrCenterActor,
+  notificationIds: string[],
+  correlationId: string = randomUUID(),
+) {
+  const ids = [...new Set(notificationIds)].filter((id) => id.length > 0).slice(0, 100);
+  if (ids.length === 0)
+    throw new PrCenterError("Notification IDs are required", 422, "INVALID_BODY");
+  return prisma.$transaction(async (tx) => {
+    const updated = await tx.prNotification.updateMany({
+      where: { id: { in: ids }, userId: actor.id, readAt: null },
+      data: { readAt: new Date() },
+    });
+    await auditAndOutbox(tx, {
+      actor,
+      action: "notification.read",
+      entityType: "notification",
+      entityId: ids.join(","),
+      after: { count: updated.count },
+      eventType: "pr.notification.read",
+      correlationId,
+    });
+    return { updated: updated.count };
+  });
+}
+
+export async function listAuditEvents(actor: PrCenterActor, take = 100) {
+  const limit = Math.min(Math.max(take, 1), 100);
+  return prisma.prAuditEvent.findMany({
+    where: canReadAllRequests(actor.role)
+      ? { organizationId: actor.organizationId }
+      : { organizationId: actor.organizationId, actorId: actor.id },
+    include: { actor: { select: { displayName: true } } },
+    orderBy: { createdAt: "desc" },
+    take: limit,
+  });
+}
+
 export async function transitionTask(
   actor: PrCenterActor,
   taskId: string,
@@ -619,4 +821,387 @@ export async function transitionTask(
 export function assertApprovalAuthority(actor: PrCenterActor) {
   if (!canApprove(actor.role))
     throw new PrCenterError("You cannot record an approval decision", 403, "FORBIDDEN");
+}
+
+export async function createTaskRevision(
+  actor: PrCenterActor,
+  taskId: string,
+  fromVersion: number,
+  input: { body?: string; keyMessage?: string; changeSummary?: string },
+  correlationId: string = randomUUID(),
+) {
+  if (!canManageTasks(actor.role))
+    throw new PrCenterError("You cannot revise this task", 403, "FORBIDDEN");
+  const task = await prisma.prTask.findFirst({
+    where: { id: taskId, request: { organizationId: actor.organizationId } },
+    include: { revisions: { orderBy: { revisionNumber: "desc" } } },
+  });
+  if (!task) throw new PrCenterError("Task not found", 404, "NOT_FOUND");
+  if (task.version !== fromVersion)
+    throw new PrCenterError(
+      "This task has changed. Refresh and try again.",
+      409,
+      "STALE_UPDATE",
+    );
+  if (["PUBLISHED", "CLOSED", "CANCELLED"].includes(task.status))
+    throw new PrCenterError(
+      "This task can no longer be revised",
+      422,
+      "INVALID_TRANSITION",
+    );
+  const body = input.body?.trim() || null;
+  const keyMessage = input.keyMessage?.trim() || null;
+  return prisma.$transaction(async (tx) => {
+    const updated = await tx.prTask.updateMany({
+      where: { id: task.id, version: fromVersion },
+      data: { status: "IN_PRODUCTION", version: { increment: 1 } },
+    });
+    if (updated.count !== 1)
+      throw new PrCenterError(
+        "This task has changed. Refresh and try again.",
+        409,
+        "STALE_UPDATE",
+      );
+    const revision = await tx.prTaskRevision.create({
+      data: {
+        taskId: task.id,
+        revisionNumber: (task.revisions[0]?.revisionNumber || 0) + 1,
+        body,
+        keyMessage,
+        immutableAt: new Date(),
+      },
+    });
+    await tx.prStatusHistory.create({
+      data: {
+        taskId: task.id,
+        fromState: task.status,
+        toState: "IN_PRODUCTION",
+        reason: input.changeSummary?.trim() || "Material revision",
+        actorId: actor.id,
+      },
+    });
+    await auditAndOutbox(tx, {
+      actor,
+      action: "task.revised",
+      entityType: "task",
+      entityId: task.id,
+      after: { revisionNumber: revision.revisionNumber, version: fromVersion + 1 },
+      eventType: "pr.task.revised",
+      correlationId,
+    });
+    return revision;
+  });
+}
+
+export async function listApprovalQueue(actor: PrCenterActor) {
+  if (!canApprove(actor.role))
+    throw new PrCenterError("You cannot view the approval queue", 403, "FORBIDDEN");
+  return prisma.prTask.findMany({
+    where: {
+      request: { organizationId: actor.organizationId },
+      status: {
+        in: [
+          "SOURCE_FACT_CHECK",
+          "TECHNICAL_REVIEW",
+          "PR_EDITORIAL_REVIEW",
+          "MANAGEMENT_APPROVAL",
+        ],
+      },
+    },
+    include: {
+      request: { select: { title: true, requesterId: true } },
+      revisions: { orderBy: { revisionNumber: "desc" }, take: 1 },
+    },
+    orderBy: { updatedAt: "asc" },
+  });
+}
+
+export async function recordApprovalDecision(
+  actor: PrCenterActor,
+  taskId: string,
+  fromVersion: number,
+  input: { decision: "APPROVED" | "REVISION_REQUIRED" | "REJECTED"; comment?: string },
+  correlationId: string = randomUUID(),
+) {
+  assertApprovalAuthority(actor);
+  const task = await prisma.prTask.findFirst({
+    where: { id: taskId, request: { organizationId: actor.organizationId } },
+    include: {
+      request: true,
+      revisions: { orderBy: { revisionNumber: "desc" }, take: 1 },
+    },
+  });
+  if (!task) throw new PrCenterError("Task not found", 404, "NOT_FOUND");
+  if (task.ownerId === actor.id || task.request.requesterId === actor.id)
+    throw new PrCenterError(
+      "You cannot approve your own work",
+      403,
+      "SELF_APPROVAL_BLOCKED",
+    );
+  if (task.version !== fromVersion)
+    throw new PrCenterError(
+      "This task has changed. Refresh and try again.",
+      409,
+      "STALE_UPDATE",
+    );
+  if (
+    ![
+      "SOURCE_FACT_CHECK",
+      "TECHNICAL_REVIEW",
+      "PR_EDITORIAL_REVIEW",
+      "MANAGEMENT_APPROVAL",
+    ].includes(task.status)
+  )
+    throw new PrCenterError(
+      "This task is not awaiting approval",
+      422,
+      "INVALID_TRANSITION",
+    );
+  const revision = task.revisions[0];
+  if (!revision)
+    throw new PrCenterError(
+      "A task revision is required before approval",
+      422,
+      "REVISION_REQUIRED",
+    );
+  const next = input.decision === "APPROVED" ? "APPROVED" : input.decision;
+  return prisma.$transaction(async (tx) => {
+    const updated = await tx.prTask.updateMany({
+      where: { id: task.id, version: fromVersion },
+      data: { status: next, version: { increment: 1 } },
+    });
+    if (updated.count !== 1)
+      throw new PrCenterError(
+        "This task has changed. Refresh and try again.",
+        409,
+        "STALE_UPDATE",
+      );
+    const approval = await tx.prApproval.create({
+      data: {
+        taskId: task.id,
+        taskRevision: revision.revisionNumber,
+        stage: task.status,
+        decision: input.decision as PrApprovalDecision,
+        comment: input.comment?.trim() || null,
+        decidedById: actor.id,
+      },
+    });
+    await tx.prStatusHistory.create({
+      data: {
+        taskId: task.id,
+        fromState: task.status,
+        toState: next,
+        reason: input.comment?.trim() || null,
+        actorId: actor.id,
+      },
+    });
+    await auditAndOutbox(tx, {
+      actor,
+      action: "approval.recorded",
+      entityType: "task",
+      entityId: task.id,
+      after: {
+        decision: input.decision,
+        revision: revision.revisionNumber,
+        version: fromVersion + 1,
+      },
+      eventType: "pr.approval.recorded",
+      correlationId,
+    });
+    return approval;
+  });
+}
+
+export async function scheduleTask(
+  actor: PrCenterActor,
+  taskId: string,
+  fromVersion: number,
+  input: { channel: string; scheduledFor: Date; idempotencyKey: string },
+  correlationId: string = randomUUID(),
+) {
+  if (!canManageTasks(actor.role))
+    throw new PrCenterError("You cannot schedule this task", 403, "FORBIDDEN");
+  const channel = input.channel.trim();
+  const idempotencyKey = input.idempotencyKey.trim();
+  if (!channel || channel.length > 100)
+    throw new PrCenterError("A publication channel is required", 422, "INVALID_CHANNEL");
+  if (Number.isNaN(input.scheduledFor.getTime()))
+    throw new PrCenterError("Schedule time is invalid", 422, "INVALID_SCHEDULE");
+  if (idempotencyKey.length < 8 || idempotencyKey.length > 128)
+    throw new PrCenterError("Idempotency key is invalid", 422, "INVALID_IDEMPOTENCY_KEY");
+  const existing = await prisma.prSchedule.findUnique({ where: { idempotencyKey } });
+  if (existing) {
+    if (existing.taskId !== taskId)
+      throw new PrCenterError(
+        "Idempotency key is already in use",
+        409,
+        "IDEMPOTENCY_CONFLICT",
+      );
+    return existing;
+  }
+  const task = await prisma.prTask.findFirst({
+    where: { id: taskId, request: { organizationId: actor.organizationId } },
+    include: {
+      request: { include: { sources: true } },
+      revisions: { orderBy: { revisionNumber: "desc" }, take: 1 },
+    },
+  });
+  if (!task) throw new PrCenterError("Task not found", 404, "NOT_FOUND");
+  if (task.version !== fromVersion)
+    throw new PrCenterError(
+      "This task has changed. Refresh and try again.",
+      409,
+      "STALE_UPDATE",
+    );
+  const revision = task.revisions[0];
+  const cleanFinalAsset = revision?.finalAssetId
+    ? Boolean(
+        await prisma.prFileObject.findFirst({
+          where: { id: revision.finalAssetId, scanStatus: "CLEAN" },
+          select: { id: true },
+        }),
+      )
+    : false;
+  const missing = publicationGate({
+    approved: task.status === "APPROVED",
+    ownerId: task.ownerId,
+    channel,
+    hasSource: task.request.sources.length > 0,
+    hasKeyMessage: Boolean(revision?.keyMessage?.trim()),
+    hasCleanFinalAsset: cleanFinalAsset,
+    scheduledFor: input.scheduledFor,
+  });
+  if (missing.length)
+    throw new PrCenterError(
+      `Publication gate is incomplete: ${missing.join(", ")}`,
+      422,
+      "PUBLICATION_GATE_INCOMPLETE",
+    );
+  return prisma.$transaction(async (tx) => {
+    const updated = await tx.prTask.updateMany({
+      where: { id: task.id, version: fromVersion, status: "APPROVED" },
+      data: { status: "SCHEDULED", channel, version: { increment: 1 } },
+    });
+    if (updated.count !== 1)
+      throw new PrCenterError(
+        "This task has changed. Refresh and try again.",
+        409,
+        "STALE_UPDATE",
+      );
+    const schedule = await tx.prSchedule.create({
+      data: {
+        taskId: task.id,
+        channel,
+        scheduledFor: input.scheduledFor,
+        idempotencyKey,
+      },
+    });
+    await tx.prStatusHistory.create({
+      data: {
+        taskId: task.id,
+        fromState: "APPROVED",
+        toState: "SCHEDULED",
+        actorId: actor.id,
+      },
+    });
+    await auditAndOutbox(tx, {
+      actor,
+      action: "task.scheduled",
+      entityType: "task",
+      entityId: task.id,
+      after: {
+        scheduleId: schedule.id,
+        channel,
+        scheduledFor: input.scheduledFor.toISOString(),
+        version: fromVersion + 1,
+      },
+      eventType: "pr.task.scheduled",
+      correlationId,
+    });
+    return schedule;
+  });
+}
+
+export async function recordPublishingEvidence(
+  actor: PrCenterActor,
+  taskId: string,
+  fromVersion: number,
+  input: { publishedUrl: string; publishedReference: string },
+  correlationId: string = randomUUID(),
+) {
+  if (!canManageTasks(actor.role))
+    throw new PrCenterError("You cannot publish this task", 403, "FORBIDDEN");
+  const publishedUrl = assertUrl(input.publishedUrl.trim());
+  const publishedReference = input.publishedReference.trim();
+  if (!publishedReference || publishedReference.length > 300)
+    throw new PrCenterError(
+      "A publication reference is required",
+      422,
+      "INVALID_PUBLICATION_EVIDENCE",
+    );
+  const task = await prisma.prTask.findFirst({
+    where: { id: taskId, request: { organizationId: actor.organizationId } },
+    include: {
+      schedules: {
+        where: { publishedAt: null },
+        orderBy: { scheduledFor: "desc" },
+        take: 1,
+      },
+    },
+  });
+  if (!task) throw new PrCenterError("Task not found", 404, "NOT_FOUND");
+  if (task.version !== fromVersion)
+    throw new PrCenterError(
+      "This task has changed. Refresh and try again.",
+      409,
+      "STALE_UPDATE",
+    );
+  const schedule = task.schedules[0];
+  if (task.status !== "SCHEDULED" || !schedule)
+    throw new PrCenterError(
+      "This task has no pending schedule",
+      422,
+      "INVALID_TRANSITION",
+    );
+  return prisma.$transaction(async (tx) => {
+    const updated = await tx.prTask.updateMany({
+      where: { id: task.id, version: fromVersion, status: "SCHEDULED" },
+      data: { status: "PUBLISHED", version: { increment: 1 } },
+    });
+    if (updated.count !== 1)
+      throw new PrCenterError(
+        "This task has changed. Refresh and try again.",
+        409,
+        "STALE_UPDATE",
+      );
+    const publishedAt = new Date();
+    await tx.prSchedule.update({
+      where: { id: schedule.id },
+      data: { publishedUrl, publishedReference, publishedAt },
+    });
+    await tx.prStatusHistory.create({
+      data: {
+        taskId: task.id,
+        fromState: "SCHEDULED",
+        toState: "PUBLISHED",
+        actorId: actor.id,
+      },
+    });
+    await auditAndOutbox(tx, {
+      actor,
+      action: "task.published",
+      entityType: "task",
+      entityId: task.id,
+      after: {
+        scheduleId: schedule.id,
+        publishedUrl,
+        publishedReference,
+        publishedAt: publishedAt.toISOString(),
+        version: fromVersion + 1,
+      },
+      eventType: "pr.task.published",
+      correlationId,
+    });
+    return { id: schedule.id, publishedUrl, publishedReference, publishedAt };
+  });
 }
