@@ -1091,6 +1091,61 @@ export function PrCenterApp({
     setApprovalTasks((previous) => previous.filter((item) => item.id !== taskId));
     announce("Approval decision saved");
   };
+  const scheduleTask = async (taskId: string, channel: string, scheduledFor: string) => {
+    const task = state.tasks.find((item) => item.id === taskId);
+    if (!task) return;
+    const response = await fetch(`/api/pr-center/tasks/${taskId}/schedule`, {
+      method: "POST",
+      credentials: "same-origin",
+      headers: {
+        "Content-Type": "application/json",
+        "If-Match": String(task.version ?? 0),
+      },
+      body: JSON.stringify({
+        channel,
+        scheduledFor,
+        idempotencyKey: `schedule:${taskId}:${channel}:${scheduledFor}`,
+      }),
+    });
+    if (!response.ok)
+      return announce("Scheduling failed. Complete the publication gate first.");
+    setState((previous) => ({
+      ...previous,
+      tasks: previous.tasks.map((item) =>
+        item.id === taskId
+          ? { ...item, status: "scheduled", version: (item.version || 0) + 1 }
+          : item,
+      ),
+    }));
+    announce("Task scheduled");
+  };
+  const publishTask = async (
+    taskId: string,
+    publishedUrl: string,
+    publishedReference: string,
+  ) => {
+    const task = state.tasks.find((item) => item.id === taskId);
+    if (!task) return;
+    const response = await fetch(`/api/pr-center/tasks/${taskId}/publishing-evidence`, {
+      method: "POST",
+      credentials: "same-origin",
+      headers: {
+        "Content-Type": "application/json",
+        "If-Match": String(task.version ?? 0),
+      },
+      body: JSON.stringify({ publishedUrl, publishedReference }),
+    });
+    if (!response.ok) return announce("Publishing evidence could not be saved");
+    setState((previous) => ({
+      ...previous,
+      tasks: previous.tasks.map((item) =>
+        item.id === taskId
+          ? { ...item, status: "published", version: (item.version || 0) + 1 }
+          : item,
+      ),
+    }));
+    announce("Publishing evidence saved");
+  };
   const assignTaskToMe = async (taskId: string, dueDate: string) => {
     const task = state.tasks.find((item) => item.id === taskId);
     if (!task) return;
@@ -1435,6 +1490,8 @@ export function PrCenterApp({
               tasks={state.tasks}
               onTransition={transitionTask}
               onAssign={assignTaskToMe}
+              onSchedule={scheduleTask}
+              onPublish={publishTask}
             />
           )}
           {page === "calendar" && (
@@ -2017,16 +2074,24 @@ function Operations({
   tasks: taskItems,
   onTransition,
   onAssign,
+  onSchedule,
+  onPublish,
 }: {
   tasks: Task[];
   onTransition: (taskId: string, status: StatusId) => void;
   onAssign: (taskId: string, dueDate: string) => void;
+  onSchedule: (taskId: string, channel: string, scheduledFor: string) => void;
+  onPublish: (taskId: string, publishedUrl: string, publishedReference: string) => void;
 }) {
   const [view, setView] = useState<"board" | "table">("board");
   const [status, setStatus] = useState<"all" | StatusId>("all");
   const [ownerId, setOwnerId] = useState("all");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [dueDate, setDueDate] = useState("");
+  const [channel, setChannel] = useState("");
+  const [scheduledFor, setScheduledFor] = useState("");
+  const [publishedUrl, setPublishedUrl] = useState("");
+  const [publishedReference, setPublishedReference] = useState("");
   const visibleTasks = taskItems.filter(
     (task) =>
       (status === "all" || task.status === status) &&
@@ -2145,7 +2210,9 @@ function Operations({
           <button onClick={() => onAssign(selected.id, dueDate || selected.dueDate)}>
             Assign to me and save due date
           </button>
-          {STATUS_TRANSITIONS[selected.status].length > 0 && (
+          {STATUS_TRANSITIONS[selected.status].filter(
+            (next) => next !== "scheduled" && next !== "published",
+          ).length > 0 && (
             <label>
               Move to{" "}
               <select
@@ -2156,13 +2223,61 @@ function Operations({
                 }}
               >
                 <option value="">Choose a legal next state</option>
-                {STATUS_TRANSITIONS[selected.status].map((next) => (
-                  <option key={next} value={next}>
-                    {STATUS_LABELS[next]}
-                  </option>
-                ))}
+                {STATUS_TRANSITIONS[selected.status]
+                  .filter((next) => next !== "scheduled" && next !== "published")
+                  .map((next) => (
+                    <option key={next} value={next}>
+                      {STATUS_LABELS[next]}
+                    </option>
+                  ))}
               </select>
             </label>
+          )}
+          {selected.status === "approved" && (
+            <>
+              <label>
+                Channel{" "}
+                <input
+                  value={channel}
+                  onChange={(event) => setChannel(event.target.value)}
+                />
+              </label>
+              <label>
+                Schedule time{" "}
+                <input
+                  type="datetime-local"
+                  value={scheduledFor}
+                  onChange={(event) => setScheduledFor(event.target.value)}
+                />
+              </label>
+              <button onClick={() => onSchedule(selected.id, channel, scheduledFor)}>
+                Schedule after gate check
+              </button>
+            </>
+          )}
+          {selected.status === "scheduled" && (
+            <>
+              <label>
+                Published URL{" "}
+                <input
+                  type="url"
+                  value={publishedUrl}
+                  onChange={(event) => setPublishedUrl(event.target.value)}
+                />
+              </label>
+              <label>
+                Publication reference{" "}
+                <input
+                  value={publishedReference}
+                  onChange={(event) => setPublishedReference(event.target.value)}
+                />
+              </label>
+              <button
+                onClick={() => onPublish(selected.id, publishedUrl, publishedReference)}
+              >
+                Record publishing evidence
+              </button>
+            </>
           )}
         </article>
       )}
