@@ -549,6 +549,44 @@ export async function listNotifications(actor: PrCenterActor) {
   });
 }
 
+export async function markNotificationsRead(
+  actor: PrCenterActor,
+  notificationIds: string[],
+  correlationId: string = randomUUID(),
+) {
+  const ids = [...new Set(notificationIds)].filter((id) => id.length > 0).slice(0, 100);
+  if (ids.length === 0)
+    throw new PrCenterError("Notification IDs are required", 422, "INVALID_BODY");
+  return prisma.$transaction(async (tx) => {
+    const updated = await tx.prNotification.updateMany({
+      where: { id: { in: ids }, userId: actor.id, readAt: null },
+      data: { readAt: new Date() },
+    });
+    await auditAndOutbox(tx, {
+      actor,
+      action: "notification.read",
+      entityType: "notification",
+      entityId: ids.join(","),
+      after: { count: updated.count },
+      eventType: "pr.notification.read",
+      correlationId,
+    });
+    return { updated: updated.count };
+  });
+}
+
+export async function listAuditEvents(actor: PrCenterActor, take = 100) {
+  const limit = Math.min(Math.max(take, 1), 100);
+  return prisma.prAuditEvent.findMany({
+    where: canReadAllRequests(actor.role)
+      ? { organizationId: actor.organizationId }
+      : { organizationId: actor.organizationId, actorId: actor.id },
+    include: { actor: { select: { displayName: true } } },
+    orderBy: { createdAt: "desc" },
+    take: limit,
+  });
+}
+
 export async function transitionTask(
   actor: PrCenterActor,
   taskId: string,

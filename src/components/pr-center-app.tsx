@@ -817,6 +817,64 @@ export function PrCenterApp({
       })
       .catch(() => undefined);
   }, []);
+  useEffect(() => {
+    fetch("/api/pr-center/notifications", { credentials: "same-origin" })
+      .then(async (response) => {
+        if (!response.ok) throw new Error("Notifications unavailable");
+        const notifications = (await response.json()) as Array<{
+          id: string;
+          userId: string;
+          title: string;
+          body: string;
+          target: string | null;
+          readAt: string | null;
+          createdAt: string;
+        }>;
+        setState((previous) => ({
+          ...previous,
+          notifications: notifications.map((notification) => ({
+            id: notification.id,
+            userId: notification.userId,
+            title: notification.title,
+            message: notification.body,
+            target: PHASE_1_PAGES.has(notification.target as Page)
+              ? (notification.target as Page)
+              : "home",
+            createdAt: notification.createdAt,
+            read: Boolean(notification.readAt),
+          })),
+        }));
+      })
+      .catch(() => setNotice("Unable to load notifications"));
+    fetch("/api/pr-center/audit?take=100", { credentials: "same-origin" })
+      .then(async (response) => {
+        if (!response.ok) throw new Error("Audit history unavailable");
+        const audit = (await response.json()) as Array<{
+          id: string;
+          actorId: string | null;
+          entityType: string;
+          entityId: string;
+          action: string;
+          createdAt: string;
+        }>;
+        setState((previous) => ({
+          ...previous,
+          audit: audit.map((entry) => ({
+            id: entry.id,
+            actorId: entry.actorId || "system",
+            entity: ["request", "task", "notification"].includes(entry.entityType)
+              ? (entry.entityType as AuditEntry["entity"])
+              : "system",
+            entityId: entry.entityId,
+            action: entry.action,
+            before: "",
+            after: "",
+            createdAt: entry.createdAt,
+          })),
+        }));
+      })
+      .catch(() => setNotice("Unable to load audit history"));
+  }, []);
 
   const currentUser: User = actor
     ? {
@@ -845,7 +903,7 @@ export function PrCenterApp({
   );
   const unreadCount = userNotifications.filter((item) => !item.read).length;
   const go = (next: Page) => {
-    if (!ROLE_PAGES[currentUser.role].includes(next)) return;
+    if (!PHASE_1_PAGES.has(next) || !ROLE_PAGES[currentUser.role].includes(next)) return;
     setPage(next);
     setSidebarOpen(false);
   };
@@ -1124,45 +1182,22 @@ export function PrCenterApp({
         "Master data updated",
       ),
     );
-  const saveSnapshot = (name: string) =>
-    updateState((previous) => ({
+  const readNotifications = async (ids: string[]) => {
+    if (ids.length === 0) return;
+    const response = await fetch("/api/pr-center/notifications/read", {
+      method: "POST",
+      credentials: "same-origin",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ids }),
+    });
+    if (!response.ok) return announce("Notification update failed");
+    setState((previous) => ({
       ...previous,
-      snapshots: [
-        {
-          id: `SNAP-${previous.snapshots.length + 1}`,
-          name,
-          createdAt: new Date().toISOString(),
-          state: structuredClone({ ...previous, snapshots: [] }),
-        },
-        ...previous.snapshots,
-      ],
-    }));
-  const recoverSnapshot = (snapshot: Snapshot) => {
-    if (
-      !window.confirm(
-        `Recover “${snapshot.name}”? Current demo changes will be replaced.`,
-      )
-    )
-      return;
-    setState({ ...structuredClone(snapshot.state), snapshots: state.snapshots });
-    announce("Snapshot recovered");
-  };
-  const readNotifications = (ids: string[]) =>
-    updateState((previous) =>
-      addAudit(
-        {
-          ...previous,
-          notifications: previous.notifications.map((item) =>
-            ids.includes(item.id) ? { ...item, read: true } : item,
-          ),
-        },
-        "notification",
-        ids.join(","),
-        "marked_read",
-        "unread",
-        "read",
+      notifications: previous.notifications.map((item) =>
+        ids.includes(item.id) ? { ...item, read: true } : item,
       ),
-    );
+    }));
+  };
   const switchUser = (userId: string) => {
     const next = getUser(userId);
     if (!next) return;
@@ -1297,7 +1332,11 @@ export function PrCenterApp({
               <option value="th">ไทย</option>
               <option value="en">EN</option>
             </select>
-            <button className={styles.profile} onClick={() => go("directory")}>
+            <button
+              className={styles.profile}
+              type="button"
+              aria-label="Current PR Center role"
+            >
               <span>{currentUser.name.slice(0, 2)}</span>
               <i>{currentUser.role}</i>
             </button>
@@ -1392,13 +1431,7 @@ export function PrCenterApp({
             />
           )}
           {page === "history" && (
-            <History
-              audit={state.audit}
-              snapshots={state.snapshots}
-              language={state.language}
-              onSaveSnapshot={saveSnapshot}
-              onRecoverSnapshot={recoverSnapshot}
-            />
+            <History audit={state.audit} language={state.language} />
           )}
           {page === "directory" && (
             <Directory
@@ -2657,70 +2690,13 @@ function Notifications({
     </>
   );
 }
-function History({
-  audit,
-  snapshots,
-  language,
-  onSaveSnapshot,
-  onRecoverSnapshot,
-}: {
-  audit: AuditEntry[];
-  snapshots: Snapshot[];
-  language: Language;
-  onSaveSnapshot: (name: string) => void;
-  onRecoverSnapshot: (snapshot: Snapshot) => void;
-}) {
-  const [name, setName] = useState("");
+function History({ audit, language }: { audit: AuditEntry[]; language: Language }) {
   return (
     <>
       <SectionHeading
-        eyebrow="AUDIT AND RECOVERY"
-        title={language === "th" ? "ประวัติและการกู้คืน" : "Activity History"}
-        action={
-          <form
-            onSubmit={(event) => {
-              event.preventDefault();
-              onSaveSnapshot(name.trim() || "Manual snapshot");
-              setName("");
-            }}
-          >
-            <input
-              value={name}
-              onChange={(event) => setName(event.target.value)}
-              placeholder={language === "th" ? "ชื่อจุดคืนค่า" : "Snapshot name"}
-            />
-            <button className={styles.primary} type="submit">
-              {language === "th" ? "บันทึกจุดคืนค่า" : "Save snapshot"}
-            </button>
-          </form>
-        }
+        eyebrow="AUDIT"
+        title={language === "th" ? "ประวัติกิจกรรม" : "Activity History"}
       />
-      <section className={styles.list}>
-        {snapshots.map((snapshot) => (
-          <article key={snapshot.id} className={styles.listItem}>
-            <div>
-              <h2>{snapshot.name}</h2>
-              <span>
-                {new Date(snapshot.createdAt).toLocaleString(
-                  language === "th" ? "th-TH-u-ca-buddhist" : "en-GB",
-                )}
-              </span>
-            </div>
-            <button onClick={() => onRecoverSnapshot(snapshot)}>
-              {language === "th" ? "กู้คืน" : "Recover"}
-            </button>
-          </article>
-        ))}
-        {snapshots.length === 0 && (
-          <article className={styles.card}>
-            <p>
-              {language === "th"
-                ? "ยังไม่มีจุดคืนค่าที่บันทึกไว้"
-                : "No saved snapshots yet."}
-            </p>
-          </article>
-        )}
-      </section>
       <article className={styles.card}>
         <Table
           headers={["Time", "Actor", "Action", "Entity"]}

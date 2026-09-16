@@ -7,6 +7,8 @@ import {
   currentMessageHouse,
   listIdeas,
   listNotifications,
+  listAuditEvents,
+  markNotificationsRead,
   listRequests,
   sessionProfile,
   transitionIdea,
@@ -146,6 +148,20 @@ export function buildPrCenterApi(
     currentMessageHouse(request.prCenterActor!),
   );
   app.get("/notifications", async (request) => listNotifications(request.prCenterActor!));
+  app.post("/notifications/read", async (request) => {
+    const input = await body(request);
+    return markNotificationsRead(
+      request.prCenterActor!,
+      Array.isArray(input.ids)
+        ? input.ids.filter((id): id is string => typeof id === "string")
+        : [],
+      correlationId(request),
+    );
+  });
+  app.get("/audit", async (request) => {
+    const query = request.query as { take?: string };
+    return listAuditEvents(request.prCenterActor!, Number(query.take || 100));
+  });
   app.get("/session", async (request) => sessionProfile(request.prCenterActor!));
   app.get("/auth/login", async (request, reply) => {
     if (!entraAuth)
