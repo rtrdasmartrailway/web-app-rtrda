@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import type {
   Prisma,
   PrContentIdeaStatus,
+  PrApprovalDecision,
   PrRequestStatus,
   PrTaskStatus,
 } from "@/generated/prisma/client";
@@ -819,4 +820,193 @@ export async function transitionTask(
 export function assertApprovalAuthority(actor: PrCenterActor) {
   if (!canApprove(actor.role))
     throw new PrCenterError("You cannot record an approval decision", 403, "FORBIDDEN");
+}
+
+export async function createTaskRevision(
+  actor: PrCenterActor,
+  taskId: string,
+  fromVersion: number,
+  input: { body?: string; keyMessage?: string; changeSummary?: string },
+  correlationId: string = randomUUID(),
+) {
+  if (!canManageTasks(actor.role))
+    throw new PrCenterError("You cannot revise this task", 403, "FORBIDDEN");
+  const task = await prisma.prTask.findFirst({
+    where: { id: taskId, request: { organizationId: actor.organizationId } },
+    include: { revisions: { orderBy: { revisionNumber: "desc" } } },
+  });
+  if (!task) throw new PrCenterError("Task not found", 404, "NOT_FOUND");
+  if (task.version !== fromVersion)
+    throw new PrCenterError(
+      "This task has changed. Refresh and try again.",
+      409,
+      "STALE_UPDATE",
+    );
+  if (["PUBLISHED", "CLOSED", "CANCELLED"].includes(task.status))
+    throw new PrCenterError(
+      "This task can no longer be revised",
+      422,
+      "INVALID_TRANSITION",
+    );
+  const body = input.body?.trim() || null;
+  const keyMessage = input.keyMessage?.trim() || null;
+  return prisma.$transaction(async (tx) => {
+    const updated = await tx.prTask.updateMany({
+      where: { id: task.id, version: fromVersion },
+      data: { status: "IN_PRODUCTION", version: { increment: 1 } },
+    });
+    if (updated.count !== 1)
+      throw new PrCenterError(
+        "This task has changed. Refresh and try again.",
+        409,
+        "STALE_UPDATE",
+      );
+    const revision = await tx.prTaskRevision.create({
+      data: {
+        taskId: task.id,
+        revisionNumber: (task.revisions[0]?.revisionNumber || 0) + 1,
+        body,
+        keyMessage,
+        immutableAt: new Date(),
+      },
+    });
+    await tx.prStatusHistory.create({
+      data: {
+        taskId: task.id,
+        fromState: task.status,
+        toState: "IN_PRODUCTION",
+        reason: input.changeSummary?.trim() || "Material revision",
+        actorId: actor.id,
+      },
+    });
+    await auditAndOutbox(tx, {
+      actor,
+      action: "task.revised",
+      entityType: "task",
+      entityId: task.id,
+      after: { revisionNumber: revision.revisionNumber, version: fromVersion + 1 },
+      eventType: "pr.task.revised",
+      correlationId,
+    });
+    return revision;
+  });
+}
+
+export async function listApprovalQueue(actor: PrCenterActor) {
+  if (!canApprove(actor.role))
+    throw new PrCenterError("You cannot view the approval queue", 403, "FORBIDDEN");
+  return prisma.prTask.findMany({
+    where: {
+      request: { organizationId: actor.organizationId },
+      status: {
+        in: [
+          "SOURCE_FACT_CHECK",
+          "TECHNICAL_REVIEW",
+          "PR_EDITORIAL_REVIEW",
+          "MANAGEMENT_APPROVAL",
+        ],
+      },
+    },
+    include: {
+      request: { select: { title: true, requesterId: true } },
+      revisions: { orderBy: { revisionNumber: "desc" }, take: 1 },
+    },
+    orderBy: { updatedAt: "asc" },
+  });
+}
+
+export async function recordApprovalDecision(
+  actor: PrCenterActor,
+  taskId: string,
+  fromVersion: number,
+  input: { decision: "APPROVED" | "REVISION_REQUIRED" | "REJECTED"; comment?: string },
+  correlationId: string = randomUUID(),
+) {
+  assertApprovalAuthority(actor);
+  const task = await prisma.prTask.findFirst({
+    where: { id: taskId, request: { organizationId: actor.organizationId } },
+    include: {
+      request: true,
+      revisions: { orderBy: { revisionNumber: "desc" }, take: 1 },
+    },
+  });
+  if (!task) throw new PrCenterError("Task not found", 404, "NOT_FOUND");
+  if (task.ownerId === actor.id || task.request.requesterId === actor.id)
+    throw new PrCenterError(
+      "You cannot approve your own work",
+      403,
+      "SELF_APPROVAL_BLOCKED",
+    );
+  if (task.version !== fromVersion)
+    throw new PrCenterError(
+      "This task has changed. Refresh and try again.",
+      409,
+      "STALE_UPDATE",
+    );
+  if (
+    ![
+      "SOURCE_FACT_CHECK",
+      "TECHNICAL_REVIEW",
+      "PR_EDITORIAL_REVIEW",
+      "MANAGEMENT_APPROVAL",
+    ].includes(task.status)
+  )
+    throw new PrCenterError(
+      "This task is not awaiting approval",
+      422,
+      "INVALID_TRANSITION",
+    );
+  const revision = task.revisions[0];
+  if (!revision)
+    throw new PrCenterError(
+      "A task revision is required before approval",
+      422,
+      "REVISION_REQUIRED",
+    );
+  const next = input.decision === "APPROVED" ? "APPROVED" : input.decision;
+  return prisma.$transaction(async (tx) => {
+    const updated = await tx.prTask.updateMany({
+      where: { id: task.id, version: fromVersion },
+      data: { status: next, version: { increment: 1 } },
+    });
+    if (updated.count !== 1)
+      throw new PrCenterError(
+        "This task has changed. Refresh and try again.",
+        409,
+        "STALE_UPDATE",
+      );
+    const approval = await tx.prApproval.create({
+      data: {
+        taskId: task.id,
+        taskRevision: revision.revisionNumber,
+        stage: task.status,
+        decision: input.decision as PrApprovalDecision,
+        comment: input.comment?.trim() || null,
+        decidedById: actor.id,
+      },
+    });
+    await tx.prStatusHistory.create({
+      data: {
+        taskId: task.id,
+        fromState: task.status,
+        toState: next,
+        reason: input.comment?.trim() || null,
+        actorId: actor.id,
+      },
+    });
+    await auditAndOutbox(tx, {
+      actor,
+      action: "approval.recorded",
+      entityType: "task",
+      entityId: task.id,
+      after: {
+        decision: input.decision,
+        revision: revision.revisionNumber,
+        version: fromVersion + 1,
+      },
+      eventType: "pr.approval.recorded",
+      correlationId,
+    });
+    return approval;
+  });
 }

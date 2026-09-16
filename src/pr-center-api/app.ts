@@ -5,11 +5,14 @@ import {
   addTaskComment,
   convertIdea,
   currentMessageHouse,
+  createTaskRevision,
   listIdeas,
   listNotifications,
   listAuditEvents,
   markNotificationsRead,
   listRequests,
+  listApprovalQueue,
+  recordApprovalDecision,
   requestDetail,
   transitionRequest,
   updateRequestDraft,
@@ -110,6 +113,7 @@ export function buildPrCenterApi(
     const query = request.query as { take?: string; cursor?: string };
     return listRequests(request.prCenterActor!, Number(query.take || 25), query.cursor);
   });
+  app.get("/approvals", async (request) => listApprovalQueue(request.prCenterActor!));
   app.get("/requests/:requestId", async (request) =>
     requestDetail(
       request.prCenterActor!,
@@ -308,6 +312,36 @@ export function buildPrCenterApi(
       expectedVersion(request),
       to as PrTaskStatus,
       typeof input.reason === "string" ? input.reason : undefined,
+      correlationId(request),
+    );
+  });
+  app.post("/tasks/:taskId/revisions", async (request) => {
+    const input = await body(request);
+    return createTaskRevision(
+      request.prCenterActor!,
+      taskId((request.params as { taskId: string }).taskId),
+      expectedVersion(request),
+      {
+        body: typeof input.body === "string" ? input.body : undefined,
+        keyMessage: typeof input.keyMessage === "string" ? input.keyMessage : undefined,
+        changeSummary:
+          typeof input.changeSummary === "string" ? input.changeSummary : undefined,
+      },
+      correlationId(request),
+    );
+  });
+  app.post("/tasks/:taskId/approvals", async (request) => {
+    const input = await body(request);
+    if (!["APPROVED", "REVISION_REQUIRED", "REJECTED"].includes(String(input.decision)))
+      throw new PrCenterError("Unknown approval decision", 422, "INVALID_DECISION");
+    return recordApprovalDecision(
+      request.prCenterActor!,
+      taskId((request.params as { taskId: string }).taskId),
+      expectedVersion(request),
+      {
+        decision: input.decision as "APPROVED" | "REVISION_REQUIRED" | "REJECTED",
+        comment: typeof input.comment === "string" ? input.comment : undefined,
+      },
       correlationId(request),
     );
   });
