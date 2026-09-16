@@ -33,6 +33,15 @@ export const railStrategyPublicationGroups: KnowledgeDocumentGroup[] = [
     title: "อินโฟกราฟฟิค",
     open: false,
     documents: [],
+    infographics: Array.from({ length: 6 }, (_, index) => {
+      const number = index + 1;
+      const caption = `อินโฟกราฟฟิกยุทธศาสตร์ด้านเทคโนโลยีระบบรางของประเทศ ${number}`;
+      return {
+        src: `/infographics/rail-technology-strategy-2571-2575/${number}.svg`,
+        alt: caption,
+        caption,
+      };
+    }),
   },
 ];
 

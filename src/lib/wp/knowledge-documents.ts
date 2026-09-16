@@ -13,11 +13,18 @@ export interface KnowledgeDocument {
   protectedDocumentId?: string;
 }
 
+export interface KnowledgeInfographic {
+  src: string;
+  alt: string;
+  caption: string;
+}
+
 export interface KnowledgeDocumentGroup {
   title: string;
   open: boolean;
   compact?: boolean;
   documents: KnowledgeDocument[];
+  infographics?: KnowledgeInfographic[];
 }
 
 export interface KnowledgeDocumentParseOptions {
