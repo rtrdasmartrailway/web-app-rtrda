@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import type {
   Prisma,
   PrContentIdeaStatus,
+  PrRequestStatus,
   PrTaskStatus,
 } from "@/generated/prisma/client";
 import { prisma } from "@/lib/db/client";
@@ -58,6 +59,8 @@ type CreateRequestInput = {
   audience?: string;
   requestedFor?: Date;
   sourceUrls: string[];
+  priority?: string;
+  priorityReason?: string;
 };
 type IdeaStatus = "PROPOSED" | "UNDER_REVIEW" | "ACCEPTED" | "CONVERTED" | "ARCHIVED";
 
@@ -151,6 +154,8 @@ export async function createRequest(
         requestNumber: requestNumber(input.type),
         type: input.type,
         title,
+        priority: input.priority || "NORMAL",
+        priorityReason: input.priorityReason?.trim() || null,
         requestedFor: input.requestedFor,
         revisions: {
           create: {
@@ -206,6 +211,163 @@ export async function listRequests(actor: PrCenterActor, take = 25, cursor?: str
       sources: { select: { url: true } },
       tasks: true,
     },
+  });
+}
+
+async function requestInScope(actor: PrCenterActor, requestId: string) {
+  const request = await prisma.prRequest.findFirst({
+    where: {
+      id: requestId,
+      organizationId: actor.organizationId,
+      ...(canReadAllRequests(actor.role) ? {} : { requesterId: actor.id }),
+    },
+    include: {
+      revisions: { orderBy: { revisionNumber: "desc" } },
+      sources: true,
+      tasks: true,
+    },
+  });
+  if (!request) throw new PrCenterError("Request not found", 404, "NOT_FOUND");
+  return request;
+}
+
+export async function requestDetail(actor: PrCenterActor, requestId: string) {
+  return requestInScope(actor, requestId);
+}
+
+export async function updateRequestDraft(
+  actor: PrCenterActor,
+  requestId: string,
+  fromVersion: number,
+  input: CreateRequestInput,
+  correlationId: string = randomUUID(),
+) {
+  const request = await requestInScope(actor, requestId);
+  if (request.requesterId !== actor.id && actor.role !== "SCOPED_ADMINISTRATOR")
+    throw new PrCenterError("You cannot amend this request", 403, "FORBIDDEN");
+  if (request.status !== "DRAFT" && request.status !== "SUBMITTED")
+    throw new PrCenterError(
+      "This request can no longer be amended",
+      422,
+      "INVALID_TRANSITION",
+    );
+  if (request.version !== fromVersion)
+    throw new PrCenterError(
+      "This request has changed. Refresh and try again.",
+      409,
+      "STALE_UPDATE",
+    );
+  const title = input.title.trim();
+  if (title.length < 3 || title.length > 300)
+    throw new PrCenterError(
+      "Title must contain 3 to 300 characters",
+      422,
+      "INVALID_TITLE",
+    );
+  const sourceUrls = [...new Set(input.sourceUrls.map(assertUrl))];
+  return prisma.$transaction(async (tx) => {
+    const revisionNumber = (request.revisions[0]?.revisionNumber || 0) + 1;
+    const updated = await tx.prRequest.updateMany({
+      where: { id: request.id, version: fromVersion },
+      data: {
+        title,
+        priority: input.priority || request.priority,
+        priorityReason: input.priorityReason?.trim() || null,
+        requestedFor: input.requestedFor,
+        version: { increment: 1 },
+      },
+    });
+    if (updated.count !== 1)
+      throw new PrCenterError(
+        "This request has changed. Refresh and try again.",
+        409,
+        "STALE_UPDATE",
+      );
+    await tx.prRequestRevision.create({
+      data: {
+        requestId: request.id,
+        revisionNumber,
+        title,
+        objective: input.objective?.trim() || null,
+        audience: input.audience?.trim() || null,
+        changeSummary: "Requester amendment",
+      },
+    });
+    await tx.prRequestSource.deleteMany({ where: { requestId: request.id } });
+    if (sourceUrls.length)
+      await tx.prRequestSource.createMany({
+        data: sourceUrls.map((url) => ({ requestId: request.id, url })),
+      });
+    await auditAndOutbox(tx, {
+      actor,
+      action: "request.amended",
+      entityType: "request",
+      entityId: request.id,
+      after: { revisionNumber, version: fromVersion + 1 },
+      eventType: "pr.request.amended",
+      correlationId,
+    });
+    return tx.prRequest.findUniqueOrThrow({
+      where: { id: request.id },
+      include: { revisions: true, sources: true, tasks: true },
+    });
+  });
+}
+
+export async function transitionRequest(
+  actor: PrCenterActor,
+  requestId: string,
+  fromVersion: number,
+  status: "SUBMITTED" | "WITHDRAWN",
+  correlationId: string = randomUUID(),
+) {
+  const request = await requestInScope(actor, requestId);
+  if (request.requesterId !== actor.id && actor.role !== "SCOPED_ADMINISTRATOR")
+    throw new PrCenterError("You cannot update this request", 403, "FORBIDDEN");
+  const allowed =
+    (status === "SUBMITTED" && request.status === "DRAFT") ||
+    (status === "WITHDRAWN" && ["DRAFT", "SUBMITTED"].includes(request.status));
+  if (!allowed)
+    throw new PrCenterError(
+      "This request transition is not allowed",
+      422,
+      "INVALID_TRANSITION",
+    );
+  if (request.version !== fromVersion)
+    throw new PrCenterError(
+      "This request has changed. Refresh and try again.",
+      409,
+      "STALE_UPDATE",
+    );
+  return prisma.$transaction(async (tx) => {
+    const updated = await tx.prRequest.updateMany({
+      where: { id: request.id, version: fromVersion },
+      data: { status: status as PrRequestStatus, version: { increment: 1 } },
+    });
+    if (updated.count !== 1)
+      throw new PrCenterError(
+        "This request has changed. Refresh and try again.",
+        409,
+        "STALE_UPDATE",
+      );
+    await tx.prStatusHistory.create({
+      data: {
+        requestId: request.id,
+        fromState: request.status,
+        toState: status,
+        actorId: actor.id,
+      },
+    });
+    await auditAndOutbox(tx, {
+      actor,
+      action: `request.${status.toLowerCase()}`,
+      entityType: "request",
+      entityId: request.id,
+      after: { status, version: fromVersion + 1 },
+      eventType: `pr.request.${status.toLowerCase()}`,
+      correlationId,
+    });
+    return tx.prRequest.findUniqueOrThrow({ where: { id: request.id } });
   });
 }
 
