@@ -130,6 +130,35 @@ function KnowledgeDocumentCard({
   );
 }
 
+function KnowledgeInfographics({
+  infographics,
+}: {
+  infographics: NonNullable<KnowledgeDocumentGroup["infographics"]>;
+}) {
+  return (
+    <div className={styles.infographics}>
+      {infographics.map((infographic) => (
+        <figure className={styles.infographic} key={infographic.src}>
+          {/* SVG files are served at their original intrinsic dimensions. */}
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            alt={infographic.alt}
+            data-caption={infographic.caption}
+            data-fullsrc={infographic.src}
+            data-lightbox="true"
+            decoding="async"
+            height="1080"
+            loading="lazy"
+            src={infographic.src}
+            width="1920"
+          />
+          <figcaption>{infographic.caption}</figcaption>
+        </figure>
+      ))}
+    </div>
+  );
+}
+
 export function KnowledgeDocuments({
   groups,
   language,
@@ -145,7 +174,9 @@ export function KnowledgeDocuments({
             <summary className={styles.summary}>
               <span>{group.title}</span>
             </summary>
-            {group.documents.length > 0 ? (
+            {group.infographics?.length ? (
+              <KnowledgeInfographics infographics={group.infographics} />
+            ) : group.documents.length > 0 ? (
               <div
                 className={
                   group.compact ? `${styles.grid} ${styles.compactGrid}` : styles.grid
