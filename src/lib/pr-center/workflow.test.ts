@@ -48,4 +48,9 @@ describe("PR Center workflow policy", () => {
       "schedule",
     ]);
   });
+
+  it("does not allow generic task transitions to schedule or publish", () => {
+    expect(canTransitionTask("PR_OPERATIONS", "APPROVED", "SCHEDULED")).toBe(false);
+    expect(canTransitionTask("PR_OPERATIONS", "SCHEDULED", "PUBLISHED")).toBe(false);
+  });
 });

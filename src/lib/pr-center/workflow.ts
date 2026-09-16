@@ -61,6 +61,8 @@ export function canTransitionTask(
   from: PrTaskStatus,
   to: PrTaskStatus,
 ): boolean {
+  // Scheduling and publishing must pass the guarded publication commands.
+  if (to === "SCHEDULED" || to === "PUBLISHED") return false;
   return WRITE_ROLES.includes(role) && TASK_TRANSITIONS[from].includes(to as never);
 }
 
