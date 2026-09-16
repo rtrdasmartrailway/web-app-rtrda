@@ -73,11 +73,11 @@ export const NAV: NavGroup[] = [
     ],
   },
   {
-    label: "แจ้งปัญหา",
+    label: "Report",
     href: "#",
     children: [
       {
-        label: "แจ้งปัญหา Helpdesk",
+        label: "Report Helpdesk",
         href: "https://docs.google.com/forms/d/e/1FAIpQLSeeAC917cMzuJ6u8cdCMoy1hYe0a8rn5OUrAYPL2oEc2jTqEQ/viewform?usp=dialog",
       },
     ],
