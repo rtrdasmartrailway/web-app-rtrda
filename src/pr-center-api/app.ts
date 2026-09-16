@@ -5,9 +5,19 @@ import {
   addTaskComment,
   convertIdea,
   currentMessageHouse,
+  createTaskRevision,
   listIdeas,
   listNotifications,
+  listAuditEvents,
+  markNotificationsRead,
   listRequests,
+  listApprovalQueue,
+  recordApprovalDecision,
+  requestDetail,
+  recordPublishingEvidence,
+  scheduleTask,
+  transitionRequest,
+  updateRequestDraft,
   sessionProfile,
   transitionIdea,
   taskHistory,
@@ -105,6 +115,13 @@ export function buildPrCenterApi(
     const query = request.query as { take?: string; cursor?: string };
     return listRequests(request.prCenterActor!, Number(query.take || 25), query.cursor);
   });
+  app.get("/approvals", async (request) => listApprovalQueue(request.prCenterActor!));
+  app.get("/requests/:requestId", async (request) =>
+    requestDetail(
+      request.prCenterActor!,
+      taskId((request.params as { requestId: string }).requestId),
+    ),
+  );
   app.get("/ideas", async (request) => listIdeas(request.prCenterActor!));
   app.post("/ideas", async (request, reply) => {
     const input = await body(request);
@@ -146,6 +163,20 @@ export function buildPrCenterApi(
     currentMessageHouse(request.prCenterActor!),
   );
   app.get("/notifications", async (request) => listNotifications(request.prCenterActor!));
+  app.post("/notifications/read", async (request) => {
+    const input = await body(request);
+    return markNotificationsRead(
+      request.prCenterActor!,
+      Array.isArray(input.ids)
+        ? input.ids.filter((id): id is string => typeof id === "string")
+        : [],
+      correlationId(request),
+    );
+  });
+  app.get("/audit", async (request) => {
+    const query = request.query as { take?: string };
+    return listAuditEvents(request.prCenterActor!, Number(query.take || 100));
+  });
   app.get("/session", async (request) => sessionProfile(request.prCenterActor!));
   app.get("/auth/login", async (request, reply) => {
     if (!entraAuth)
@@ -227,10 +258,50 @@ export function buildPrCenterApi(
         sourceUrls: Array.isArray(input.sourceUrls)
           ? input.sourceUrls.filter((item): item is string => typeof item === "string")
           : [],
+        priority: typeof input.priority === "string" ? input.priority : undefined,
+        priorityReason:
+          typeof input.priorityReason === "string" ? input.priorityReason : undefined,
       },
       correlationId(request),
     );
     return reply.status(201).send(result);
+  });
+  app.patch("/requests/:requestId", async (request) => {
+    const input = await body(request);
+    return updateRequestDraft(
+      request.prCenterActor!,
+      taskId((request.params as { requestId: string }).requestId),
+      expectedVersion(request),
+      {
+        type: input.type === "OFFSITE" ? "OFFSITE" : "PR",
+        title: typeof input.title === "string" ? input.title : "",
+        objective: typeof input.objective === "string" ? input.objective : undefined,
+        audience: typeof input.audience === "string" ? input.audience : undefined,
+        requestedFor:
+          typeof input.requestedFor === "string"
+            ? new Date(input.requestedFor)
+            : undefined,
+        sourceUrls: Array.isArray(input.sourceUrls)
+          ? input.sourceUrls.filter((item): item is string => typeof item === "string")
+          : [],
+        priority: typeof input.priority === "string" ? input.priority : undefined,
+        priorityReason:
+          typeof input.priorityReason === "string" ? input.priorityReason : undefined,
+      },
+      correlationId(request),
+    );
+  });
+  app.post("/requests/:requestId/transitions", async (request) => {
+    const input = await body(request);
+    if (input.to !== "SUBMITTED" && input.to !== "WITHDRAWN")
+      throw new PrCenterError("Unknown request status", 422, "INVALID_STATUS");
+    return transitionRequest(
+      request.prCenterActor!,
+      taskId((request.params as { requestId: string }).requestId),
+      expectedVersion(request),
+      input.to,
+      correlationId(request),
+    );
   });
   app.post("/tasks/:taskId/transitions", async (request) => {
     const input = await body(request);
@@ -243,6 +314,68 @@ export function buildPrCenterApi(
       expectedVersion(request),
       to as PrTaskStatus,
       typeof input.reason === "string" ? input.reason : undefined,
+      correlationId(request),
+    );
+  });
+  app.post("/tasks/:taskId/revisions", async (request) => {
+    const input = await body(request);
+    return createTaskRevision(
+      request.prCenterActor!,
+      taskId((request.params as { taskId: string }).taskId),
+      expectedVersion(request),
+      {
+        body: typeof input.body === "string" ? input.body : undefined,
+        keyMessage: typeof input.keyMessage === "string" ? input.keyMessage : undefined,
+        changeSummary:
+          typeof input.changeSummary === "string" ? input.changeSummary : undefined,
+      },
+      correlationId(request),
+    );
+  });
+  app.post("/tasks/:taskId/approvals", async (request) => {
+    const input = await body(request);
+    if (!["APPROVED", "REVISION_REQUIRED", "REJECTED"].includes(String(input.decision)))
+      throw new PrCenterError("Unknown approval decision", 422, "INVALID_DECISION");
+    return recordApprovalDecision(
+      request.prCenterActor!,
+      taskId((request.params as { taskId: string }).taskId),
+      expectedVersion(request),
+      {
+        decision: input.decision as "APPROVED" | "REVISION_REQUIRED" | "REJECTED",
+        comment: typeof input.comment === "string" ? input.comment : undefined,
+      },
+      correlationId(request),
+    );
+  });
+  app.post("/tasks/:taskId/schedule", async (request) => {
+    const input = await body(request);
+    return scheduleTask(
+      request.prCenterActor!,
+      taskId((request.params as { taskId: string }).taskId),
+      expectedVersion(request),
+      {
+        channel: typeof input.channel === "string" ? input.channel : "",
+        scheduledFor:
+          typeof input.scheduledFor === "string"
+            ? new Date(input.scheduledFor)
+            : new Date("invalid"),
+        idempotencyKey:
+          typeof input.idempotencyKey === "string" ? input.idempotencyKey : "",
+      },
+      correlationId(request),
+    );
+  });
+  app.post("/tasks/:taskId/publishing-evidence", async (request) => {
+    const input = await body(request);
+    return recordPublishingEvidence(
+      request.prCenterActor!,
+      taskId((request.params as { taskId: string }).taskId),
+      expectedVersion(request),
+      {
+        publishedUrl: typeof input.publishedUrl === "string" ? input.publishedUrl : "",
+        publishedReference:
+          typeof input.publishedReference === "string" ? input.publishedReference : "",
+      },
       correlationId(request),
     );
   });

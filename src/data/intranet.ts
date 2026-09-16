@@ -72,6 +72,16 @@ export const NAV: NavGroup[] = [
       },
     ],
   },
+  {
+    label: "REPORT",
+    href: "#",
+    children: [
+      {
+        label: "Report Helpdesk",
+        href: "https://docs.google.com/forms/d/e/1FAIpQLSeeAC917cMzuJ6u8cdCMoy1hYe0a8rn5OUrAYPL2oEc2jTqEQ/viewform?usp=dialog",
+      },
+    ],
+  },
 ];
 
 export const ICON_ROWS: IconItem[][] = [
