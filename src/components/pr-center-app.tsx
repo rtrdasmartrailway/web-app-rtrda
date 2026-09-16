@@ -718,6 +718,7 @@ export function PrCenterApp({
   const [requestDraft, setRequestDraft] = useState<RequestDraft>(() =>
     emptyRequestDraft(users[0]),
   );
+  const [approvalTasks, setApprovalTasks] = useState<Task[]>([]);
   const [notice, setNotice] = useState<string | null>(null);
   useEffect(() => {
     fetch("/api/pr-center/requests?take=100", { credentials: "same-origin" })
@@ -771,6 +772,36 @@ export function PrCenterApp({
       })
       .catch(() => setNotice("Unable to load server requests"));
   }, []);
+  useEffect(() => {
+    if (actor?.role !== "APPROVER" && actor?.role !== "SCOPED_ADMINISTRATOR") return;
+    fetch("/api/pr-center/approvals", { credentials: "same-origin" })
+      .then(async (response) => {
+        if (!response.ok) throw new Error("Approval queue unavailable");
+        const items = (await response.json()) as Array<{
+          id: string;
+          requestId: string;
+          title: string;
+          contentType: string;
+          status: string;
+          ownerId: string | null;
+          dueAt: string | null;
+          version: number;
+        }>;
+        setApprovalTasks(
+          items.map((task) => ({
+            id: task.id,
+            requestId: task.requestId,
+            title: task.title,
+            type: task.contentType,
+            status: task.status.toLowerCase() as StatusId,
+            ownerId: task.ownerId || "",
+            dueDate: task.dueAt?.slice(0, 10) || "",
+            version: task.version,
+          })),
+        );
+      })
+      .catch(() => setNotice("Unable to load approval queue"));
+  }, [actor?.role]);
   useEffect(() => {
     fetch("/api/pr-center/ideas", { credentials: "same-origin" })
       .then(async (response) => {
@@ -1043,6 +1074,22 @@ export function PrCenterApp({
           : "Task transition failed",
       );
     }
+  };
+  const recordApproval = async (
+    taskId: string,
+    decision: "APPROVED" | "REVISION_REQUIRED" | "REJECTED",
+  ) => {
+    const task = approvalTasks.find((item) => item.id === taskId);
+    if (!task?.version) return;
+    const response = await fetch(`/api/pr-center/tasks/${taskId}/approvals`, {
+      method: "POST",
+      credentials: "same-origin",
+      headers: { "Content-Type": "application/json", "If-Match": String(task.version) },
+      body: JSON.stringify({ decision }),
+    });
+    if (!response.ok) return announce("Approval decision failed");
+    setApprovalTasks((previous) => previous.filter((item) => item.id !== taskId));
+    announce("Approval decision saved");
   };
   const assignTaskToMe = async (taskId: string, dueDate: string) => {
     const task = state.tasks.find((item) => item.id === taskId);
@@ -1395,9 +1442,9 @@ export function PrCenterApp({
           )}
           {page === "approvals" && (
             <Approvals
-              tasks={state.tasks}
+              tasks={approvalTasks}
               role={currentUser.role}
-              onTransition={transitionTask}
+              onDecision={recordApproval}
             />
           )}
           {page === "library" && (
@@ -2239,17 +2286,16 @@ function Calendar({
 function Approvals({
   tasks: taskItems,
   role,
-  onTransition,
+  onDecision,
 }: {
   tasks: Task[];
   role: Role;
-  onTransition: (taskId: string, status: StatusId) => void;
+  onDecision: (
+    taskId: string,
+    decision: "APPROVED" | "REVISION_REQUIRED" | "REJECTED",
+  ) => void;
 }) {
-  const reviewStatuses: StatusId[] =
-    role === "executive"
-      ? ["management_approval"]
-      : ["pr_editorial_review", "management_approval"];
-  const pendingTasks = taskItems.filter((task) => reviewStatuses.includes(task.status));
+  const pendingTasks = taskItems;
   return (
     <>
       <SectionHeading eyebrow="REVIEW AND APPROVAL" title="Approval Queue" />
@@ -2265,17 +2311,14 @@ function Approvals({
             </div>
             <div>
               <Status>Awaiting approval</Status>
-              {(role === "admin" &&
-                ["pr_editorial_review", "management_approval"].includes(task.status)) ||
-              (role === "executive" && task.status === "management_approval") ||
-              (role === "pr" && task.status === "pr_editorial_review") ? (
+              {role === "admin" || role === "approver" ? (
                 <>
-                  <button onClick={() => onTransition(task.id, "revision_required")}>
+                  <button onClick={() => onDecision(task.id, "REVISION_REQUIRED")}>
                     Request revision
                   </button>
                   <button
                     className={styles.primary}
-                    onClick={() => onTransition(task.id, "approved")}
+                    onClick={() => onDecision(task.id, "APPROVED")}
                   >
                     Approve
                   </button>
