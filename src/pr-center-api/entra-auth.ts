@@ -13,6 +13,26 @@ const STATE_TTL_MS = 10 * 60 * 1000;
 type Session = { actor: PrCenterActor; expiresAt: number };
 type PendingLogin = { verifier: string; nonce: string; expiresAt: number };
 
+function oidcErrorCode(error: unknown): string {
+  const value =
+    error &&
+    typeof error === "object" &&
+    "error" in error &&
+    typeof error.error === "string"
+      ? error.error
+      : "";
+  const allowed = new Set([
+    "invalid_client",
+    "invalid_grant",
+    "invalid_request",
+    "invalid_scope",
+    "server_error",
+    "temporarily_unavailable",
+    "unauthorized_client",
+  ]);
+  return allowed.has(value) ? value.toUpperCase() : "UNKNOWN";
+}
+
 function cookies(request: FastifyRequest) {
   return Object.fromEntries(
     (request.headers.cookie || "")
@@ -200,11 +220,11 @@ export function createEntraAuth() {
           expectedState: state,
           expectedNonce: login.nonce,
         });
-      } catch {
+      } catch (error) {
         throw new PrCenterError(
           "Microsoft sign-in could not be completed. Try again or contact an administrator.",
           401,
-          "OIDC_LOGIN_FAILED",
+          `OIDC_TOKEN_EXCHANGE_${oidcErrorCode(error)}`,
         );
       }
       const claims = (

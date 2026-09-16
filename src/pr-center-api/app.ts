@@ -174,7 +174,11 @@ export function buildPrCenterApi(
       return reply.header("Set-Cookie", cookies).redirect(login.redirect);
     } catch (error) {
       request.log.warn(
-        { error: error instanceof Error ? error.name : "unknown" },
+        {
+          error: error instanceof Error ? error.name : "unknown",
+          errorCode:
+            error instanceof PrCenterError ? error.code : "UNEXPECTED_OIDC_ERROR",
+        },
         "OIDC callback failed",
       );
       const cookies = [...entraAuth.signOut(request)];
