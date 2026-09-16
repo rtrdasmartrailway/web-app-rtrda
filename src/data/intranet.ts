@@ -73,7 +73,7 @@ export const NAV: NavGroup[] = [
     ],
   },
   {
-    label: "Report",
+    label: "REPORT",
     href: "#",
     children: [
       {
