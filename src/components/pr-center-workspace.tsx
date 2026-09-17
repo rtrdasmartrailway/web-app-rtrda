@@ -62,8 +62,6 @@ export function PrCenterWorkspace() {
   const [sessionState, setSessionState] = useState<SessionState>("loading");
   const [session, setSession] = useState<PrCenterSession | null>(null);
   const [page, setPage] = useState<Page>("Home");
-  const [email, setEmail] = useState("");
-  const [loginError, setLoginError] = useState<string | null>(null);
   const [requests, setRequests] = useState<RequestRow[]>([]);
   const [requestsError, setRequestsError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -99,37 +97,6 @@ export function PrCenterWorkspace() {
   function navigate(nextPage: Page) {
     setRequestsError(null);
     setPage(nextPage);
-  }
-
-  async function signIn(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    setSubmitting(true);
-    setLoginError(null);
-    try {
-      const response = await fetch("/api/pr-center/session/email", {
-        method: "POST",
-        credentials: "same-origin",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email }),
-      });
-      if (!response.ok) {
-        const payload = (await response.json().catch(() => null)) as {
-          message?: string;
-        } | null;
-        setLoginError(payload?.message || "ไม่สามารถเข้าสู่ระบบได้");
-        return;
-      }
-      const sessionResponse = await fetch("/api/pr-center/session", {
-        credentials: "same-origin",
-      });
-      if (!sessionResponse.ok) throw new Error("Unable to load session");
-      setSession((await sessionResponse.json()) as PrCenterSession);
-      setSessionState("authenticated");
-    } catch {
-      setLoginError("ไม่สามารถเชื่อมต่อระบบ PR Center ได้");
-    } finally {
-      setSubmitting(false);
-    }
   }
 
   async function submitRequest(event: FormEvent<HTMLFormElement>) {
@@ -208,30 +175,11 @@ export function PrCenterWorkspace() {
             <a className={styles.primaryAction} href={MICROSOFT_LOGIN_URL}>
               Sign in with Microsoft
             </a>
-            <p className={styles.lead}>Test fallback: กรอก email ที่ได้รับอนุญาต</p>
-            <form onSubmit={signIn}>
-              <label htmlFor="pr-center-email">Email</label>
-              <div className={styles.loginRow}>
-                <input
-                  id="pr-center-email"
-                  type="email"
-                  autoComplete="email"
-                  value={email}
-                  onChange={(event) => setEmail(event.target.value)}
-                  placeholder="name@rtrda.or.th"
-                  required
-                />
-                <button type="submit" disabled={submitting}>
-                  {submitting ? "กำลังตรวจสอบ" : "เข้าสู่ระบบ"}
-                </button>
-              </div>
-              {(loginError || signInFailed) && (
-                <p className={styles.loginError}>
-                  {loginError ||
-                    "Microsoft sign-in ไม่สำเร็จ กรุณาลองใหม่ หรือติดต่อผู้ดูแลระบบ"}
-                </p>
-              )}
-            </form>
+            {signInFailed && (
+              <p className={styles.loginError}>
+                Microsoft sign-in ไม่สำเร็จ กรุณาลองใหม่ หรือติดต่อผู้ดูแลระบบ
+              </p>
+            )}
           </section>
         )}
         {signedIn && page === "Submit Request" && (
@@ -304,10 +252,7 @@ export function PrCenterWorkspace() {
             </p>
           </section>
         )}
-        <p className={styles.note}>
-          Test-only temporary email access. This will be replaced by Entra OIDC. Demo
-          roles, browser import/export and localStorage are not used by this workspace.
-        </p>
+        <p className={styles.note}>PR Center uses Microsoft Entra sign-in.</p>
       </section>
     </main>
   );
