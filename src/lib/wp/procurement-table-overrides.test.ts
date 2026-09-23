@@ -119,6 +119,7 @@ describe("applyProcurementTableOverrides", () => {
     const updatedRows = rows(updated.contentHtml);
 
     expect(updatedRows.map((row) => row[0])).toEqual([
+      "12",
       "11",
       "10",
       "9",
@@ -193,6 +194,7 @@ describe("applyProcurementTableOverrides", () => {
     const updatedRows = rows(applyProcurementTableOverrides(source).contentHtml);
 
     expect(updatedRows.map((row) => row[0])).toEqual([
+      "13",
       "12",
       "11",
       "10",
@@ -397,12 +399,32 @@ describe("applyProcurementTableOverrides", () => {
       )
       .first();
 
-    expect(row.find("td").first().text()).toBe("3");
+    expect(row.find("td").first().text()).toBe("4");
     expect(row.text()).toContain("8 กรกฎาคม 2569");
     expect(row.text()).toContain("National Rolling Stock Company");
     expect(row.text()).toContain("7,950,000.00");
     expect(row.find("a").attr("href")).toBe(
       "/wp-content/uploads/2026/07/procurement-winner-national-rolling-stock-company-25690708.pdf",
+    );
+  });
+
+  it("adds the 1 May passenger coach refurbishment winner row with its PDF", () => {
+    const source = record(
+      "/จัดซื้อจัดจ้าง/ประกาศผลผู้ชนะการเสนอร",
+      yearTableHtml(
+        `<tr><td>1</td><td>6 พฤษภาคม 2569</td><td>รายการเดิม</td><td>1.00</td><td>–</td><td><a href="/old.pdf">PDF</a></td></tr>`,
+      ),
+    );
+    const updated = applyProcurementTableOverrides(source);
+    const $ = cheerio.load(updated.contentHtml, null, false);
+    const row = $("tbody tr")
+      .filter((_, element) => $(element).text().includes("Passenger Coach Refurbishment"))
+      .first();
+
+    expect(row.find("td").eq(1).text()).toBe("1 พฤษภาคม 2569");
+    expect(row.text()).toContain("40,433,706.00");
+    expect(row.find("a").attr("href")).toBe(
+      "/wp-content/uploads/2026/05/procurement-winner-passenger-coach-refurbishment-25690501.pdf",
     );
   });
 });
