@@ -29,13 +29,6 @@ import {
 import { TASK_TRANSITIONS, type PrTaskStatus } from "@/lib/pr-center/workflow";
 
 export type ActorResolver = (request: FastifyRequest) => Promise<PrCenterActor | null>;
-export type EmailOnlyAuth = {
-  signIn: (
-    request: FastifyRequest,
-    email: string,
-  ) => Promise<{ actor: PrCenterActor; cookie: string }>;
-  signOut: (request: FastifyRequest) => string;
-};
 export type EntraAuth = {
   resolve: (request: FastifyRequest) => Promise<PrCenterActor | null>;
   begin: () => Promise<{ url: string; cookie: string }>;
@@ -77,7 +70,6 @@ function taskId(value: string): `${string}-${string}-${string}-${string}-${strin
 
 export function buildPrCenterApi(
   resolveActor: ActorResolver,
-  emailOnlyAuth?: EmailOnlyAuth,
   entraAuth?: EntraAuth | null,
 ): FastifyInstance {
   const app = Fastify({
@@ -100,7 +92,6 @@ export function buildPrCenterApi(
   app.addHook("preHandler", async (request) => {
     if (
       request.routeOptions.url === "/healthz" ||
-      request.routeOptions.url === "/session/email" ||
       request.routeOptions.url === "/auth/login" ||
       request.routeOptions.url === "/auth/callback"
     )
@@ -186,10 +177,7 @@ export function buildPrCenterApi(
         "AUTH_UNAVAILABLE",
       );
     const login = await entraAuth.begin();
-    // A Microsoft sign-in attempt supersedes Test-only email access.
-    const cookies = [login.cookie];
-    if (emailOnlyAuth) cookies.push(emailOnlyAuth.signOut(request));
-    return reply.header("Set-Cookie", cookies).redirect(login.url);
+    return reply.header("Set-Cookie", login.cookie).redirect(login.url);
   });
   app.get("/auth/callback", async (request, reply) => {
     if (!entraAuth)
@@ -200,9 +188,7 @@ export function buildPrCenterApi(
       );
     try {
       const login = await entraAuth.callback(request);
-      const cookies = [...login.cookie];
-      if (emailOnlyAuth) cookies.push(emailOnlyAuth.signOut(request));
-      return reply.header("Set-Cookie", cookies).redirect(login.redirect);
+      return reply.header("Set-Cookie", login.cookie).redirect(login.redirect);
     } catch (error) {
       request.log.warn(
         {
@@ -212,10 +198,8 @@ export function buildPrCenterApi(
         },
         "OIDC callback failed",
       );
-      const cookies = [...entraAuth.signOut(request)];
-      if (emailOnlyAuth) cookies.push(emailOnlyAuth.signOut(request));
       return reply
-        .header("Set-Cookie", cookies)
+        .header("Set-Cookie", entraAuth.signOut(request))
         .redirect("/rtrdaintranet/prcenter?signin=failed");
     }
   });
@@ -227,20 +211,6 @@ export function buildPrCenterApi(
         "AUTH_UNAVAILABLE",
       );
     return reply.header("Set-Cookie", entraAuth.signOut(request)).status(204).send();
-  });
-  app.post("/session/email", async (request, reply) => {
-    if (!emailOnlyAuth)
-      throw new PrCenterError("Email-only access is disabled", 503, "AUTH_UNAVAILABLE");
-    const input = await body(request);
-    const login = await emailOnlyAuth.signIn(
-      request,
-      typeof input.email === "string" ? input.email : "",
-    );
-    return reply.header("Set-Cookie", login.cookie).send({ role: login.actor.role });
-  });
-  app.delete("/session", async (request, reply) => {
-    if (!emailOnlyAuth) return reply.status(204).send();
-    return reply.header("Set-Cookie", emailOnlyAuth.signOut(request)).status(204).send();
   });
   app.post("/requests", async (request, reply) => {
     const input = await body(request);

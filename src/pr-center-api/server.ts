@@ -6,20 +6,15 @@ const entraEnvFile = process.env.ENTRA_ENV_FILE || "/srv/workspace/rtrda.env";
 if (existsSync(entraEnvFile)) loadEnvFile(entraEnvFile);
 
 async function main() {
-  const [{ buildPrCenterApi }, { createEntraAuth }, { createEmailOnlyAuth }] =
-    await Promise.all([
-      import("./app"),
-      import("./entra-auth"),
-      import("./email-only-auth"),
-    ]);
+  const [{ buildPrCenterApi }, { createEntraAuth }] = await Promise.all([
+    import("./app"),
+    import("./entra-auth"),
+  ]);
   const port = Number(process.env.PR_CENTER_API_PORT || 3100);
   const host = process.env.PR_CENTER_API_HOST || "127.0.0.1";
-  const emailOnlyAuth = createEmailOnlyAuth();
   const entraAuth = createEntraAuth();
   const app = buildPrCenterApi(
-    async (request) =>
-      (await entraAuth?.resolve(request)) || emailOnlyAuth.resolve(request),
-    emailOnlyAuth,
+    async (request) => (await entraAuth?.resolve(request)) || null,
     entraAuth,
   );
   await app.listen({ host, port });
