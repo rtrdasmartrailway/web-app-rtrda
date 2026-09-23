@@ -433,7 +433,6 @@ describe("presentation helpers", () => {
   });
 });
 
-
 it("appends the corruption risk management page to publications", () => {
   const wordpressMenu: WpNavigationItem[] = [
     {

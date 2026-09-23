@@ -93,8 +93,7 @@ export const moralityReportGroups: KnowledgeDocumentGroup[] = [
 
 export const corruptionRiskManagementPath =
   "/เอกสารเผยแพร่/การบริหารจัดการความเสี่ยงการทุจริต";
-export const corruptionRiskManagementTitle =
-  "การบริหารจัดการความเสี่ยงการทุจริต";
+export const corruptionRiskManagementTitle = "การบริหารจัดการความเสี่ยงการทุจริต";
 
 const moralityReportPages = [
   {
