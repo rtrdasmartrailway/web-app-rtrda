@@ -432,3 +432,24 @@ describe("presentation helpers", () => {
     ]);
   });
 });
+
+
+it("appends the corruption risk management page to publications", () => {
+  const wordpressMenu: WpNavigationItem[] = [
+    {
+      label: "เอกสารเผยแพร่",
+      href: "/ เอกสารเผยแพร่",
+      path: "/เอกสารเผยแพร่",
+      external: false,
+      children: [],
+    },
+  ];
+
+  const nav = buildPrimaryNavigation([], "th", "/", wordpressMenu);
+  expect(nav[0].children).toContainEqual(
+    expect.objectContaining({
+      label: "การบริหารจัดการความเสี่ยงการทุจริต",
+      path: "/เอกสารเผยแพร่/การบริหารจัดการความเสี่ยงการทุจริต",
+    }),
+  );
+});

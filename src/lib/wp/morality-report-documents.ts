@@ -91,16 +91,32 @@ export const moralityReportGroups: KnowledgeDocumentGroup[] = [
   },
 ];
 
-export function isMoralityReportPath(path: string): boolean {
-  return normalizeRoutePath(path).normalize("NFC") === moralityReportPath;
-}
+export const corruptionRiskManagementPath =
+  "/เอกสารเผยแพร่/การบริหารจัดการความเสี่ยงการทุจริต";
+export const corruptionRiskManagementTitle =
+  "การบริหารจัดการความเสี่ยงการทุจริต";
 
-export function getMoralityReportPage(path: string) {
-  if (!isMoralityReportPath(path)) return null;
-  return {
+const moralityReportPages = [
+  {
     slug: "morality-report",
     path: moralityReportPath,
     title: moralityReportTitle,
     groups: moralityReportGroups,
-  };
+  },
+  {
+    slug: "corruption-risk-management",
+    path: corruptionRiskManagementPath,
+    title: corruptionRiskManagementTitle,
+    groups: [] as KnowledgeDocumentGroup[],
+  },
+];
+
+export function isMoralityReportPath(path: string): boolean {
+  const normalized = normalizeRoutePath(path).normalize("NFC");
+  return moralityReportPages.some((page) => page.path === normalized);
+}
+
+export function getMoralityReportPage(path: string) {
+  const normalized = normalizeRoutePath(path).normalize("NFC");
+  return moralityReportPages.find((page) => page.path === normalized) ?? null;
 }
