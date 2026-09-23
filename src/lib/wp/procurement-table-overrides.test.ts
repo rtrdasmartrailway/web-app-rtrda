@@ -424,7 +424,7 @@ describe("applyProcurementTableOverrides", () => {
     expect(row.find("td").eq(1).text()).toBe("1 พฤษภาคม 2569");
     expect(row.text()).toContain("40,433,706.00");
     expect(row.find("a").attr("href")).toBe(
-      "/wp-content/uploads/2026/05/procurement-winner-passenger-coach-refurbishment-25690501.pdf",
+      "/wp-content/uploads/2026/05/procurement-winner-passenger-coach-refurbishment-25690501.pdf?v=20260501",
     );
   });
 });
