@@ -106,7 +106,20 @@ const moralityReportPages = [
     slug: "corruption-risk-management",
     path: corruptionRiskManagementPath,
     title: corruptionRiskManagementTitle,
-    groups: [] as KnowledgeDocumentGroup[],
+    groups: [
+      {
+        title:
+          "รายงานการประเมินความเสี่ยงการทุจริต ประจำปีงบประมาณ พ.ศ. 2569 รอบที่ 1 รายงานแผนบริหารจัดการความเสี่ยงการทุจริต",
+        open: true,
+        documents: [],
+      },
+      {
+        title:
+          "รายงานการประเมินความเสี่ยงการทุจริต ประจำปีงบประมาณ พ.ศ. 2569 รอบที่ 2 รายงานผลการดำเนินการตามแผนบริหารจัดการความเสี่ยงการทุจริต",
+        open: true,
+        documents: [],
+      },
+    ] satisfies KnowledgeDocumentGroup[],
   },
 ];
 
