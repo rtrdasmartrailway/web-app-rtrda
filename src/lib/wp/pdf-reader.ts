@@ -79,6 +79,10 @@ function classifyReaderLink(value: string): {
     return { href: path, kind: "upload" };
   }
 
+  if (path.startsWith("/risk-reports/") && hasPdfExtension(path)) {
+    return { href: path, kind: "upload" };
+  }
+
   if (path === RAIL_STRATEGY_PREVIEW_PATH) {
     return { href: path, kind: "upload" };
   }
