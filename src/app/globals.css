@@ -953,6 +953,24 @@ a.language-toggle-item:hover {
   text-decoration: none;
 }
 
+.risk-report-pdf-mobile-link {
+  display: none !important;
+}
+
+@media (max-width: 720px) {
+  .risk-report-pdf-page iframe {
+    display: none;
+  }
+
+  .wp-content .risk-report-pdf-page .risk-report-pdf-desktop-link {
+    display: none;
+  }
+
+  .wp-content .risk-report-pdf-page .risk-report-pdf-mobile-link {
+    display: inline-flex !important;
+  }
+}
+
 .contact-form-cta {
   display: flex;
   justify-content: center;

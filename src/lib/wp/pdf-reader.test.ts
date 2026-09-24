@@ -74,6 +74,26 @@ describe("PDF reader helpers", () => {
     ]);
   });
 
+  it("builds a mobile reader target for direct risk report PDFs", async () => {
+    const targets = await buildPdfReaderTargets(
+      '<a href="/risk-reports/corruption-risk/report-2-2569.pdf?v=20260924-final">รายงานรอบที่ 2</a>',
+      {
+        resolveDownload: async () => null,
+        resolveFlipbookPdf: async () => null,
+      },
+    );
+
+    expect(targets).toEqual([
+      {
+        sourceHref: "/risk-reports/corruption-risk/report-2-2569.pdf",
+        inlineHref: "/risk-reports/corruption-risk/report-2-2569.pdf?inline=1",
+        downloadHref: "/risk-reports/corruption-risk/report-2-2569.pdf",
+        title: "รายงานรอบที่ 2",
+        kind: "upload",
+      },
+    ]);
+  });
+
   it("marks the rail strategy document target as protected", async () => {
     const targets = await buildPdfReaderTargets(
       '<a href="/documents/rail-technology-strategy-2571-2575.pdf">ยุทธศาสตร์</a>',

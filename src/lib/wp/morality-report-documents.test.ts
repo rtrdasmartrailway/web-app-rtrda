@@ -51,14 +51,20 @@ describe("getMoralityReportPage", () => {
   });
 
   it("embeds the first-round PDF in its report page", () => {
-    expect(getMoralityReportPage("/เอกสารเผยแพร่/report_1_2569")?.contentHtml).toContain(
+    const content = getMoralityReportPage("/เอกสารเผยแพร่/report_1_2569")?.contentHtml;
+    expect(content).toContain(
       "/risk-reports/corruption-risk/report-1-2569.pdf?v=20260924",
     );
+    expect(content).toContain('class="risk-report-pdf-mobile-link"');
+    expect(content).toContain('data-pdf-reader-ignore="true"');
   });
 
   it("embeds the second-round PDF in its report page", () => {
-    expect(getMoralityReportPage("/เอกสารเผยแพร่/report_2_2569")?.contentHtml).toContain(
+    const content = getMoralityReportPage("/เอกสารเผยแพร่/report_2_2569")?.contentHtml;
+    expect(content).toContain(
       "/risk-reports/corruption-risk/report-2-2569.pdf?v=20260924-final",
     );
+    expect(content).toContain('class="risk-report-pdf-mobile-link"');
+    expect(content).toContain('data-pdf-reader-ignore="true"');
   });
 });
