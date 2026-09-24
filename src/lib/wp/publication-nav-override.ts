@@ -1,6 +1,11 @@
 import type { WpLanguage } from "./types";
 import type { PresentationNavItem } from "./presentation";
-import { moralityReportPath, moralityReportTitle } from "./morality-report-documents";
+import {
+  corruptionRiskManagementPath,
+  corruptionRiskManagementTitle,
+  moralityReportPath,
+  moralityReportTitle,
+} from "./morality-report-documents";
 import {
   railStrategyPublicationPath,
   railStrategyPublicationTitle,
@@ -27,6 +32,10 @@ export function applyPublicationNavOverride(
     );
     const additions = [
       { label: moralityReportTitle, path: moralityReportPath },
+      {
+        label: corruptionRiskManagementTitle,
+        path: corruptionRiskManagementPath,
+      },
       { label: railStrategyPublicationTitle, path: railStrategyPublicationPath },
     ].filter(
       (addition) => !visibleChildren.some((child) => child.path === addition.path),

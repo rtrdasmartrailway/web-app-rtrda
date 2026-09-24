@@ -91,16 +91,77 @@ export const moralityReportGroups: KnowledgeDocumentGroup[] = [
   },
 ];
 
-export function isMoralityReportPath(path: string): boolean {
-  return normalizeRoutePath(path).normalize("NFC") === moralityReportPath;
+export const corruptionRiskManagementPath =
+  "/เอกสารเผยแพร่/การบริหารจัดการความเสี่ยงการทุจริต";
+export const corruptionRiskManagementTitle = "การบริหารจัดการความเสี่ยงการทุจริต";
+
+const corruptionRiskReportRoundOnePath = "/เอกสารเผยแพร่/report_1_2569";
+const corruptionRiskReportRoundOneTitle =
+  "รายงานการประเมินความเสี่ยงการทุจริต ประจำปีงบประมาณ พ.ศ. 2569 รอบที่ 1 รายงานแผนบริหารจัดการความเสี่ยงการทุจริต";
+const corruptionRiskReportRoundTwoPath = "/เอกสารเผยแพร่/report_2_2569";
+const corruptionRiskReportRoundTwoTitle =
+  "รายงานการประเมินความเสี่ยงการทุจริต ประจำปีงบประมาณ พ.ศ. 2569 รอบที่ 2 รายงานผลการดำเนินการตามแผนบริหารจัดการความเสี่ยงการทุจริต";
+
+const corruptionRiskReportRoundOnePdfPath =
+  "/risk-reports/corruption-risk/report-1-2569.pdf?v=20260924";
+
+interface MoralityReportPage {
+  slug: string;
+  path: string;
+  title: string;
+  groups: KnowledgeDocumentGroup[] | null;
+  contentHtml?: string;
 }
 
-export function getMoralityReportPage(path: string) {
-  if (!isMoralityReportPath(path)) return null;
-  return {
+const moralityReportPages: MoralityReportPage[] = [
+  {
     slug: "morality-report",
     path: moralityReportPath,
     title: moralityReportTitle,
     groups: moralityReportGroups,
-  };
+  },
+  {
+    slug: "corruption-risk-management",
+    path: corruptionRiskManagementPath,
+    title: corruptionRiskManagementTitle,
+    groups: [
+      {
+        title: corruptionRiskReportRoundOneTitle,
+        open: true,
+        contentHeading: "รายงานแผนบริหารจัดการความเสี่ยงการทุจริต",
+        contentHeadingHref: corruptionRiskReportRoundOnePath,
+        documents: [],
+      },
+      {
+        title: corruptionRiskReportRoundTwoTitle,
+        open: true,
+        contentHeading: "รายงานผลการดำเนินการตามแผนบริหารจัดการความเสี่ยงการทุจริต",
+        contentHeadingHref: corruptionRiskReportRoundTwoPath,
+        documents: [],
+      },
+    ] satisfies KnowledgeDocumentGroup[],
+  },
+  {
+    slug: "corruption-risk-report-round-one-2569",
+    path: corruptionRiskReportRoundOnePath,
+    title: corruptionRiskReportRoundOneTitle,
+    groups: null,
+    contentHtml: `<div class="standalone-pdf-page"><p><a href="${corruptionRiskReportRoundOnePdfPath}" target="_blank" rel="noreferrer">เปิด PDF ในแท็บใหม่</a></p><iframe src="${corruptionRiskReportRoundOnePdfPath}#toolbar=1&navpanes=1&view=FitH" title="${corruptionRiskReportRoundOneTitle}" loading="lazy"></iframe></div>`,
+  },
+  {
+    slug: "corruption-risk-report-round-two-2569",
+    path: corruptionRiskReportRoundTwoPath,
+    title: corruptionRiskReportRoundTwoTitle,
+    groups: [],
+  },
+];
+
+export function isMoralityReportPath(path: string): boolean {
+  const normalized = normalizeRoutePath(path).normalize("NFC");
+  return moralityReportPages.some((page) => page.path === normalized);
+}
+
+export function getMoralityReportPage(path: string) {
+  const normalized = normalizeRoutePath(path).normalize("NFC");
+  return moralityReportPages.find((page) => page.path === normalized) ?? null;
 }

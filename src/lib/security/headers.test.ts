@@ -59,11 +59,15 @@ describe("security headers", () => {
     }
   });
 
-  it("overrides clickjacking denial after the global route for mirrored assets", async () => {
+  it("overrides clickjacking denial for public documents framed by the same origin", async () => {
     const routes = await nextConfig.headers?.();
     const globalIndex = routes?.findIndex((route) => route.source === "/:path*") ?? -1;
 
-    for (const source of ["/wp-content/uploads/:path*", "/sdc-downloads/:path*"]) {
+    for (const source of [
+      "/wp-content/uploads/:path*",
+      "/sdc-downloads/:path*",
+      "/risk-reports/:path*",
+    ]) {
       const routeIndex = routes?.findIndex((route) => route.source === source) ?? -1;
       expect(routeIndex).toBeGreaterThan(globalIndex);
       const route = routes?.[routeIndex];

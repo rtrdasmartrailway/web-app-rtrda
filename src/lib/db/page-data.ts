@@ -389,7 +389,7 @@ export const getPageData = cache(async (path: string): Promise<PageData | null> 
             path: moralityReportPage!.path,
             title: moralityReportPage!.title,
             groups: moralityReportPage!.groups,
-            contentHtml: "",
+            contentHtml: moralityReportPage!.contentHtml ?? "",
             parentTitle: "เอกสารเผยแพร่",
             parentPath: "/เอกสารเผยแพร่",
             idPrefix: "morality-report",
