@@ -103,7 +103,7 @@ const corruptionRiskReportRoundTwoTitle =
   "รายงานการประเมินความเสี่ยงการทุจริต ประจำปีงบประมาณ พ.ศ. 2569 รอบที่ 2 รายงานผลการดำเนินการตามแผนบริหารจัดการความเสี่ยงการทุจริต";
 
 const corruptionRiskReportRoundOnePdfPath =
-  "/risk-reports/corruption-risk/report-1-2569.pdf";
+  "/risk-reports/corruption-risk/report-1-2569.pdf?v=20260924";
 
 interface MoralityReportPage {
   slug: string;

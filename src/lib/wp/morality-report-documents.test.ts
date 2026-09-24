@@ -52,7 +52,7 @@ describe("getMoralityReportPage", () => {
 
   it("embeds the first-round PDF in its report page", () => {
     expect(getMoralityReportPage("/เอกสารเผยแพร่/report_1_2569")?.contentHtml).toContain(
-      "/risk-reports/corruption-risk/report-1-2569.pdf",
+      "/risk-reports/corruption-risk/report-1-2569.pdf?v=20260924",
     );
   });
 });
