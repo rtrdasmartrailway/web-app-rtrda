@@ -10,6 +10,7 @@ import { DownloadCaptcha } from "./download-captcha";
 import { HighSpeedRailStandardsContent } from "./high-speed-rail-standards";
 import { HomeHeroSlider } from "./home-hero-slider";
 import { HomeSections } from "./home/home-sections";
+import { InlineRiskReportPdf } from "./inline-risk-report-pdf";
 import { KnowledgeDocuments } from "./knowledge-documents";
 import { PdfReader } from "./pdf-reader";
 import { SiteShell } from "./site-shell";
@@ -98,6 +99,9 @@ export function ContentPage({ data }: { data: PageData }) {
   } = data;
   const isHome = record.path === "/" || record.path === "/en";
   const isCategory = record.kind === "category";
+  const inlineRiskReportTarget = data.pdfReaderTargets.find((target) =>
+    target.sourceHref.startsWith("/risk-reports/"),
+  );
   const dateText = formatDate(record.date, record.language);
   const routeClass = contentRouteClass(record.path);
   const pageClassName = [
@@ -148,6 +152,23 @@ export function ContentPage({ data }: { data: PageData }) {
               <HomeSections home={data.home} language={record.language} />
             ) : isRailStandardsPath(record.path) ? (
               <HighSpeedRailStandardsContent html={record.contentHtml} />
+            ) : inlineRiskReportTarget ? (
+              <>
+                <div className="risk-report-pdf-desktop">
+                  <div
+                    className="wp-content"
+                    dangerouslySetInnerHTML={{
+                      __html: normalizeWpContentHtml(record.contentHtml),
+                    }}
+                  />
+                </div>
+                <div className="risk-report-pdf-mobile">
+                  <InlineRiskReportPdf
+                    target={inlineRiskReportTarget}
+                    title={record.title}
+                  />
+                </div>
+              </>
             ) : data.knowledgeDocuments ? (
               <KnowledgeDocuments
                 groups={data.knowledgeDocuments}

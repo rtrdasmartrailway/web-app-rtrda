@@ -107,6 +107,10 @@ const corruptionRiskReportRoundOnePdfPath =
 const corruptionRiskReportRoundTwoPdfPath =
   "/risk-reports/corruption-risk/report-2-2569.pdf?v=20260924-final";
 
+function riskReportPdfContent(title: string, pdfPath: string): string {
+  return `<div class="standalone-pdf-page"><p><a href="${pdfPath}" target="_blank" rel="noreferrer" data-pdf-reader-ignore="true">เปิด PDF ในแท็บใหม่</a></p><iframe src="${pdfPath}#toolbar=1&navpanes=1&view=FitH" title="${title}" loading="lazy"></iframe></div>`;
+}
+
 interface MoralityReportPage {
   slug: string;
   path: string;
@@ -148,14 +152,20 @@ const moralityReportPages: MoralityReportPage[] = [
     path: corruptionRiskReportRoundOnePath,
     title: corruptionRiskReportRoundOneTitle,
     groups: null,
-    contentHtml: `<div class="standalone-pdf-page"><p><a href="${corruptionRiskReportRoundOnePdfPath}" target="_blank" rel="noreferrer">เปิด PDF ในแท็บใหม่</a></p><iframe src="${corruptionRiskReportRoundOnePdfPath}#toolbar=1&navpanes=1&view=FitH" title="${corruptionRiskReportRoundOneTitle}" loading="lazy"></iframe></div>`,
+    contentHtml: riskReportPdfContent(
+      corruptionRiskReportRoundOneTitle,
+      corruptionRiskReportRoundOnePdfPath,
+    ),
   },
   {
     slug: "corruption-risk-report-round-two-2569",
     path: corruptionRiskReportRoundTwoPath,
     title: corruptionRiskReportRoundTwoTitle,
     groups: null,
-    contentHtml: `<div class="standalone-pdf-page"><p><a href="${corruptionRiskReportRoundTwoPdfPath}" target="_blank" rel="noreferrer">เปิด PDF ในแท็บใหม่</a></p><iframe src="${corruptionRiskReportRoundTwoPdfPath}#toolbar=1&navpanes=1&view=FitH" title="${corruptionRiskReportRoundTwoTitle}" loading="lazy"></iframe></div>`,
+    contentHtml: riskReportPdfContent(
+      corruptionRiskReportRoundTwoTitle,
+      corruptionRiskReportRoundTwoPdfPath,
+    ),
   },
 ];
 

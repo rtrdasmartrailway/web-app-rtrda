@@ -395,6 +395,13 @@ export const getPageData = cache(async (path: string): Promise<PageData | null> 
             idPrefix: "morality-report",
           };
 
+    const syntheticPdfReaderTargets = moralityReportPage
+      ? await buildPdfReaderTargets(syntheticPage.contentHtml, {
+          resolveDownload: async () => null,
+          resolveFlipbookPdf: async () => null,
+        })
+      : [];
+
     const shell = await buildShellData(path);
     const now = new Date().toISOString();
     const record: WpContentRecord = {
@@ -427,7 +434,7 @@ export const getPageData = cache(async (path: string): Promise<PageData | null> 
       home: null,
       knowledgeDocuments: syntheticPage.groups,
       boardExecutivePresentation: null,
-      pdfReaderTargets: [],
+      pdfReaderTargets: syntheticPdfReaderTargets,
       sidebarItems: syntheticSidebarItems,
       parentTitle: syntheticPage.parentTitle,
       shell,

@@ -953,6 +953,101 @@ a.language-toggle-item:hover {
   text-decoration: none;
 }
 
+.risk-report-pdf-mobile {
+  display: none;
+}
+
+.inline-risk-report {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+}
+
+.inline-risk-report-toolbar {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: space-between;
+}
+
+.inline-risk-report-toolbar span {
+  color: var(--text-muted);
+  font-size: calc(14px * var(--reader-scale));
+  font-weight: 700;
+}
+
+.inline-risk-report-toolbar a {
+  background: linear-gradient(135deg, #0f3d6e 0%, #006bb8 55%, #00a6c8 100%);
+  border-radius: 999px;
+  box-shadow: var(--shadow-card);
+  color: #fff;
+  display: inline-flex;
+  font-weight: 800;
+  justify-content: center;
+  padding: 10px 18px;
+  text-decoration: none;
+}
+
+.inline-risk-report-pages {
+  display: grid;
+  gap: 14px;
+  min-width: 0;
+}
+
+.inline-risk-report-page {
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-card);
+  min-width: 0;
+  overflow: hidden;
+  width: 100%;
+}
+
+.inline-risk-report-page canvas {
+  display: block;
+  height: auto;
+  max-width: 100%;
+}
+
+.inline-risk-report-status,
+.inline-risk-report-error {
+  color: var(--text-muted);
+  font-weight: 700;
+  margin: 0;
+  padding: 12px 0;
+  text-align: center;
+}
+
+.inline-risk-report-error {
+  color: #b42318;
+}
+
+@media (min-width: 721px) {
+  .inline-risk-report {
+    display: none;
+  }
+}
+
+@media (max-width: 720px) {
+  .risk-report-pdf-desktop {
+    display: none;
+  }
+
+  .risk-report-pdf-mobile {
+    display: block;
+  }
+
+  .inline-risk-report-toolbar {
+    align-items: stretch;
+  }
+
+  .inline-risk-report-toolbar a {
+    flex: 0 0 auto;
+  }
+}
+
 .contact-form-cta {
   display: flex;
   justify-content: center;
