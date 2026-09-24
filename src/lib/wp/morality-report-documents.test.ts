@@ -55,7 +55,8 @@ describe("getMoralityReportPage", () => {
     expect(content).toContain(
       "/risk-reports/corruption-risk/report-1-2569.pdf?v=20260924",
     );
-    expect(content).toContain('class="risk-report-pdf-mobile-link"');
+    expect(content).toContain('<div class="standalone-pdf-page">');
+    expect(content).toContain("<iframe");
     expect(content).toContain('data-pdf-reader-ignore="true"');
   });
 
@@ -64,7 +65,8 @@ describe("getMoralityReportPage", () => {
     expect(content).toContain(
       "/risk-reports/corruption-risk/report-2-2569.pdf?v=20260924-final",
     );
-    expect(content).toContain('class="risk-report-pdf-mobile-link"');
+    expect(content).toContain('<div class="standalone-pdf-page">');
+    expect(content).toContain("<iframe");
     expect(content).toContain('data-pdf-reader-ignore="true"');
   });
 });

@@ -108,7 +108,7 @@ const corruptionRiskReportRoundTwoPdfPath =
   "/risk-reports/corruption-risk/report-2-2569.pdf?v=20260924-final";
 
 function riskReportPdfContent(title: string, pdfPath: string): string {
-  return `<div class="standalone-pdf-page risk-report-pdf-page"><p><a class="risk-report-pdf-desktop-link" href="${pdfPath}" target="_blank" rel="noreferrer" data-pdf-reader-ignore="true">เปิด PDF ในแท็บใหม่</a><a class="risk-report-pdf-mobile-link" href="${pdfPath}">เปิดอ่าน PDF</a></p><iframe src="${pdfPath}#toolbar=1&navpanes=1&view=FitH" title="${title}" loading="lazy"></iframe></div>`;
+  return `<div class="standalone-pdf-page"><p><a href="${pdfPath}" target="_blank" rel="noreferrer" data-pdf-reader-ignore="true">เปิด PDF ในแท็บใหม่</a></p><iframe src="${pdfPath}#toolbar=1&navpanes=1&view=FitH" title="${title}" loading="lazy"></iframe></div>`;
 }
 
 interface MoralityReportPage {
