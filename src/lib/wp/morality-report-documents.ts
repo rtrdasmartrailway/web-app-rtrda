@@ -111,12 +111,14 @@ const moralityReportPages = [
         title:
           "รายงานการประเมินความเสี่ยงการทุจริต ประจำปีงบประมาณ พ.ศ. 2569 รอบที่ 1 รายงานแผนบริหารจัดการความเสี่ยงการทุจริต",
         open: true,
+        collapsible: false,
         documents: [],
       },
       {
         title:
           "รายงานการประเมินความเสี่ยงการทุจริต ประจำปีงบประมาณ พ.ศ. 2569 รอบที่ 2 รายงานผลการดำเนินการตามแผนบริหารจัดการความเสี่ยงการทุจริต",
         open: true,
+        collapsible: false,
         documents: [],
       },
     ] satisfies KnowledgeDocumentGroup[],

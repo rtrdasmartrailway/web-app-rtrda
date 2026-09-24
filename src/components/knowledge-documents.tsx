@@ -170,28 +170,51 @@ export function KnowledgeDocuments({
     <div className={`wp-content ${styles.root}`}>
       {groups.map((group) => (
         <section className={styles.group} key={group.title}>
-          <details open={group.open}>
-            <summary className={styles.summary}>
-              <span>{group.title}</span>
-            </summary>
-            {group.infographics?.length ? (
-              <KnowledgeInfographics infographics={group.infographics} />
-            ) : group.documents.length > 0 ? (
-              <div
-                className={
-                  group.compact ? `${styles.grid} ${styles.compactGrid}` : styles.grid
-                }
-              >
-                {group.documents.map((document, index) => (
-                  <KnowledgeDocumentCard
-                    key={`${group.title}-${document.title}-${index}`}
-                    document={document}
-                    language={language}
-                  />
-                ))}
-              </div>
-            ) : null}
-          </details>
+          {group.collapsible === false ? (
+            <div className={styles.staticGroup}>
+              <h2 className={styles.heading}>{group.title}</h2>
+              {group.infographics?.length ? (
+                <KnowledgeInfographics infographics={group.infographics} />
+              ) : group.documents.length > 0 ? (
+                <div
+                  className={
+                    group.compact ? `${styles.grid} ${styles.compactGrid}` : styles.grid
+                  }
+                >
+                  {group.documents.map((document, index) => (
+                    <KnowledgeDocumentCard
+                      key={`${group.title}-${document.title}-${index}`}
+                      document={document}
+                      language={language}
+                    />
+                  ))}
+                </div>
+              ) : null}
+            </div>
+          ) : (
+            <details open={group.open}>
+              <summary className={styles.summary}>
+                <span>{group.title}</span>
+              </summary>
+              {group.infographics?.length ? (
+                <KnowledgeInfographics infographics={group.infographics} />
+              ) : group.documents.length > 0 ? (
+                <div
+                  className={
+                    group.compact ? `${styles.grid} ${styles.compactGrid}` : styles.grid
+                  }
+                >
+                  {group.documents.map((document, index) => (
+                    <KnowledgeDocumentCard
+                      key={`${group.title}-${document.title}-${index}`}
+                      document={document}
+                      language={language}
+                    />
+                  ))}
+                </div>
+              ) : null}
+            </details>
+          )}
         </section>
       ))}
     </div>
