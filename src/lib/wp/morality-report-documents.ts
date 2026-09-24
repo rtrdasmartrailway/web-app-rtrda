@@ -105,7 +105,7 @@ const corruptionRiskReportRoundTwoTitle =
 const corruptionRiskReportRoundOnePdfPath =
   "/risk-reports/corruption-risk/report-1-2569.pdf?v=20260924";
 const corruptionRiskReportRoundTwoPdfPath =
-  "/risk-reports/corruption-risk/report-2-2569.pdf?v=20260924";
+  "/risk-reports/corruption-risk/report-2-2569.pdf?v=20260924-final";
 
 interface MoralityReportPage {
   slug: string;
