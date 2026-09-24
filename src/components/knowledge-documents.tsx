@@ -174,6 +174,15 @@ export function KnowledgeDocuments({
             <summary className={styles.summary}>
               <span>{group.title}</span>
             </summary>
+            {group.contentHeading ? (
+              <h2 className={styles.contentHeading}>
+                {group.contentHeadingHref ? (
+                  <a href={group.contentHeadingHref}>{group.contentHeading}</a>
+                ) : (
+                  group.contentHeading
+                )}
+              </h2>
+            ) : null}
             {group.infographics?.length ? (
               <KnowledgeInfographics infographics={group.infographics} />
             ) : group.documents.length > 0 ? (
