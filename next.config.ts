@@ -40,10 +40,14 @@ const nextConfig: NextConfig = {
           ...SECURITY_HEADERS,
         ],
       },
-      // Mirrored documents and media may be framed by the same RTRDA origin.
+      // Public documents and media may be framed by the same RTRDA origin.
       // These later rules override only the global frame denial while keeping
       // third-party framing blocked and preserving bounded CDN caching.
-      ...["/wp-content/uploads/:path*", "/sdc-downloads/:path*"].map((source) => ({
+      ...[
+        "/wp-content/uploads/:path*",
+        "/sdc-downloads/:path*",
+        "/risk-reports/:path*",
+      ].map((source) => ({
         source,
         headers: [
           { key: "Cache-Control", value: "public, max-age=14400, s-maxage=86400" },
