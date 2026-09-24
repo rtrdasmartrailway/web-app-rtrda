@@ -16,12 +16,15 @@
 }
 
 .contentHeading {
+  background: var(--surface-muted);
+  border-left: 4px solid var(--accent);
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
   color: var(--navy-900);
-  font-size: calc(19px * var(--reader-scale));
+  font-size: calc(17px * var(--reader-scale));
   font-weight: 800;
-  line-height: 1.35;
-  margin: 0;
-  padding: 20px 28px 0;
+  line-height: 1.5;
+  margin: 20px 28px 0;
+  padding: 14px 18px;
 }
 
 .summary {
@@ -36,6 +39,16 @@
   line-height: 1.35;
   list-style: none;
   padding: 18px 22px;
+  transition: background-color 150ms ease;
+}
+
+.summary:hover {
+  background: var(--navy-800);
+}
+
+.summary:focus-visible {
+  outline: 3px solid var(--accent);
+  outline-offset: -3px;
 }
 
 .summary::-webkit-details-marker {
@@ -224,7 +237,8 @@
   }
 
   .contentHeading {
-    padding: 18px 18px 0;
+    margin: 16px 18px 0;
+    padding: 12px 14px;
   }
 
   .grid {
