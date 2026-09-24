@@ -23,6 +23,7 @@ export interface KnowledgeDocumentGroup {
   title: string;
   open: boolean;
   contentHeading?: string;
+  contentHeadingHref?: string;
   compact?: boolean;
   documents: KnowledgeDocument[];
   infographics?: KnowledgeInfographic[];

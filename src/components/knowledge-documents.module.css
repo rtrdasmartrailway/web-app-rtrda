@@ -33,6 +33,17 @@
   display: none;
 }
 
+.root .contentHeading a {
+  color: inherit;
+  text-decoration: none;
+  text-underline-offset: 4px;
+}
+
+.root .contentHeading a:hover,
+.root .contentHeading a:focus-visible {
+  text-decoration: underline;
+}
+
 .summary {
   align-items: center;
   background: var(--navy-900);

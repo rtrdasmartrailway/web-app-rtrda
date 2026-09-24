@@ -95,6 +95,13 @@ export const corruptionRiskManagementPath =
   "/เอกสารเผยแพร่/การบริหารจัดการความเสี่ยงการทุจริต";
 export const corruptionRiskManagementTitle = "การบริหารจัดการความเสี่ยงการทุจริต";
 
+const corruptionRiskReportRoundOnePath = "/เอกสารเผยแพร่/report_1_2569";
+const corruptionRiskReportRoundOneTitle =
+  "รายงานการประเมินความเสี่ยงการทุจริต ประจำปีงบประมาณ พ.ศ. 2569 รอบที่ 1 รายงานแผนบริหารจัดการความเสี่ยงการทุจริต";
+const corruptionRiskReportRoundTwoPath = "/เอกสารเผยแพร่/report_2_2569";
+const corruptionRiskReportRoundTwoTitle =
+  "รายงานการประเมินความเสี่ยงการทุจริต ประจำปีงบประมาณ พ.ศ. 2569 รอบที่ 2 รายงานผลการดำเนินการตามแผนบริหารจัดการความเสี่ยงการทุจริต";
+
 const moralityReportPages = [
   {
     slug: "morality-report",
@@ -108,20 +115,32 @@ const moralityReportPages = [
     title: corruptionRiskManagementTitle,
     groups: [
       {
-        title:
-          "รายงานการประเมินความเสี่ยงการทุจริต ประจำปีงบประมาณ พ.ศ. 2569 รอบที่ 1 รายงานแผนบริหารจัดการความเสี่ยงการทุจริต",
+        title: corruptionRiskReportRoundOneTitle,
         open: true,
         contentHeading: "รายงานแผนบริหารจัดการความเสี่ยงการทุจริต",
+        contentHeadingHref: corruptionRiskReportRoundOnePath,
         documents: [],
       },
       {
-        title:
-          "รายงานการประเมินความเสี่ยงการทุจริต ประจำปีงบประมาณ พ.ศ. 2569 รอบที่ 2 รายงานผลการดำเนินการตามแผนบริหารจัดการความเสี่ยงการทุจริต",
+        title: corruptionRiskReportRoundTwoTitle,
         open: true,
         contentHeading: "รายงานผลการดำเนินการตามแผนบริหารจัดการความเสี่ยงการทุจริต",
+        contentHeadingHref: corruptionRiskReportRoundTwoPath,
         documents: [],
       },
     ] satisfies KnowledgeDocumentGroup[],
+  },
+  {
+    slug: "corruption-risk-report-round-one-2569",
+    path: corruptionRiskReportRoundOnePath,
+    title: corruptionRiskReportRoundOneTitle,
+    groups: [] satisfies KnowledgeDocumentGroup[],
+  },
+  {
+    slug: "corruption-risk-report-round-two-2569",
+    path: corruptionRiskReportRoundTwoPath,
+    title: corruptionRiskReportRoundTwoTitle,
+    groups: [] satisfies KnowledgeDocumentGroup[],
   },
 ];
 
