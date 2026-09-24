@@ -60,10 +60,13 @@ export function InlineRiskReportPdf({
           const page = pageNumber === 1 ? firstPage : await document.getPage(pageNumber);
           if (cancelled) return;
 
-          const baseViewport = pageNumber === 1 ? firstViewport : page.getViewport({ scale: 1 });
+          const baseViewport =
+            pageNumber === 1 ? firstViewport : page.getViewport({ scale: 1 });
           const width = Math.max(1, pages.clientWidth - 24);
           const pixelRatio = Math.min(window.devicePixelRatio || 1, 2);
-          const viewport = page.getViewport({ scale: (width / baseViewport.width) * pixelRatio });
+          const viewport = page.getViewport({
+            scale: (width / baseViewport.width) * pixelRatio,
+          });
           const canvas = window.document.createElement("canvas");
           const context = canvas.getContext("2d");
           if (!context) throw new Error("Canvas unavailable");
