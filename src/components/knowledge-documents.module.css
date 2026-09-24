@@ -15,22 +15,13 @@
   overflow: hidden;
 }
 
-.staticGroup {
-  background: #fff;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  box-shadow: var(--shadow-card);
-  overflow: hidden;
-}
-
-.heading {
-  background: var(--navy-900);
-  color: #fff;
+.contentHeading {
+  color: var(--navy-900);
   font-size: calc(19px * var(--reader-scale));
   font-weight: 800;
   line-height: 1.35;
   margin: 0;
-  padding: 18px 22px;
+  padding: 20px 28px 0;
 }
 
 .summary {
@@ -228,9 +219,12 @@
 }
 
 @media (max-width: 720px) {
-  .summary,
-  .heading {
+  .summary {
     padding: 16px 18px;
+  }
+
+  .contentHeading {
+    padding: 18px 18px 0;
   }
 
   .grid {

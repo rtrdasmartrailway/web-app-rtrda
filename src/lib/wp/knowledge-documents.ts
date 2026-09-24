@@ -22,7 +22,7 @@ export interface KnowledgeInfographic {
 export interface KnowledgeDocumentGroup {
   title: string;
   open: boolean;
-  collapsible?: boolean;
+  contentHeading?: string;
   compact?: boolean;
   documents: KnowledgeDocument[];
   infographics?: KnowledgeInfographic[];
