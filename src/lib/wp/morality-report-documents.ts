@@ -104,6 +104,8 @@ const corruptionRiskReportRoundTwoTitle =
 
 const corruptionRiskReportRoundOnePdfPath =
   "/risk-reports/corruption-risk/report-1-2569.pdf?v=20260924";
+const corruptionRiskReportRoundTwoPdfPath =
+  "/risk-reports/corruption-risk/report-2-2569.pdf?v=20260924";
 
 interface MoralityReportPage {
   slug: string;
@@ -152,7 +154,8 @@ const moralityReportPages: MoralityReportPage[] = [
     slug: "corruption-risk-report-round-two-2569",
     path: corruptionRiskReportRoundTwoPath,
     title: corruptionRiskReportRoundTwoTitle,
-    groups: [],
+    groups: null,
+    contentHtml: `<div class="standalone-pdf-page"><p><a href="${corruptionRiskReportRoundTwoPdfPath}" target="_blank" rel="noreferrer">เปิด PDF ในแท็บใหม่</a></p><iframe src="${corruptionRiskReportRoundTwoPdfPath}#toolbar=1&navpanes=1&view=FitH" title="${corruptionRiskReportRoundTwoTitle}" loading="lazy"></iframe></div>`,
   },
 ];
 
