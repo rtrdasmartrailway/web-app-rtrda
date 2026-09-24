@@ -34,17 +34,25 @@ describe("getMoralityReportPage", () => {
       path: "/เอกสารเผยแพร่/report_1_2569",
       title:
         "รายงานการประเมินความเสี่ยงการทุจริต ประจำปีงบประมาณ พ.ศ. 2569 รอบที่ 1 รายงานแผนบริหารจัดการความเสี่ยงการทุจริต",
+      groups: null,
     },
     {
       path: "/เอกสารเผยแพร่/report_2_2569",
       title:
         "รายงานการประเมินความเสี่ยงการทุจริต ประจำปีงบประมาณ พ.ศ. 2569 รอบที่ 2 รายงานผลการดำเนินการตามแผนบริหารจัดการความเสี่ยงการทุจริต",
+      groups: [],
     },
-  ])("creates an empty report page at $path", ({ path, title }) => {
+  ])("creates a report page at $path", ({ path, title, groups }) => {
     expect(getMoralityReportPage(path)).toMatchObject({
       path,
       title,
-      groups: [],
+      groups,
     });
+  });
+
+  it("embeds the first-round PDF in its report page", () => {
+    expect(getMoralityReportPage("/เอกสารเผยแพร่/report_1_2569")?.contentHtml).toContain(
+      "/risk-reports/corruption-risk/report-1-2569.pdf",
+    );
   });
 });

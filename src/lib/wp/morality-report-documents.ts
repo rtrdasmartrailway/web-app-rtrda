@@ -102,7 +102,18 @@ const corruptionRiskReportRoundTwoPath = "/เอกสารเผยแพร�
 const corruptionRiskReportRoundTwoTitle =
   "รายงานการประเมินความเสี่ยงการทุจริต ประจำปีงบประมาณ พ.ศ. 2569 รอบที่ 2 รายงานผลการดำเนินการตามแผนบริหารจัดการความเสี่ยงการทุจริต";
 
-const moralityReportPages = [
+const corruptionRiskReportRoundOnePdfPath =
+  "/risk-reports/corruption-risk/report-1-2569.pdf";
+
+interface MoralityReportPage {
+  slug: string;
+  path: string;
+  title: string;
+  groups: KnowledgeDocumentGroup[] | null;
+  contentHtml?: string;
+}
+
+const moralityReportPages: MoralityReportPage[] = [
   {
     slug: "morality-report",
     path: moralityReportPath,
@@ -134,13 +145,14 @@ const moralityReportPages = [
     slug: "corruption-risk-report-round-one-2569",
     path: corruptionRiskReportRoundOnePath,
     title: corruptionRiskReportRoundOneTitle,
-    groups: [] satisfies KnowledgeDocumentGroup[],
+    groups: null,
+    contentHtml: `<div class="standalone-pdf-page"><p><a href="${corruptionRiskReportRoundOnePdfPath}" target="_blank" rel="noreferrer">เปิด PDF ในแท็บใหม่</a></p><iframe src="${corruptionRiskReportRoundOnePdfPath}#toolbar=1&navpanes=1&view=FitH" title="${corruptionRiskReportRoundOneTitle}" loading="lazy"></iframe></div>`,
   },
   {
     slug: "corruption-risk-report-round-two-2569",
     path: corruptionRiskReportRoundTwoPath,
     title: corruptionRiskReportRoundTwoTitle,
-    groups: [] satisfies KnowledgeDocumentGroup[],
+    groups: [],
   },
 ];
 
