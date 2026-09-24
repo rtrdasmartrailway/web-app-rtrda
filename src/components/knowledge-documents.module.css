@@ -15,16 +15,22 @@
   overflow: hidden;
 }
 
-.contentHeading {
+.root .contentHeading {
   background: var(--surface-muted);
   border-left: 4px solid var(--accent);
   border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+  border-bottom: 0;
   color: var(--navy-900);
   font-size: calc(17px * var(--reader-scale));
   font-weight: 800;
   line-height: 1.5;
-  margin: 20px 28px 0;
+  margin: 16px 24px;
   padding: 14px 18px;
+  position: static;
+}
+
+.root .contentHeading::after {
+  display: none;
 }
 
 .summary {
@@ -236,8 +242,8 @@
     padding: 16px 18px;
   }
 
-  .contentHeading {
-    margin: 16px 18px 0;
+  .root .contentHeading {
+    margin: 14px 16px;
     padding: 12px 14px;
   }
 
