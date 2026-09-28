@@ -75,7 +75,11 @@ function classifyReaderLink(value: string): {
     return { href: canonicalDownloadHref(downloadId), kind: "download" };
   }
 
-  if (path.startsWith("/wp-content/uploads/") && hasPdfExtension(path)) {
+  if (
+    (path.startsWith("/wp-content/uploads/") ||
+      path.startsWith("/recruitment-documents/")) &&
+    hasPdfExtension(path)
+  ) {
     return { href: path, kind: "upload" };
   }
 

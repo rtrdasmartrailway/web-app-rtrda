@@ -74,6 +74,28 @@ describe("PDF reader helpers", () => {
     ]);
   });
 
+  it("builds a reader target for recruitment PDFs", async () => {
+    const targets = await buildPdfReaderTargets(
+      '<a href="/recruitment-documents/recruitment-policy-planning-support-2569.pdf">PDF</a>',
+      {
+        resolveDownload: async () => null,
+        resolveFlipbookPdf: async () => null,
+      },
+    );
+
+    expect(targets).toEqual([
+      {
+        sourceHref: "/recruitment-documents/recruitment-policy-planning-support-2569.pdf",
+        inlineHref:
+          "/recruitment-documents/recruitment-policy-planning-support-2569.pdf?inline=1",
+        downloadHref:
+          "/recruitment-documents/recruitment-policy-planning-support-2569.pdf",
+        title: "PDF",
+        kind: "upload",
+      },
+    ]);
+  });
+
   it("builds a mobile reader target for direct risk report PDFs", async () => {
     const targets = await buildPdfReaderTargets(
       '<a href="/risk-reports/corruption-risk/report-2-2569.pdf?v=20260924-final">รายงานรอบที่ 2</a>',
