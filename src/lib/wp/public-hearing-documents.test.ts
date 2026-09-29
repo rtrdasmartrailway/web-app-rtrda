@@ -31,14 +31,14 @@ function record(overrides: Partial<WpContentRecord> = {}): WpContentRecord {
 describe("public hearing document card", () => {
   it("renders the 2569 document as a knowledge-style card with preview and download", async () => {
     const updated = applyPublicHearingDocumentsOverride(record({}));
-    const groups = buildKnowledgeDocumentGroups(updated.contentHtml);
+    const groups = buildKnowledgeDocumentGroups(updated.contentHtml, { compact: true });
     const targets = await buildPdfReaderTargets(updated.contentHtml, {
       resolveDownload: async () => null,
       resolveFlipbookPdf: async () => null,
     });
 
     expect(groups).toHaveLength(1);
-    expect(groups[0]).toMatchObject({ title: "2569" });
+    expect(groups[0]).toMatchObject({ title: "2569", compact: true });
     expect(groups[0].documents[0]).toMatchObject({
       title: "สทร.-SS-1001:2569",
       description:

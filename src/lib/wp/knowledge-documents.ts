@@ -32,6 +32,7 @@ export interface KnowledgeDocumentGroup {
 export interface KnowledgeDocumentParseOptions {
   validDownloadIds?: Set<string>;
   excludedGroupTitles?: Set<string>;
+  compact?: boolean;
 }
 
 export function isKnowledgeDocumentPath(path: string): boolean {
@@ -331,6 +332,7 @@ export function buildKnowledgeDocumentGroups(
     groups.push({
       title,
       open: $details.attr("open") !== undefined,
+      ...(options.compact ? { compact: true } : {}),
       documents: normalizedDocuments,
     });
   });

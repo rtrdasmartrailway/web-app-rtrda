@@ -522,6 +522,7 @@ export const getPageData = cache(async (path: string): Promise<PageData | null> 
       : isKnowledgeDocuments
         ? buildKnowledgeDocumentGroups(recordWithOverrides.contentHtml, {
             validDownloadIds: new Set(downloadIds),
+            compact: isPublicHearingPath(recordWithOverrides.path),
             excludedGroupTitles:
               recordWithOverrides.path === "/คลังความรู้"
                 ? new Set(["มาตรฐานระบบราง สทร.", "ร่างมาตรฐานระบบราง สทร."])
