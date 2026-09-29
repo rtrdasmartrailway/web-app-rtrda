@@ -58,12 +58,20 @@ function rows(html: string, accordionIndex: number): string[][] {
 }
 
 describe("applyProcurementWinnerOverride", () => {
-  it("prepends the new 2569 winner rows and numbers bottom-up", () => {
+  it("prepends the 2569 winner rows and numbers bottom-up", () => {
     const updated = applyProcurementWinnerOverride(record({}));
     const year2026Rows = rows(updated.contentHtml, 0);
 
-    expect(year2026Rows).toHaveLength(4);
+    expect(year2026Rows).toHaveLength(5);
     expect(year2026Rows[0]).toEqual([
+      "5",
+      "29 กันยายน 2569",
+      "ประกาศผู้ชนะการเสนอราคา งานจ้างที่ปรึกษาโครงการศึกษาพัฒนา Algorithm เพื่อตรวจจับและแจ้งเตือนการฝ่าฝืนไม้กั้นทางรถไฟ ณ จุดตัดทางรถไฟแนวระดับ โดยวิธีจ้างที่ปรึกษาโดยวิธีเฉพาะเจาะจง",
+      "1,695,000.00",
+      "–",
+      "PDF",
+    ]);
+    expect(year2026Rows[1]).toEqual([
       "4",
       "10 กรกฎาคม 2569",
       "เรื่อง ประกาศผู้ชนะการเสนอราคา จ้างเหมาบริการจัดงานพิธีทำบุญวันสถาปนา สถาบันวิจัยและพัฒนาเทคโนโลยีระบบราง (องค์การมหาชน) ครบรอบ 5 ปี โดยวิธีเฉพาะเจาะจง",
@@ -71,7 +79,7 @@ describe("applyProcurementWinnerOverride", () => {
       "–",
       "PDF",
     ]);
-    expect(year2026Rows[1]).toEqual([
+    expect(year2026Rows[2]).toEqual([
       "3",
       "25 มิถุนายน 2569",
       "เรื่อง ประกาศผู้ชนะการเสนอราคา จัดซื้อซอฟต์แวร์การออกแบบใช้คอมพิวเตอร์ช่วย (CAD Computer Aided Design) ด้วยโปรแกรม CATIA พร้อมติดตั้ง โดยวิธีประกวดราคาอิเล็กทรอนิกส์ (e-bidding)",
@@ -79,22 +87,38 @@ describe("applyProcurementWinnerOverride", () => {
       "–",
       "PDF",
     ]);
-    expect(year2026Rows.map((row) => row[0])).toEqual(["4", "3", "2", "1"]);
-    expect(year2026Rows[2]?.[2]).toBe("รายการเดิมแรก");
+    expect(year2026Rows.map((row) => row[0])).toEqual(["5", "4", "3", "2", "1"]);
+    expect(year2026Rows[3]?.[2]).toBe("รายการเดิมแรก");
   });
 
   it("links the 10 July row to the local PDF file", () => {
     const updated = applyProcurementWinnerOverride(record({}));
     const $ = cheerio.load(updated.contentHtml, null, false);
-    const firstRowLink = $(".lightweight-accordion")
+    const julyRowLink = $(".lightweight-accordion")
       .first()
       .find("tbody tr")
+      .filter((_, row) => $(row).text().includes("10 กรกฎาคม 2569"))
       .first()
       .find("a");
 
-    expect(firstRowLink.text().trim()).toBe("PDF");
-    expect(firstRowLink.attr("href")).toBe(
+    expect(julyRowLink.text().trim()).toBe("PDF");
+    expect(julyRowLink.attr("href")).toBe(
       "/wp-content/uploads/2026/07/procurement-winner-rtrda-5th-anniversary-25690710.pdf",
+    );
+  });
+
+  it("links the 29 September row to its PDF and marks the document number as unavailable", () => {
+    const updated = applyProcurementWinnerOverride(record({}));
+    const $ = cheerio.load(updated.contentHtml, null, false);
+    const septemberRow = $(".lightweight-accordion")
+      .first()
+      .find("tbody tr")
+      .filter((_, row) => $(row).text().includes("29 กันยายน 2569"))
+      .first();
+
+    expect(septemberRow.find("td").eq(4).text().trim()).toBe("–");
+    expect(septemberRow.find("a").attr("href")).toBe(
+      "/procurement-documents/procurement-winner-29-9-69.pdf",
     );
   });
 
