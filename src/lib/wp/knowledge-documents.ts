@@ -44,6 +44,15 @@ const flipbookPathPattern = /^\/(?:en\/)?3d-flip-book\/[^/]+\/?$/;
 const documentAssetPattern = /\.(?:pdf|xlsx|png|jpe?g|webp|gif|avif)$/i;
 const downloadableAssetPattern = /\.(?:pdf|xlsx|png|jpe?g|webp|gif|avif)$/i;
 
+function isPublicStaticDocumentPath(path: string): boolean {
+  return (
+    path.startsWith("/wp-content/uploads/") ||
+    path.startsWith("/recruitment-documents/") ||
+    path.startsWith("/procurement-documents/") ||
+    path.startsWith("/public-hearing-documents/")
+  );
+}
+
 function compactText(value: string): string {
   return value.replace(/\s+/g, " ").trim();
 }
@@ -91,7 +100,7 @@ function normalizeActionHref(
     return path;
   }
 
-  if (path.startsWith("/wp-content/uploads/") && documentAssetPattern.test(path)) {
+  if (isPublicStaticDocumentPath(path) && documentAssetPattern.test(path)) {
     return path;
   }
 
@@ -100,7 +109,7 @@ function normalizeActionHref(
 
 function isDownloadableAsset(path: string | null): path is string {
   return Boolean(
-    path?.startsWith("/wp-content/uploads/") && downloadableAssetPattern.test(path),
+    path && isPublicStaticDocumentPath(path) && downloadableAssetPattern.test(path),
   );
 }
 
