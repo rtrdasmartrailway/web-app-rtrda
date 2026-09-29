@@ -5,6 +5,8 @@ import { normalizeRoutePath } from "./url";
 export const PUBLIC_HEARING_PATH = "/ประชาพิจารณ์";
 export const PUBLIC_HEARING_DOCUMENT_HREF =
   "/public-hearing-documents/ss-1001-2569-evacuation.pdf";
+export const PUBLIC_HEARING_COVER_IMAGE =
+  "/public-hearing-documents/ss-1001-2569-cover.webp";
 
 const YEAR = "2569";
 const DOCUMENT_CODE = "สทร.-SS-1001:2569";
@@ -24,9 +26,7 @@ export function applyPublicHearingDocumentsOverride(
 
   const $ = cheerio.load(record.contentHtml, null, false);
   const accordion = $(".lightweight-accordion")
-    .filter((_, element) =>
-      $(element).find("summary").first().text().includes(YEAR),
-    )
+    .filter((_, element) => $(element).find("summary").first().text().includes(YEAR))
     .first();
   const column = accordion
     .find(".lightweight-accordion-body .wp-block-columns")
@@ -34,11 +34,27 @@ export function applyPublicHearingDocumentsOverride(
     .children(".wp-block-column")
     .first();
 
-  if (column.length === 0 || column.find(`a[href="${PUBLIC_HEARING_DOCUMENT_HREF}"]`).length) {
+  if (column.length === 0) {
     return record;
   }
 
+  const cover = $("<figure></figure>").append(
+    $("<img />")
+      .attr("src", PUBLIC_HEARING_COVER_IMAGE)
+      .attr("alt", `หน้าปก ${DOCUMENT_CODE} ${DOCUMENT_TITLE}`),
+  );
+  const existingCard =
+    column.find(`a[href="${PUBLIC_HEARING_DOCUMENT_HREF}"]`).length > 0;
+  const hasCover = column.find(`img[src="${PUBLIC_HEARING_COVER_IMAGE}"]`).length > 0;
+
+  if (existingCard) {
+    if (hasCover) return record;
+    column.prepend(cover);
+    return { ...record, contentHtml: $.html() };
+  }
+
   column.empty();
+  column.append(cover);
   column.append($(`<h6></h6>`).text(DOCUMENT_CODE));
   column.append($(`<p></p>`).text(DOCUMENT_TITLE));
   column.append(
@@ -48,9 +64,7 @@ export function applyPublicHearingDocumentsOverride(
   );
   column.append(
     $("<p></p>").append(
-      $("<a></a>")
-        .attr("href", PUBLIC_HEARING_DOCUMENT_HREF)
-        .text("ดาวน์โหลดไฟล์"),
+      $("<a></a>").attr("href", PUBLIC_HEARING_DOCUMENT_HREF).text("ดาวน์โหลดไฟล์"),
     ),
   );
 

@@ -4,6 +4,7 @@ import { buildKnowledgeDocumentGroups } from "./knowledge-documents";
 import type { WpContentRecord } from "./types";
 import {
   applyPublicHearingDocumentsOverride,
+  PUBLIC_HEARING_COVER_IMAGE,
   PUBLIC_HEARING_DOCUMENT_HREF,
 } from "./public-hearing-documents";
 
@@ -42,6 +43,8 @@ describe("public hearing document card", () => {
       title: "สทร.-SS-1001:2569",
       description:
         "มาตรฐานว่าด้วยการอพยพผู้ใช้บริการขนส่งทางราง กรณีเกิดเหตุอัคคีภัยหรือกรณีฉุกเฉิน",
+      coverImage: PUBLIC_HEARING_COVER_IMAGE,
+      coverAlt: expect.stringContaining("สทร.-SS-1001:2569"),
       previewHref: PUBLIC_HEARING_DOCUMENT_HREF,
       downloadHref: PUBLIC_HEARING_DOCUMENT_HREF,
       hasUsableTarget: true,
