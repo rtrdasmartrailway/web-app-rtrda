@@ -40,9 +40,9 @@ describe("public hearing document card", () => {
     expect(groups).toHaveLength(1);
     expect(groups[0]).toMatchObject({ title: "2569", compact: true });
     expect(groups[0].documents[0]).toMatchObject({
-      title: "สทร.-SS-1001:2569",
+      title: "(ร่าง) สทร.-SS-1001:2569",
       description:
-        "มาตรฐานว่าด้วยการอพยพผู้ใช้บริการขนส่งทางราง กรณีเกิดเหตุอัคคีภัยหรือกรณีฉุกเฉิน",
+        "(ร่าง) มาตรฐานว่าด้วยการอพยพผู้ใช้บริการขนส่งทางราง กรณีเกิดเหตุอัคคีภัยหรือกรณีฉุกเฉิน",
       coverImage: PUBLIC_HEARING_COVER_IMAGE,
       coverAlt: expect.stringContaining("สทร.-SS-1001:2569"),
       previewHref: PUBLIC_HEARING_DOCUMENT_HREF,

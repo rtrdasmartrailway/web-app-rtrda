@@ -55,8 +55,8 @@ export function applyPublicHearingDocumentsOverride(
 
   column.empty();
   column.append(cover);
-  column.append($(`<h6></h6>`).text(DOCUMENT_CODE));
-  column.append($(`<p></p>`).text(DOCUMENT_TITLE));
+  column.append($(`<h6></h6>`).text(`(ร่าง) ${DOCUMENT_CODE}`));
+  column.append($(`<p></p>`).text(`(ร่าง) ${DOCUMENT_TITLE}`));
   column.append(
     $('<div class="wp-block-button detail-btn"></div>').append(
       $("<a></a>").attr("href", PUBLIC_HEARING_DOCUMENT_HREF).text("อ่านเพิ่มเติม"),
