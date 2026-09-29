@@ -77,7 +77,6 @@ function classifyReaderLink(value: string): {
 
   if (
     (path.startsWith("/wp-content/uploads/") ||
-      path.startsWith("/recruitment-documents/") ||
       path.startsWith("/procurement-documents/") ||
       path.startsWith("/public-hearing-documents/")) &&
     hasPdfExtension(path)
