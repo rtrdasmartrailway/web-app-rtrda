@@ -13,8 +13,18 @@ const WINNER_DOCUMENT_HREF_6_MAY_2569 =
   "/wp-content/uploads/2026/05/ประกาศผู้ชนะการเสนอราคา_12_05_2569.pdf";
 const WINNER_DOCUMENT_HREF_10_JULY_2569 =
   "/wp-content/uploads/2026/07/procurement-winner-rtrda-5th-anniversary-25690710.pdf";
+const WINNER_DOCUMENT_HREF_29_SEPTEMBER_2569 =
+  "/procurement-documents/procurement-winner-29-9-69.pdf";
 
 const NEW_WINNER_ROWS = [
+  {
+    date: "29 กันยายน 2569",
+    project:
+      "ประกาศผู้ชนะการเสนอราคา งานจ้างที่ปรึกษาโครงการศึกษาพัฒนา Algorithm เพื่อตรวจจับและแจ้งเตือนการฝ่าฝืนไม้กั้นทางรถไฟ ณ จุดตัดทางรถไฟแนวระดับ โดยวิธีจ้างที่ปรึกษาโดยวิธีเฉพาะเจาะจง",
+    budget: "1,695,000.00",
+    documentNo: "–",
+    documentHref: WINNER_DOCUMENT_HREF_29_SEPTEMBER_2569,
+  },
   {
     date: "10 กรกฎาคม 2569",
     project:

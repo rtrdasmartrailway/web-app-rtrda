@@ -96,6 +96,26 @@ describe("PDF reader helpers", () => {
     ]);
   });
 
+  it("builds a reader target for procurement PDFs", async () => {
+    const targets = await buildPdfReaderTargets(
+      '<a href="/procurement-documents/procurement-winner-29-9-69.pdf">PDF</a>',
+      {
+        resolveDownload: async () => null,
+        resolveFlipbookPdf: async () => null,
+      },
+    );
+
+    expect(targets).toEqual([
+      {
+        sourceHref: "/procurement-documents/procurement-winner-29-9-69.pdf",
+        inlineHref: "/procurement-documents/procurement-winner-29-9-69.pdf?inline=1",
+        downloadHref: "/procurement-documents/procurement-winner-29-9-69.pdf",
+        title: "PDF",
+        kind: "upload",
+      },
+    ]);
+  });
+
   it("builds a mobile reader target for direct risk report PDFs", async () => {
     const targets = await buildPdfReaderTargets(
       '<a href="/risk-reports/corruption-risk/report-2-2569.pdf?v=20260924-final">รายงานรอบที่ 2</a>',
