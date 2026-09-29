@@ -74,6 +74,28 @@ describe("PDF reader helpers", () => {
     ]);
   });
 
+  it("builds a reader target for recruitment PDFs", async () => {
+    const targets = await buildPdfReaderTargets(
+      '<a href="/recruitment-documents/recruitment-policy-planning-support-2569.pdf">PDF</a>',
+      {
+        resolveDownload: async () => null,
+        resolveFlipbookPdf: async () => null,
+      },
+    );
+
+    expect(targets).toEqual([
+      {
+        sourceHref: "/recruitment-documents/recruitment-policy-planning-support-2569.pdf",
+        inlineHref:
+          "/recruitment-documents/recruitment-policy-planning-support-2569.pdf?inline=1",
+        downloadHref:
+          "/recruitment-documents/recruitment-policy-planning-support-2569.pdf",
+        title: "PDF",
+        kind: "upload",
+      },
+    ]);
+  });
+
   it("builds a reader target for procurement PDFs", async () => {
     const targets = await buildPdfReaderTargets(
       '<a href="/procurement-documents/procurement-winner-29-9-69.pdf">PDF</a>',
