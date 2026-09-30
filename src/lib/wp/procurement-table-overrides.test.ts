@@ -51,6 +51,36 @@ function rows(html: string): string[][] {
 }
 
 describe("applyProcurementTableOverrides", () => {
+  it("adds the 25 September 2569 vehicle rental price row with its PDF", () => {
+    const source = record(
+      "/จัดซื้อจัดจ้าง/ประกาศราคากลาง",
+      yearTableHtml(
+        `<tr><td>1</td><td>19 ก.พ. 2569</td><td>โครงการเดิม</td><td>6,499,654.33</td><td>–</td><td><a href="/old.pdf">PDF</a></td></tr>`,
+      ),
+    );
+
+    const updated = applyProcurementTableOverrides(source);
+    const updatedRows = rows(updated.contentHtml);
+    const row = updatedRows[0];
+
+    expect(row).toEqual([
+      "1",
+      "25 ก.ย. 2569",
+      "เช่ายานพาหนะ (รถโดยสาร ขนาด ๑๒ ที่นั่ง) จำนวน ๑ คัน",
+      "1,485,000.00",
+      "–",
+      "PDF",
+    ]);
+    expect(updatedRows[1]?.[0]).toBe("2");
+    expect(updated.contentHtml).toContain(
+      'href="/procurement-vehicle-rental-25690925.pdf"',
+    );
+
+    const appliedTwice = applyProcurementTableOverrides(updated);
+    expect(rows(appliedTwice.contentHtml)).toHaveLength(2);
+    expect(appliedTwice.contentHtml).toBe(updated.contentHtml);
+  });
+
   it("adds the quarterly winner row, fixes the title, and numbers bottom-up", () => {
     const source = record(
       "/จัดซื้อจัดจ้าง/ประกาศผลผู้ชนะการจัดซื",

@@ -14,6 +14,7 @@ const YEAR_2569 = "ปี 2569";
 const PUBLISHED_STATUS = "เผยแพร่ขึ้นเว็บ";
 
 const QUARTERLY_WINNER_PATH = "/จัดซื้อจัดจ้าง/ประกาศผลผู้ชนะการจัดซื";
+const PROCUREMENT_PRICE_PATH = "/จัดซื้อจัดจ้าง/ประกาศราคากลาง";
 const PROCUREMENT_SUMMARY_PATH = "/จัดซื้อจัดจ้าง/ประกาศจดซอจดจางตามแบบส";
 const PROCUREMENT_WINNER_PATH = "/จัดซื้อจัดจ้าง/ประกาศผลผู้ชนะการเสนอร";
 const PROCUREMENT_CANCEL_WINNER_PATH = "/จัดซื้อจัดจ้าง/ยกเลิกประกาศเชิญชวน-ผู้";
@@ -30,6 +31,19 @@ const quarterlyRows: TableRowSpec[] = [
       PUBLISHED_STATUS,
     ],
     href: uploadFile("2026/07/procurement-quarterly-winner-q3-2569.pdf"),
+  },
+];
+
+const procurementPriceRows: TableRowSpec[] = [
+  {
+    matchText: "เช่ายานพาหนะ (รถโดยสาร ขนาด ๑๒ ที่นั่ง) จำนวน ๑ คัน",
+    cells: [
+      "25 ก.ย. 2569",
+      "เช่ายานพาหนะ (รถโดยสาร ขนาด ๑๒ ที่นั่ง) จำนวน ๑ คัน",
+      "1,485,000.00",
+      "–",
+    ],
+    href: "/procurement-vehicle-rental-25690925.pdf",
   },
 ];
 
@@ -909,6 +923,9 @@ export function applyProcurementTableOverrides(record: WpContentRecord): WpConte
   const path = normalized(record.path);
   if (path === QUARTERLY_WINNER_PATH || path === `/en${QUARTERLY_WINNER_PATH}`) {
     return applyQuarterlyWinnerRows(record);
+  }
+  if (path === PROCUREMENT_PRICE_PATH || path === `/en${PROCUREMENT_PRICE_PATH}`) {
+    return applyYearTableRows(record, procurementPriceRows);
   }
   if (path === PROCUREMENT_SUMMARY_PATH || path === `/en${PROCUREMENT_SUMMARY_PATH}`) {
     return applyYearTableRows(record, summaryRows);
