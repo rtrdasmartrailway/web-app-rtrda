@@ -10,19 +10,12 @@ const PDF_URL = "/recruitment-director-regulation-2569.pdf";
 export function updateDirectorRegulation(contentHtml) {
   const $ = load(contentHtml, null, false);
   const rows = $("tbody tr").filter((_index, row) => {
-    const title = $(row)
-      .find("td")
-      .first()
-      .text()
-      .replace(/\s+/g, " ")
-      .trim();
+    const title = $(row).find("td").first().text().replace(/\s+/g, " ").trim();
     return title === OLD_TITLE || title === NEW_TITLE;
   });
 
   if (rows.length !== 1) {
-    throw new Error(
-      `Expected one director regulation row, found ${rows.length}`,
-    );
+    throw new Error(`Expected one director regulation row, found ${rows.length}`);
   }
 
   const cells = rows.first().find("td");
@@ -47,17 +40,10 @@ export async function applyDirectorRegulationOverride(client) {
 
   const contentHtml = updateDirectorRegulation(result.rows[0].contentHtml);
   const plainText = load(contentHtml).text().replace(/\s+/g, " ").trim();
-  const excerpt =
-    plainText.length > 160 ? `${plainText.slice(0, 157)}…` : plainText;
+  const excerpt = plainText.length > 160 ? `${plainText.slice(0, 157)}…` : plainText;
 
   await client.query(
     'UPDATE "ContentRecord" SET "contentHtml" = $1, "excerpt" = $2, "searchText" = $3, "modified" = $4 WHERE "id" = $5',
-    [
-      contentHtml,
-      excerpt,
-      plainText,
-      new Date().toISOString(),
-      result.rows[0].id,
-    ],
+    [contentHtml, excerpt, plainText, new Date().toISOString(), result.rows[0].id],
   );
 }
