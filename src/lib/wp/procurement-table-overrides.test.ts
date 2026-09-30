@@ -36,6 +36,18 @@ function yearTableHtml(rows: string): string {
   `;
 }
 
+function quarterlyYearTableHtml(rows: string): string {
+  return `
+    <div class="lightweight-accordion"><details>
+      <summary class="lightweight-accordion-title"><strong>ปี 2569</strong></summary>
+      <div class="lightweight-accordion-body"><table>
+        <thead><tr><th>ลำดับ</th><th>วันที่ประกาศ</th><th>โครงการ</th><th>สถานะ</th><th>เอกสาร</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table></div>
+    </details></div>
+  `;
+}
+
 function rows(html: string): string[][] {
   const $ = cheerio.load(html, null, false);
   return $(".lightweight-accordion")
@@ -73,6 +85,25 @@ function rowsForYear(html: string, year: string): string[][] {
         .toArray()
         .map((cell) => $(cell).text().replace(/\s+/g, " ").trim()),
     );
+}
+
+function headersForYear(html: string, year: string): string[] {
+  const $ = cheerio.load(html, null, false);
+  const accordion = $(".lightweight-accordion")
+    .filter((_, element) =>
+      $(element)
+        .find("summary")
+        .first()
+        .text()
+        .replace(/\s+/g, " ")
+        .trim()
+        .includes(year),
+    )
+    .first();
+  return accordion
+    .find("thead th")
+    .toArray()
+    .map((cell) => $(cell).text().replace(/\s+/g, " ").trim());
 }
 
 describe("applyProcurementTableOverrides", () => {
@@ -118,13 +149,21 @@ describe("applyProcurementTableOverrides", () => {
   it("adds the quarterly winner row, fixes the title, and numbers bottom-up", () => {
     const source = record(
       "/จัดซื้อจัดจ้าง/ประกาศผลผู้ชนะการจัดซื",
-      yearTableHtml(
+      quarterlyYearTableHtml(
         `<tr><td>1</td><td>7 เมษายน 2569</td><td>ไตรมาสที่ 2</td><td>เผยแพร่ขึ้นเว็บ</td><td><a href="/old.pdf">PDF</a></td></tr>`,
       ),
     );
     const updated = applyProcurementTableOverrides(source);
-    const updatedRows = rows(updated.contentHtml);
+    const updatedRows = rowsForYear(updated.contentHtml, "ปี 2569");
 
+    expect(rowsForYear(updated.contentHtml, "ปี 2570")).toEqual([]);
+    expect(headersForYear(updated.contentHtml, "ปี 2570")).toEqual([
+      "ลำดับ",
+      "วันที่ประกาศ",
+      "โครงการ",
+      "สถานะ",
+      "เอกสาร",
+    ]);
     expect(updatedRows.map((row) => row[0])).toEqual(["2", "1"]);
     expect(updatedRows[0]?.[1]).toBe("7 กรกฎาคม 2569");
     expect(updatedRows[0]?.[2]).toContain("ประจำไตรมาสที่ 3");
@@ -135,6 +174,9 @@ describe("applyProcurementTableOverrides", () => {
       "/wp-content/uploads/2026/07/procurement-quarterly-winner-q3-2569.pdf",
     );
     expect(updated.contentHtml).not.toContain("drive.google.com");
+
+    const appliedTwice = applyProcurementTableOverrides(updated);
+    expect(appliedTwice.contentHtml).toBe(updated.contentHtml);
   });
 
   it("adds the August, July, and June monthly procurement summary rows before existing rows", () => {

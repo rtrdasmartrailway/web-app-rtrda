@@ -590,8 +590,13 @@ function sortQuarterlyRowsDescending(
 
 function applyQuarterlyWinnerRows(record: WpContentRecord): WpContentRecord {
   const $ = cheerio.load(record.contentHtml, null, false);
+  const hasYear2570 = findYearTable($, YEAR_2570).length > 0;
+  const year2570 = ensureYearTable($, YEAR_2570);
+  if (year2570.length === 0) return record;
+
   const tbody = findYearTable($, YEAR_2569);
-  let changed = upsertRows($, tbody, quarterlyRows);
+  let changed = !hasYear2570;
+  changed = upsertRows($, tbody, quarterlyRows) || changed;
   changed = sortQuarterlyRowsDescending($, tbody) || changed;
   const quarterlyRowsInDisplayOrder = tbody.find("tr").toArray();
   quarterlyRowsInDisplayOrder.forEach((row, index) => {
