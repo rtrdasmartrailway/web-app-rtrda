@@ -11,6 +11,7 @@ import process from "node:process";
 import pg from "pg";
 import { manifestToRows } from "./seed-db-helpers.mjs";
 import { stripImportedChrome } from "./import-wordpress-sanitize.mjs";
+import { applyDirectorRegulationOverride } from "./legislation-regulation-override.mjs";
 
 process.loadEnvFile();
 
@@ -176,6 +177,8 @@ async function main() {
       row.key,
       JSON.stringify(row.value),
     ]);
+
+    await applyDirectorRegulationOverride(client);
 
     await client.query("COMMIT");
   } catch (error) {
