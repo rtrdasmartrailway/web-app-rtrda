@@ -214,6 +214,19 @@ const winnerRows: TableRowSpec[] = [
   },
 ];
 
+const winnerRows2570: TableRowSpec[] = [
+  {
+    matchText: "จ้างเหมาบริการพนักงานขับรถยนต์ไฟฟ้า จำนวน 1 คน",
+    cells: [
+      "30 กันยายน 2569",
+      "ประกาศผู้ชนะการเสนอราคา จ้างเหมาบริการพนักงานขับรถยนต์ไฟฟ้า จำนวน 1 คน โดยวิธีเฉพาะเจาะจง",
+      "214,800.00",
+      "–",
+    ],
+    href: "/procurement-winner-driver-ev-25690930.pdf",
+  },
+];
+
 const railComponentDocuments: Array<{
   code: string;
   title: string;
@@ -622,6 +635,10 @@ function applyWinnerRows(record: WpContentRecord): WpContentRecord {
 
   changed = sortRowsByThaiDateDescending($, tbody) || changed;
   changed = renumberRows($, tbody, true) || changed;
+
+  changed = upsertRows($, year2570, winnerRows2570, { numberBottomUp: true }) || changed;
+  changed = sortRowsByThaiDateDescending($, year2570) || changed;
+  changed = renumberRows($, year2570, true) || changed;
 
   return changed ? { ...record, contentHtml: $.html() } : record;
 }

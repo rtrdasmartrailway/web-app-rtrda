@@ -243,7 +243,19 @@ describe("applyProcurementTableOverrides", () => {
       .get();
 
     expect(years.slice(0, 2)).toEqual(["ปี 2570", "ปี 2569"]);
-    expect(rowsForYear(updated.contentHtml, "ปี 2570")).toEqual([]);
+    expect(rowsForYear(updated.contentHtml, "ปี 2570")).toEqual([
+      [
+        "1",
+        "30 กันยายน 2569",
+        "ประกาศผู้ชนะการเสนอราคา จ้างเหมาบริการพนักงานขับรถยนต์ไฟฟ้า จำนวน 1 คน โดยวิธีเฉพาะเจาะจง",
+        "214,800.00",
+        "–",
+        "PDF",
+      ],
+    ]);
+    expect(updated.contentHtml).toContain(
+      'href="/procurement-winner-driver-ev-25690930.pdf"',
+    );
     expect(headersForYear(updated.contentHtml, "ปี 2570")).toEqual([
       "ลำดับ",
       "วันที่ประกาศ",
@@ -317,6 +329,9 @@ describe("applyProcurementTableOverrides", () => {
       "/wp-content/uploads/2026/07/ประกาศผู้ชนะโครงการพัฒนาตู้รถไฟท่องเที่ยว_21_07_2569.pdf?v=20260721",
     );
     expect(updated.contentHtml).not.toContain("drive.google.com");
+
+    const appliedTwice = applyProcurementTableOverrides(updated);
+    expect(appliedTwice.contentHtml).toBe(updated.contentHtml);
   });
 
   it("keeps the 10 July winner row above the older July winner rows", () => {
