@@ -235,6 +235,16 @@ const winnerRows2570: TableRowSpec[] = [
     ],
     href: "/procurement-winner-passenger-van-driver-25690930.pdf",
   },
+  {
+    matchText: "จ้างเหมาทำความสะอาดสำนักงาน จำนวน 2 คน",
+    cells: [
+      "30 กันยายน 2569",
+      "ประกาศผู้ชนะการเสนอราคา จ้างเหมาทำความสะอาดสำนักงาน จำนวน 2 คน โดยวิธีเฉพาะเจาะจง",
+      "499,476.00",
+      "–",
+    ],
+    href: "/procurement-winner-office-cleaning-25690930.pdf",
+  },
 ];
 
 const railComponentDocuments: Array<{

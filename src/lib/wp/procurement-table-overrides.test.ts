@@ -245,7 +245,7 @@ describe("applyProcurementTableOverrides", () => {
     expect(years.slice(0, 2)).toEqual(["ปี 2570", "ปี 2569"]);
     expect(rowsForYear(updated.contentHtml, "ปี 2570")).toEqual([
       [
-        "2",
+        "3",
         "30 กันยายน 2569",
         "ประกาศผู้ชนะการเสนอราคา จ้างเหมาบริการพนักงานขับรถยนต์ไฟฟ้า จำนวน 1 คน โดยวิธีเฉพาะเจาะจง",
         "214,800.00",
@@ -253,10 +253,18 @@ describe("applyProcurementTableOverrides", () => {
         "PDF",
       ],
       [
-        "1",
+        "2",
         "30 กันยายน 2569",
         "ประกาศผู้ชนะการเสนอราคา จ้างเหมาบริการพนักงานขับรถตู้โดยสาร ขนาด 12 ที่นั่ง จำนวน 1 คน โดยวิธีเฉพาะเจาะจง",
         "215,712.00",
+        "–",
+        "PDF",
+      ],
+      [
+        "1",
+        "30 กันยายน 2569",
+        "ประกาศผู้ชนะการเสนอราคา จ้างเหมาทำความสะอาดสำนักงาน จำนวน 2 คน โดยวิธีเฉพาะเจาะจง",
+        "499,476.00",
         "–",
         "PDF",
       ],
@@ -266,6 +274,9 @@ describe("applyProcurementTableOverrides", () => {
     );
     expect(updated.contentHtml).toContain(
       'href="/procurement-winner-passenger-van-driver-25690930.pdf"',
+    );
+    expect(updated.contentHtml).toContain(
+      'href="/procurement-winner-office-cleaning-25690930.pdf"',
     );
     expect(headersForYear(updated.contentHtml, "ปี 2570")).toEqual([
       "ลำดับ",
