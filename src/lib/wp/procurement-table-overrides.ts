@@ -11,9 +11,11 @@ interface TableRowSpec {
 }
 
 const YEAR_2569 = "ปี 2569";
+const YEAR_2570 = "ปี 2570";
 const PUBLISHED_STATUS = "เผยแพร่ขึ้นเว็บ";
 
 const QUARTERLY_WINNER_PATH = "/จัดซื้อจัดจ้าง/ประกาศผลผู้ชนะการจัดซื";
+const PROCUREMENT_PRICE_PATH = "/จัดซื้อจัดจ้าง/ประกาศราคากลาง";
 const PROCUREMENT_SUMMARY_PATH = "/จัดซื้อจัดจ้าง/ประกาศจดซอจดจางตามแบบส";
 const PROCUREMENT_WINNER_PATH = "/จัดซื้อจัดจ้าง/ประกาศผลผู้ชนะการเสนอร";
 const PROCUREMENT_CANCEL_WINNER_PATH = "/จัดซื้อจัดจ้าง/ยกเลิกประกาศเชิญชวน-ผู้";
@@ -30,6 +32,19 @@ const quarterlyRows: TableRowSpec[] = [
       PUBLISHED_STATUS,
     ],
     href: uploadFile("2026/07/procurement-quarterly-winner-q3-2569.pdf"),
+  },
+];
+
+const procurementPriceRows: TableRowSpec[] = [
+  {
+    matchText: "เช่ายานพาหนะ (รถโดยสาร ขนาด 12 ที่นั่ง) จำนวน 1 คัน",
+    cells: [
+      "25 ก.ย. 2569",
+      "เช่ายานพาหนะ (รถโดยสาร ขนาด 12 ที่นั่ง) จำนวน 1 คัน",
+      "1,485,000.00",
+      "–",
+    ],
+    href: "/procurement-vehicle-rental-25690925.pdf",
   },
 ];
 
@@ -196,6 +211,39 @@ const winnerRows: TableRowSpec[] = [
     href: uploadFile(
       "2026/07/procurement-winner-infrastructure-enhancement-consultant.pdf",
     ),
+  },
+];
+
+const winnerRows2570: TableRowSpec[] = [
+  {
+    matchText: "จ้างเหมาบริการพนักงานขับรถยนต์ไฟฟ้า จำนวน 1 คน",
+    cells: [
+      "30 กันยายน 2569",
+      "ประกาศผู้ชนะการเสนอราคา จ้างเหมาบริการพนักงานขับรถยนต์ไฟฟ้า จำนวน 1 คน โดยวิธีเฉพาะเจาะจง",
+      "214,800.00",
+      "–",
+    ],
+    href: "/procurement-winner-driver-ev-25690930.pdf",
+  },
+  {
+    matchText: "จ้างเหมาบริการพนักงานขับรถตู้โดยสาร ขนาด 12 ที่นั่ง จำนวน 1 คน",
+    cells: [
+      "30 กันยายน 2569",
+      "ประกาศผู้ชนะการเสนอราคา จ้างเหมาบริการพนักงานขับรถตู้โดยสาร ขนาด 12 ที่นั่ง จำนวน 1 คน โดยวิธีเฉพาะเจาะจง",
+      "215,712.00",
+      "–",
+    ],
+    href: "/procurement-winner-passenger-van-driver-25690930.pdf",
+  },
+  {
+    matchText: "จ้างเหมาทำความสะอาดสำนักงาน จำนวน 2 คน",
+    cells: [
+      "30 กันยายน 2569",
+      "ประกาศผู้ชนะการเสนอราคา จ้างเหมาทำความสะอาดสำนักงาน จำนวน 2 คน โดยวิธีเฉพาะเจาะจง",
+      "499,476.00",
+      "–",
+    ],
+    href: "/procurement-winner-office-cleaning-25690930.pdf",
   },
 ];
 
@@ -506,6 +554,39 @@ function applyYearTableRows(
   return changed ? { ...record, contentHtml: $.html() } : record;
 }
 
+function applyProcurementPriceRows(record: WpContentRecord): WpContentRecord {
+  const $ = cheerio.load(record.contentHtml, null, false);
+  const sourceTbody = findYearTable($, YEAR_2569);
+  const hasYear2570 = findYearTable($, YEAR_2570).length > 0;
+  const targetTbody = ensureYearTable($, YEAR_2570);
+  if (targetTbody.length === 0) return record;
+
+  let changed = !hasYear2570;
+  for (const spec of procurementPriceRows) {
+    const rowsInPreviousYear = sourceTbody
+      .find("tr")
+      .filter((_, row) => rowText($, row).includes(spec.matchText));
+    if (rowsInPreviousYear.length > 0) {
+      rowsInPreviousYear.remove();
+      changed = true;
+    }
+
+    const matchingRowsInTargetYear = targetTbody
+      .find("tr")
+      .filter((_, row) => rowText($, row).includes(spec.matchText))
+      .toArray();
+    matchingRowsInTargetYear.slice(1).forEach((row) => {
+      $(row).remove();
+      changed = true;
+    });
+
+    changed = upsertRows($, targetTbody, [spec]) || changed;
+  }
+
+  changed = renumberRows($, sourceTbody) || changed;
+  return changed ? { ...record, contentHtml: $.html() } : record;
+}
+
 function applyEmptyCancelWinnerTable(record: WpContentRecord): WpContentRecord {
   const $ = cheerio.load(record.contentHtml, null, false);
   const hasYearTable = findYearTable($, YEAR_2569).length > 0;
@@ -542,8 +623,13 @@ function sortQuarterlyRowsDescending(
 
 function applyQuarterlyWinnerRows(record: WpContentRecord): WpContentRecord {
   const $ = cheerio.load(record.contentHtml, null, false);
+  const hasYear2570 = findYearTable($, YEAR_2570).length > 0;
+  const year2570 = ensureYearTable($, YEAR_2570);
+  if (year2570.length === 0) return record;
+
   const tbody = findYearTable($, YEAR_2569);
-  let changed = upsertRows($, tbody, quarterlyRows);
+  let changed = !hasYear2570;
+  changed = upsertRows($, tbody, quarterlyRows) || changed;
   changed = sortQuarterlyRowsDescending($, tbody) || changed;
   const quarterlyRowsInDisplayOrder = tbody.find("tr").toArray();
   quarterlyRowsInDisplayOrder.forEach((row, index) => {
@@ -559,11 +645,20 @@ function applyQuarterlyWinnerRows(record: WpContentRecord): WpContentRecord {
 
 function applyWinnerRows(record: WpContentRecord): WpContentRecord {
   const $ = cheerio.load(record.contentHtml, null, false);
+  const hasYear2570 = findYearTable($, YEAR_2570).length > 0;
+  const year2570 = ensureYearTable($, YEAR_2570);
+  if (year2570.length === 0) return record;
+
   const tbody = findYearTable($, YEAR_2569);
-  let changed = upsertRows($, tbody, winnerRows, { numberBottomUp: true });
+  let changed = !hasYear2570;
+  changed = upsertRows($, tbody, winnerRows, { numberBottomUp: true }) || changed;
 
   changed = sortRowsByThaiDateDescending($, tbody) || changed;
   changed = renumberRows($, tbody, true) || changed;
+
+  changed = upsertRows($, year2570, winnerRows2570, { numberBottomUp: true }) || changed;
+  changed = sortRowsByThaiDateDescending($, year2570) || changed;
+  changed = renumberRows($, year2570, true) || changed;
 
   return changed ? { ...record, contentHtml: $.html() } : record;
 }
@@ -909,6 +1004,9 @@ export function applyProcurementTableOverrides(record: WpContentRecord): WpConte
   const path = normalized(record.path);
   if (path === QUARTERLY_WINNER_PATH || path === `/en${QUARTERLY_WINNER_PATH}`) {
     return applyQuarterlyWinnerRows(record);
+  }
+  if (path === PROCUREMENT_PRICE_PATH || path === `/en${PROCUREMENT_PRICE_PATH}`) {
+    return applyProcurementPriceRows(record);
   }
   if (path === PROCUREMENT_SUMMARY_PATH || path === `/en${PROCUREMENT_SUMMARY_PATH}`) {
     return applyYearTableRows(record, summaryRows);
