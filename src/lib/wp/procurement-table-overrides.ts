@@ -225,6 +225,16 @@ const winnerRows2570: TableRowSpec[] = [
     ],
     href: "/procurement-winner-driver-ev-25690930.pdf",
   },
+  {
+    matchText: "จ้างเหมาบริการพนักงานขับรถตู้โดยสาร ขนาด 12 ที่นั่ง จำนวน 1 คน",
+    cells: [
+      "30 กันยายน 2569",
+      "ประกาศผู้ชนะการเสนอราคา จ้างเหมาบริการพนักงานขับรถตู้โดยสาร ขนาด 12 ที่นั่ง จำนวน 1 คน โดยวิธีเฉพาะเจาะจง",
+      "215,712.00",
+      "–",
+    ],
+    href: "/procurement-winner-passenger-van-driver-25690930.pdf",
+  },
 ];
 
 const railComponentDocuments: Array<{
