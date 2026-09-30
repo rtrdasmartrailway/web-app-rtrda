@@ -612,8 +612,13 @@ function applyQuarterlyWinnerRows(record: WpContentRecord): WpContentRecord {
 
 function applyWinnerRows(record: WpContentRecord): WpContentRecord {
   const $ = cheerio.load(record.contentHtml, null, false);
+  const hasYear2570 = findYearTable($, YEAR_2570).length > 0;
+  const year2570 = ensureYearTable($, YEAR_2570);
+  if (year2570.length === 0) return record;
+
   const tbody = findYearTable($, YEAR_2569);
-  let changed = upsertRows($, tbody, winnerRows, { numberBottomUp: true });
+  let changed = !hasYear2570;
+  changed = upsertRows($, tbody, winnerRows, { numberBottomUp: true }) || changed;
 
   changed = sortRowsByThaiDateDescending($, tbody) || changed;
   changed = renumberRows($, tbody, true) || changed;

@@ -48,6 +48,18 @@ function quarterlyYearTableHtml(rows: string): string {
   `;
 }
 
+function winnerYearTableHtml(rows: string): string {
+  return `
+    <div class="lightweight-accordion"><details>
+      <summary class="lightweight-accordion-title"><strong>ปี 2569</strong></summary>
+      <div class="lightweight-accordion-body"><table>
+        <thead><tr><th>ลำดับ</th><th>วันที่ประกาศ</th><th>โครงการ/กิจกรรม</th><th>งบประมาณโครงการ (บาท)</th><th>เลขที่เอกสาร/ประกาศ</th><th>เอกสาร</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table></div>
+    </details></div>
+  `;
+}
+
 function rows(html: string): string[][] {
   const $ = cheerio.load(html, null, false);
   return $(".lightweight-accordion")
@@ -217,12 +229,29 @@ describe("applyProcurementTableOverrides", () => {
   it("adds the September, August, and July winner rows to the winner price table and numbers bottom-up", () => {
     const source = record(
       "/จัดซื้อจัดจ้าง/ประกาศผลผู้ชนะการเสนอร",
-      yearTableHtml(
+      winnerYearTableHtml(
         `<tr><td>1</td><td>22 พฤษภาคม 2569</td><td>รายการเดิม</td><td>1.00</td><td>–</td><td><a href="/old.pdf">PDF</a></td></tr>`,
       ),
     );
     const updated = applyProcurementTableOverrides(source);
-    const updatedRows = rows(updated.contentHtml);
+    const updatedRows = rowsForYear(updated.contentHtml, "ปี 2569");
+    const $ = cheerio.load(updated.contentHtml, null, false);
+    const years = $(".lightweight-accordion")
+      .map((_, element) =>
+        $(element).find("summary").first().text().replace(/\s+/g, " ").trim(),
+      )
+      .get();
+
+    expect(years.slice(0, 2)).toEqual(["ปี 2570", "ปี 2569"]);
+    expect(rowsForYear(updated.contentHtml, "ปี 2570")).toEqual([]);
+    expect(headersForYear(updated.contentHtml, "ปี 2570")).toEqual([
+      "ลำดับ",
+      "วันที่ประกาศ",
+      "โครงการ/กิจกรรม",
+      "งบประมาณโครงการ (บาท)",
+      "เลขที่เอกสาร/ประกาศ",
+      "เอกสาร",
+    ]);
 
     expect(updatedRows.map((row) => row[0])).toEqual([
       "12",
@@ -293,11 +322,14 @@ describe("applyProcurementTableOverrides", () => {
   it("keeps the 10 July winner row above the older July winner rows", () => {
     const source = record(
       "/จัดซื้อจัดจ้าง/ประกาศผลผู้ชนะการเสนอร",
-      yearTableHtml(
+      winnerYearTableHtml(
         `<tr><td>1</td><td>10 กรกฎาคม 2569</td><td>เรื่อง ประกาศผู้ชนะการเสนอราคา จ้างเหมาบริการจัดงานพิธีทำบุญวันสถาปนา สถาบันวิจัยและพัฒนาเทคโนโลยีระบบราง (องค์การมหาชน) ครบรอบ 5 ปี โดยวิธีเฉพาะเจาะจง</td><td>250,000.00</td><td>–</td><td><a href="/wp-content/uploads/2026/07/procurement-winner-rtrda-5th-anniversary-25690710.pdf">PDF</a></td></tr><tr><td>2</td><td>25 มิถุนายน 2569</td><td>รายการเดิม</td><td>1.00</td><td>–</td><td><a href="/old.pdf">PDF</a></td></tr>`,
       ),
     );
-    const updatedRows = rows(applyProcurementTableOverrides(source).contentHtml);
+    const updatedRows = rowsForYear(
+      applyProcurementTableOverrides(source).contentHtml,
+      "ปี 2569",
+    );
 
     expect(updatedRows.map((row) => row[0])).toEqual([
       "13",
