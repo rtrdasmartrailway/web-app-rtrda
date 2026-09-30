@@ -50,35 +50,69 @@ function rows(html: string): string[][] {
     );
 }
 
+function rowsForYear(html: string, year: string): string[][] {
+  const $ = cheerio.load(html, null, false);
+  const accordion = $(".lightweight-accordion")
+    .filter((_, element) =>
+      $(element)
+        .find("summary")
+        .first()
+        .text()
+        .replace(/\s+/g, " ")
+        .trim()
+        .includes(year),
+    )
+    .first();
+
+  return accordion
+    .find("tbody tr")
+    .toArray()
+    .map((row) =>
+      $(row)
+        .find("td")
+        .toArray()
+        .map((cell) => $(cell).text().replace(/\s+/g, " ").trim()),
+    );
+}
+
 describe("applyProcurementTableOverrides", () => {
-  it("adds the 25 September 2569 vehicle rental price row with its PDF", () => {
+  it("moves the latest vehicle rental price row to 2570 and preserves its details", () => {
     const source = record(
       "/จัดซื้อจัดจ้าง/ประกาศราคากลาง",
       yearTableHtml(
-        `<tr><td>1</td><td>19 ก.พ. 2569</td><td>โครงการเดิม</td><td>6,499,654.33</td><td>–</td><td><a href="/old.pdf">PDF</a></td></tr>`,
+        `<tr><td>1</td><td>25 ก.ย. 2569</td><td>เช่ายานพาหนะ (รถโดยสาร ขนาด 12 ที่นั่ง) จำนวน 1 คัน</td><td>1,485,000.00</td><td>–</td><td><a href="/old.pdf">PDF</a></td></tr><tr><td>2</td><td>19 ก.พ. 2569</td><td>โครงการเดิม</td><td>6,499,654.33</td><td>–</td><td><a href="/older.pdf">PDF</a></td></tr>`,
       ),
     );
 
     const updated = applyProcurementTableOverrides(source);
-    const updatedRows = rows(updated.contentHtml);
-    const row = updatedRows[0];
+    const $ = cheerio.load(updated.contentHtml, null, false);
+    const years = $(".lightweight-accordion")
+      .map((_, element) =>
+        $(element).find("summary").first().text().replace(/\s+/g, " ").trim(),
+      )
+      .get();
 
-    expect(row).toEqual([
-      "1",
-      "25 ก.ย. 2569",
-      "เช่ายานพาหนะ (รถโดยสาร ขนาด 12 ที่นั่ง) จำนวน 1 คัน",
-      "1,485,000.00",
-      "–",
-      "PDF",
+    expect(years.slice(0, 3)).toEqual(["ปี 2570", "ปี 2569", "ปี 2568"]);
+    expect(rowsForYear(updated.contentHtml, "ปี 2570")).toEqual([
+      [
+        "1",
+        "25 ก.ย. 2569",
+        "เช่ายานพาหนะ (รถโดยสาร ขนาด 12 ที่นั่ง) จำนวน 1 คัน",
+        "1,485,000.00",
+        "–",
+        "PDF",
+      ],
     ]);
-    expect(updatedRows[1]?.[0]).toBe("2");
+    expect(rowsForYear(updated.contentHtml, "ปี 2569")).toEqual([
+      ["1", "19 ก.พ. 2569", "โครงการเดิม", "6,499,654.33", "–", "PDF"],
+    ]);
     expect(updated.contentHtml).toContain(
       'href="/procurement-vehicle-rental-25690925.pdf"',
     );
 
     const appliedTwice = applyProcurementTableOverrides(updated);
-    expect(rows(appliedTwice.contentHtml)).toHaveLength(2);
     expect(appliedTwice.contentHtml).toBe(updated.contentHtml);
+    expect(rowsForYear(appliedTwice.contentHtml, "ปี 2570")).toHaveLength(1);
   });
 
   it("adds the quarterly winner row, fixes the title, and numbers bottom-up", () => {

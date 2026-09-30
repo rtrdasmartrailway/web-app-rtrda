@@ -11,6 +11,7 @@ interface TableRowSpec {
 }
 
 const YEAR_2569 = "ปี 2569";
+const YEAR_2570 = "ปี 2570";
 const PUBLISHED_STATUS = "เผยแพร่ขึ้นเว็บ";
 
 const QUARTERLY_WINNER_PATH = "/จัดซื้อจัดจ้าง/ประกาศผลผู้ชนะการจัดซื";
@@ -520,6 +521,39 @@ function applyYearTableRows(
   return changed ? { ...record, contentHtml: $.html() } : record;
 }
 
+function applyProcurementPriceRows(record: WpContentRecord): WpContentRecord {
+  const $ = cheerio.load(record.contentHtml, null, false);
+  const sourceTbody = findYearTable($, YEAR_2569);
+  const hasYear2570 = findYearTable($, YEAR_2570).length > 0;
+  const targetTbody = ensureYearTable($, YEAR_2570);
+  if (targetTbody.length === 0) return record;
+
+  let changed = !hasYear2570;
+  for (const spec of procurementPriceRows) {
+    const rowsInPreviousYear = sourceTbody
+      .find("tr")
+      .filter((_, row) => rowText($, row).includes(spec.matchText));
+    if (rowsInPreviousYear.length > 0) {
+      rowsInPreviousYear.remove();
+      changed = true;
+    }
+
+    const matchingRowsInTargetYear = targetTbody
+      .find("tr")
+      .filter((_, row) => rowText($, row).includes(spec.matchText))
+      .toArray();
+    matchingRowsInTargetYear.slice(1).forEach((row) => {
+      $(row).remove();
+      changed = true;
+    });
+
+    changed = upsertRows($, targetTbody, [spec]) || changed;
+  }
+
+  changed = renumberRows($, sourceTbody) || changed;
+  return changed ? { ...record, contentHtml: $.html() } : record;
+}
+
 function applyEmptyCancelWinnerTable(record: WpContentRecord): WpContentRecord {
   const $ = cheerio.load(record.contentHtml, null, false);
   const hasYearTable = findYearTable($, YEAR_2569).length > 0;
@@ -925,7 +959,7 @@ export function applyProcurementTableOverrides(record: WpContentRecord): WpConte
     return applyQuarterlyWinnerRows(record);
   }
   if (path === PROCUREMENT_PRICE_PATH || path === `/en${PROCUREMENT_PRICE_PATH}`) {
-    return applyYearTableRows(record, procurementPriceRows);
+    return applyProcurementPriceRows(record);
   }
   if (path === PROCUREMENT_SUMMARY_PATH || path === `/en${PROCUREMENT_SUMMARY_PATH}`) {
     return applyYearTableRows(record, summaryRows);
