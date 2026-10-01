@@ -11,6 +11,7 @@ import process from "node:process";
 import pg from "pg";
 import { manifestToRows } from "./seed-db-helpers.mjs";
 import { stripImportedChrome } from "./import-wordpress-sanitize.mjs";
+import { applyRecruitmentNoticeOverride } from "./recruitment-notice-override.mjs";
 import { applyDirectorRegulationOverride } from "./legislation-regulation-override.mjs";
 
 process.loadEnvFile();
@@ -178,6 +179,7 @@ async function main() {
       JSON.stringify(row.value),
     ]);
 
+    await applyRecruitmentNoticeOverride(client);
     await applyDirectorRegulationOverride(client);
 
     await client.query("COMMIT");

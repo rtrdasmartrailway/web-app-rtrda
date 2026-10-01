@@ -34,6 +34,7 @@ import { applyBoardExecutiveOverride } from "@/lib/wp/board-executive-override";
 import { applyContactMapOverride } from "@/lib/wp/contact-map";
 import { applyEServicesContactOverride } from "@/lib/wp/e-services-contact";
 import { applyItaHeadingsOverride } from "@/lib/wp/ita-headings-override";
+import { applyJobApplicationNoticeOverride } from "@/lib/wp/job-application";
 import { getStaticDownloadOverride } from "@/lib/wp/static-download-overrides";
 import { getSupplementalKnowledgePage } from "@/lib/wp/knowledge-supplemental-documents";
 import { getLandingGuidePage } from "@/lib/wp/landing-guide-pages";
@@ -454,9 +455,11 @@ export const getPageData = cache(async (path: string): Promise<PageData | null> 
   const overriddenRecord = applyProcurementTableOverrides(
     applyProcurementWinnerOverride(applyPublicHearingDocumentsOverride(record)),
   );
+  const recordWithJobApplicationOverride =
+    applyJobApplicationNoticeOverride(overriddenRecord);
   const recordWithOverrides = {
-    ...overriddenRecord,
-    contentHtml: sanitizeContentHtml(overriddenRecord.contentHtml),
+    ...recordWithJobApplicationOverride,
+    contentHtml: sanitizeContentHtml(recordWithJobApplicationOverride.contentHtml),
   };
 
   const isHome = recordWithOverrides.path === "/" || recordWithOverrides.path === "/en";

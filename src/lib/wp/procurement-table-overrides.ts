@@ -16,6 +16,8 @@ const PUBLISHED_STATUS = "เผยแพร่ขึ้นเว็บ";
 
 const QUARTERLY_WINNER_PATH = "/จัดซื้อจัดจ้าง/ประกาศผลผู้ชนะการจัดซื";
 const PROCUREMENT_PRICE_PATH = "/จัดซื้อจัดจ้าง/ประกาศราคากลาง";
+const PROCUREMENT_DRAFT_PATH = "/จัดซื้อจัดจ้าง/ร่างรายการข้อกำหนด-ร่าง";
+const PROCUREMENT_INVITATION_PATH = "/จัดซื้อจัดจ้าง/ประกาศเชิญชวน-เปลี่ยนแป";
 const PROCUREMENT_SUMMARY_PATH = "/จัดซื้อจัดจ้าง/ประกาศจดซอจดจางตามแบบส";
 const PROCUREMENT_WINNER_PATH = "/จัดซื้อจัดจ้าง/ประกาศผลผู้ชนะการเสนอร";
 const PROCUREMENT_CANCEL_WINNER_PATH = "/จัดซื้อจัดจ้าง/ยกเลิกประกาศเชิญชวน-ผู้";
@@ -84,6 +86,32 @@ const summaryRows: TableRowSpec[] = [
       PUBLISHED_STATUS,
     ],
     href: uploadFile("2026/07/procurement-summary-june-2569-20260611.pdf"),
+  },
+];
+
+const procurementDraftRows2570: TableRowSpec[] = [
+  {
+    matchText: "โครงการเช่ายานพาหนะ (รถโดยสาร ขนาด 12 ที่นั่ง) จำนวน 1 คัน",
+    cells: [
+      "30 กันยายน 2569",
+      "ประกาศประกวดราคาโครงการเช่ายานพาหนะ (รถโดยสาร ขนาด 12 ที่นั่ง) จำนวน 1 คัน",
+      "1,485,000.00",
+      "–",
+    ],
+    href: "/procurement-tor-vehicle-rental-12-seat-2570-25690930.pdf",
+  },
+];
+
+const procurementInvitationRows2570: TableRowSpec[] = [
+  {
+    matchText: "รถตู้โดยสารขนาด 12 ที่นั่ง) จำนวน 1 คัน",
+    cells: [
+      "1 ตุลาคม 2569",
+      "ประกวดราคาเช่ายานพาหนะ (รถตู้โดยสารขนาด 12 ที่นั่ง) จำนวน 1 คัน ด้วยวิธีประกวดราคาอิเล็กทรอนิกส์ (e-bidding)",
+      "1,485,000.00",
+      "สทร.01/2570",
+    ],
+    href: "/procurement-invitation-van-rental-12-seat-2570-25691001.pdf",
   },
 ];
 
@@ -215,6 +243,26 @@ const winnerRows: TableRowSpec[] = [
 ];
 
 const winnerRows2570: TableRowSpec[] = [
+  {
+    matchText: "ขออนุมัติเช่าเครื่องถ่ายเอกสารประจำปี งบประมาณ 2570 จำนวน 1 เครื่อง",
+    cells: [
+      "30 กันยายน 2569",
+      "ประกาศผู้ชนะการเสนอราคา ขออนุมัติเช่าเครื่องถ่ายเอกสารประจำปี งบประมาณ 2570 จำนวน 1 เครื่อง โดยวิธีเฉพาะเจาะจง",
+      "240,000.00",
+      "–",
+    ],
+    href: "/procurement-winner-photocopier-rental-2570-25690930.pdf",
+  },
+  {
+    matchText: "ขออนุมัติงานจ้างเหมาบริการพนักงานจัดเตรียมอาหารและเครื่องดื่ม",
+    cells: [
+      "30 กันยายน 2569",
+      "ประกาศผู้ชนะการเสนอราคา ขออนุมัติงานจ้างเหมาบริการพนักงานจัดเตรียมอาหารและเครื่องดื่ม ประจำปีงบประมาณ 2570 โดยวิธีเฉพาะเจาะจง",
+      "187,200.00",
+      "–",
+    ],
+    href: "/procurement-winner-food-service-2570-25690930.pdf",
+  },
   {
     matchText: "จ้างเหมาบริการพนักงานขับรถยนต์ไฟฟ้า จำนวน 1 คน",
     cells: [
@@ -599,6 +647,37 @@ function applyEmptyCancelWinnerTable(record: WpContentRecord): WpContentRecord {
   }
 
   return !hasYearTable || hasRows ? { ...record, contentHtml: $.html() } : record;
+}
+
+function applyProcurementDraftYearTable(record: WpContentRecord): WpContentRecord {
+  const $ = cheerio.load(record.contentHtml, null, false);
+  if (findYearTable($, YEAR_2569).length === 0) return record;
+
+  const hasYear2570 = findYearTable($, YEAR_2570).length > 0;
+  const year2570 = ensureYearTable($, YEAR_2570);
+  if (year2570.length === 0) return record;
+
+  let changed = !hasYear2570;
+  changed = upsertRows($, year2570, procurementDraftRows2570) || changed;
+  changed = renumberRows($, year2570, true) || changed;
+
+  return changed ? { ...record, contentHtml: $.html() } : record;
+}
+
+function applyProcurementInvitationYearTable(record: WpContentRecord): WpContentRecord {
+  const $ = cheerio.load(record.contentHtml, null, false);
+  if (findYearTable($, YEAR_2569).length === 0) return record;
+
+  const hasYear2570 = findYearTable($, YEAR_2570).length > 0;
+  const year2570 = ensureYearTable($, YEAR_2570);
+  if (year2570.length === 0) return record;
+
+  let changed = !hasYear2570;
+  changed = upsertRows($, year2570, procurementInvitationRows2570) || changed;
+  changed = sortRowsByThaiDateDescending($, year2570) || changed;
+  changed = renumberRows($, year2570) || changed;
+
+  return changed ? { ...record, contentHtml: $.html() } : record;
 }
 
 function quarterNumber($: cheerio.CheerioAPI, row: AnyNode): number {
@@ -1007,6 +1086,15 @@ export function applyProcurementTableOverrides(record: WpContentRecord): WpConte
   }
   if (path === PROCUREMENT_PRICE_PATH || path === `/en${PROCUREMENT_PRICE_PATH}`) {
     return applyProcurementPriceRows(record);
+  }
+  if (path === PROCUREMENT_DRAFT_PATH || path === `/en${PROCUREMENT_DRAFT_PATH}`) {
+    return applyProcurementDraftYearTable(record);
+  }
+  if (
+    path === PROCUREMENT_INVITATION_PATH ||
+    path === `/en${PROCUREMENT_INVITATION_PATH}`
+  ) {
+    return applyProcurementInvitationYearTable(record);
   }
   if (path === PROCUREMENT_SUMMARY_PATH || path === `/en${PROCUREMENT_SUMMARY_PATH}`) {
     return applyYearTableRows(record, summaryRows);

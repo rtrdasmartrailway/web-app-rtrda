@@ -60,6 +60,30 @@ function winnerYearTableHtml(rows: string): string {
   `;
 }
 
+function procurementDraftYearTableHtml(): string {
+  return `
+    <div class="lightweight-accordion"><details>
+      <summary class="lightweight-accordion-title"><span><strong>ปี 2569</strong></span></summary>
+      <div class="lightweight-accordion-body"><figure class="wp-block-table is-style-vk-table-border-stripes"><table>
+        <thead><tr><th>ลำดับ</th><th>วันที่ประกาศ</th><th>โครงการ</th><th>งบประมาณโครงการ (บาท)</th><th>เลขที่เอกสาร/ประกาศ</th><th>เอกสาร</th></tr></thead>
+        <tbody><tr><td>1</td><td>19 ก.พ. 2569</td><td>รายการปี 2569</td><td>1,000.00</td><td>–</td><td><a href="/old.pdf">PDF</a></td></tr></tbody>
+      </table></figure></div>
+    </details></div>
+  `;
+}
+
+function procurementInvitationYearTableHtml(): string {
+  return `
+    <div class="lightweight-accordion"><details>
+      <summary class="lightweight-accordion-title"><strong>ปี 2569</strong></summary>
+      <div class="lightweight-accordion-body"><figure class="wp-block-table is-style-vk-table-border-stripes"><table>
+        <thead><tr><th>ลำดับ</th><th>วันที่ประกาศ</th><th>โครงการ</th><th>งบประมาณโครงการ (บาท)</th><th>เลขที่เอกสาร/ประกาศ</th><th>เอกสาร</th></tr></thead>
+        <tbody><tr><td>1</td><td>4 มิถุนายน 2569</td><td>ประกาศเดิม</td><td>2,000,000.00</td><td>–</td><td><a href="/old.pdf">PDF</a></td></tr></tbody>
+      </table></figure></div>
+    </details></div>
+  `;
+}
+
 function rows(html: string): string[][] {
   const $ = cheerio.load(html, null, false);
   return $(".lightweight-accordion")
@@ -119,6 +143,91 @@ function headersForYear(html: string, year: string): string[] {
 }
 
 describe("applyProcurementTableOverrides", () => {
+  it("adds the 2570 invitation row using the 2569 headers", () => {
+    const source = record(
+      "/จัดซื้อจัดจ้าง/ประกาศเชิญชวน-เปลี่ยนแป",
+      procurementInvitationYearTableHtml(),
+    );
+    const updated = applyProcurementTableOverrides(source);
+    const $ = cheerio.load(updated.contentHtml, null, false);
+    const years = $(".lightweight-accordion")
+      .map((_, element) =>
+        $(element).find("summary").first().text().replace(/\s+/g, " ").trim(),
+      )
+      .get();
+
+    expect(years).toEqual(["ปี 2570", "ปี 2569"]);
+    expect(headersForYear(updated.contentHtml, "ปี 2570")).toEqual([
+      "ลำดับ",
+      "วันที่ประกาศ",
+      "โครงการ",
+      "งบประมาณโครงการ (บาท)",
+      "เลขที่เอกสาร/ประกาศ",
+      "เอกสาร",
+    ]);
+    expect(rowsForYear(updated.contentHtml, "ปี 2570")).toEqual([
+      [
+        "1",
+        "1 ตุลาคม 2569",
+        "ประกวดราคาเช่ายานพาหนะ (รถตู้โดยสารขนาด 12 ที่นั่ง) จำนวน 1 คัน ด้วยวิธีประกวดราคาอิเล็กทรอนิกส์ (e-bidding)",
+        "1,485,000.00",
+        "สทร.01/2570",
+        "PDF",
+      ],
+    ]);
+    expect(updated.contentHtml).toContain(
+      'href="/procurement-invitation-van-rental-12-seat-2570-25691001.pdf"',
+    );
+    expect(rowsForYear(updated.contentHtml, "ปี 2569")).toEqual([
+      ["1", "4 มิถุนายน 2569", "ประกาศเดิม", "2,000,000.00", "–", "PDF"],
+    ]);
+    expect(applyProcurementTableOverrides(updated)).toBe(updated);
+  });
+
+  it("adds the 2570 procurement draft row using the 2569 table format", () => {
+    const source = record(
+      "/จัดซื้อจัดจ้าง/ร่างรายการข้อกำหนด-ร่าง",
+      procurementDraftYearTableHtml(),
+    );
+    const updated = applyProcurementTableOverrides(source);
+    const $ = cheerio.load(updated.contentHtml, null, false);
+    const years = $(".lightweight-accordion")
+      .map((_, element) =>
+        $(element).find("summary").first().text().replace(/\s+/g, " ").trim(),
+      )
+      .get();
+
+    expect(years).toEqual(["ปี 2570", "ปี 2569"]);
+    expect(headersForYear(updated.contentHtml, "ปี 2570")).toEqual([
+      "ลำดับ",
+      "วันที่ประกาศ",
+      "โครงการ",
+      "งบประมาณโครงการ (บาท)",
+      "เลขที่เอกสาร/ประกาศ",
+      "เอกสาร",
+    ]);
+    expect(rowsForYear(updated.contentHtml, "ปี 2570")).toEqual([
+      [
+        "1",
+        "30 กันยายน 2569",
+        "ประกาศประกวดราคาโครงการเช่ายานพาหนะ (รถโดยสาร ขนาด 12 ที่นั่ง) จำนวน 1 คัน",
+        "1,485,000.00",
+        "–",
+        "PDF",
+      ],
+    ]);
+    expect(updated.contentHtml).toContain(
+      'href="/procurement-tor-vehicle-rental-12-seat-2570-25690930.pdf"',
+    );
+    expect(rowsForYear(updated.contentHtml, "ปี 2569")).toEqual([
+      ["1", "19 ก.พ. 2569", "รายการปี 2569", "1,000.00", "–", "PDF"],
+    ]);
+    expect(
+      $(".lightweight-accordion").first().find("figure").hasClass("wp-block-table"),
+    ).toBe(true);
+    expect(applyProcurementTableOverrides(updated)).toBe(updated);
+  });
+
   it("moves the latest vehicle rental price row to 2570 and preserves its details", () => {
     const source = record(
       "/จัดซื้อจัดจ้าง/ประกาศราคากลาง",
@@ -245,6 +354,22 @@ describe("applyProcurementTableOverrides", () => {
     expect(years.slice(0, 2)).toEqual(["ปี 2570", "ปี 2569"]);
     expect(rowsForYear(updated.contentHtml, "ปี 2570")).toEqual([
       [
+        "5",
+        "30 กันยายน 2569",
+        "ประกาศผู้ชนะการเสนอราคา ขออนุมัติเช่าเครื่องถ่ายเอกสารประจำปี งบประมาณ 2570 จำนวน 1 เครื่อง โดยวิธีเฉพาะเจาะจง",
+        "240,000.00",
+        "–",
+        "PDF",
+      ],
+      [
+        "4",
+        "30 กันยายน 2569",
+        "ประกาศผู้ชนะการเสนอราคา ขออนุมัติงานจ้างเหมาบริการพนักงานจัดเตรียมอาหารและเครื่องดื่ม ประจำปีงบประมาณ 2570 โดยวิธีเฉพาะเจาะจง",
+        "187,200.00",
+        "–",
+        "PDF",
+      ],
+      [
         "3",
         "30 กันยายน 2569",
         "ประกาศผู้ชนะการเสนอราคา จ้างเหมาบริการพนักงานขับรถยนต์ไฟฟ้า จำนวน 1 คน โดยวิธีเฉพาะเจาะจง",
@@ -277,6 +402,12 @@ describe("applyProcurementTableOverrides", () => {
     );
     expect(updated.contentHtml).toContain(
       'href="/procurement-winner-office-cleaning-25690930.pdf"',
+    );
+    expect(updated.contentHtml).toContain(
+      'href="/procurement-winner-food-service-2570-25690930.pdf"',
+    );
+    expect(updated.contentHtml).toContain(
+      'href="/procurement-winner-photocopier-rental-2570-25690930.pdf"',
     );
     expect(headersForYear(updated.contentHtml, "ปี 2570")).toEqual([
       "ลำดับ",
