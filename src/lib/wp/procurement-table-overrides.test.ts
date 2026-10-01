@@ -72,6 +72,18 @@ function procurementDraftYearTableHtml(): string {
   `;
 }
 
+function procurementInvitationYearTableHtml(): string {
+  return `
+    <div class="lightweight-accordion"><details>
+      <summary class="lightweight-accordion-title"><strong>ปี 2569</strong></summary>
+      <div class="lightweight-accordion-body"><figure class="wp-block-table is-style-vk-table-border-stripes"><table>
+        <thead><tr><th>ลำดับ</th><th>วันที่ประกาศ</th><th>โครงการ</th><th>งบประมาณโครงการ (บาท)</th><th>เลขที่เอกสาร/ประกาศ</th><th>เอกสาร</th></tr></thead>
+        <tbody><tr><td>1</td><td>4 มิถุนายน 2569</td><td>ประกาศเดิม</td><td>2,000,000.00</td><td>–</td><td><a href="/old.pdf">PDF</a></td></tr></tbody>
+      </table></figure></div>
+    </details></div>
+  `;
+}
+
 function rows(html: string): string[][] {
   const $ = cheerio.load(html, null, false);
   return $(".lightweight-accordion")
@@ -131,6 +143,35 @@ function headersForYear(html: string, year: string): string[] {
 }
 
 describe("applyProcurementTableOverrides", () => {
+  it("adds an empty 2570 invitation table using the 2569 headers", () => {
+    const source = record(
+      "/จัดซื้อจัดจ้าง/ประกาศเชิญชวน-เปลี่ยนแป",
+      procurementInvitationYearTableHtml(),
+    );
+    const updated = applyProcurementTableOverrides(source);
+    const $ = cheerio.load(updated.contentHtml, null, false);
+    const years = $(".lightweight-accordion")
+      .map((_, element) =>
+        $(element).find("summary").first().text().replace(/\s+/g, " ").trim(),
+      )
+      .get();
+
+    expect(years).toEqual(["ปี 2570", "ปี 2569"]);
+    expect(headersForYear(updated.contentHtml, "ปี 2570")).toEqual([
+      "ลำดับ",
+      "วันที่ประกาศ",
+      "โครงการ",
+      "งบประมาณโครงการ (บาท)",
+      "เลขที่เอกสาร/ประกาศ",
+      "เอกสาร",
+    ]);
+    expect(rowsForYear(updated.contentHtml, "ปี 2570")).toEqual([]);
+    expect(rowsForYear(updated.contentHtml, "ปี 2569")).toEqual([
+      ["1", "4 มิถุนายน 2569", "ประกาศเดิม", "2,000,000.00", "–", "PDF"],
+    ]);
+    expect(applyProcurementTableOverrides(updated)).toBe(updated);
+  });
+
   it("adds the 2570 procurement draft row using the 2569 table format", () => {
     const source = record(
       "/จัดซื้อจัดจ้าง/ร่างรายการข้อกำหนด-ร่าง",
