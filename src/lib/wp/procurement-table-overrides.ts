@@ -102,6 +102,19 @@ const procurementDraftRows2570: TableRowSpec[] = [
   },
 ];
 
+const procurementInvitationRows2570: TableRowSpec[] = [
+  {
+    matchText: "รถตู้โดยสารขนาด 12 ที่นั่ง) จำนวน 1 คัน",
+    cells: [
+      "1 ตุลาคม 2569",
+      "ประกวดราคาเช่ายานพาหนะ (รถตู้โดยสารขนาด 12 ที่นั่ง) จำนวน 1 คัน ด้วยวิธีประกวดราคาอิเล็กทรอนิกส์ (e-bidding)",
+      "1,485,000.00",
+      "สทร.01/2570",
+    ],
+    href: "/procurement-invitation-van-rental-12-seat-2570-25691001.pdf",
+  },
+];
+
 const winnerRows: TableRowSpec[] = [
   {
     matchText: "โครงการปรับปรุงตู้รถไฟโดยสาร: ตู้รถไฟโดยสารนั่งและนอนชั้นหนึ่งปรับอากาศ",
@@ -654,10 +667,17 @@ function applyProcurementDraftYearTable(record: WpContentRecord): WpContentRecor
 function applyProcurementInvitationYearTable(record: WpContentRecord): WpContentRecord {
   const $ = cheerio.load(record.contentHtml, null, false);
   if (findYearTable($, YEAR_2569).length === 0) return record;
-  if (findYearTable($, YEAR_2570).length > 0) return record;
 
+  const hasYear2570 = findYearTable($, YEAR_2570).length > 0;
   const year2570 = ensureYearTable($, YEAR_2570);
-  return year2570.length > 0 ? { ...record, contentHtml: $.html() } : record;
+  if (year2570.length === 0) return record;
+
+  let changed = !hasYear2570;
+  changed = upsertRows($, year2570, procurementInvitationRows2570) || changed;
+  changed = sortRowsByThaiDateDescending($, year2570) || changed;
+  changed = renumberRows($, year2570) || changed;
+
+  return changed ? { ...record, contentHtml: $.html() } : record;
 }
 
 function quarterNumber($: cheerio.CheerioAPI, row: AnyNode): number {
