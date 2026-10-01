@@ -245,6 +245,14 @@ describe("applyProcurementTableOverrides", () => {
     expect(years.slice(0, 2)).toEqual(["ปี 2570", "ปี 2569"]);
     expect(rowsForYear(updated.contentHtml, "ปี 2570")).toEqual([
       [
+        "5",
+        "30 กันยายน 2569",
+        "ประกาศผู้ชนะการเสนอราคา ขออนุมัติเช่าเครื่องถ่ายเอกสารประจำปี งบประมาณ 2570 จำนวน 1 เครื่อง โดยวิธีเฉพาะเจาะจง",
+        "240,000.00",
+        "–",
+        "PDF",
+      ],
+      [
         "4",
         "30 กันยายน 2569",
         "ประกาศผู้ชนะการเสนอราคา ขออนุมัติงานจ้างเหมาบริการพนักงานจัดเตรียมอาหารและเครื่องดื่ม ประจำปีงบประมาณ 2570 โดยวิธีเฉพาะเจาะจง",
@@ -288,6 +296,9 @@ describe("applyProcurementTableOverrides", () => {
     );
     expect(updated.contentHtml).toContain(
       'href="/procurement-winner-food-service-2570-25690930.pdf"',
+    );
+    expect(updated.contentHtml).toContain(
+      'href="/procurement-winner-photocopier-rental-2570-25690930.pdf"',
     );
     expect(headersForYear(updated.contentHtml, "ปี 2570")).toEqual([
       "ลำดับ",
