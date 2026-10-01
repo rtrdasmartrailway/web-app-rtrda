@@ -131,7 +131,7 @@ function headersForYear(html: string, year: string): string[] {
 }
 
 describe("applyProcurementTableOverrides", () => {
-  it("adds an empty 2570 procurement draft table using the 2569 headers", () => {
+  it("adds the 2570 procurement draft row using the 2569 table format", () => {
     const source = record(
       "/จัดซื้อจัดจ้าง/ร่างรายการข้อกำหนด-ร่าง",
       procurementDraftYearTableHtml(),
@@ -153,7 +153,19 @@ describe("applyProcurementTableOverrides", () => {
       "เลขที่เอกสาร/ประกาศ",
       "เอกสาร",
     ]);
-    expect(rowsForYear(updated.contentHtml, "ปี 2570")).toEqual([]);
+    expect(rowsForYear(updated.contentHtml, "ปี 2570")).toEqual([
+      [
+        "1",
+        "30 กันยายน 2569",
+        "โครงการเช่ายานพาหนะ (รถโดยสาร ขนาด 12 ที่นั่ง) จำนวน 1 คัน",
+        "1,485,000.00",
+        "–",
+        "PDF",
+      ],
+    ]);
+    expect(updated.contentHtml).toContain(
+      'href="/procurement-tor-vehicle-rental-12-seat-2570-25690930.pdf"',
+    );
     expect(rowsForYear(updated.contentHtml, "ปี 2569")).toEqual([
       ["1", "19 ก.พ. 2569", "รายการปี 2569", "1,000.00", "–", "PDF"],
     ]);

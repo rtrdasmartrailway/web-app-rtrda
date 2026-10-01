@@ -88,6 +88,19 @@ const summaryRows: TableRowSpec[] = [
   },
 ];
 
+const procurementDraftRows2570: TableRowSpec[] = [
+  {
+    matchText: "โครงการเช่ายานพาหนะ (รถโดยสาร ขนาด 12 ที่นั่ง) จำนวน 1 คัน",
+    cells: [
+      "30 กันยายน 2569",
+      "โครงการเช่ายานพาหนะ (รถโดยสาร ขนาด 12 ที่นั่ง) จำนวน 1 คัน",
+      "1,485,000.00",
+      "–",
+    ],
+    href: "/procurement-tor-vehicle-rental-12-seat-2570-25690930.pdf",
+  },
+];
+
 const winnerRows: TableRowSpec[] = [
   {
     matchText: "โครงการปรับปรุงตู้รถไฟโดยสาร: ตู้รถไฟโดยสารนั่งและนอนชั้นหนึ่งปรับอากาศ",
@@ -624,21 +637,17 @@ function applyEmptyCancelWinnerTable(record: WpContentRecord): WpContentRecord {
 
 function applyProcurementDraftYearTable(record: WpContentRecord): WpContentRecord {
   const $ = cheerio.load(record.contentHtml, null, false);
-  if (findYearTable($, YEAR_2570).length > 0) return record;
+  if (findYearTable($, YEAR_2569).length === 0) return record;
 
-  const sourceTbody = findYearTable($, YEAR_2569);
-  if (sourceTbody.length === 0) return record;
+  const hasYear2570 = findYearTable($, YEAR_2570).length > 0;
+  const year2570 = ensureYearTable($, YEAR_2570);
+  if (year2570.length === 0) return record;
 
-  const sourceAccordion = sourceTbody.closest(".lightweight-accordion");
-  const year2570Accordion = sourceAccordion.clone();
-  year2570Accordion
-    .find("summary")
-    .first()
-    .html(`<span><strong>${YEAR_2570}</strong></span>`);
-  year2570Accordion.find("tbody").first().empty();
-  sourceAccordion.before(year2570Accordion);
+  let changed = !hasYear2570;
+  changed = upsertRows($, year2570, procurementDraftRows2570) || changed;
+  changed = renumberRows($, year2570, true) || changed;
 
-  return { ...record, contentHtml: $.html() };
+  return changed ? { ...record, contentHtml: $.html() } : record;
 }
 
 function quarterNumber($: cheerio.CheerioAPI, row: AnyNode): number {
