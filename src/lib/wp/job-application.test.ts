@@ -48,9 +48,9 @@ describe("applyJobApplicationNoticeOverride", () => {
       "https://forms.gle/z3abJcX9QRk8zGGA7",
     );
     expect(notice.find("td").eq(5).find("a").attr("href")).toBe(
-      "/job-application-policy-planning-support-25691001.png",
+      "/job-application-policy-planning-support-25691001.pdf",
     );
-    expect(notice.find("td").eq(5).find("a").text()).toBe("PNG");
+    expect(notice.find("td").eq(5).find("a").text()).toBe("PDF");
     expect($(rows[1]).find("td").eq(1).text()).toBe("23 เมษายน 2569");
     expect(applyJobApplicationNoticeOverride(updated)).toBe(updated);
   });

@@ -8,7 +8,7 @@ const JOB_APPLICATION_PATH = "/ข่าวสาร-กิจกรรม/ร�
 const PREVIOUS_NOTICE_DATE = "28 กันยายน 2569";
 const TARGET_POSITION = "เจ้าหน้าที่สนับสนุนงานนโยบายและแผน";
 const APPLICATION_URL = "https://forms.gle/z3abJcX9QRk8zGGA7";
-const NOTICE_IMAGE_URL = "/job-application-policy-planning-support-25691001.png";
+const NOTICE_DOCUMENT_URL = "/job-application-policy-planning-support-25691001.pdf";
 
 function isJobApplicationPath(path: string): boolean {
   return normalizeRoutePath(path).replace(/^\/en(?=\/)/, "") === JOB_APPLICATION_PATH;
@@ -75,16 +75,16 @@ export function applyJobApplicationNoticeOverride(
   let documentLink: Cheerio<AnyNode> = documentCell.find("a").first();
   if (documentLink.length === 0) {
     documentCell.empty();
-    documentLink = $("<a></a>").text("PNG");
+    documentLink = $("<a></a>").text("PDF");
     documentCell.append(documentLink);
     changed = true;
   }
-  if (documentLink.attr("href") !== NOTICE_IMAGE_URL) {
-    documentLink.attr("href", NOTICE_IMAGE_URL);
+  if (documentLink.attr("href") !== NOTICE_DOCUMENT_URL) {
+    documentLink.attr("href", NOTICE_DOCUMENT_URL);
     changed = true;
   }
-  if (documentLink.text().trim() !== "PNG") {
-    documentLink.text("PNG");
+  if (documentLink.text().trim() !== "PDF") {
+    documentLink.text("PDF");
     changed = true;
   }
   if (documentLink.attr("target") !== "_blank") {
