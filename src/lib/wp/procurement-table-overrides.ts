@@ -16,6 +16,7 @@ const PUBLISHED_STATUS = "เผยแพร่ขึ้นเว็บ";
 
 const QUARTERLY_WINNER_PATH = "/จัดซื้อจัดจ้าง/ประกาศผลผู้ชนะการจัดซื";
 const PROCUREMENT_PRICE_PATH = "/จัดซื้อจัดจ้าง/ประกาศราคากลาง";
+const PROCUREMENT_DRAFT_PATH = "/จัดซื้อจัดจ้าง/ร่างรายการข้อกำหนด-ร่าง";
 const PROCUREMENT_SUMMARY_PATH = "/จัดซื้อจัดจ้าง/ประกาศจดซอจดจางตามแบบส";
 const PROCUREMENT_WINNER_PATH = "/จัดซื้อจัดจ้าง/ประกาศผลผู้ชนะการเสนอร";
 const PROCUREMENT_CANCEL_WINNER_PATH = "/จัดซื้อจัดจ้าง/ยกเลิกประกาศเชิญชวน-ผู้";
@@ -621,6 +622,25 @@ function applyEmptyCancelWinnerTable(record: WpContentRecord): WpContentRecord {
   return !hasYearTable || hasRows ? { ...record, contentHtml: $.html() } : record;
 }
 
+function applyProcurementDraftYearTable(record: WpContentRecord): WpContentRecord {
+  const $ = cheerio.load(record.contentHtml, null, false);
+  if (findYearTable($, YEAR_2570).length > 0) return record;
+
+  const sourceTbody = findYearTable($, YEAR_2569);
+  if (sourceTbody.length === 0) return record;
+
+  const sourceAccordion = sourceTbody.closest(".lightweight-accordion");
+  const year2570Accordion = sourceAccordion.clone();
+  year2570Accordion
+    .find("summary")
+    .first()
+    .html(`<span><strong>${YEAR_2570}</strong></span>`);
+  year2570Accordion.find("tbody").first().empty();
+  sourceAccordion.before(year2570Accordion);
+
+  return { ...record, contentHtml: $.html() };
+}
+
 function quarterNumber($: cheerio.CheerioAPI, row: AnyNode): number {
   const match = rowText($, row).match(/ไตรมาสที่\s*(\d+)/);
   return match ? Number(match[1]) : Number.MAX_SAFE_INTEGER;
@@ -1027,6 +1047,9 @@ export function applyProcurementTableOverrides(record: WpContentRecord): WpConte
   }
   if (path === PROCUREMENT_PRICE_PATH || path === `/en${PROCUREMENT_PRICE_PATH}`) {
     return applyProcurementPriceRows(record);
+  }
+  if (path === PROCUREMENT_DRAFT_PATH || path === `/en${PROCUREMENT_DRAFT_PATH}`) {
+    return applyProcurementDraftYearTable(record);
   }
   if (path === PROCUREMENT_SUMMARY_PATH || path === `/en${PROCUREMENT_SUMMARY_PATH}`) {
     return applyYearTableRows(record, summaryRows);

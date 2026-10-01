@@ -60,6 +60,18 @@ function winnerYearTableHtml(rows: string): string {
   `;
 }
 
+function procurementDraftYearTableHtml(): string {
+  return `
+    <div class="lightweight-accordion"><details>
+      <summary class="lightweight-accordion-title"><span><strong>ปี 2569</strong></span></summary>
+      <div class="lightweight-accordion-body"><figure class="wp-block-table is-style-vk-table-border-stripes"><table>
+        <thead><tr><th>ลำดับ</th><th>วันที่ประกาศ</th><th>โครงการ</th><th>งบประมาณโครงการ (บาท)</th><th>เลขที่เอกสาร/ประกาศ</th><th>เอกสาร</th></tr></thead>
+        <tbody><tr><td>1</td><td>19 ก.พ. 2569</td><td>รายการปี 2569</td><td>1,000.00</td><td>–</td><td><a href="/old.pdf">PDF</a></td></tr></tbody>
+      </table></figure></div>
+    </details></div>
+  `;
+}
+
 function rows(html: string): string[][] {
   const $ = cheerio.load(html, null, false);
   return $(".lightweight-accordion")
@@ -119,6 +131,38 @@ function headersForYear(html: string, year: string): string[] {
 }
 
 describe("applyProcurementTableOverrides", () => {
+  it("adds an empty 2570 procurement draft table using the 2569 headers", () => {
+    const source = record(
+      "/จัดซื้อจัดจ้าง/ร่างรายการข้อกำหนด-ร่าง",
+      procurementDraftYearTableHtml(),
+    );
+    const updated = applyProcurementTableOverrides(source);
+    const $ = cheerio.load(updated.contentHtml, null, false);
+    const years = $(".lightweight-accordion")
+      .map((_, element) =>
+        $(element).find("summary").first().text().replace(/\s+/g, " ").trim(),
+      )
+      .get();
+
+    expect(years).toEqual(["ปี 2570", "ปี 2569"]);
+    expect(headersForYear(updated.contentHtml, "ปี 2570")).toEqual([
+      "ลำดับ",
+      "วันที่ประกาศ",
+      "โครงการ",
+      "งบประมาณโครงการ (บาท)",
+      "เลขที่เอกสาร/ประกาศ",
+      "เอกสาร",
+    ]);
+    expect(rowsForYear(updated.contentHtml, "ปี 2570")).toEqual([]);
+    expect(rowsForYear(updated.contentHtml, "ปี 2569")).toEqual([
+      ["1", "19 ก.พ. 2569", "รายการปี 2569", "1,000.00", "–", "PDF"],
+    ]);
+    expect(
+      $(".lightweight-accordion").first().find("figure").hasClass("wp-block-table"),
+    ).toBe(true);
+    expect(applyProcurementTableOverrides(updated)).toBe(updated);
+  });
+
   it("moves the latest vehicle rental price row to 2570 and preserves its details", () => {
     const source = record(
       "/จัดซื้อจัดจ้าง/ประกาศราคากลาง",
