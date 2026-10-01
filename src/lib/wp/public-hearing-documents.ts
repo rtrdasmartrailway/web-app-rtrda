@@ -4,7 +4,7 @@ import { normalizeRoutePath } from "./url";
 
 export const PUBLIC_HEARING_PATH = "/ประชาพิจารณ์";
 export const PUBLIC_HEARING_DOCUMENT_HREF =
-  "/public-hearing-documents/ss-1001-2569-evacuation.pdf";
+  "/public-hearing-documents/ss-1001-2569-evacuation-20261001.pdf";
 export const PUBLIC_HEARING_COVER_IMAGE =
   "/public-hearing-documents/ss-1001-2569-cover.webp";
 
