@@ -269,7 +269,7 @@ a.language-toggle-item:hover {
   font-weight: 600;
   gap: 8px;
   min-height: 84px;
-  padding: 0 12px;
+  padding: 0 7px;
   position: relative;
   white-space: nowrap;
 }
