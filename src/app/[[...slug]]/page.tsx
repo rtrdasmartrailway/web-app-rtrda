@@ -36,6 +36,7 @@ export async function generateMetadata({
   return {
     title: `${data.record.title} | RTRDA`,
     description: data.record.excerpt || data.record.title,
+    robots: data.record.id.startsWith("certification-") ? { index: false } : undefined,
     alternates: {
       canonical: data.record.path,
     },

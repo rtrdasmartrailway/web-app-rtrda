@@ -12,9 +12,8 @@ describe("certification pages", () => {
   });
 
   it("provides a real Test page for each certification link without inventing a registry", () => {
-    const source = readFileSync("src/app/หน่วยรับรอง/[topic]/page.tsx", "utf8");
+    const source = readFileSync("src/lib/db/page-data.ts", "utf8");
     expect(source).toContain("certificationPages.find");
-    expect(source).toContain("notFound()");
     expect(source).toContain("อยู่ระหว่างจัดเตรียมข้อมูล");
     expect(certificationPages).toHaveLength(4);
   });

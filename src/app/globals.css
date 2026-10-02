@@ -5875,7 +5875,7 @@ a.calendar-cell.has-posts:hover {
 /* ============================================================
    Responsive
    ============================================================ */
-@media (max-width: 1180px) {
+@media (max-width: 1400px) {
   .header-inner {
     min-height: 74px;
   }

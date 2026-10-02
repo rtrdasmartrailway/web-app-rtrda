@@ -43,6 +43,7 @@ import {
   railStrategyPublicationGroups,
 } from "@/lib/wp/rail-strategy-publication";
 import { getMoralityReportPage } from "@/lib/wp/morality-report-documents";
+import { CERTIFICATION_LABEL, certificationPages } from "@/lib/wp/certification";
 import { applyProcurementPlanOverride } from "@/lib/wp/procurement-plan";
 import { applyProcurementTableOverrides } from "@/lib/wp/procurement-table-overrides";
 import { applyProcurementWinnerOverride } from "@/lib/wp/procurement-winner";
@@ -359,7 +360,17 @@ export const getPageData = cache(async (path: string): Promise<PageData | null> 
     const supplementalPage = getSupplementalKnowledgePage(path);
     const landingGuidePage = getLandingGuidePage(path);
     const moralityReportPage = getMoralityReportPage(path);
-    if (!supplementalPage && !landingGuidePage && !moralityReportPage) {
+    const certificationPage = certificationPages.find(
+      (page) =>
+        normalizeRoutePath(path).normalize("NFC") ===
+        "/" + CERTIFICATION_LABEL + "/" + page.slug,
+    );
+    if (
+      !supplementalPage &&
+      !landingGuidePage &&
+      !moralityReportPage &&
+      !certificationPage
+    ) {
       return null;
     }
 
@@ -389,16 +400,27 @@ export const getPageData = cache(async (path: string): Promise<PageData | null> 
             parentPath: "/บริการและข้อมูลสำคัญ",
             idPrefix: "landing-guide",
           }
-        : {
-            slug: moralityReportPage!.slug,
-            path: moralityReportPage!.path,
-            title: moralityReportPage!.title,
-            groups: moralityReportPage!.groups,
-            contentHtml: moralityReportPage!.contentHtml ?? "",
-            parentTitle: "เอกสารเผยแพร่",
-            parentPath: "/เอกสารเผยแพร่",
-            idPrefix: "morality-report",
-          };
+        : certificationPage
+          ? {
+              slug: certificationPage.slug,
+              path: normalizeRoutePath(path),
+              title: certificationPage.label,
+              groups: null,
+              contentHtml: "<p>อยู่ระหว่างจัดเตรียมข้อมูล</p>",
+              parentTitle: CERTIFICATION_LABEL,
+              parentPath: "/" + CERTIFICATION_LABEL,
+              idPrefix: "certification",
+            }
+          : {
+              slug: moralityReportPage!.slug,
+              path: moralityReportPage!.path,
+              title: moralityReportPage!.title,
+              groups: moralityReportPage!.groups,
+              contentHtml: moralityReportPage!.contentHtml ?? "",
+              parentTitle: "เอกสารเผยแพร่",
+              parentPath: "/เอกสารเผยแพร่",
+              idPrefix: "morality-report",
+            };
 
     const syntheticPdfReaderTargets = moralityReportPage
       ? await buildPdfReaderTargets(syntheticPage.contentHtml, {
