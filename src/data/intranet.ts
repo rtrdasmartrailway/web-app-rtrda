@@ -41,7 +41,10 @@ export const NAV: NavGroup[] = [
         label: "SCHEDULE VAN",
         href: "https://calendar.google.com/calendar/embed?src=fdae8485008aad70fc1d1bd0ee210e818b4be9d7582d3405e1c0cd49bb646eb5%40group.calendar.google.com&ctz=Asia%2FBangkok",
       },
-      { label: "Booking", href: "https://forms.gle/ecpXE3mdbFkq9n6R6" },
+      {
+        label: "Booking",
+        href: "https://docs.google.com/forms/d/e/1FAIpQLSdAHR4roxS-UXC40YjQj-bK4nemI9Y752t5pI8Uv5ZO01oOEw/viewform",
+      },
     ],
   },
   {
