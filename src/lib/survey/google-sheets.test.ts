@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { mkdtemp, writeFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { readSurveySummary } from "./google-sheets";
+import { readSurveySummary, readSurveyData } from "./google-sheets";
 
 let directory = "";
 afterEach(async () => {
@@ -53,6 +53,58 @@ describe("Google Sheets read-only adapter", () => {
     expect(JSON.stringify(result)).not.toMatch(
       /private@example|respondent timestamp|secret-password|access-secret|test-client/,
     );
+  });
+
+  it("returns every header and every original cell, padding only trailing blanks", async () => {
+    directory = await mkdtemp(join(tmpdir(), "survey-test-"));
+    const path = join(directory, "token.json");
+    await writeFile(
+      path,
+      JSON.stringify({
+        client_id: "client",
+        client_secret: "secret",
+        refresh_token: "refresh",
+        token_uri: "https://oauth2.googleapis.com/token",
+      }),
+    );
+    const headers = Array.from({ length: 73 }, (_, i) => `คำถาม ${i + 1}`);
+    const row = ["2026-10-02 10:00", "ชื่อผู้ตอบ", "  เว้นวรรค  "];
+    vi.spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(new Response(JSON.stringify({ access_token: "access" })))
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ values: [headers, row, ["", ""]] })),
+      );
+    const data = await readSurveyData(path);
+    expect(data.headers).toEqual(headers);
+    expect(data.responses).toHaveLength(1);
+    expect(data.responses[0].cells).toHaveLength(73);
+    expect(data.responses[0].cells.slice(0, 3)).toEqual(row);
+    expect(data.responses[0].cells[72]).toBe("");
+    expect(data.summary.totalResponses).toBe(1);
+    expect(JSON.stringify(data)).not.toContain("access");
+  });
+
+  it("pads sparse headers to the full 73 survey columns", async () => {
+    directory = await mkdtemp(join(tmpdir(), "survey-test-"));
+    const path = join(directory, "token.json");
+    await writeFile(
+      path,
+      JSON.stringify({
+        client_id: "client",
+        client_secret: "secret",
+        refresh_token: "refresh",
+        token_uri: "https://oauth2.googleapis.com/token",
+      }),
+    );
+    vi.spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(new Response(JSON.stringify({ access_token: "access" })))
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ values: [["ชื่อ"], ["สมชาย", "last field"]] })),
+      );
+    const data = await readSurveyData(path);
+    expect(data.headers).toHaveLength(73);
+    expect(data.responses[0].cells).toHaveLength(73);
+    expect(data.responses[0].cells[1]).toBe("last field");
   });
 
   it("rejects non-Google token endpoints before any outbound request", async () => {

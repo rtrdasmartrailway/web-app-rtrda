@@ -9,7 +9,7 @@ function credential(value: unknown): string | null {
   return typeof value === "string" && value.trim() ? value : null;
 }
 
-export async function readSurveySummary(tokenFile: string) {
+async function readSurveyValues(tokenFile: string): Promise<string[][]> {
   if (!tokenFile.startsWith("/") || !tokenFile.trim())
     throw new Error("Invalid survey configuration");
   const token = JSON.parse(await readFile(tokenFile, "utf8"));
@@ -59,5 +59,28 @@ export async function readSurveySummary(tokenFile: string) {
     )
   )
     throw new Error("Invalid survey sheet response");
-  return aggregateSurvey(data.values as string[][], new Date().toISOString());
+  return data.values as string[][];
 }
+
+export async function readSurveySummary(tokenFile: string) {
+  return aggregateSurvey(await readSurveyValues(tokenFile), new Date().toISOString());
+}
+
+export async function readSurveyData(tokenFile: string) {
+  const values = await readSurveyValues(tokenFile);
+  const headers = Array.from({ length: 73 }, (_, index) => values[0]?.[index] ?? "");
+  const responses = values
+    .slice(1)
+    .map((cells, index) => ({
+      sheetRow: index + 2,
+      cells: headers.map((_, column) => cells[column] ?? ""),
+    }))
+    .filter(({ cells }) => cells.some((cell) => cell.trim()));
+  return {
+    summary: aggregateSurvey(values, new Date().toISOString()),
+    headers,
+    responses,
+  };
+}
+
+export type SurveyData = Awaited<ReturnType<typeof readSurveyData>>;

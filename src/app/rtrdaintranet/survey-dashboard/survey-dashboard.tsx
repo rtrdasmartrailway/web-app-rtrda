@@ -1,7 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
-import type { SurveySummary } from "@/lib/survey/survey-aggregate";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import type { SurveyData } from "@/lib/survey/google-sheets";
 
 const format = new Intl.NumberFormat("th-TH");
 const clock = new Intl.DateTimeFormat("th-TH", {
@@ -11,7 +11,49 @@ const clock = new Intl.DateTimeFormat("th-TH", {
 });
 
 export default function SurveyDashboard() {
-  const [summary, setSummary] = useState<SurveySummary | null>(null);
+  const [data, setData] = useState<SurveyData | null>(null);
+  const summary = data?.summary;
+  const [query, setQuery] = useState("");
+  const [organization, setOrganization] = useState("");
+  const [selectedRow, setSelectedRow] = useState<number | null>(null);
+  const nameColumns = useMemo(
+    () =>
+      data?.headers.flatMap((header, index) =>
+        index < 14 &&
+        /ชื่อ|name|นามสกุล|surname/i.test(header) &&
+        !/หน่วยงาน|organization|ตำแหน่ง|position/i.test(header)
+          ? [index]
+          : [],
+      ) ?? [],
+    [data],
+  );
+  const organizationColumn =
+    data?.headers.findIndex((header) => /หน่วยงาน|องค์กร|organization/i.test(header)) ??
+    -1;
+  const organizationFor = (cells: string[]) =>
+    cells[organizationColumn >= 0 ? organizationColumn : 5] ?? "";
+  const nameFor = (cells: string[], row: number) =>
+    nameColumns
+      .map((index) => cells[index])
+      .filter(Boolean)
+      .join(" ") || `ผู้ตอบลำดับ ${row}`;
+  const organizations = Array.from(
+    new Set(
+      data?.responses
+        .map((response) => organizationFor(response.cells))
+        .filter(Boolean) ?? [],
+    ),
+  ).sort();
+  const filtered =
+    data?.responses.filter(
+      (response) =>
+        (!organization || organizationFor(response.cells) === organization) &&
+        (!query.trim() ||
+          response.cells.some((cell) =>
+            cell.toLocaleLowerCase().includes(query.trim().toLocaleLowerCase()),
+          )),
+    ) ?? [];
+  const selected = data?.responses.find((response) => response.sheetRow === selectedRow);
   const [state, setState] = useState<"loading" | "live" | "stale">("loading");
   const [refreshing, setRefreshing] = useState(false);
 
@@ -22,10 +64,13 @@ export default function SurveyDashboard() {
         cache: "no-store",
         signal,
       });
-      if (!response.ok) throw new Error("unavailable");
-      const next = (await response.json()) as SurveySummary;
+      if (!response.ok) {
+        if (response.status === 401 || response.status === 503) setData(null);
+        throw new Error("unavailable");
+      }
+      const next = (await response.json()) as SurveyData;
       if (signal?.aborted) return;
-      setSummary(next);
+      setData(next);
       setState("live");
     } catch {
       if (!signal?.aborted) setState("stale");
@@ -112,7 +157,7 @@ export default function SurveyDashboard() {
                 </div>
                 <p>จำนวนแบบสำรวจที่ได้รับทั้งหมด</p>
                 <div className="survey-hero-rule" />
-                <small>ข้อมูลแสดงในรูปแบบสถิติรวมเท่านั้น</small>
+                <small>ข้อมูลสรุปและรายละเอียดสำหรับผู้ได้รับอนุญาต</small>
               </article>
               <article className="survey-intro-card">
                 <div className="survey-card-top">
@@ -213,9 +258,124 @@ export default function SurveyDashboard() {
                 )}
               </div>
             </section>
+            <section
+              className="survey-section survey-explorer"
+              aria-labelledby="survey-respondents"
+            >
+              <div className="survey-section-title">
+                <div>
+                  <span className="survey-section-index">04 / RESPONSE EXPLORER</span>
+                  <h2 id="survey-respondents">รายชื่อผู้ตอบ</h2>
+                </div>
+                <span className="survey-section-note">
+                  แสดง {format.format(filtered.length)} จาก{" "}
+                  {format.format(data?.responses.length ?? 0)} รายการ ·
+                  เลือกเพื่อดูคำตอบทั้งชุด
+                </span>
+              </div>
+              <div className="survey-explorer-controls">
+                <label>
+                  ค้นหาผู้ตอบหรือคำตอบ
+                  <input
+                    type="search"
+                    value={query}
+                    onChange={(event) => setQuery(event.target.value)}
+                    placeholder="ชื่อ อีเมล หรือข้อความคำตอบ"
+                  />
+                </label>
+                <label>
+                  กรองตามหน่วยงาน
+                  <select
+                    value={organization}
+                    onChange={(event) => setOrganization(event.target.value)}
+                  >
+                    <option value="">ทุกหน่วยงาน</option>
+                    {organizations.map((value) => (
+                      <option key={value} value={value}>
+                        {value}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+              <div className="survey-response-list">
+                {filtered.length ? (
+                  filtered.map((response) => (
+                    <button
+                      key={response.sheetRow}
+                      type="button"
+                      className="survey-response-item"
+                      onClick={() => setSelectedRow(response.sheetRow)}
+                    >
+                      <span className="survey-response-number">
+                        #{format.format(response.sheetRow - 1)}
+                      </span>
+                      <span>
+                        <strong>{nameFor(response.cells, response.sheetRow - 1)}</strong>
+                        <small>
+                          {organizationFor(response.cells) || "ไม่ระบุหน่วยงาน"}
+                        </small>
+                      </span>
+                      <span className="survey-response-open">ดูคำตอบ ↗</span>
+                    </button>
+                  ))
+                ) : (
+                  <p className="survey-response-empty">ไม่พบคำตอบที่ตรงกับเงื่อนไข</p>
+                )}
+              </div>
+            </section>
             <div className="survey-footnote">
-              อัปเดตอัตโนมัติทุก 30 วินาที · ไม่แสดงข้อมูลรายบุคคลหรือคำตอบแบบรายแถว
+              อัปเดตอัตโนมัติทุก 30 วินาที · ข้อมูลรายบุคคลสำหรับผู้ได้รับอนุญาตเท่านั้น
             </div>
+            {selected && data && (
+              <div
+                className="survey-drawer-backdrop"
+                onClick={() => setSelectedRow(null)}
+              >
+                <aside
+                  className="survey-drawer"
+                  role="dialog"
+                  aria-modal="true"
+                  aria-label="รายละเอียดคำตอบทั้งหมด"
+                  onClick={(event) => event.stopPropagation()}
+                >
+                  <div className="survey-drawer-header">
+                    <div>
+                      <span className="survey-section-index">
+                        RESPONSE / #{format.format(selected.sheetRow - 1)}
+                      </span>
+                      <h2>{nameFor(selected.cells, selected.sheetRow - 1)}</h2>
+                      <p>
+                        รายละเอียดคำตอบทั้งหมด · {format.format(data.headers.length)}{" "}
+                        หัวข้อ
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      aria-label="ปิดรายละเอียด"
+                      onClick={() => setSelectedRow(null)}
+                    >
+                      ✕
+                    </button>
+                  </div>
+                  <div className="survey-drawer-fields">
+                    {data.headers.map((header, index) => (
+                      <div className="survey-drawer-field" key={index}>
+                        <div className="survey-field-label">
+                          <span>{format.format(index + 1).padStart(2, "0")}</span>
+                          {header || `หัวข้อ ${index + 1}`}
+                        </div>
+                        <p>
+                          {selected.cells[index] || (
+                            <span className="survey-no-answer">ไม่ระบุ</span>
+                          )}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                </aside>
+              </div>
+            )}
           </>
         )}
       </div>

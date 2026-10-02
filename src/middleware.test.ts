@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { NextRequest } from "next/server";
-import { middleware } from "./middleware";
+import { middleware } from "./lib/request-policy";
 
 function request(
   url: string,
