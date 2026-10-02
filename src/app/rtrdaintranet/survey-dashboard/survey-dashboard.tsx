@@ -234,7 +234,7 @@ export default function SurveyDashboard() {
                   <h2 id="survey-types">ประเภทหน่วยงาน</h2>
                 </div>
                 <span className="survey-section-note">
-                  แสดงทุกประเภทตามคำตอบจริง · ไม่รวมเป็น “อื่น ๆ”
+                  ตัวเลือก 8 ประเภท + ระบุเอง · แสดงครบแม้ยังไม่มีผู้เลือก
                 </span>
               </div>
               <div className="survey-types">

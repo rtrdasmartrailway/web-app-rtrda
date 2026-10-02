@@ -28,7 +28,15 @@ describe("aggregateSurvey", () => {
     expect(result.updatedAt).toBe("2026-10-02T01:00:00.000Z");
     expect(result.sections).toHaveLength(5);
     expect(result.sections[0]).toMatchObject({ completed: 3, mean: 4 });
-    expect(result.organizationTypes).toEqual([{ label: "มหาวิทยาลัย", count: 3 }]);
+    expect(result.organizationTypes).toHaveLength(9);
+    expect(result.organizationTypes[4]).toEqual({
+      label: "(5) หน่วยบริหารและจัดการทุน",
+      count: 0,
+    });
+    expect(result.organizationTypes[8]).toEqual({
+      label: "(9) ระบุเอง — มหาวิทยาลัย",
+      count: 3,
+    });
     const serialized = JSON.stringify(result);
     for (const secret of [
       "PRIVATE ORGANIZATION NAME",
@@ -39,7 +47,7 @@ describe("aggregateSurvey", () => {
       expect(serialized).not.toContain(secret);
   });
 
-  it("keeps low-frequency fixed choices and sanitizes formula-like values", () => {
+  it("keeps all nine form choices and sanitizes formula-like custom values", () => {
     const result = aggregateSurvey(
       [
         Array(73).fill(""),
@@ -58,11 +66,29 @@ describe("aggregateSurvey", () => {
       "2026-10-02T01:00:00.000Z",
     );
     expect(result.totalResponses).toBe(2);
-    expect(result.organizationTypes).toEqual([
-      { label: "บริษัทเอกชน", count: 1 },
-      { label: "ไม่ระบุประเภท", count: 1 },
-    ]);
+    expect(result.organizationTypes).toHaveLength(9);
+    expect(result.organizationTypes[8]).toEqual({
+      label: "(9) ระบุเอง — บริษัทเอกชน",
+      count: 2,
+    });
     expect(result.sections[0]).toMatchObject({ completed: 1, mean: 4 });
     expect(JSON.stringify(result)).not.toContain("secret");
+  });
+
+  it("counts numbered choices separately and preserves zero-choice slots", () => {
+    const result = aggregateSurvey(
+      [
+        Array(73).fill("heading"),
+        row({ 5: "(2) องค์การมหาชน" }),
+        row({ 5: "(7) หน่วยงานมาตรฐาน/ทดสอบ/รับรอง" }),
+      ],
+      "2026-10-02T01:00:00.000Z",
+    );
+    expect(result.organizationTypes).toHaveLength(9);
+    expect(result.organizationTypes[1].count).toBe(1);
+    expect(result.organizationTypes[4].count).toBe(0);
+    expect(result.organizationTypes[6].count).toBe(1);
+    expect(result.organizationTypes[8].count).toBe(0);
+    expect(result.organizationTypes.reduce((sum, type) => sum + type.count, 0)).toBe(2);
   });
 });
