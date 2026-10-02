@@ -14,7 +14,7 @@ function row(overrides: Record<number, string> = {}) {
 }
 
 describe("aggregateSurvey", () => {
-  it("returns only fixed-schema aggregates and never respondent text", () => {
+  it("returns exact category labels without respondent identifiers", () => {
     const result = aggregateSurvey(
       [
         Array(73).fill("heading"),
@@ -28,19 +28,18 @@ describe("aggregateSurvey", () => {
     expect(result.updatedAt).toBe("2026-10-02T01:00:00.000Z");
     expect(result.sections).toHaveLength(5);
     expect(result.sections[0]).toMatchObject({ completed: 3, mean: 4 });
-    expect(result.organizationTypes).toEqual([{ label: "สถาบันการศึกษา", count: 3 }]);
+    expect(result.organizationTypes).toEqual([{ label: "มหาวิทยาลัย", count: 3 }]);
     const serialized = JSON.stringify(result);
     for (const secret of [
       "PRIVATE ORGANIZATION NAME",
       "secret@example.com",
       "10/01/2026",
       "heading",
-      "มหาวิทยาลัย",
     ])
       expect(serialized).not.toContain(secret);
   });
 
-  it("ignores blank rows and suppresses categories below three", () => {
+  it("keeps low-frequency fixed choices and sanitizes formula-like values", () => {
     const result = aggregateSurvey(
       [
         Array(73).fill(""),
@@ -59,7 +58,10 @@ describe("aggregateSurvey", () => {
       "2026-10-02T01:00:00.000Z",
     );
     expect(result.totalResponses).toBe(2);
-    expect(result.organizationTypes).toEqual([]);
+    expect(result.organizationTypes).toEqual([
+      { label: "บริษัทเอกชน", count: 1 },
+      { label: "ไม่ระบุประเภท", count: 1 },
+    ]);
     expect(result.sections[0]).toMatchObject({ completed: 1, mean: 4 });
     expect(JSON.stringify(result)).not.toContain("secret");
   });

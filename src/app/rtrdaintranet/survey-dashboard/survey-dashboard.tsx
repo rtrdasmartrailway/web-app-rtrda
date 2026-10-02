@@ -234,7 +234,7 @@ export default function SurveyDashboard() {
                   <h2 id="survey-types">ประเภทหน่วยงาน</h2>
                 </div>
                 <span className="survey-section-note">
-                  แสดงเฉพาะกลุ่มที่มีอย่างน้อย 3 คำตอบ
+                  แสดงทุกประเภทตามคำตอบจริง · ไม่รวมเป็น “อื่น ๆ”
                 </span>
               </div>
               <div className="survey-types">
@@ -254,9 +254,7 @@ export default function SurveyDashboard() {
                     </div>
                   ))
                 ) : (
-                  <p className="survey-types-empty">
-                    ยังไม่มีกลุ่มที่มีจำนวนมากพอสำหรับการแสดงผล
-                  </p>
+                  <p className="survey-types-empty">ยังไม่มีข้อมูลประเภทหน่วยงาน</p>
                 )}
               </div>
             </section>

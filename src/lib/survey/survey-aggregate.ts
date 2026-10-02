@@ -1,4 +1,4 @@
-// Only static labels and numeric aggregates may cross the public API boundary.
+// Aggregate labels are safe only behind the dashboard authentication boundary.
 const SECTIONS = [
   { label: "วิจัยและพัฒนา", start: 14 },
   { label: "มาตรฐานและการรับรอง", start: 24 },
@@ -13,12 +13,11 @@ function score(value: string | undefined): number | null {
 }
 
 function organizationType(value: string | undefined): string {
-  const text = value?.trim() ?? "";
-  if (/มหาวิทยาลัย|สถาบันการศึกษา|สถานศึกษา|วิทยาลัย/.test(text)) return "สถาบันการศึกษา";
-  if (/รัฐวิสาหกิจ/.test(text)) return "รัฐวิสาหกิจ";
-  if (/หน่วยงานภาครัฐ|ราชการ|ภาครัฐ|กระทรวง|กรม/.test(text)) return "หน่วยงานภาครัฐ";
-  if (/บริษัท|เอกชน|อุตสาหกรรม/.test(text)) return "ภาคเอกชน";
-  return "อื่น ๆ";
+  const text = (value ?? "").trim().replace(/[\x00-\x1f\x7f]+/g, " ");
+  // Keep the actual fixed choice or the respondent-specified subtype instead
+  // of collapsing distinct organizations into a misleading "other" bucket.
+  if (!text || /^[=+@]/.test(text)) return "ไม่ระบุประเภท";
+  return text.slice(0, 120);
 }
 
 export function aggregateSurvey(rows: string[][], updatedAt: string) {
@@ -32,9 +31,13 @@ export function aggregateSurvey(rows: string[][], updatedAt: string) {
   return {
     totalResponses: responses.length,
     updatedAt,
-    organizationTypes: Array.from(types, ([label, count]) => ({ label, count }))
-      .filter(({ count }) => count >= 3)
-      .sort((a, b) => b.count - a.count),
+    organizationTypes: Array.from(types, ([label, count]) => ({ label, count })).sort(
+      (a, b) => {
+        const codeA = Number(/^\((\d+)\)/.exec(a.label)?.[1] ?? 99);
+        const codeB = Number(/^\((\d+)\)/.exec(b.label)?.[1] ?? 99);
+        return codeA - codeB || a.label.localeCompare(b.label, "th");
+      },
+    ),
     sections: SECTIONS.map(({ label, start }) => {
       let completed = 0;
       let sum = 0;
