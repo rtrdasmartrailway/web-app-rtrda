@@ -452,3 +452,42 @@ it("appends the corruption risk management page to publications", () => {
     }),
   );
 });
+
+it("adds the certification dropdown with four working routes only in Thai", () => {
+  const menu: WpNavigationItem[] = [
+    { label: "หน้าแรก", href: "/", path: "/", external: false, children: [] },
+    {
+      label: "ติดต่อเรา",
+      href: "/ติดต่อเรา",
+      path: "/ติดต่อเรา",
+      external: false,
+      children: [],
+    },
+  ];
+  const path = "/หน่วยรับรอง/หลักเกณฑ์การรับรอง";
+  const nav = buildPrimaryNavigation([], "th", path, menu);
+  const section = nav.find((item) => item.label === "หน่วยรับรอง");
+  expect(nav.map((item) => item.label)).toEqual(["หน้าแรก", "หน่วยรับรอง", "ติดต่อเรา"]);
+  expect(section?.active).toBe(true);
+  expect(
+    section?.children.map(({ label, href, active }) => ({ label, href, active })),
+  ).toEqual([
+    { label: "นโยบาย", href: "/หน่วยรับรอง/นโยบาย", active: false },
+    { label: "หลักเกณฑ์การรับรอง", href: path, active: true },
+    {
+      label: "กระบวนการอุทธรณ์ร้องเรียน",
+      href: "/หน่วยรับรอง/กระบวนการอุทธรณ์ร้องเรียน",
+      active: false,
+    },
+    {
+      label: "ทะเบียนรายชื่อผู้ได้รับการรับรอง",
+      href: "/หน่วยรับรอง/ทะเบียนรายชื่อผู้ได้รับการรับรอง",
+      active: false,
+    },
+  ]);
+  expect(
+    buildPrimaryNavigation([], "en", "/en", menu).some(
+      (item) => item.label === "หน่วยรับรอง",
+    ),
+  ).toBe(false);
+});

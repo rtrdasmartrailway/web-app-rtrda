@@ -1,5 +1,6 @@
 import { normalizeRoutePath } from "./url";
 import { applyContactNavOverride } from "./contact-nav-override";
+import { applyCertificationNavOverride } from "./certification";
 import { applyEnglishNavOverride } from "./english-nav-override";
 import { applyPublicationNavOverride } from "./publication-nav-override";
 import type {
@@ -86,12 +87,16 @@ export function buildPrimaryNavigation(
     const mapped = navigation.map((item) =>
       mapNavigationItem(item, language, currentPath, true),
     );
-    return applyEnglishNavOverride(
-      applyContactNavOverride(
-        applyPublicationNavOverride(mapped, language, currentPath),
+    return applyCertificationNavOverride(
+      applyEnglishNavOverride(
+        applyContactNavOverride(
+          applyPublicationNavOverride(mapped, language, currentPath),
+          language,
+        ),
         language,
       ),
       language,
+      currentPath,
     );
   }
 
@@ -120,12 +125,16 @@ export function buildPrimaryNavigation(
     };
   });
 
-  return applyEnglishNavOverride(
-    applyContactNavOverride(
-      applyPublicationNavOverride(fromRecords, language, currentPath),
+  return applyCertificationNavOverride(
+    applyEnglishNavOverride(
+      applyContactNavOverride(
+        applyPublicationNavOverride(fromRecords, language, currentPath),
+        language,
+      ),
       language,
     ),
     language,
+    currentPath,
   );
 }
 
