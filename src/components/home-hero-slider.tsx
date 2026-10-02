@@ -12,7 +12,7 @@ const SLIDES = [
   },
   {
     src: "/stitch-assets/home-hero-slides/slide-2.png",
-    href: "/สทร-ร่วมประกาศเจตนารมณ์-no-gift-policy-2569",
+    href: "/rtrda-no-gift-policy-2569",
     label: "นโยบาย No Gift Policy",
   },
   {

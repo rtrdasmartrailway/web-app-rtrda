@@ -153,7 +153,7 @@ export const landingGuidePages: LandingGuidePage[] = [
             description: "ข่าวประชาสัมพันธ์ที่เกี่ยวข้องกับ No Gift Policy",
             coverImage: "/stitch-assets/home-hero-slides/slide-2.png",
             coverAlt: "นโยบาย No Gift Policy",
-            previewHref: "/สทร-ร่วมประกาศเจตนารมณ์-no-gift-policy-2569",
+            previewHref: "/rtrda-no-gift-policy-2569",
             downloadHref: null,
             hasUsableTarget: true,
           },

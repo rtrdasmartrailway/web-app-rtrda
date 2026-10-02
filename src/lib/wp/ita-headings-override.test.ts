@@ -420,7 +420,7 @@ describe("applyItaHeadingsOverride", () => {
       {
         title:
           "– สทร.ร่วมประกาศเจตนารมณ์การต่อต้านการทุจริตคอร์รัปชันในองค์กร การไม่รับของขวัญ (No Gift Policy)",
-        href: "/สทร-ร่วมประกาศเจตนารมณ์-no-gift-policy-2569",
+        href: "/rtrda-no-gift-policy-2569",
       },
       {
         title: '– หนังสือประกาศเจตนารมณ์ No Gift Policy "ฉบับภาษาไทย"',
