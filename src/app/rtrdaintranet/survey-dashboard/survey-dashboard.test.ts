@@ -7,7 +7,8 @@ describe("private response explorer wiring", () => {
   it("has search, organization filter, respondent list, and all-field detail view", () => {
     expect(source).toContain("ค้นหาผู้ตอบหรือคำตอบ");
     expect(source).toContain("กรองตามหน่วยงาน");
-    expect(source).toContain("รายชื่อผู้ตอบ");
+    expect(source).toContain("รายการคำตอบและผู้ประสานงาน");
+    expect(source).toContain("cells[4]?.trim()");
     expect(source).toContain("รายละเอียดคำตอบทั้งหมด");
     expect(source).toContain("data.headers.map(");
     expect(source).toContain("selected.cells[index]");

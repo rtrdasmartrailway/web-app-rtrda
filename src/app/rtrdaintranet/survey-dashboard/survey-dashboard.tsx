@@ -36,7 +36,9 @@ export default function SurveyDashboard() {
     nameColumns
       .map((index) => cells[index])
       .filter(Boolean)
-      .join(" ") || `ผู้ตอบลำดับ ${row}`;
+      .join(" ") ||
+    cells[4]?.trim() ||
+    `ผู้ตอบลำดับ ${row}`;
   const organizations = Array.from(
     new Set(
       data?.responses
@@ -265,7 +267,7 @@ export default function SurveyDashboard() {
               <div className="survey-section-title">
                 <div>
                   <span className="survey-section-index">04 / RESPONSE EXPLORER</span>
-                  <h2 id="survey-respondents">รายชื่อผู้ตอบ</h2>
+                  <h2 id="survey-respondents">รายการคำตอบและผู้ประสานงาน</h2>
                 </div>
                 <span className="survey-section-note">
                   แสดง {format.format(filtered.length)} จาก{" "}
