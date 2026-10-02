@@ -90,6 +90,14 @@ describe("security headers", () => {
     expect(headers.get("Cache-Control")).toBe("no-store");
   });
 
+  it("prevents shared caching of the public survey aggregate API", async () => {
+    const routes = await nextConfig.headers?.();
+    const route = routes?.find((value) => value.source === "/api/survey-dashboard");
+    expect(route?.headers.find((header) => header.key === "Cache-Control")?.value).toBe(
+      "private, no-store, max-age=0",
+    );
+  });
+
   it("wires the shared headers into Next.js and hides the framework banner", async () => {
     expect(nextConfig.poweredByHeader).toBe(false);
     const routes = await nextConfig.headers?.();

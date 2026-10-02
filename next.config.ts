@@ -62,6 +62,13 @@ const nextConfig: NextConfig = {
         ],
       },
       {
+        source: "/api/survey-dashboard",
+        headers: [
+          { key: "Cache-Control", value: "private, no-store, max-age=0" },
+          ...SECURITY_HEADERS,
+        ],
+      },
+      {
         source: "/api/pr-center/:path*",
         headers: [{ key: "Cache-Control", value: "no-store" }, ...SECURITY_HEADERS],
       },
