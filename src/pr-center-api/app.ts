@@ -22,7 +22,6 @@ import {
   transitionIdea,
   taskHistory,
   updateTaskAssignment,
-  PrCenterError,
   transitionTask,
   uploadFile,
   downloadFile,
@@ -30,9 +29,15 @@ import {
   listAttachments,
   removeAttachment,
   assignFinalAsset,
+  listAdminUsers,
+  grantRole,
+  revokeRole,
+  toggleUserActive,
+  listAccessAuditEvents,
+  PrCenterError,
   type PrCenterActor,
 } from "@/lib/pr-center/service";
-import { TASK_TRANSITIONS, type PrTaskStatus } from "@/lib/pr-center/workflow";
+import { TASK_TRANSITIONS, type PrCenterRole, type PrTaskStatus, PR_CENTER_ROLES } from "@/lib/pr-center/workflow";
 
 export type ActorResolver = (request: FastifyRequest) => Promise<PrCenterActor | null>;
 export type EntraAuth = {
@@ -461,6 +466,39 @@ export function buildPrCenterApi(
       },
       correlationId(request),
     );
+  });
+  // ── Access Administration routes (SCOPED_ADMINISTRATOR only) ────────────
+  app.get("/admin/users", async (request) => listAdminUsers(request.prCenterActor!));
+  app.post("/admin/users/:userId/roles", async (request, reply) => {
+    const input = await body(request);
+    if (typeof input.role !== "string" || !PR_CENTER_ROLES.includes(input.role as PrCenterRole))
+      throw new PrCenterError("A valid role is required", 422, "INVALID_ROLE");
+    const result = await grantRole(
+      request.prCenterActor!,
+      (request.params as { userId: string }).userId,
+      input.role as PrCenterRole,
+      typeof input.departmentId === "string" ? input.departmentId : null,
+      correlationId(request),
+    );
+    return reply.status(201).send(result);
+  });
+  app.delete("/admin/roles/:roleId", async (request) =>
+    revokeRole(
+      request.prCenterActor!,
+      (request.params as { roleId: string }).roleId,
+      correlationId(request),
+    ),
+  );
+  app.patch("/admin/users/:userId/active", async (request) =>
+    toggleUserActive(
+      request.prCenterActor!,
+      (request.params as { userId: string }).userId,
+      correlationId(request),
+    ),
+  );
+  app.get("/admin/access-audit", async (request) => {
+    const query = request.query as { take?: string };
+    return listAccessAuditEvents(request.prCenterActor!, Number(query.take || 100));
   });
   return app;
 }

@@ -7,6 +7,7 @@ import {
   canAttachFiles,
   canRemoveAttachment,
   canAssignFinalAsset,
+  canManageAccess,
   publicationGate,
 } from "./workflow";
 
@@ -79,5 +80,13 @@ describe("PR Center workflow policy", () => {
     expect(canAssignFinalAsset("REQUESTER")).toBe(false);
     expect(canAssignFinalAsset("APPROVER")).toBe(false);
     expect(canAssignFinalAsset("EXECUTIVE_READ_ONLY")).toBe(false);
+  });
+
+  it("restricts access administration to SCOPED_ADMINISTRATOR only", () => {
+    expect(canManageAccess("SCOPED_ADMINISTRATOR")).toBe(true);
+    expect(canManageAccess("PR_OPERATIONS")).toBe(false);
+    expect(canManageAccess("REQUESTER")).toBe(false);
+    expect(canManageAccess("APPROVER")).toBe(false);
+    expect(canManageAccess("EXECUTIVE_READ_ONLY")).toBe(false);
   });
 });

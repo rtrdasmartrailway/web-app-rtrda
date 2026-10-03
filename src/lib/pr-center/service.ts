@@ -18,9 +18,11 @@ import {
   canAttachFiles,
   canRemoveAttachment,
   canAssignFinalAsset,
+  canManageAccess,
   publicationGate,
   type PrCenterRole,
   type PrTaskStatus as WorkflowStatus,
+  PR_CENTER_ROLES,
 } from "./workflow";
 import {
   storeFile,
@@ -1549,5 +1551,157 @@ export async function assignFinalAsset(
       },
     });
     return { taskId: task.id, revisionNumber: targetRevisionNumber, fileId: fileObject.id };
+  });
+}
+
+// ── Access Administration (SCOPED_ADMINISTRATOR only) ────────────────────
+
+export async function listAdminUsers(actor: PrCenterActor) {
+  if (!canManageAccess(actor.role))
+    throw new PrCenterError("You cannot view user directory", 403, "FORBIDDEN");
+  return prisma.prCenterUser.findMany({
+    where: { organizationId: actor.organizationId },
+    include: {
+      department: { select: { id: true, name: true } },
+      roles: { select: { id: true, role: true, departmentId: true } },
+    },
+    orderBy: { displayName: "asc" },
+  });
+}
+
+export async function grantRole(
+  actor: PrCenterActor,
+  userId: string,
+  role: PrCenterRole,
+  departmentId: string | null,
+  correlationId: string = randomUUID(),
+) {
+  if (!canManageAccess(actor.role))
+    throw new PrCenterError("You cannot grant roles", 403, "FORBIDDEN");
+  if (!PR_CENTER_ROLES.includes(role))
+    throw new PrCenterError("Invalid role code", 422, "INVALID_ROLE");
+  const user = await prisma.prCenterUser.findFirst({
+    where: { id: userId, organizationId: actor.organizationId },
+  });
+  if (!user) throw new PrCenterError("User not found", 404, "NOT_FOUND");
+  if (departmentId) {
+    const dept = await prisma.prDepartment.findFirst({
+      where: { id: departmentId, organizationId: actor.organizationId },
+    });
+    if (!dept) throw new PrCenterError("Department not found", 404, "DEPARTMENT_NOT_FOUND");
+  }
+  const existing = await prisma.prUserRole.findFirst({
+    where: { userId, role, organizationId: actor.organizationId, departmentId: departmentId ?? null },
+  });
+  if (existing)
+    throw new PrCenterError("User already has this role in this scope", 409, "ROLE_ALREADY_ASSIGNED");
+  return prisma.$transaction(async (tx) => {
+    const granted = await tx.prUserRole.create({
+      data: {
+        userId,
+        role,
+        organizationId: actor.organizationId,
+        departmentId: departmentId ?? null,
+      },
+    });
+    await tx.prAuditEvent.create({
+      data: {
+        organizationId: actor.organizationId,
+        actorId: actor.id,
+        action: "access.role_granted",
+        entityType: "user",
+        entityId: userId,
+        correlationId,
+        after: { roleId: granted.id, role, departmentId: departmentId ?? null },
+      },
+    });
+    return granted;
+  });
+}
+
+export async function revokeRole(
+  actor: PrCenterActor,
+  roleId: string,
+  correlationId: string = randomUUID(),
+) {
+  if (!canManageAccess(actor.role))
+    throw new PrCenterError("You cannot revoke roles", 403, "FORBIDDEN");
+  const roleRecord = await prisma.prUserRole.findFirst({
+    where: { id: roleId, organizationId: actor.organizationId },
+    include: { user: { select: { id: true, displayName: true } } },
+  });
+  if (!roleRecord) throw new PrCenterError("Role assignment not found", 404, "NOT_FOUND");
+  return prisma.$transaction(async (tx) => {
+    await tx.prUserRole.delete({ where: { id: roleId } });
+    await tx.prAuditEvent.create({
+      data: {
+        organizationId: actor.organizationId,
+        actorId: actor.id,
+        action: "access.role_revoked",
+        entityType: "user",
+        entityId: roleRecord.userId,
+        correlationId,
+        before: { roleId, role: roleRecord.role, departmentId: roleRecord.departmentId },
+      },
+    });
+    return { id: roleId, removed: true };
+  });
+}
+
+export async function toggleUserActive(
+  actor: PrCenterActor,
+  userId: string,
+  correlationId: string = randomUUID(),
+) {
+  if (!canManageAccess(actor.role))
+    throw new PrCenterError("You cannot modify user status", 403, "FORBIDDEN");
+  const user = await prisma.prCenterUser.findFirst({
+    where: { id: userId, organizationId: actor.organizationId },
+  });
+  if (!user) throw new PrCenterError("User not found", 404, "NOT_FOUND");
+  if (user.id === actor.id)
+    throw new PrCenterError("You cannot deactivate yourself", 422, "SELF_DEACTIVATION_BLOCKED");
+  const nextActive = !user.active;
+  return prisma.$transaction(async (tx) => {
+    const updated = await tx.prCenterUser.update({
+      where: { id: userId },
+      data: { active: nextActive },
+    });
+    await tx.prAuditEvent.create({
+      data: {
+        organizationId: actor.organizationId,
+        actorId: actor.id,
+        action: nextActive ? "access.user_activated" : "access.user_deactivated",
+        entityType: "user",
+        entityId: userId,
+        correlationId,
+        before: { active: user.active },
+        after: { active: nextActive },
+      },
+    });
+    return { id: userId, active: updated.active };
+  });
+}
+
+export async function listAccessAuditEvents(actor: PrCenterActor, take = 100) {
+  if (!canManageAccess(actor.role))
+    throw new PrCenterError("You cannot view access audit events", 403, "FORBIDDEN");
+  const limit = Math.min(Math.max(take, 1), 500);
+  return prisma.prAuditEvent.findMany({
+    where: {
+      organizationId: actor.organizationId,
+      action: {
+        in: [
+          "access.role_granted",
+          "access.role_revoked",
+          "access.user_activated",
+          "access.user_deactivated",
+          "auth.oidc_login",
+        ],
+      },
+    },
+    include: { actor: { select: { displayName: true, email: true } } },
+    orderBy: { createdAt: "desc" },
+    take: limit,
   });
 }

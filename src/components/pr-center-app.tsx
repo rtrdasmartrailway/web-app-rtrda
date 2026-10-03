@@ -195,6 +195,8 @@ const PHASE_1_PAGES = new Set<Page>([
   "approvals",
   "notifications",
   "history",
+  "directory",
+  "settings",
 ]);
 
 const copy = {
@@ -1300,12 +1302,7 @@ export function PrCenterApp({
       ),
     }));
   };
-  const switchUser = (userId: string) => {
-    const next = getUser(userId);
-    if (!next) return;
-    updateState((previous) => ({ ...previous, currentUserId: userId }));
-    if (!ROLE_PAGES[next.role].includes(page)) setPage("home");
-  };
+
   const resetData = () => {
     if (!window.confirm("Reset all PR Center demo data?")) return;
     setState(cloneDefaultState());
@@ -1537,17 +1534,13 @@ export function PrCenterApp({
           {page === "history" && (
             <History audit={state.audit} language={state.language} />
           )}
-          {page === "directory" && (
+          {page === "directory" && actor && (
             <Directory
-              users={users}
-              currentUserId={currentUser.id}
-              onSwitch={switchUser}
+              actor={actor}
             />
           )}
-          {page === "settings" && (
+          {page === "settings" && actor && (
             <Settings
-              data={state.masterData}
-              onSave={updateMasterData}
               language={state.language}
             />
           )}
@@ -3064,45 +3057,170 @@ function History({ audit, language }: { audit: AuditEntry[]; language: Language 
   );
 }
 function Directory({
-  users: directoryUsers,
-  currentUserId,
-  onSwitch,
+  actor,
 }: {
-  users: User[];
-  currentUserId: string;
-  onSwitch: (userId: string) => void;
+  actor: {
+    userId: string;
+    displayName: string;
+    role: string;
+  };
 }) {
+  const [users, setUsers] = useState<Array<{
+    id: string;
+    displayName: string;
+    email: string;
+    active: boolean;
+    department: { id: string; name: string } | null;
+    roles: Array<{ id: string; role: string; departmentId: string | null }>;
+  }>>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [grantTarget, setGrantTarget] = useState<string | null>(null);
+  const [grantRole, setGrantRole] = useState<string>("REQUESTER");
+  const [notice, setNotice] = useState<string | null>(null);
+
+  const reload = () => {
+    setError(null);
+    fetch("/api/pr-center/admin/users", { credentials: "same-origin" })
+      .then(async (r) => {
+        if (!r.ok) throw new Error("Could not load users");
+        setUsers(await r.json());
+      })
+      .catch(() => setError("Could not load user directory"))
+      .finally(() => setLoading(false));
+  };
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/pr-center/admin/users", { credentials: "same-origin" })
+      .then(async (r) => {
+        if (!r.ok) throw new Error("Could not load users");
+        if (!cancelled) setUsers(await r.json());
+      })
+      .catch(() => { if (!cancelled) setError("Could not load user directory"); })
+      .finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
+  }, []);
+
+  const handleGrant = async (userId: string) => {
+    setNotice(null);
+    setError(null);
+    const res = await fetch(`/api/pr-center/admin/users/${userId}/roles`, {
+      method: "POST",
+      credentials: "same-origin",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ role: grantRole }),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => null);
+      setError(err?.message || "Grant failed");
+      return;
+    }
+    setNotice("Role granted");
+    setGrantTarget(null);
+    reload();
+  };
+
+  const handleRevoke = async (roleId: string) => {
+    setNotice(null);
+    setError(null);
+    const res = await fetch(`/api/pr-center/admin/roles/${roleId}`, {
+      method: "DELETE",
+      credentials: "same-origin",
+    });
+    if (!res.ok) {
+      setError("Revoke failed");
+      return;
+    }
+    setNotice("Role revoked");
+    reload();
+  };
+
+  const handleToggleActive = async (userId: string) => {
+    setNotice(null);
+    setError(null);
+    const res = await fetch(`/api/pr-center/admin/users/${userId}/active`, {
+      method: "PATCH",
+      credentials: "same-origin",
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => null);
+      setError(err?.message || "Status toggle failed");
+      return;
+    }
+    setNotice("User status updated");
+    reload();
+  };
+
   return (
     <>
       <SectionHeading
-        eyebrow="PEOPLE"
+        eyebrow="ACCESS ADMINISTRATION"
         title="User Directory"
-        action={
-          <select
-            value={currentUserId}
-            onChange={(event) => onSwitch(event.target.value)}
-            aria-label="Demo role switcher"
-          >
-            {directoryUsers.map((user) => (
-              <option key={user.id} value={user.id}>
-                {user.name} ({user.role})
-              </option>
-            ))}
-          </select>
-        }
       />
-      <section className={styles.directory}>
-        {directoryUsers.map((user) => (
-          <article key={user.id}>
-            <b>{user.name.slice(0, 2)}</b>
+      {notice && <p style={{ color: "#16a34a", fontSize: 13, margin: "4px 0" }}>{notice}</p>}
+      {error && <p style={{ color: "#dc2626", fontSize: 13, margin: "4px 0" }}>{error}</p>}
+      {loading && <p>Loading user directory…</p>}
+      {!loading && users.map((user) => (
+        <article key={user.id} className={styles.card} style={{ marginBottom: 12 }}>
+          <header>
             <div>
-              <h2>{user.name}</h2>
-              <span>{user.role}</span>
+              <h2>{user.displayName}</h2>
+              <p style={{ fontSize: 13, color: "#6b7280" }}>{user.email}</p>
+              <p style={{ fontSize: 13 }}>
+                {user.department?.name || "No department"} · {user.active ? "Active" : "Inactive"}
+              </p>
             </div>
-            <Status>{user.active ? "Active" : "Inactive"}</Status>
-          </article>
-        ))}
-      </section>
+            <div style={{ display: "flex", gap: 8 }}>
+              <button
+                onClick={() => handleToggleActive(user.id)}
+                disabled={user.id === actor.userId}
+                style={{ fontSize: 12, color: user.active ? "#dc2626" : "#16a34a" }}
+              >
+                {user.active ? "Deactivate" : "Activate"}
+              </button>
+              <button
+                onClick={() => setGrantTarget(grantTarget === user.id ? null : user.id)}
+                style={{ fontSize: 12 }}
+              >
+                + Grant role
+              </button>
+            </div>
+          </header>
+          <div style={{ marginTop: 8 }}>
+            <p style={{ fontSize: 12, fontWeight: 600, marginBottom: 4 }}>Assigned roles:</p>
+            {user.roles.length === 0 && <p style={{ fontSize: 12, color: "#6b7280" }}>No roles assigned</p>}
+            {user.roles.map((r) => (
+              <span key={r.id} style={{ display: "inline-flex", alignItems: "center", gap: 4, marginRight: 8, marginBottom: 4, padding: "2px 8px", background: "#f3f4f6", borderRadius: 4, fontSize: 12 }}>
+                {r.role}
+                <button
+                  onClick={() => handleRevoke(r.id)}
+                  style={{ fontSize: 11, color: "#dc2626", background: "none", border: "none", cursor: "pointer", padding: 0 }}
+                >
+                  ✕
+                </button>
+              </span>
+            ))}
+          </div>
+          {grantTarget === user.id && (
+            <div style={{ marginTop: 8, display: "flex", gap: 8, alignItems: "center" }}>
+              <select value={grantRole} onChange={(e) => setGrantRole(e.target.value)} style={{ fontSize: 12 }}>
+                <option value="REQUESTER">REQUESTER</option>
+                <option value="PR_OPERATIONS">PR_OPERATIONS</option>
+                <option value="APPROVER">APPROVER</option>
+                <option value="EXECUTIVE_READ_ONLY">EXECUTIVE_READ_ONLY</option>
+                <option value="SCOPED_ADMINISTRATOR">SCOPED_ADMINISTRATOR</option>
+              </select>
+              <button onClick={() => handleGrant(user.id)} className={styles.primary} style={{ fontSize: 12 }}>
+                Confirm grant
+              </button>
+              <button onClick={() => setGrantTarget(null)} style={{ fontSize: 12 }}>
+                Cancel
+              </button>
+            </div>
+          )}
+        </article>
+      ))}
     </>
   );
 }
@@ -3159,39 +3277,72 @@ function MasterDataEditor({
   );
 }
 function Settings({
-  data,
-  onSave,
   language,
 }: {
-  data: MasterData;
-  onSave: (data: MasterData) => void;
   language: Language;
 }) {
+  const [auditEvents, setAuditEvents] = useState<Array<{
+    id: string;
+    action: string;
+    entityType: string;
+    entityId: string;
+    createdAt: string;
+    before: unknown;
+    after: unknown;
+    actor: { displayName: string; email: string } | null;
+  }>>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/pr-center/admin/access-audit?take=200", { credentials: "same-origin" })
+      .then(async (r) => {
+        if (!r.ok) throw new Error("Could not load access audit");
+        if (!cancelled) setAuditEvents(await r.json());
+      })
+      .catch(() => { if (!cancelled) setError("Could not load access audit events"); })
+      .finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
+  }, []);
+
+  const actionLabel: Record<string, string> = {
+    "access.role_granted": "Role granted",
+    "access.role_revoked": "Role revoked",
+    "access.user_activated": "User activated",
+    "access.user_deactivated": "User deactivated",
+    "auth.oidc_login": "SSO login",
+  };
+
   return (
     <>
       <SectionHeading
-        eyebrow="ADMINISTRATION"
-        title={language === "th" ? "การตั้งค่าสิทธิ์และขั้นตอน" : "Permission Settings"}
+        eyebrow="ACCESS ADMINISTRATION"
+        title={language === "th" ? "บันทึกการเข้าถึง" : "Access Audit Log"}
       />
-      <section className={styles.settings}>
-        <MasterDataEditor
-          label={language === "th" ? "ขั้นตอนอนุมัติ" : "Approval stages"}
-          values={data.approvalStages}
-          onSave={(approvalStages) => onSave({ ...data, approvalStages })}
-        />
-        <MasterDataEditor
-          label={language === "th" ? "ช่องทางเผยแพร่" : "Channels"}
-          values={data.channels}
-          onSave={(channels) => onSave({ ...data, channels })}
-        />
+      {error && <p style={{ color: "#dc2626", fontSize: 13 }}>{error}</p>}
+      {loading && <p>Loading audit events…</p>}
+      {!loading && auditEvents.length === 0 && (
         <article className={styles.card}>
-          <h2>{language === "th" ? "บทบาทในเดโม" : "Demo roles"}</h2>
-          <p>
-            Admin · PR Lead · Executive · Project owner · Approver · Writer · Designer ·
-            Video producer · Requester
-          </p>
+          <p>No access events recorded yet.</p>
         </article>
-      </section>
+      )}
+      {!loading && auditEvents.length > 0 && (
+        <article className={styles.card}>
+          <Table
+            headers={["Time", "Action", "Actor", "Entity", "Details"]}
+            rows={auditEvents.map((event) => [
+              new Date(event.createdAt).toLocaleString(
+                language === "th" ? "th-TH-u-ca-buddhist" : "en-GB",
+              ),
+              actionLabel[event.action] || event.action,
+              event.actor?.displayName || "system",
+              event.entityId,
+              JSON.stringify(event.after || event.before || ""),
+            ])}
+          />
+        </article>
+      )}
     </>
   );
 }

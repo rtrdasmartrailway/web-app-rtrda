@@ -102,6 +102,10 @@ export function canAssignFinalAsset(role: PrCenterRole): boolean {
   return role === "PR_OPERATIONS" || role === "SCOPED_ADMINISTRATOR";
 }
 
+export function canManageAccess(role: PrCenterRole): boolean {
+  return role === "SCOPED_ADMINISTRATOR";
+}
+
 export function publicationGate(input: {
   approved: boolean;
   ownerId: string | null;

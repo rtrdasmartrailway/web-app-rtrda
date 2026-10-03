@@ -112,3 +112,98 @@ describe("File and attachment route guards", () => {
     await app.close();
   });
 });
+
+describe("Access administration route guards", () => {
+  const adminActor = {
+    ...mockActor,
+    role: "SCOPED_ADMINISTRATOR" as const,
+  };
+
+  it("rejects unauthenticated admin user list", async () => {
+    const app = buildPrCenterApi(async () => null);
+    const response = await app.inject({ method: "GET", url: "/admin/users" });
+    expect(response.statusCode).toBe(401);
+    await app.close();
+  });
+
+  it("rejects non-admin role from listing users", async () => {
+    const app = buildPrCenterApi(async () => mockActor);
+    const response = await app.inject({ method: "GET", url: "/admin/users" });
+    expect(response.statusCode).toBe(403);
+    const body = response.json();
+    expect(body.error).toBe("FORBIDDEN");
+    await app.close();
+  });
+
+  it("rejects non-admin role from granting roles", async () => {
+    const app = buildPrCenterApi(async () => mockActor);
+    const response = await app.inject({
+      method: "POST",
+      url: "/admin/users/some-id/roles",
+      payload: { role: "REQUESTER" },
+    });
+    expect(response.statusCode).toBe(403);
+    await app.close();
+  });
+
+  it("rejects invalid role code in grant request", async () => {
+    const app = buildPrCenterApi(async () => adminActor);
+    const response = await app.inject({
+      method: "POST",
+      url: "/admin/users/some-id/roles",
+      payload: { role: "INVALID_ROLE" },
+    });
+    expect(response.statusCode).toBe(422);
+    const body = response.json();
+    expect(body.error).toBe("INVALID_ROLE");
+    await app.close();
+  });
+
+  it("rejects non-admin role from revoking roles", async () => {
+    const app = buildPrCenterApi(async () => mockActor);
+    const response = await app.inject({
+      method: "DELETE",
+      url: "/admin/roles/some-role-id",
+    });
+    expect(response.statusCode).toBe(403);
+    await app.close();
+  });
+
+  it("rejects non-admin role from toggling user active", async () => {
+    const app = buildPrCenterApi(async () => mockActor);
+    const response = await app.inject({
+      method: "PATCH",
+      url: "/admin/users/some-id/active",
+    });
+    expect(response.statusCode).toBe(403);
+    await app.close();
+  });
+
+  it("rejects non-admin role from viewing access audit", async () => {
+    const app = buildPrCenterApi(async () => mockActor);
+    const response = await app.inject({ method: "GET", url: "/admin/access-audit" });
+    expect(response.statusCode).toBe(403);
+    await app.close();
+  });
+
+  it("rejects unauthenticated access audit", async () => {
+    const app = buildPrCenterApi(async () => null);
+    const response = await app.inject({ method: "GET", url: "/admin/access-audit" });
+    expect(response.statusCode).toBe(401);
+    await app.close();
+  });
+
+  it("rejects unauthenticated role revocation", async () => {
+    const app = buildPrCenterApi(async () => null);
+    const response = await app.inject({ method: "DELETE", url: "/admin/roles/some-id" });
+    expect(response.statusCode).toBe(401);
+    await app.close();
+  });
+
+  it("rejects unauthenticated user active toggle", async () => {
+    const app = buildPrCenterApi(async () => null);
+    const response = await app.inject({ method: "PATCH", url: "/admin/users/some-id/active" });
+    expect(response.statusCode).toBe(401);
+    await app.close();
+  });
+});
