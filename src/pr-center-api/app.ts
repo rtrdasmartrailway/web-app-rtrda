@@ -38,6 +38,9 @@ import {
   listQuarantinedFiles,
   reviewQuarantinedFile,
   rescanFile,
+  exportAuditEvents,
+  restoreRequest,
+  releaseReadinessCheck,
   PrCenterError,
   type PrCenterActor,
 } from "@/lib/pr-center/service";
@@ -530,6 +533,32 @@ export function buildPrCenterApi(
       (request.params as { fileId: string }).fileId,
       correlationId(request),
     ),
+  );
+  // ── Audit export (SCOPED_ADMINISTRATOR) ──────────────────────────────
+  app.post("/audit/export", async (request) => {
+    const input = await body(request);
+    return exportAuditEvents(request.prCenterActor!, {
+      from: typeof input.from === "string" ? input.from : undefined,
+      to: typeof input.to === "string" ? input.to : undefined,
+      entityType:
+        typeof input.entityType === "string" ? input.entityType : undefined,
+      actorId: typeof input.actorId === "string" ? input.actorId : undefined,
+    });
+  });
+  // ── Restore / compensating-change (SCOPED_ADMINISTRATOR) ─────────────
+  app.post("/requests/:requestId/restore", async (request) => {
+    const input = await body(request);
+    return restoreRequest(
+      request.prCenterActor!,
+      taskId((request.params as { requestId: string }).requestId),
+      expectedVersion(request),
+      typeof input.reason === "string" ? input.reason : undefined,
+      correlationId(request),
+    );
+  });
+  // ── Release readiness (SCOPED_ADMINISTRATOR) ─────────────────────────
+  app.get("/admin/release-readiness", async (request) =>
+    releaseReadinessCheck(request.prCenterActor!),
   );
   return app;
 }

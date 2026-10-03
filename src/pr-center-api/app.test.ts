@@ -298,3 +298,114 @@ describe("Quarantine management route guards", () => {
     await app.close();
   });
 });
+
+describe("Audit export route guards", () => {
+  const adminActor = {
+    ...mockActor,
+    role: "SCOPED_ADMINISTRATOR" as const,
+  };
+
+  it("rejects unauthenticated audit export", async () => {
+    const app = buildPrCenterApi(async () => null);
+    const response = await app.inject({
+      method: "POST",
+      url: "/audit/export",
+      payload: {},
+    });
+    expect(response.statusCode).toBe(401);
+    await app.close();
+  });
+
+  it("rejects non-admin role from audit export", async () => {
+    const app = buildPrCenterApi(async () => mockActor);
+    const response = await app.inject({
+      method: "POST",
+      url: "/audit/export",
+      payload: {},
+    });
+    expect(response.statusCode).toBe(403);
+    const body = response.json();
+    expect(body.error).toBe("FORBIDDEN");
+    await app.close();
+  });
+
+  it("rejects non-POST body on audit export", async () => {
+    const app = buildPrCenterApi(async () => adminActor);
+    const response = await app.inject({
+      method: "POST",
+      url: "/audit/export",
+      payload: "not-json",
+      headers: { "content-type": "text/plain" },
+    });
+    expect(response.statusCode).toBe(400);
+    await app.close();
+  });
+});
+
+describe("Restore request route guards", () => {
+  const adminActor = {
+    ...mockActor,
+    role: "SCOPED_ADMINISTRATOR" as const,
+  };
+
+  it("rejects unauthenticated restore", async () => {
+    const app = buildPrCenterApi(async () => null);
+    const response = await app.inject({
+      method: "POST",
+      url: "/requests/some-id/restore",
+      headers: { "if-match": "1" },
+      payload: { reason: "test" },
+    });
+    expect(response.statusCode).toBe(401);
+    await app.close();
+  });
+
+  it("rejects non-admin role from restore", async () => {
+    const app = buildPrCenterApi(async () => mockActor);
+    const response = await app.inject({
+      method: "POST",
+      url: "/requests/00000000-0000-4000-8000-000000000001/restore",
+      headers: { "if-match": "1" },
+      payload: { reason: "test" },
+    });
+    expect(response.statusCode).toBe(403);
+    const body = response.json();
+    expect(body.error).toBe("FORBIDDEN");
+    await app.close();
+  });
+
+  it("rejects restore without If-Match header", async () => {
+    const app = buildPrCenterApi(async () => adminActor);
+    const response = await app.inject({
+      method: "POST",
+      url: "/requests/00000000-0000-4000-8000-000000000001/restore",
+      payload: { reason: "test" },
+    });
+    expect(response.statusCode).toBe(428);
+    await app.close();
+  });
+});
+
+describe("Release readiness route guards", () => {
+  it("rejects unauthenticated release readiness", async () => {
+    const app = buildPrCenterApi(async () => null);
+    const response = await app.inject({
+      method: "GET",
+      url: "/admin/release-readiness",
+    });
+    expect(response.statusCode).toBe(401);
+    await app.close();
+  });
+
+  it("rejects non-admin role from release readiness", async () => {
+    const app = buildPrCenterApi(async () => mockActor);
+    const response = await app.inject({
+      method: "GET",
+      url: "/admin/release-readiness",
+    });
+    expect(response.statusCode).toBe(403);
+    const body = response.json();
+    expect(body.error).toBe("FORBIDDEN");
+    await app.close();
+  });
+});

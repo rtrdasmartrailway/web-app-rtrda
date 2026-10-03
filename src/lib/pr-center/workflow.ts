@@ -110,6 +110,14 @@ export function canManageQuarantine(role: PrCenterRole): boolean {
   return role === "SCOPED_ADMINISTRATOR" || role === "PR_OPERATIONS";
 }
 
+export function canExportAudit(role: PrCenterRole): boolean {
+  return role === "SCOPED_ADMINISTRATOR";
+}
+
+export function canRestoreRequests(role: PrCenterRole): boolean {
+  return role === "SCOPED_ADMINISTRATOR";
+}
+
 export function publicationGate(input: {
   approved: boolean;
   ownerId: string | null;

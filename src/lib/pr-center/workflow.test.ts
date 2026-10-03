@@ -9,6 +9,8 @@ import {
   canAssignFinalAsset,
   canManageAccess,
   canManageQuarantine,
+  canExportAudit,
+  canRestoreRequests,
   publicationGate,
 } from "./workflow";
 
@@ -97,5 +99,21 @@ describe("PR Center workflow policy", () => {
     expect(canManageQuarantine("REQUESTER")).toBe(false);
     expect(canManageQuarantine("APPROVER")).toBe(false);
     expect(canManageQuarantine("EXECUTIVE_READ_ONLY")).toBe(false);
+  });
+
+  it("restricts audit export to SCOPED_ADMINISTRATOR only", () => {
+    expect(canExportAudit("SCOPED_ADMINISTRATOR")).toBe(true);
+    expect(canExportAudit("PR_OPERATIONS")).toBe(false);
+    expect(canExportAudit("REQUESTER")).toBe(false);
+    expect(canExportAudit("APPROVER")).toBe(false);
+    expect(canExportAudit("EXECUTIVE_READ_ONLY")).toBe(false);
+  });
+
+  it("restricts request restore to SCOPED_ADMINISTRATOR only", () => {
+    expect(canRestoreRequests("SCOPED_ADMINISTRATOR")).toBe(true);
+    expect(canRestoreRequests("PR_OPERATIONS")).toBe(false);
+    expect(canRestoreRequests("REQUESTER")).toBe(false);
+    expect(canRestoreRequests("APPROVER")).toBe(false);
+    expect(canRestoreRequests("EXECUTIVE_READ_ONLY")).toBe(false);
   });
 });
