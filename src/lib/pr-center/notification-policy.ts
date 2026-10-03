@@ -46,12 +46,7 @@ export function prefixedTitle(category: NotificationCategory, body: string): str
 const DUE_REMINDER_HOURS = 48;
 
 /** Closed/terminal statuses that should not receive reminders. */
-const TERMINAL_STATUSES = new Set([
-  "PUBLISHED",
-  "CLOSED",
-  "CANCELLED",
-  "REJECTED",
-]);
+const TERMINAL_STATUSES = new Set(["PUBLISHED", "CLOSED", "CANCELLED", "REJECTED"]);
 
 // ── Reminder computation ────────────────────────────────────────────────
 
@@ -203,9 +198,7 @@ export async function evaluateNotificationPolicy(): Promise<PolicyEvaluationResu
     },
     select: { userId: true, title: true },
   });
-  const recentKeys = new Set(
-    recentNotifications.map((n) => `${n.userId}:${n.title}`),
-  );
+  const recentKeys = new Set(recentNotifications.map((n) => `${n.userId}:${n.title}`));
 
   const notifications: Array<{
     userId: string;
@@ -216,10 +209,7 @@ export async function evaluateNotificationPolicy(): Promise<PolicyEvaluationResu
 
   for (const task of dueTasks) {
     if (!task.ownerId) continue;
-    const title = prefixedTitle(
-      "DUE",
-      `Task due soon: ${task.title.slice(0, 80)}`,
-    );
+    const title = prefixedTitle("DUE", `Task due soon: ${task.title.slice(0, 80)}`);
     const key = `${task.ownerId}:${title}`;
     if (recentKeys.has(key)) continue;
     notifications.push({
@@ -232,10 +222,7 @@ export async function evaluateNotificationPolicy(): Promise<PolicyEvaluationResu
 
   for (const task of overdueTasks) {
     if (!task.ownerId) continue;
-    const title = prefixedTitle(
-      "OVERDUE",
-      `Task overdue: ${task.title.slice(0, 80)}`,
-    );
+    const title = prefixedTitle("OVERDUE", `Task overdue: ${task.title.slice(0, 80)}`);
     const key = `${task.ownerId}:${title}`;
     if (recentKeys.has(key)) continue;
     notifications.push({

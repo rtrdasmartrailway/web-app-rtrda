@@ -163,7 +163,7 @@ export class LineNotificationChannel implements NotificationChannel {
 let defaultChannels: NotificationChannel[] = [
   new OutboxNotificationChannel(),
   new EmailNotificationChannel(false), // disabled by default
-  new LineNotificationChannel(false),  // disabled by default
+  new LineNotificationChannel(false), // disabled by default
 ];
 
 export function getNotificationChannels(): NotificationChannel[] {

@@ -647,7 +647,12 @@ export async function updateTaskAssignment(
         },
       });
     // Material-change notification: when dueAt changes
-    if (input.dueAt && task.dueAt && input.dueAt.getTime() !== task.dueAt.getTime() && task.ownerId) {
+    if (
+      input.dueAt &&
+      task.dueAt &&
+      input.dueAt.getTime() !== task.dueAt.getTime() &&
+      task.ownerId
+    ) {
       const changeDesc = `Due date changed from ${task.dueAt.toISOString().slice(0, 10)} to ${input.dueAt.toISOString().slice(0, 10)}`;
       await tx.prNotification.create({
         data: {
@@ -1258,10 +1263,16 @@ async function mockScanFile(input: {
 }): Promise<{ result: ScanResult; reason: string }> {
   // Simulate async scan latency (no actual delay in tests).
   if (input.mimeType === "image/svg+xml") {
-    return { result: "QUARANTINED", reason: "SVG files require manual review due to embedded script risk" };
+    return {
+      result: "QUARANTINED",
+      reason: "SVG files require manual review due to embedded script risk",
+    };
   }
   if (input.mimeType === "application/zip") {
-    return { result: "QUARANTINED", reason: "Archive files require manual review for embedded threats" };
+    return {
+      result: "QUARANTINED",
+      reason: "Archive files require manual review for embedded threats",
+    };
   }
   return { result: "CLEAN", reason: "No threats detected" };
 }
@@ -1372,8 +1383,7 @@ export async function downloadFile(
       },
     },
   });
-  if (!attachment)
-    throw new PrCenterError("File not found", 404, "NOT_FOUND");
+  if (!attachment) throw new PrCenterError("File not found", 404, "NOT_FOUND");
   const orgId =
     attachment.request?.organizationId ?? attachment.task?.request.organizationId;
   const requesterId =
@@ -1406,16 +1416,16 @@ export async function createAttachment(
     );
   const kind = input.kind.trim();
   if (!kind || kind.length > 100)
-    throw new PrCenterError("Attachment kind is required (max 100 characters)", 422, "INVALID_KIND");
+    throw new PrCenterError(
+      "Attachment kind is required (max 100 characters)",
+      422,
+      "INVALID_KIND",
+    );
   const fileObject = await prisma.prFileObject.findFirst({
     where: { id: input.fileId, scanStatus: "CLEAN", deletedAt: null },
   });
   if (!fileObject)
-    throw new PrCenterError(
-      "File not found or not yet available",
-      404,
-      "FILE_NOT_FOUND",
-    );
+    throw new PrCenterError("File not found or not yet available", 404, "FILE_NOT_FOUND");
   // Authorize scope.
   if (input.requestId) {
     const request = await prisma.prRequest.findFirst({
@@ -1606,11 +1616,7 @@ export async function assignFinalAsset(
     where: { id: input.fileId, scanStatus: "CLEAN", deletedAt: null },
   });
   if (!fileObject)
-    throw new PrCenterError(
-      "File not found or not yet clean",
-      404,
-      "FILE_NOT_FOUND",
-    );
+    throw new PrCenterError("File not found or not yet clean", 404, "FILE_NOT_FOUND");
   const revision = task.revisions[0];
   if (!revision)
     throw new PrCenterError(
@@ -1628,11 +1634,7 @@ export async function assignFinalAsset(
       data: { finalAssetId: fileObject.id },
     });
     if (updated.count !== 1)
-      throw new PrCenterError(
-        "Task revision not found",
-        404,
-        "REVISION_NOT_FOUND",
-      );
+      throw new PrCenterError("Task revision not found", 404, "REVISION_NOT_FOUND");
     await tx.prAuditEvent.create({
       data: {
         organizationId: actor.organizationId,
@@ -1647,7 +1649,11 @@ export async function assignFinalAsset(
         },
       },
     });
-    return { taskId: task.id, revisionNumber: targetRevisionNumber, fileId: fileObject.id };
+    return {
+      taskId: task.id,
+      revisionNumber: targetRevisionNumber,
+      fileId: fileObject.id,
+    };
   });
 }
 
@@ -1655,9 +1661,15 @@ export async function assignFinalAsset(
 
 export async function evaluateNotificationReminders(
   actor: PrCenterActor,
-): Promise<PolicyEvaluationResult & { channelResults: Array<{ channel: string; status: string }> }> {
+): Promise<
+  PolicyEvaluationResult & { channelResults: Array<{ channel: string; status: string }> }
+> {
   if (actor.role !== "SCOPED_ADMINISTRATOR")
-    throw new PrCenterError("Only administrators can trigger reminder evaluation", 403, "FORBIDDEN");
+    throw new PrCenterError(
+      "Only administrators can trigger reminder evaluation",
+      403,
+      "FORBIDDEN",
+    );
 
   const result = await evaluateNotificationPolicy();
 
@@ -1713,13 +1725,23 @@ export async function grantRole(
     const dept = await prisma.prDepartment.findFirst({
       where: { id: departmentId, organizationId: actor.organizationId },
     });
-    if (!dept) throw new PrCenterError("Department not found", 404, "DEPARTMENT_NOT_FOUND");
+    if (!dept)
+      throw new PrCenterError("Department not found", 404, "DEPARTMENT_NOT_FOUND");
   }
   const existing = await prisma.prUserRole.findFirst({
-    where: { userId, role, organizationId: actor.organizationId, departmentId: departmentId ?? null },
+    where: {
+      userId,
+      role,
+      organizationId: actor.organizationId,
+      departmentId: departmentId ?? null,
+    },
   });
   if (existing)
-    throw new PrCenterError("User already has this role in this scope", 409, "ROLE_ALREADY_ASSIGNED");
+    throw new PrCenterError(
+      "User already has this role in this scope",
+      409,
+      "ROLE_ALREADY_ASSIGNED",
+    );
   return prisma.$transaction(async (tx) => {
     const granted = await tx.prUserRole.create({
       data: {
@@ -1785,7 +1807,11 @@ export async function toggleUserActive(
   });
   if (!user) throw new PrCenterError("User not found", 404, "NOT_FOUND");
   if (user.id === actor.id)
-    throw new PrCenterError("You cannot deactivate yourself", 422, "SELF_DEACTIVATION_BLOCKED");
+    throw new PrCenterError(
+      "You cannot deactivate yourself",
+      422,
+      "SELF_DEACTIVATION_BLOCKED",
+    );
   const nextActive = !user.active;
   return prisma.$transaction(async (tx) => {
     const updated = await tx.prCenterUser.update({
@@ -1833,10 +1859,7 @@ export async function listAccessAuditEvents(actor: PrCenterActor, take = 100) {
 
 // ── Quarantine management (SCOPED_ADMINISTRATOR + PR_OPERATIONS) ───────────
 
-export async function listQuarantinedFiles(
-  actor: PrCenterActor,
-  take = 50,
-) {
+export async function listQuarantinedFiles(actor: PrCenterActor, take = 50) {
   if (!canManageQuarantine(actor.role))
     throw new PrCenterError("You cannot review quarantined files", 403, "FORBIDDEN");
   const limit = Math.min(Math.max(take, 1), 100);
@@ -1923,7 +1946,10 @@ export async function reviewQuarantinedFile(
         entityId: fileId,
         correlationId,
         before: { scanStatus: "QUARANTINED" },
-        after: { deletedAt: updated.deletedAt?.toISOString(), reason: reason?.trim() || null },
+        after: {
+          deletedAt: updated.deletedAt?.toISOString(),
+          reason: reason?.trim() || null,
+        },
       },
     });
     return updated;
@@ -1940,8 +1966,7 @@ export async function rescanFile(
   const fileObject = await prisma.prFileObject.findFirst({
     where: { id: fileId, deletedAt: null },
   });
-  if (!fileObject)
-    throw new PrCenterError("File not found", 404, "NOT_FOUND");
+  if (!fileObject) throw new PrCenterError("File not found", 404, "NOT_FOUND");
   if (fileObject.scanStatus === "CLEAN")
     throw new PrCenterError("File is already clean", 422, "ALREADY_CLEAN");
 
@@ -2035,16 +2060,11 @@ export async function restoreRequest(
   correlationId: string = randomUUID(),
 ) {
   if (!canRestoreRequests(actor.role))
-    throw new PrCenterError(
-      "You cannot restore requests",
-      403,
-      "FORBIDDEN",
-    );
+    throw new PrCenterError("You cannot restore requests", 403, "FORBIDDEN");
   const request = await prisma.prRequest.findFirst({
     where: { id: requestId, organizationId: actor.organizationId },
   });
-  if (!request)
-    throw new PrCenterError("Request not found", 404, "NOT_FOUND");
+  if (!request) throw new PrCenterError("Request not found", 404, "NOT_FOUND");
   if (request.status !== "WITHDRAWN" && request.status !== "CANCELLED")
     throw new PrCenterError(
       "Only withdrawn or cancelled requests can be restored",
@@ -2099,11 +2119,7 @@ export async function restoreRequest(
 
 export async function releaseReadinessCheck(actor: PrCenterActor) {
   if (!canExportAudit(actor.role))
-    throw new PrCenterError(
-      "You cannot view release readiness",
-      403,
-      "FORBIDDEN",
-    );
+    throw new PrCenterError("You cannot view release readiness", 403, "FORBIDDEN");
   const org = { organizationId: actor.organizationId };
   const checks: { name: string; passed: boolean; detail: string }[] = [];
 

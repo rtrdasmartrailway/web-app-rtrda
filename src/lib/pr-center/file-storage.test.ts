@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { validateFileInput, ALLOWED_MIME_TYPES, MAX_FILE_SIZE_BYTES } from "./file-storage";
+import {
+  validateFileInput,
+  ALLOWED_MIME_TYPES,
+  MAX_FILE_SIZE_BYTES,
+} from "./file-storage";
 
 describe("file-storage validation", () => {
   it("accepts a valid PDF under the size limit", () => {
@@ -63,7 +67,11 @@ describe("file-storage validation", () => {
     expect(ALLOWED_MIME_TYPES.has("application/pdf")).toBe(true);
     expect(ALLOWED_MIME_TYPES.has("image/jpeg")).toBe(true);
     expect(ALLOWED_MIME_TYPES.has("image/png")).toBe(true);
-    expect(ALLOWED_MIME_TYPES.has("application/vnd.openxmlformats-officedocument.wordprocessingml.document")).toBe(true);
+    expect(
+      ALLOWED_MIME_TYPES.has(
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      ),
+    ).toBe(true);
     expect(ALLOWED_MIME_TYPES.has("video/mp4")).toBe(true);
   });
 });

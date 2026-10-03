@@ -1,8 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  classifyNotification,
-  prefixedTitle,
-} from "./notification-policy";
+import { classifyNotification, prefixedTitle } from "./notification-policy";
 
 describe("classifyNotification", () => {
   it("classifies DUE notifications from title prefix", () => {
@@ -10,15 +7,13 @@ describe("classifyNotification", () => {
   });
 
   it("classifies OVERDUE notifications from title prefix", () => {
-    expect(classifyNotification("[OVERDUE] Task overdue: My Task")).toBe(
-      "OVERDUE",
-    );
+    expect(classifyNotification("[OVERDUE] Task overdue: My Task")).toBe("OVERDUE");
   });
 
   it("classifies MANDATORY notifications from title prefix", () => {
-    expect(
-      classifyNotification("[MANDATORY] Pending approval: My Task"),
-    ).toBe("MANDATORY");
+    expect(classifyNotification("[MANDATORY] Pending approval: My Task")).toBe(
+      "MANDATORY",
+    );
   });
 
   it("classifies CHANGE notifications from title prefix", () => {
@@ -56,18 +51,12 @@ describe("classifyNotification", () => {
 
 describe("prefixedTitle", () => {
   it("creates correct prefixed title for each category", () => {
-    expect(prefixedTitle("DUE", "Task due soon")).toBe(
-      "[DUE] Task due soon",
-    );
-    expect(prefixedTitle("OVERDUE", "Task overdue")).toBe(
-      "[OVERDUE] Task overdue",
-    );
+    expect(prefixedTitle("DUE", "Task due soon")).toBe("[DUE] Task due soon");
+    expect(prefixedTitle("OVERDUE", "Task overdue")).toBe("[OVERDUE] Task overdue");
     expect(prefixedTitle("MANDATORY", "Pending approval")).toBe(
       "[MANDATORY] Pending approval",
     );
-    expect(prefixedTitle("CHANGE", "Due date changed")).toBe(
-      "[CHANGE] Due date changed",
-    );
+    expect(prefixedTitle("CHANGE", "Due date changed")).toBe("[CHANGE] Due date changed");
     expect(prefixedTitle("ASSIGNMENT", "Task assigned")).toBe(
       "[ASSIGNMENT] Task assigned",
     );

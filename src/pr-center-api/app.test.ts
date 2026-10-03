@@ -202,7 +202,10 @@ describe("Access administration route guards", () => {
 
   it("rejects unauthenticated user active toggle", async () => {
     const app = buildPrCenterApi(async () => null);
-    const response = await app.inject({ method: "PATCH", url: "/admin/users/some-id/active" });
+    const response = await app.inject({
+      method: "PATCH",
+      url: "/admin/users/some-id/active",
+    });
     expect(response.statusCode).toBe(401);
     await app.close();
   });

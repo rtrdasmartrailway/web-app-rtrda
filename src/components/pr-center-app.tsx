@@ -1534,16 +1534,8 @@ export function PrCenterApp({
           {page === "history" && (
             <History audit={state.audit} language={state.language} />
           )}
-          {page === "directory" && actor && (
-            <Directory
-              actor={actor}
-            />
-          )}
-          {page === "settings" && actor && (
-            <Settings
-              language={state.language}
-            />
-          )}
+          {page === "directory" && actor && <Directory actor={actor} />}
+          {page === "settings" && actor && <Settings language={state.language} />}
           {page === "system-data" && (
             <SystemData
               state={state}
@@ -2341,9 +2333,7 @@ function AttachmentPanel({ taskId }: { taskId: string }) {
     setError(null);
     try {
       const arrayBuffer = await file.arrayBuffer();
-      const base64 = btoa(
-        String.fromCharCode(...new Uint8Array(arrayBuffer)),
-      );
+      const base64 = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
       const uploadRes = await fetch("/api/pr-center/files", {
         method: "POST",
         credentials: "same-origin",
@@ -2431,7 +2421,9 @@ function AttachmentPanel({ taskId }: { taskId: string }) {
           >
             <span>{att.file.fileName}</span>
             <span style={{ color: "#6b7280" }}>{formatSize(att.file.sizeBytes)}</span>
-            <span style={{ color: "#6b7280" }}>{att.kind} v{att.version}</span>
+            <span style={{ color: "#6b7280" }}>
+              {att.kind} v{att.version}
+            </span>
             <span
               style={{
                 display: "inline-block",
@@ -3126,14 +3118,16 @@ function Directory({
     role: string;
   };
 }) {
-  const [users, setUsers] = useState<Array<{
-    id: string;
-    displayName: string;
-    email: string;
-    active: boolean;
-    department: { id: string; name: string } | null;
-    roles: Array<{ id: string; role: string; departmentId: string | null }>;
-  }>>([]);
+  const [users, setUsers] = useState<
+    Array<{
+      id: string;
+      displayName: string;
+      email: string;
+      active: boolean;
+      department: { id: string; name: string } | null;
+      roles: Array<{ id: string; role: string; departmentId: string | null }>;
+    }>
+  >([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [grantTarget, setGrantTarget] = useState<string | null>(null);
@@ -3158,9 +3152,15 @@ function Directory({
         if (!r.ok) throw new Error("Could not load users");
         if (!cancelled) setUsers(await r.json());
       })
-      .catch(() => { if (!cancelled) setError("Could not load user directory"); })
-      .finally(() => { if (!cancelled) setLoading(false); });
-    return () => { cancelled = true; };
+      .catch(() => {
+        if (!cancelled) setError("Could not load user directory");
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const handleGrant = async (userId: string) => {
@@ -3215,73 +3215,110 @@ function Directory({
 
   return (
     <>
-      <SectionHeading
-        eyebrow="ACCESS ADMINISTRATION"
-        title="User Directory"
-      />
-      {notice && <p style={{ color: "#16a34a", fontSize: 13, margin: "4px 0" }}>{notice}</p>}
-      {error && <p style={{ color: "#dc2626", fontSize: 13, margin: "4px 0" }}>{error}</p>}
+      <SectionHeading eyebrow="ACCESS ADMINISTRATION" title="User Directory" />
+      {notice && (
+        <p style={{ color: "#16a34a", fontSize: 13, margin: "4px 0" }}>{notice}</p>
+      )}
+      {error && (
+        <p style={{ color: "#dc2626", fontSize: 13, margin: "4px 0" }}>{error}</p>
+      )}
       {loading && <p>Loading user directory…</p>}
-      {!loading && users.map((user) => (
-        <article key={user.id} className={styles.card} style={{ marginBottom: 12 }}>
-          <header>
-            <div>
-              <h2>{user.displayName}</h2>
-              <p style={{ fontSize: 13, color: "#6b7280" }}>{user.email}</p>
-              <p style={{ fontSize: 13 }}>
-                {user.department?.name || "No department"} · {user.active ? "Active" : "Inactive"}
-              </p>
-            </div>
-            <div style={{ display: "flex", gap: 8 }}>
-              <button
-                onClick={() => handleToggleActive(user.id)}
-                disabled={user.id === actor.userId}
-                style={{ fontSize: 12, color: user.active ? "#dc2626" : "#16a34a" }}
-              >
-                {user.active ? "Deactivate" : "Activate"}
-              </button>
-              <button
-                onClick={() => setGrantTarget(grantTarget === user.id ? null : user.id)}
-                style={{ fontSize: 12 }}
-              >
-                + Grant role
-              </button>
-            </div>
-          </header>
-          <div style={{ marginTop: 8 }}>
-            <p style={{ fontSize: 12, fontWeight: 600, marginBottom: 4 }}>Assigned roles:</p>
-            {user.roles.length === 0 && <p style={{ fontSize: 12, color: "#6b7280" }}>No roles assigned</p>}
-            {user.roles.map((r) => (
-              <span key={r.id} style={{ display: "inline-flex", alignItems: "center", gap: 4, marginRight: 8, marginBottom: 4, padding: "2px 8px", background: "#f3f4f6", borderRadius: 4, fontSize: 12 }}>
-                {r.role}
+      {!loading &&
+        users.map((user) => (
+          <article key={user.id} className={styles.card} style={{ marginBottom: 12 }}>
+            <header>
+              <div>
+                <h2>{user.displayName}</h2>
+                <p style={{ fontSize: 13, color: "#6b7280" }}>{user.email}</p>
+                <p style={{ fontSize: 13 }}>
+                  {user.department?.name || "No department"} ·{" "}
+                  {user.active ? "Active" : "Inactive"}
+                </p>
+              </div>
+              <div style={{ display: "flex", gap: 8 }}>
                 <button
-                  onClick={() => handleRevoke(r.id)}
-                  style={{ fontSize: 11, color: "#dc2626", background: "none", border: "none", cursor: "pointer", padding: 0 }}
+                  onClick={() => handleToggleActive(user.id)}
+                  disabled={user.id === actor.userId}
+                  style={{ fontSize: 12, color: user.active ? "#dc2626" : "#16a34a" }}
                 >
-                  ✕
+                  {user.active ? "Deactivate" : "Activate"}
                 </button>
-              </span>
-            ))}
-          </div>
-          {grantTarget === user.id && (
-            <div style={{ marginTop: 8, display: "flex", gap: 8, alignItems: "center" }}>
-              <select value={grantRole} onChange={(e) => setGrantRole(e.target.value)} style={{ fontSize: 12 }}>
-                <option value="REQUESTER">REQUESTER</option>
-                <option value="PR_OPERATIONS">PR_OPERATIONS</option>
-                <option value="APPROVER">APPROVER</option>
-                <option value="EXECUTIVE_READ_ONLY">EXECUTIVE_READ_ONLY</option>
-                <option value="SCOPED_ADMINISTRATOR">SCOPED_ADMINISTRATOR</option>
-              </select>
-              <button onClick={() => handleGrant(user.id)} className={styles.primary} style={{ fontSize: 12 }}>
-                Confirm grant
-              </button>
-              <button onClick={() => setGrantTarget(null)} style={{ fontSize: 12 }}>
-                Cancel
-              </button>
+                <button
+                  onClick={() => setGrantTarget(grantTarget === user.id ? null : user.id)}
+                  style={{ fontSize: 12 }}
+                >
+                  + Grant role
+                </button>
+              </div>
+            </header>
+            <div style={{ marginTop: 8 }}>
+              <p style={{ fontSize: 12, fontWeight: 600, marginBottom: 4 }}>
+                Assigned roles:
+              </p>
+              {user.roles.length === 0 && (
+                <p style={{ fontSize: 12, color: "#6b7280" }}>No roles assigned</p>
+              )}
+              {user.roles.map((r) => (
+                <span
+                  key={r.id}
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: 4,
+                    marginRight: 8,
+                    marginBottom: 4,
+                    padding: "2px 8px",
+                    background: "#f3f4f6",
+                    borderRadius: 4,
+                    fontSize: 12,
+                  }}
+                >
+                  {r.role}
+                  <button
+                    onClick={() => handleRevoke(r.id)}
+                    style={{
+                      fontSize: 11,
+                      color: "#dc2626",
+                      background: "none",
+                      border: "none",
+                      cursor: "pointer",
+                      padding: 0,
+                    }}
+                  >
+                    ✕
+                  </button>
+                </span>
+              ))}
             </div>
-          )}
-        </article>
-      ))}
+            {grantTarget === user.id && (
+              <div
+                style={{ marginTop: 8, display: "flex", gap: 8, alignItems: "center" }}
+              >
+                <select
+                  value={grantRole}
+                  onChange={(e) => setGrantRole(e.target.value)}
+                  style={{ fontSize: 12 }}
+                >
+                  <option value="REQUESTER">REQUESTER</option>
+                  <option value="PR_OPERATIONS">PR_OPERATIONS</option>
+                  <option value="APPROVER">APPROVER</option>
+                  <option value="EXECUTIVE_READ_ONLY">EXECUTIVE_READ_ONLY</option>
+                  <option value="SCOPED_ADMINISTRATOR">SCOPED_ADMINISTRATOR</option>
+                </select>
+                <button
+                  onClick={() => handleGrant(user.id)}
+                  className={styles.primary}
+                  style={{ fontSize: 12 }}
+                >
+                  Confirm grant
+                </button>
+                <button onClick={() => setGrantTarget(null)} style={{ fontSize: 12 }}>
+                  Cancel
+                </button>
+              </div>
+            )}
+          </article>
+        ))}
     </>
   );
 }
@@ -3337,21 +3374,19 @@ function MasterDataEditor({
     </article>
   );
 }
-function Settings({
-  language,
-}: {
-  language: Language;
-}) {
-  const [auditEvents, setAuditEvents] = useState<Array<{
-    id: string;
-    action: string;
-    entityType: string;
-    entityId: string;
-    createdAt: string;
-    before: unknown;
-    after: unknown;
-    actor: { displayName: string; email: string } | null;
-  }>>([]);
+function Settings({ language }: { language: Language }) {
+  const [auditEvents, setAuditEvents] = useState<
+    Array<{
+      id: string;
+      action: string;
+      entityType: string;
+      entityId: string;
+      createdAt: string;
+      before: unknown;
+      after: unknown;
+      actor: { displayName: string; email: string } | null;
+    }>
+  >([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -3362,9 +3397,15 @@ function Settings({
         if (!r.ok) throw new Error("Could not load access audit");
         if (!cancelled) setAuditEvents(await r.json());
       })
-      .catch(() => { if (!cancelled) setError("Could not load access audit events"); })
-      .finally(() => { if (!cancelled) setLoading(false); });
-    return () => { cancelled = true; };
+      .catch(() => {
+        if (!cancelled) setError("Could not load access audit events");
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const actionLabel: Record<string, string> = {

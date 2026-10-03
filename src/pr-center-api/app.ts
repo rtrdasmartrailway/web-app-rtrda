@@ -44,7 +44,12 @@ import {
   PrCenterError,
   type PrCenterActor,
 } from "@/lib/pr-center/service";
-import { TASK_TRANSITIONS, type PrCenterRole, type PrTaskStatus, PR_CENTER_ROLES } from "@/lib/pr-center/workflow";
+import {
+  TASK_TRANSITIONS,
+  type PrCenterRole,
+  type PrTaskStatus,
+  PR_CENTER_ROLES,
+} from "@/lib/pr-center/workflow";
 
 export type ActorResolver = (request: FastifyRequest) => Promise<PrCenterActor | null>;
 export type EntraAuth = {
@@ -406,7 +411,11 @@ export function buildPrCenterApi(
     if (typeof input.fileName !== "string" || typeof input.mimeType !== "string")
       throw new PrCenterError("fileName and mimeType are required", 422, "INVALID_BODY");
     if (typeof input.content !== "string")
-      throw new PrCenterError("content must be a base64-encoded string", 422, "INVALID_BODY");
+      throw new PrCenterError(
+        "content must be a base64-encoded string",
+        422,
+        "INVALID_BODY",
+      );
     let contentBuffer: Buffer;
     try {
       contentBuffer = Buffer.from(input.content, "base64");
@@ -481,7 +490,10 @@ export function buildPrCenterApi(
   app.get("/admin/users", async (request) => listAdminUsers(request.prCenterActor!));
   app.post("/admin/users/:userId/roles", async (request, reply) => {
     const input = await body(request);
-    if (typeof input.role !== "string" || !PR_CENTER_ROLES.includes(input.role as PrCenterRole))
+    if (
+      typeof input.role !== "string" ||
+      !PR_CENTER_ROLES.includes(input.role as PrCenterRole)
+    )
       throw new PrCenterError("A valid role is required", 422, "INVALID_ROLE");
     const result = await grantRole(
       request.prCenterActor!,
@@ -518,7 +530,11 @@ export function buildPrCenterApi(
   app.post("/admin/quarantine/:fileId/review", async (request) => {
     const input = await body(request);
     if (input.disposition !== "approve" && input.disposition !== "delete")
-      throw new PrCenterError("Disposition must be 'approve' or 'delete'", 422, "INVALID_DISPOSITION");
+      throw new PrCenterError(
+        "Disposition must be 'approve' or 'delete'",
+        422,
+        "INVALID_DISPOSITION",
+      );
     return reviewQuarantinedFile(
       request.prCenterActor!,
       (request.params as { fileId: string }).fileId,
@@ -540,8 +556,7 @@ export function buildPrCenterApi(
     return exportAuditEvents(request.prCenterActor!, {
       from: typeof input.from === "string" ? input.from : undefined,
       to: typeof input.to === "string" ? input.to : undefined,
-      entityType:
-        typeof input.entityType === "string" ? input.entityType : undefined,
+      entityType: typeof input.entityType === "string" ? input.entityType : undefined,
       actorId: typeof input.actorId === "string" ? input.actorId : undefined,
     });
   });

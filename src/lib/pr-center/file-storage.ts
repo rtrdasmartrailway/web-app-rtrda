@@ -74,7 +74,11 @@ export function validateFileInput(input: {
   sizeBytes: number;
 }): void {
   if (!input.fileName || input.fileName.length > 500)
-    throw new FileValidationError("File name is required (max 500 characters)", 422, "INVALID_FILE_NAME");
+    throw new FileValidationError(
+      "File name is required (max 500 characters)",
+      422,
+      "INVALID_FILE_NAME",
+    );
   if (!ALLOWED_MIME_TYPES.has(input.mimeType))
     throw new FileValidationError(
       `File type "${input.mimeType}" is not allowed`,
