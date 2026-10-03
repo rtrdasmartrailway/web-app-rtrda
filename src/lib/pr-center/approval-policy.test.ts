@@ -59,10 +59,7 @@ describe("approval policy configuration", () => {
   it("rejects legacy APPROVER role from stage authority", () => {
     const legacyRolePolicy = {
       ...source,
-      stages: [
-        { ...source.stages[0], roles: ["APPROVER"] },
-        ...source.stages.slice(1),
-      ],
+      stages: [{ ...source.stages[0], roles: ["APPROVER"] }, ...source.stages.slice(1)],
     };
     expect(() => parseApprovalPolicy(JSON.stringify(legacyRolePolicy))).toThrow(
       /valid approver roles/i,

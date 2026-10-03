@@ -87,6 +87,7 @@ services:
       PR_CENTER_CLAMD_HOST: clamav
       PR_CENTER_CLAMD_PORT: "3310"
       ENTRA_ENV_FILE: /run/secrets/rtrda.env
+      PR_CENTER_FILE_DIR: /var/lib/pr-center/files
     depends_on:
       db:
         condition: service_healthy
@@ -94,6 +95,7 @@ services:
         condition: service_healthy
     volumes:
       - /srv/workspace/rtrda.env:/run/secrets/rtrda.env:ro
+      - pr-center-file-data:/var/lib/pr-center/files
     healthcheck:
       test:
         [
@@ -166,3 +168,5 @@ volumes:
     name: rtrda-db-data
   clamav-db-data:
     name: rtrda-test-clamav-db
+  pr-center-file-data:
+    name: rtrda-test-pr-center-file-data

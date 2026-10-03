@@ -1,5 +1,5 @@
 import { randomUUID, createHash } from "node:crypto";
-import { mkdir, readFile, writeFile, unlink, stat } from "node:fs/promises";
+import { mkdir, readFile, writeFile, unlink, stat, chmod } from "node:fs/promises";
 import path from "node:path";
 
 const BASE_DIR =
@@ -109,9 +109,20 @@ export async function storeFile(
   const key = storageKey();
   const dir = storageDir(orgId);
   const filePath = path.join(dir, key);
-  await mkdir(path.dirname(filePath), { recursive: true });
+  await mkdir(path.dirname(filePath), { recursive: true, mode: 0o700 });
+  // Existing directories keep their old mode when mkdir({ recursive }) is used.
+  // Walk back to the organization directory so all private path components
+  // deny traversal/listing to other OS users.
+  for (
+    let current = path.dirname(filePath);
+    current.startsWith(dir);
+    current = path.dirname(current)
+  ) {
+    await chmod(current, 0o700);
+    if (current === dir) break;
+  }
   const checksum = computeChecksum(input.content);
-  await writeFile(filePath, input.content);
+  await writeFile(filePath, input.content, { flag: "wx", mode: 0o600 });
   return {
     storageKey: key,
     absolutePath: filePath,
