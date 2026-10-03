@@ -88,6 +88,20 @@ export function canReviewIdeas(role: PrCenterRole): boolean {
   return role === "PR_OPERATIONS" || role === "SCOPED_ADMINISTRATOR";
 }
 
+export function canAttachFiles(role: PrCenterRole): boolean {
+  // Requesters can attach to their own requests; PR_OPERATIONS and admins
+  // can attach to any request/task in scope.
+  return role !== "EXECUTIVE_READ_ONLY";
+}
+
+export function canRemoveAttachment(role: PrCenterRole): boolean {
+  return role === "PR_OPERATIONS" || role === "SCOPED_ADMINISTRATOR";
+}
+
+export function canAssignFinalAsset(role: PrCenterRole): boolean {
+  return role === "PR_OPERATIONS" || role === "SCOPED_ADMINISTRATOR";
+}
+
 export function publicationGate(input: {
   approved: boolean;
   ownerId: string | null;

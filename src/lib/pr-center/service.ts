@@ -15,10 +15,19 @@ import {
   canReadAllRequests,
   canReviewIdeas,
   canTransitionTask,
+  canAttachFiles,
+  canRemoveAttachment,
+  canAssignFinalAsset,
   publicationGate,
   type PrCenterRole,
   type PrTaskStatus as WorkflowStatus,
 } from "./workflow";
+import {
+  storeFile,
+  readFileFromStorage,
+  FileValidationError,
+  type StoredFile,
+} from "./file-storage";
 
 export type PrCenterActor = {
   id: string;
@@ -1203,5 +1212,342 @@ export async function recordPublishingEvidence(
       correlationId,
     });
     return { id: schedule.id, publishedUrl, publishedReference, publishedAt };
+  });
+}
+
+// ── File upload, download, attachment, and final-asset helpers ──────────────
+
+export async function uploadFile(
+  actor: PrCenterActor,
+  input: {
+    fileName: string;
+    mimeType: string;
+    content: Buffer;
+  },
+  correlationId: string = randomUUID(),
+) {
+  if (!canAttachFiles(actor.role))
+    throw new PrCenterError("You cannot upload files", 403, "FORBIDDEN");
+  let stored: StoredFile;
+  try {
+    stored = await storeFile(actor.organizationId, input);
+  } catch (error) {
+    if (error instanceof FileValidationError)
+      throw new PrCenterError(error.message, error.statusCode, error.code);
+    throw error;
+  }
+  return prisma.$transaction(async (tx) => {
+    const fileObject = await tx.prFileObject.create({
+      data: {
+        storageKey: stored.storageKey,
+        fileName: stored.fileName,
+        mimeType: stored.mimeType,
+        sizeBytes: stored.sizeBytes,
+        checksum: stored.checksum,
+        // Phase 1 placeholder: auto-mark clean until a real scanner is wired.
+        scanStatus: "CLEAN",
+        scannedAt: new Date(),
+      },
+    });
+    await tx.prAuditEvent.create({
+      data: {
+        organizationId: actor.organizationId,
+        actorId: actor.id,
+        action: "file.uploaded",
+        entityType: "file",
+        entityId: fileObject.id,
+        correlationId,
+        after: {
+          fileName: stored.fileName,
+          mimeType: stored.mimeType,
+          sizeBytes: stored.sizeBytes,
+          checksum: stored.checksum,
+        },
+      },
+    });
+    return fileObject;
+  });
+}
+
+export async function downloadFile(
+  actor: PrCenterActor,
+  fileId: string,
+): Promise<{ buffer: Buffer; fileName: string; mimeType: string }> {
+  const fileObject = await prisma.prFileObject.findFirst({
+    where: { id: fileId },
+  });
+  if (!fileObject) throw new PrCenterError("File not found", 404, "NOT_FOUND");
+  // Only allow download of clean files.
+  if (fileObject.scanStatus !== "CLEAN")
+    throw new PrCenterError(
+      "This file is not yet available for download",
+      423,
+      "FILE_NOT_AVAILABLE",
+    );
+  // Verify the file is linked to a request/task the actor may access.
+  const attachment = await prisma.prAttachment.findFirst({
+    where: { fileId },
+    include: {
+      request: { select: { organizationId: true, requesterId: true } },
+      task: {
+        select: {
+          request: {
+            select: { organizationId: true, requesterId: true },
+          },
+        },
+      },
+    },
+  });
+  if (!attachment)
+    throw new PrCenterError("File not found", 404, "NOT_FOUND");
+  const orgId =
+    attachment.request?.organizationId ?? attachment.task?.request.organizationId;
+  const requesterId =
+    attachment.request?.requesterId ?? attachment.task?.request.requesterId;
+  if (orgId !== actor.organizationId)
+    throw new PrCenterError("File not found", 404, "NOT_FOUND");
+  if (!canReadAllRequests(actor.role) && requesterId !== actor.id)
+    throw new PrCenterError("You cannot access this file", 403, "FORBIDDEN");
+  const buffer = await readFileFromStorage(actor.organizationId, fileObject.storageKey);
+  return { buffer, fileName: fileObject.fileName, mimeType: fileObject.mimeType };
+}
+
+export async function createAttachment(
+  actor: PrCenterActor,
+  input: {
+    fileId: string;
+    requestId?: string;
+    taskId?: string;
+    kind: string;
+  },
+  correlationId: string = randomUUID(),
+) {
+  if (!canAttachFiles(actor.role))
+    throw new PrCenterError("You cannot attach files", 403, "FORBIDDEN");
+  if (!input.requestId && !input.taskId)
+    throw new PrCenterError(
+      "An attachment must be linked to a request or task",
+      422,
+      "INVALID_ATTACHMENT_TARGET",
+    );
+  const kind = input.kind.trim();
+  if (!kind || kind.length > 100)
+    throw new PrCenterError("Attachment kind is required (max 100 characters)", 422, "INVALID_KIND");
+  const fileObject = await prisma.prFileObject.findFirst({
+    where: { id: input.fileId, scanStatus: "CLEAN" },
+  });
+  if (!fileObject)
+    throw new PrCenterError(
+      "File not found or not yet available",
+      404,
+      "FILE_NOT_FOUND",
+    );
+  // Authorize scope.
+  if (input.requestId) {
+    const request = await prisma.prRequest.findFirst({
+      where: {
+        id: input.requestId,
+        organizationId: actor.organizationId,
+        ...(canReadAllRequests(actor.role) ? {} : { requesterId: actor.id }),
+      },
+    });
+    if (!request) throw new PrCenterError("Request not found", 404, "NOT_FOUND");
+  }
+  if (input.taskId) {
+    const task = await prisma.prTask.findFirst({
+      where: {
+        id: input.taskId,
+        request: { organizationId: actor.organizationId },
+      },
+    });
+    if (!task) throw new PrCenterError("Task not found", 404, "NOT_FOUND");
+  }
+  return prisma.$transaction(async (tx) => {
+    const attachment = await tx.prAttachment.create({
+      data: {
+        requestId: input.requestId || null,
+        taskId: input.taskId || null,
+        fileId: input.fileId,
+        kind,
+      },
+      include: { file: true },
+    });
+    await tx.prAuditEvent.create({
+      data: {
+        organizationId: actor.organizationId,
+        actorId: actor.id,
+        action: "attachment.created",
+        entityType: "attachment",
+        entityId: attachment.id,
+        correlationId,
+        after: {
+          fileId: input.fileId,
+          requestId: input.requestId || null,
+          taskId: input.taskId || null,
+          kind,
+        },
+      },
+    });
+    return attachment;
+  });
+}
+
+export async function listAttachments(
+  actor: PrCenterActor,
+  input: { requestId?: string; taskId?: string },
+) {
+  if (!input.requestId && !input.taskId)
+    throw new PrCenterError("Provide a requestId or taskId", 422, "INVALID_FILTER");
+  // Authorize scope.
+  if (input.requestId) {
+    const request = await prisma.prRequest.findFirst({
+      where: {
+        id: input.requestId,
+        organizationId: actor.organizationId,
+        ...(canReadAllRequests(actor.role) ? {} : { requesterId: actor.id }),
+      },
+    });
+    if (!request) throw new PrCenterError("Request not found", 404, "NOT_FOUND");
+  }
+  if (input.taskId) {
+    const task = await prisma.prTask.findFirst({
+      where: {
+        id: input.taskId,
+        request: { organizationId: actor.organizationId },
+      },
+    });
+    if (!task) throw new PrCenterError("Task not found", 404, "NOT_FOUND");
+  }
+  return prisma.prAttachment.findMany({
+    where: {
+      ...(input.requestId ? { requestId: input.requestId } : {}),
+      ...(input.taskId ? { taskId: input.taskId } : {}),
+    },
+    include: {
+      file: {
+        select: {
+          id: true,
+          fileName: true,
+          mimeType: true,
+          sizeBytes: true,
+          checksum: true,
+          scanStatus: true,
+          createdAt: true,
+        },
+      },
+    },
+    orderBy: { createdAt: "desc" },
+  });
+}
+
+export async function removeAttachment(
+  actor: PrCenterActor,
+  attachmentId: string,
+  correlationId: string = randomUUID(),
+) {
+  if (!canRemoveAttachment(actor.role))
+    throw new PrCenterError("You cannot remove attachments", 403, "FORBIDDEN");
+  const attachment = await prisma.prAttachment.findFirst({
+    where: { id: attachmentId },
+    include: {
+      request: { select: { organizationId: true } },
+      task: {
+        select: { request: { select: { organizationId: true } } },
+      },
+    },
+  });
+  if (!attachment) throw new PrCenterError("Attachment not found", 404, "NOT_FOUND");
+  const orgId =
+    attachment.request?.organizationId ?? attachment.task?.request.organizationId;
+  if (orgId !== actor.organizationId)
+    throw new PrCenterError("Attachment not found", 404, "NOT_FOUND");
+  return prisma.$transaction(async (tx) => {
+    await tx.prAttachment.delete({ where: { id: attachmentId } });
+    await tx.prAuditEvent.create({
+      data: {
+        organizationId: actor.organizationId,
+        actorId: actor.id,
+        action: "attachment.removed",
+        entityType: "attachment",
+        entityId: attachmentId,
+        correlationId,
+        after: {
+          fileId: attachment.fileId,
+          requestId: attachment.requestId,
+          taskId: attachment.taskId,
+          kind: attachment.kind,
+        },
+      },
+    });
+    return { id: attachmentId, removed: true };
+  });
+}
+
+export async function assignFinalAsset(
+  actor: PrCenterActor,
+  taskIdArg: string,
+  fromVersion: number,
+  input: { fileId: string; revisionNumber?: number },
+  correlationId: string = randomUUID(),
+) {
+  if (!canAssignFinalAsset(actor.role))
+    throw new PrCenterError("You cannot assign final assets", 403, "FORBIDDEN");
+  const task = await prisma.prTask.findFirst({
+    where: { id: taskIdArg, request: { organizationId: actor.organizationId } },
+    include: { revisions: { orderBy: { revisionNumber: "desc" }, take: 1 } },
+  });
+  if (!task) throw new PrCenterError("Task not found", 404, "NOT_FOUND");
+  if (task.version !== fromVersion)
+    throw new PrCenterError(
+      "This task has changed. Refresh and try again.",
+      409,
+      "STALE_UPDATE",
+    );
+  const fileObject = await prisma.prFileObject.findFirst({
+    where: { id: input.fileId, scanStatus: "CLEAN" },
+  });
+  if (!fileObject)
+    throw new PrCenterError(
+      "File not found or not yet clean",
+      404,
+      "FILE_NOT_FOUND",
+    );
+  const revision = task.revisions[0];
+  if (!revision)
+    throw new PrCenterError(
+      "A task revision is required before assigning a final asset",
+      422,
+      "REVISION_REQUIRED",
+    );
+  const targetRevisionNumber = input.revisionNumber ?? revision.revisionNumber;
+  return prisma.$transaction(async (tx) => {
+    const updated = await tx.prTaskRevision.updateMany({
+      where: {
+        taskId: task.id,
+        revisionNumber: targetRevisionNumber,
+      },
+      data: { finalAssetId: fileObject.id },
+    });
+    if (updated.count !== 1)
+      throw new PrCenterError(
+        "Task revision not found",
+        404,
+        "REVISION_NOT_FOUND",
+      );
+    await tx.prAuditEvent.create({
+      data: {
+        organizationId: actor.organizationId,
+        actorId: actor.id,
+        action: "task.final_asset_assigned",
+        entityType: "task",
+        entityId: task.id,
+        correlationId,
+        after: {
+          fileId: fileObject.id,
+          revisionNumber: targetRevisionNumber,
+        },
+      },
+    });
+    return { taskId: task.id, revisionNumber: targetRevisionNumber, fileId: fileObject.id };
   });
 }

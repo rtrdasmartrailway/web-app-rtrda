@@ -2279,11 +2279,200 @@ function Operations({
               </button>
             </>
           )}
+          <AttachmentPanel taskId={selected.id} />
         </article>
       )}
     </>
   );
 }
+function AttachmentPanel({ taskId }: { taskId: string }) {
+  const [attachments, setAttachments] = useState<
+    Array<{
+      id: string;
+      kind: string;
+      file: {
+        id: string;
+        fileName: string;
+        mimeType: string;
+        sizeBytes: number;
+        scanStatus: string;
+      };
+    }>
+  >([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const [notice, setNotice] = useState<string | null>(null);
+
+  const reload = () => {
+    setLoading(true);
+    setError(null);
+    fetch(`/api/pr-center/attachments?taskId=${taskId}`, {
+      credentials: "same-origin",
+    })
+      .then(async (r) => {
+        if (!r.ok) throw new Error("Could not load attachments");
+        setAttachments(await r.json());
+      })
+      .catch(() => setError("Could not load attachments"))
+      .finally(() => setLoading(false));
+  };
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch(`/api/pr-center/attachments?taskId=${taskId}`, {
+      credentials: "same-origin",
+    })
+      .then(async (r) => {
+        if (!r.ok) throw new Error("Could not load attachments");
+        const data = await r.json();
+        if (!cancelled) setAttachments(data);
+      })
+      .catch(() => {
+        if (!cancelled) setError("Could not load attachments");
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [taskId]);
+
+  const handleUpload = async (event: { target: HTMLInputElement }) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    setUploading(true);
+    setNotice(null);
+    setError(null);
+    try {
+      const arrayBuffer = await file.arrayBuffer();
+      const base64 = btoa(
+        String.fromCharCode(...new Uint8Array(arrayBuffer)),
+      );
+      const uploadRes = await fetch("/api/pr-center/files", {
+        method: "POST",
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          fileName: file.name,
+          mimeType: file.type || "application/octet-stream",
+          content: base64,
+        }),
+      });
+      if (!uploadRes.ok) {
+        const err = await uploadRes.json().catch(() => null);
+        throw new Error(err?.message || "Upload failed");
+      }
+      const uploaded = (await uploadRes.json()) as { id: string };
+      const attachRes = await fetch("/api/pr-center/attachments", {
+        method: "POST",
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          fileId: uploaded.id,
+          taskId,
+          kind: "evidence",
+        }),
+      });
+      if (!attachRes.ok) throw new Error("Attachment link failed");
+      setNotice("File attached");
+      reload();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Upload failed");
+    } finally {
+      setUploading(false);
+      event.target.value = "";
+    }
+  };
+
+  const handleRemove = async (attachmentId: string) => {
+    const res = await fetch(`/api/pr-center/attachments/${attachmentId}`, {
+      method: "DELETE",
+      credentials: "same-origin",
+    });
+    if (!res.ok) {
+      setError("Remove failed");
+      return;
+    }
+    setNotice("Attachment removed");
+    reload();
+  };
+
+  const handleDownload = (fileId: string) => {
+    window.open(`/api/pr-center/files/${fileId}/download`, "_blank");
+  };
+
+  function formatSize(bytes: number) {
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  }
+
+  return (
+    <section style={{ marginTop: 16, borderTop: "1px solid #e5e7eb", paddingTop: 12 }}>
+      <p className={styles.eyebrow}>ATTACHMENTS</p>
+      {notice && (
+        <p style={{ color: "#16a34a", fontSize: 13, margin: "4px 0" }}>{notice}</p>
+      )}
+      {error && (
+        <p style={{ color: "#dc2626", fontSize: 13, margin: "4px 0" }}>{error}</p>
+      )}
+      {loading && <p style={{ fontSize: 13 }}>Loading…</p>}
+      {!loading && attachments.length === 0 && (
+        <p style={{ fontSize: 13, color: "#6b7280" }}>No files attached.</p>
+      )}
+      {attachments.map((att) => (
+        <div
+          key={att.id}
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+            padding: "4px 0",
+            fontSize: 13,
+          }}
+        >
+          <span>{att.file.fileName}</span>
+          <span style={{ color: "#6b7280" }}>{formatSize(att.file.sizeBytes)}</span>
+          <span style={{ color: "#6b7280" }}>{att.kind}</span>
+          <button
+            type="button"
+            onClick={() => handleDownload(att.file.id)}
+            style={{ fontSize: 12 }}
+          >
+            Download
+          </button>
+          <button
+            type="button"
+            onClick={() => handleRemove(att.id)}
+            style={{ fontSize: 12, color: "#dc2626" }}
+          >
+            Remove
+          </button>
+        </div>
+      ))}
+      <label
+        style={{
+          display: "inline-block",
+          marginTop: 8,
+          fontSize: 13,
+          cursor: "pointer",
+          color: "#2563eb",
+        }}
+      >
+        {uploading ? "Uploading…" : "📎 Attach file"}
+        <input
+          type="file"
+          onChange={handleUpload}
+          disabled={uploading}
+          style={{ display: "none" }}
+        />
+      </label>
+    </section>
+  );
+}
+
 function Calendar({
   tasks,
   language,

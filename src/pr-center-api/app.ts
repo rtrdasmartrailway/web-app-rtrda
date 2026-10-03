@@ -24,6 +24,12 @@ import {
   updateTaskAssignment,
   PrCenterError,
   transitionTask,
+  uploadFile,
+  downloadFile,
+  createAttachment,
+  listAttachments,
+  removeAttachment,
+  assignFinalAsset,
   type PrCenterActor,
 } from "@/lib/pr-center/service";
 import { TASK_TRANSITIONS, type PrTaskStatus } from "@/lib/pr-center/workflow";
@@ -378,6 +384,83 @@ export function buildPrCenterApi(
       correlationId(request),
     );
     return reply.status(201).send(comment);
+  });
+  // ── File upload/download and attachment routes ──────────────────────────
+  app.post("/files", async (request, reply) => {
+    const input = await body(request);
+    if (typeof input.fileName !== "string" || typeof input.mimeType !== "string")
+      throw new PrCenterError("fileName and mimeType are required", 422, "INVALID_BODY");
+    if (typeof input.content !== "string")
+      throw new PrCenterError("content must be a base64-encoded string", 422, "INVALID_BODY");
+    let contentBuffer: Buffer;
+    try {
+      contentBuffer = Buffer.from(input.content, "base64");
+    } catch {
+      throw new PrCenterError("content is not valid base64", 422, "INVALID_BASE64");
+    }
+    if (contentBuffer.length === 0)
+      throw new PrCenterError("File content is empty", 422, "EMPTY_FILE");
+    const fileObject = await uploadFile(
+      request.prCenterActor!,
+      { fileName: input.fileName, mimeType: input.mimeType, content: contentBuffer },
+      correlationId(request),
+    );
+    return reply.status(201).send(fileObject);
+  });
+  app.get("/files/:fileId/download", async (request, reply) => {
+    const { buffer, fileName, mimeType } = await downloadFile(
+      request.prCenterActor!,
+      (request.params as { fileId: string }).fileId,
+    );
+    return reply
+      .header("Content-Type", mimeType)
+      .header("Content-Disposition", `attachment; filename="${fileName}"`)
+      .header("Content-Length", String(buffer.length))
+      .header("Cache-Control", "no-store")
+      .header("X-Content-Type-Options", "nosniff")
+      .send(buffer);
+  });
+  app.post("/attachments", async (request, reply) => {
+    const input = await body(request);
+    const attachment = await createAttachment(
+      request.prCenterActor!,
+      {
+        fileId: typeof input.fileId === "string" ? input.fileId : "",
+        requestId: typeof input.requestId === "string" ? input.requestId : undefined,
+        taskId: typeof input.taskId === "string" ? input.taskId : undefined,
+        kind: typeof input.kind === "string" ? input.kind : "",
+      },
+      correlationId(request),
+    );
+    return reply.status(201).send(attachment);
+  });
+  app.get("/attachments", async (request) => {
+    const query = request.query as { requestId?: string; taskId?: string };
+    return listAttachments(request.prCenterActor!, {
+      requestId: query.requestId,
+      taskId: query.taskId,
+    });
+  });
+  app.delete("/attachments/:attachmentId", async (request) => {
+    return removeAttachment(
+      request.prCenterActor!,
+      (request.params as { attachmentId: string }).attachmentId,
+      correlationId(request),
+    );
+  });
+  app.post("/tasks/:taskId/final-asset", async (request) => {
+    const input = await body(request);
+    return assignFinalAsset(
+      request.prCenterActor!,
+      taskId((request.params as { taskId: string }).taskId),
+      expectedVersion(request),
+      {
+        fileId: typeof input.fileId === "string" ? input.fileId : "",
+        revisionNumber:
+          typeof input.revisionNumber === "number" ? input.revisionNumber : undefined,
+      },
+      correlationId(request),
+    );
   });
   return app;
 }

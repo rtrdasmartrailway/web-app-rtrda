@@ -4,6 +4,9 @@ import {
   canCreateIdea,
   canReviewIdeas,
   canTransitionTask,
+  canAttachFiles,
+  canRemoveAttachment,
+  canAssignFinalAsset,
   publicationGate,
 } from "./workflow";
 
@@ -52,5 +55,29 @@ describe("PR Center workflow policy", () => {
   it("does not allow generic task transitions to schedule or publish", () => {
     expect(canTransitionTask("PR_OPERATIONS", "APPROVED", "SCHEDULED")).toBe(false);
     expect(canTransitionTask("PR_OPERATIONS", "SCHEDULED", "PUBLISHED")).toBe(false);
+  });
+
+  it("allows all roles except EXECUTIVE_READ_ONLY to attach files", () => {
+    expect(canAttachFiles("REQUESTER")).toBe(true);
+    expect(canAttachFiles("PR_OPERATIONS")).toBe(true);
+    expect(canAttachFiles("APPROVER")).toBe(true);
+    expect(canAttachFiles("SCOPED_ADMINISTRATOR")).toBe(true);
+    expect(canAttachFiles("EXECUTIVE_READ_ONLY")).toBe(false);
+  });
+
+  it("restricts attachment removal to PR_OPERATIONS and SCOPED_ADMINISTRATOR", () => {
+    expect(canRemoveAttachment("PR_OPERATIONS")).toBe(true);
+    expect(canRemoveAttachment("SCOPED_ADMINISTRATOR")).toBe(true);
+    expect(canRemoveAttachment("REQUESTER")).toBe(false);
+    expect(canRemoveAttachment("APPROVER")).toBe(false);
+    expect(canRemoveAttachment("EXECUTIVE_READ_ONLY")).toBe(false);
+  });
+
+  it("restricts final asset assignment to PR_OPERATIONS and SCOPED_ADMINISTRATOR", () => {
+    expect(canAssignFinalAsset("PR_OPERATIONS")).toBe(true);
+    expect(canAssignFinalAsset("SCOPED_ADMINISTRATOR")).toBe(true);
+    expect(canAssignFinalAsset("REQUESTER")).toBe(false);
+    expect(canAssignFinalAsset("APPROVER")).toBe(false);
+    expect(canAssignFinalAsset("EXECUTIVE_READ_ONLY")).toBe(false);
   });
 });
