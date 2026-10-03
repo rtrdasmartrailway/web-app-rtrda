@@ -200,6 +200,24 @@ export async function createRequest(
       },
       include: { revisions: true, sources: true, tasks: true },
     });
+    const operationsRoles = await tx.prUserRole.findMany({
+      where: {
+        organizationId: actor.organizationId,
+        role: "PR_OPERATIONS",
+        OR: [{ departmentId: departmentId }, { departmentId: null }],
+        user: { active: true },
+      },
+      select: { userId: true },
+    });
+    const recipients = new Set([actor.id, ...operationsRoles.map((role) => role.userId)]);
+    await tx.prNotification.createMany({
+      data: [...recipients].map((userId) => ({
+        userId,
+        title: "New PR request",
+        body: `${title} was saved as a draft.`,
+        target: userId === actor.id ? "my-requests" : "requests",
+      })),
+    });
     await auditAndOutbox(tx, {
       actor,
       action: "request.created",
@@ -233,6 +251,7 @@ export async function listRequests(actor: PrCenterActor, take = 25, cursor?: str
       requester: { select: { displayName: true } },
       sources: { select: { url: true } },
       tasks: true,
+      revisions: { orderBy: { revisionNumber: "desc" }, take: 1 },
     },
   });
 }
@@ -381,6 +400,32 @@ export async function transitionRequest(
         actorId: actor.id,
       },
     });
+    if (status === "SUBMITTED") {
+      const operationsRoles = await tx.prUserRole.findMany({
+        where: {
+          organizationId: actor.organizationId,
+          role: "PR_OPERATIONS",
+          OR: [{ departmentId: request.departmentId }, { departmentId: null }],
+          user: { active: true },
+        },
+        select: { userId: true },
+      });
+      const recipients = new Set([
+        request.requesterId,
+        ...operationsRoles.map((role) => role.userId),
+      ]);
+      await tx.prNotification.createMany({
+        data: [...recipients].map((userId) => ({
+          userId,
+          title:
+            userId === request.requesterId
+              ? "Request submitted"
+              : "Request ready for review",
+          body: `${request.title} was submitted.`,
+          target: userId === request.requesterId ? "my-requests" : "requests",
+        })),
+      });
+    }
     await auditAndOutbox(tx, {
       actor,
       action: `request.${status.toLowerCase()}`,

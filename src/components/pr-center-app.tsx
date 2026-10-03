@@ -69,6 +69,9 @@ type Request = {
   requestedDate: string;
   taskIds: string[];
   source?: string;
+  status?: "DRAFT" | "SUBMITTED" | "WITHDRAWN" | "CANCELLED" | "CLOSED";
+  version?: number;
+  revisionNumber?: number;
   objective?: string;
   audience?: string;
   startTime?: string;
@@ -717,6 +720,7 @@ export function PrCenterApp({
   const [state, setState] = useState<PrCenterState>(cloneDefaultState);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [requestOpen, setRequestOpen] = useState(false);
+  const [requestEditId, setRequestEditId] = useState<string | null>(null);
   const [requestDraft, setRequestDraft] = useState<RequestDraft>(() =>
     emptyRequestDraft(users[0]),
   );
@@ -733,6 +737,13 @@ export function PrCenterApp({
           requestedFor: string | null;
           department: { name: string };
           requesterId: string;
+          status: Request["status"];
+          version: number;
+          revisions: Array<{
+            revisionNumber: number;
+            objective: string | null;
+            audience: string | null;
+          }>;
           sources: { url: string }[];
           tasks: Array<{
             id: string;
@@ -755,6 +766,11 @@ export function PrCenterApp({
               department: request.department.name,
               requestedDate: request.requestedFor?.slice(0, 10) || "",
               taskIds: request.tasks.map((task) => task.id),
+              status: request.status,
+              version: request.version,
+              revisionNumber: request.revisions[0]?.revisionNumber,
+              objective: request.revisions[0]?.objective || undefined,
+              audience: request.revisions[0]?.audience || undefined,
               source: request.sources[0]?.url,
             })),
             tasks: records.flatMap((request) =>
@@ -942,7 +958,21 @@ export function PrCenterApp({
   };
 
   const openRequest = () => {
+    setRequestEditId(null);
     setRequestDraft(emptyRequestDraft(currentUser));
+    setRequestOpen(true);
+  };
+  const editRequest = (request: Request) => {
+    setRequestEditId(request.id);
+    setRequestDraft({
+      ...emptyRequestDraft(currentUser),
+      type: request.type,
+      title: request.title,
+      requestedDate: request.requestedDate,
+      source: request.source || "",
+      objective: request.objective || "",
+      audience: request.audience || "",
+    });
     setRequestOpen(true);
   };
 
@@ -972,28 +1002,82 @@ export function PrCenterApp({
       },
     ],
   });
-  const createRequest = async (draft: RequestDraft) => {
+  const refreshNotifications = async () => {
+    const response = await fetch("/api/pr-center/notifications", {
+      credentials: "same-origin",
+    });
+    if (!response.ok) return;
+    const notifications = (await response.json()) as Array<{
+      id: string;
+      userId: string;
+      title: string;
+      body: string;
+      target: string | null;
+      readAt: string | null;
+      createdAt: string;
+    }>;
+    setState((previous) => ({
+      ...previous,
+      notifications: notifications.map((notification) => ({
+        id: notification.id,
+        userId: notification.userId,
+        title: notification.title,
+        message: notification.body,
+        target: PHASE_1_PAGES.has(notification.target as Page)
+          ? (notification.target as Page)
+          : "home",
+        createdAt: notification.createdAt,
+        read: Boolean(notification.readAt),
+      })),
+    }));
+  };
+  const createRequest = async (draft: RequestDraft, editId = requestEditId) => {
     try {
-      const response = await fetch("/api/pr-center/requests", {
-        method: "POST",
-        credentials: "same-origin",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          type: draft.type.toUpperCase(),
-          title: draft.title,
-          objective: draft.objective,
-          audience: draft.audience,
-          requestedFor: draft.requestedDate || undefined,
-          sourceUrls: draft.source ? [draft.source] : [],
-        }),
-      });
-      if (!response.ok) throw new Error("Request was rejected");
-      const created = (await response.json()) as {
+      const response = await fetch(
+        editId ? `/api/pr-center/requests/${editId}` : "/api/pr-center/requests",
+        {
+          method: editId ? "PATCH" : "POST",
+          credentials: "same-origin",
+          headers: {
+            "Content-Type": "application/json",
+            ...(editId
+              ? {
+                  "If-Match": String(
+                    state.requests.find((request) => request.id === editId)?.version ?? 0,
+                  ),
+                }
+              : {}),
+          },
+          body: JSON.stringify({
+            type: draft.type.toUpperCase(),
+            title: draft.title,
+            objective: draft.objective,
+            audience: draft.audience,
+            requestedFor: draft.requestedDate || undefined,
+            sourceUrls: draft.source ? [draft.source] : [],
+          }),
+        },
+      );
+      if (!response.ok) {
+        const result = (await response.json().catch(() => null)) as {
+          message?: string;
+        } | null;
+        throw new Error(result?.message || "Request could not be saved");
+      }
+      const updated = (await response.json()) as {
         id: string;
         title: string;
         type: "PR" | "OFFSITE";
         requesterId: string;
+        status: Request["status"];
+        version: number;
         requestedFor: string | null;
+        department?: { name: string };
+        revisions: Array<{
+          revisionNumber: number;
+          objective: string | null;
+          audience: string | null;
+        }>;
         sources: { url: string }[];
         tasks: Array<{
           id: string;
@@ -1005,25 +1089,31 @@ export function PrCenterApp({
           version: number;
         }>;
       };
+      const mappedRequest: Request = {
+        id: updated.id,
+        title: updated.title,
+        type: updated.type.toLowerCase() as RequestType,
+        requesterId: updated.requesterId,
+        department: updated.department?.name || currentUser.department,
+        requestedDate: updated.requestedFor?.slice(0, 10) || "",
+        taskIds: updated.tasks.map((task) => task.id),
+        source: updated.sources[0]?.url,
+        status: updated.status,
+        version: updated.version,
+        revisionNumber: updated.revisions[0]?.revisionNumber,
+        objective: updated.revisions[0]?.objective || undefined,
+        audience: updated.revisions[0]?.audience || undefined,
+      };
       setState((previous) => ({
         ...previous,
         requests: [
-          {
-            id: created.id,
-            title: created.title,
-            type: created.type.toLowerCase() as RequestType,
-            requesterId: created.requesterId,
-            department: "RTRDA",
-            requestedDate: created.requestedFor?.slice(0, 10) || "",
-            taskIds: created.tasks.map((task) => task.id),
-            source: created.sources[0]?.url,
-          },
-          ...previous.requests,
+          mappedRequest,
+          ...previous.requests.filter((request) => request.id !== updated.id),
         ],
         tasks: [
-          ...created.tasks.map((task) => ({
+          ...updated.tasks.map((task) => ({
             id: task.id,
-            requestId: created.id,
+            requestId: updated.id,
             type: task.contentType,
             title: task.title,
             status: task.status.toLowerCase() as StatusId,
@@ -1031,15 +1121,66 @@ export function PrCenterApp({
             dueDate: task.dueAt?.slice(0, 10) || "",
             version: task.version,
           })),
-          ...previous.tasks,
+          ...previous.tasks.filter(
+            (task) => !updated.tasks.some((nextTask) => nextTask.id === task.id),
+          ),
         ],
       }));
-      announce(state.language === "th" ? "บันทึกคำขอแล้ว" : "Request saved");
-      setPage("my-requests");
-    } catch {
+      setRequestEditId(null);
+      setRequestOpen(false);
+      await refreshNotifications().catch(() => undefined);
       announce(
-        state.language === "th" ? "ไม่สามารถบันทึกคำขอได้" : "Request could not be saved",
+        state.language === "th"
+          ? editId
+            ? "บันทึกการแก้ไขคำขอแล้ว"
+            : "บันทึกคำขอเป็นฉบับร่างแล้ว"
+          : editId
+            ? "Request changes saved"
+            : "Request saved as draft",
       );
+      setPage("my-requests");
+    } catch (error) {
+      announce(error instanceof Error ? error.message : "Request could not be saved");
+    }
+  };
+  const submitRequest = async (request: Request) => {
+    if (!request.version) return announce("Refresh this request before submitting.");
+    try {
+      const response = await fetch(`/api/pr-center/requests/${request.id}/transitions`, {
+        method: "POST",
+        credentials: "same-origin",
+        headers: {
+          "Content-Type": "application/json",
+          "If-Match": String(request.version),
+        },
+        body: JSON.stringify({ to: "SUBMITTED" }),
+      });
+      if (!response.ok) {
+        const result = (await response.json().catch(() => null)) as {
+          message?: string;
+        } | null;
+        throw new Error(result?.message || "Request could not be submitted");
+      }
+      const updated = (await response.json()) as {
+        status: Request["status"];
+        version: number;
+      };
+      setState((previous) => ({
+        ...previous,
+        requests: previous.requests.map((item) =>
+          item.id === request.id
+            ? { ...item, status: updated.status, version: updated.version }
+            : item,
+        ),
+      }));
+      await refreshNotifications().catch(() => undefined);
+      announce(
+        state.language === "th"
+          ? "ส่งคำขอให้ทีม PR แล้ว"
+          : "Request submitted to PR Operations",
+      );
+    } catch (error) {
+      announce(error instanceof Error ? error.message : "Request could not be submitted");
     }
   };
   const transitionTask = async (taskId: string, nextStatus: StatusId) => {
@@ -1466,6 +1607,8 @@ export function PrCenterApp({
             <Requests
               t={t}
               onOpenRequest={openRequest}
+              onEditRequest={editRequest}
+              onSubmitRequest={submitRequest}
               mode="mine"
               requests={state.requests}
               tasks={state.tasks}
@@ -1476,6 +1619,8 @@ export function PrCenterApp({
             <Requests
               t={t}
               onOpenRequest={openRequest}
+              onEditRequest={editRequest}
+              onSubmitRequest={submitRequest}
               mode="all"
               requests={state.requests}
               tasks={state.tasks}
@@ -1557,11 +1702,13 @@ export function PrCenterApp({
           language={state.language}
           draft={requestDraft}
           onChange={setRequestDraft}
-          onClose={() => setRequestOpen(false)}
+          onClose={() => {
+            setRequestOpen(false);
+            setRequestEditId(null);
+          }}
           onSubmit={(event) => {
             event.preventDefault();
-            setRequestOpen(false);
-            createRequest(requestDraft);
+            createRequest(requestDraft, requestEditId);
           }}
         />
       )}
@@ -1931,6 +2078,8 @@ function NewRequest({
 function Requests({
   t,
   onOpenRequest,
+  onEditRequest,
+  onSubmitRequest,
   mode,
   requests: requestItems,
   tasks: taskItems,
@@ -1938,6 +2087,8 @@ function Requests({
 }: {
   t: (typeof copy)[Language];
   onOpenRequest: () => void;
+  onEditRequest: (request: Request) => void;
+  onSubmitRequest: (request: Request) => void;
   mode: "all" | "mine";
   requests: Request[];
   tasks: Task[];
@@ -2014,7 +2165,14 @@ function Requests({
                   <td>{request.id}</td>
                   <td>{request.title}</td>
                   <td>
-                    <Status>{STATUS_LABELS[requestStatus(request, taskItems)]}</Status>
+                    <Status>
+                      {request.status === "DRAFT"
+                        ? "Draft"
+                        : request.status === "SUBMITTED"
+                          ? "Submitted"
+                          : request.status ||
+                            STATUS_LABELS[requestStatus(request, taskItems)]}
+                    </Status>
                   </td>
                   <td>{request.requestedDate}</td>
                   <td>
@@ -2049,6 +2207,19 @@ function Requests({
                 .map((task) => task.title)
                 .join(", ") || "None"}
             </p>
+            {mode === "mine" &&
+              selected.requesterId === currentUserId &&
+              selected.status === "DRAFT" && (
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                  <button onClick={() => onEditRequest(selected)}>Edit draft</button>
+                  <button
+                    className={styles.primary}
+                    onClick={() => onSubmitRequest(selected)}
+                  >
+                    Submit request
+                  </button>
+                </div>
+              )}
           </section>
         )}
       </article>
@@ -3656,6 +3827,8 @@ function RequestModal({
             {thai ? "ชื่อโครงการ / กิจกรรม" : "Project / activity"}
             <input
               value={draft.title}
+              minLength={3}
+              maxLength={300}
               onChange={(event) => onChange({ ...draft, title: event.target.value })}
               required
             />
@@ -3698,6 +3871,7 @@ function RequestModal({
               ? "ลิงก์ข้อมูลต้นทาง / โฟลเดอร์โครงการ"
               : "Source links / project folder"}
             <input
+              type="url"
               value={draft.source}
               onChange={(event) => onChange({ ...draft, source: event.target.value })}
               required
