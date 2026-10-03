@@ -392,6 +392,14 @@
   background: #fff3d8;
   color: #9a6504;
 }
+.red {
+  background: #ffe4e4;
+  color: #c53030;
+}
+.purple {
+  background: #ede9fe;
+  color: #6b21a8;
+}
 .tableWrap {
   overflow-x: auto;
 }

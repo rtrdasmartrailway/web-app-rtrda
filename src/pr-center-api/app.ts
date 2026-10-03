@@ -34,6 +34,7 @@ import {
   revokeRole,
   toggleUserActive,
   listAccessAuditEvents,
+  evaluateNotificationReminders,
   PrCenterError,
   type PrCenterActor,
 } from "@/lib/pr-center/service";
@@ -175,6 +176,9 @@ export function buildPrCenterApi(
       correlationId(request),
     );
   });
+  app.post("/notifications/evaluate-reminders", async (request) =>
+    evaluateNotificationReminders(request.prCenterActor!),
+  );
   app.get("/audit", async (request) => {
     const query = request.query as { take?: string };
     return listAuditEvents(request.prCenterActor!, Number(query.take || 100));

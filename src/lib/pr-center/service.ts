@@ -30,6 +30,12 @@ import {
   FileValidationError,
   type StoredFile,
 } from "./file-storage";
+import {
+  evaluateNotificationPolicy,
+  prefixedTitle,
+  type PolicyEvaluationResult,
+} from "./notification-policy";
+import { dispatchNotification } from "./notification-channels";
 
 export type PrCenterActor = {
   id: string;
@@ -631,11 +637,23 @@ export async function updateTaskAssignment(
       await tx.prNotification.create({
         data: {
           userId: input.ownerId,
-          title: "PR Center task assigned",
+          title: prefixedTitle("ASSIGNMENT", "PR Center task assigned"),
           body: task.title,
           target: "operations",
         },
       });
+    // Material-change notification: when dueAt changes
+    if (input.dueAt && task.dueAt && input.dueAt.getTime() !== task.dueAt.getTime() && task.ownerId) {
+      const changeDesc = `Due date changed from ${task.dueAt.toISOString().slice(0, 10)} to ${input.dueAt.toISOString().slice(0, 10)}`;
+      await tx.prNotification.create({
+        data: {
+          userId: task.ownerId,
+          title: prefixedTitle("CHANGE", changeDesc),
+          body: task.title,
+          target: "operations",
+        },
+      });
+    }
     await auditAndOutbox(tx, {
       actor,
       action: "task.assigned",
@@ -1552,6 +1570,34 @@ export async function assignFinalAsset(
     });
     return { taskId: task.id, revisionNumber: targetRevisionNumber, fileId: fileObject.id };
   });
+}
+
+// ── Notification policy evaluation (admin/system trigger) ────────────────
+
+export async function evaluateNotificationReminders(
+  actor: PrCenterActor,
+): Promise<PolicyEvaluationResult & { channelResults: Array<{ channel: string; status: string }> }> {
+  if (actor.role !== "SCOPED_ADMINISTRATOR")
+    throw new PrCenterError("Only administrators can trigger reminder evaluation", 403, "FORBIDDEN");
+
+  const result = await evaluateNotificationPolicy();
+
+  // Dispatch through external channels for newly created notifications
+  const channelResults: Array<{ channel: string; status: string }> = [];
+  if (result.totalNotificationsCreated > 0) {
+    // We dispatch a summary notification through channels as evidence
+    const dispatches = await dispatchNotification({
+      userId: actor.id,
+      title: "[SYSTEM] Reminder evaluation completed",
+      body: `Created ${result.totalNotificationsCreated} notifications: ${result.dueRemindersCreated} due, ${result.overdueRemindersCreated} overdue, ${result.mandatoryRemindersCreated} mandatory.`,
+      target: "system-data",
+    });
+    for (const d of dispatches) {
+      channelResults.push({ channel: d.channel, status: d.status });
+    }
+  }
+
+  return { ...result, channelResults };
 }
 
 // ── Access Administration (SCOPED_ADMINISTRATOR only) ────────────────────

@@ -207,3 +207,27 @@ describe("Access administration route guards", () => {
     await app.close();
   });
 });
+
+describe("Notification policy route guards", () => {
+  it("rejects unauthenticated evaluate-reminders", async () => {
+    const app = buildPrCenterApi(async () => null);
+    const response = await app.inject({
+      method: "POST",
+      url: "/notifications/evaluate-reminders",
+    });
+    expect(response.statusCode).toBe(401);
+    await app.close();
+  });
+
+  it("rejects non-admin role from evaluate-reminders", async () => {
+    const app = buildPrCenterApi(async () => mockActor);
+    const response = await app.inject({
+      method: "POST",
+      url: "/notifications/evaluate-reminders",
+    });
+    expect(response.statusCode).toBe(403);
+    const body = response.json();
+    expect(body.error).toBe("FORBIDDEN");
+    await app.close();
+  });
+});

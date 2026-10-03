@@ -2978,6 +2978,19 @@ function MessageHouse({
     </>
   );
 }
+function notificationCategory(title: string): { label: string; tone: string } {
+  const upper = title.toUpperCase();
+  if (upper.startsWith("[DUE]")) return { label: "Due Soon", tone: "amber" };
+  if (upper.startsWith("[OVERDUE]")) return { label: "Overdue", tone: "red" };
+  if (upper.startsWith("[MANDATORY]")) return { label: "Mandatory", tone: "red" };
+  if (upper.startsWith("[CHANGE]")) return { label: "Changed", tone: "blue" };
+  if (upper.startsWith("[ASSIGNMENT]")) return { label: "Assigned", tone: "green" };
+  if (upper.startsWith("[STATUS]")) return { label: "Status", tone: "blue" };
+  if (upper.startsWith("[COMMENT]")) return { label: "Comment", tone: "blue" };
+  if (upper.startsWith("[SYSTEM]")) return { label: "System", tone: "purple" };
+  return { label: "", tone: "blue" };
+}
+
 function Notifications({
   onNavigate,
   notifications,
@@ -3005,27 +3018,38 @@ function Notifications({
         }
       />
       <section className={styles.list}>
-        {notifications.map(({ id, title, message, target, createdAt, read }) => (
-          <button
-            key={id}
-            className={styles.notification}
-            onClick={() => {
-              onRead([id]);
-              onNavigate(target);
-            }}
-          >
-            <i aria-label={read ? "Read" : "Unread"} />
-            <div>
-              <b>{title}</b>
-              <span>{message}</span>
-              <small>
-                {new Date(createdAt).toLocaleString(
-                  language === "th" ? "th-TH-u-ca-buddhist" : "en-GB",
+        {notifications.map(({ id, title, message, target, createdAt, read }) => {
+          const cat = notificationCategory(title);
+          return (
+            <button
+              key={id}
+              className={styles.notification}
+              onClick={() => {
+                onRead([id]);
+                onNavigate(target);
+              }}
+            >
+              <i aria-label={read ? "Read" : "Unread"} />
+              <div>
+                <b>{title.replace(/^\[[\w]+\]\s*/, "")}</b>
+                {cat.label && (
+                  <span
+                    className={`${styles.status} ${styles[cat.tone]}`}
+                    style={{ fontSize: "0.75rem", marginLeft: 8 }}
+                  >
+                    {cat.label}
+                  </span>
                 )}
-              </small>
-            </div>
-          </button>
-        ))}
+                <span>{message}</span>
+                <small>
+                  {new Date(createdAt).toLocaleString(
+                    language === "th" ? "th-TH-u-ca-buddhist" : "en-GB",
+                  )}
+                </small>
+              </div>
+            </button>
+          );
+        })}
       </section>
     </>
   );
