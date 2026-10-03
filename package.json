@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "next dev",
     "pr-center:api": "tsx src/pr-center-api/server.ts",
+    "pr-center:outbox-worker": "tsx src/pr-center-api/outbox-worker.ts",
     "import:wordpress": "node scripts/import-wordpress.mjs",
     "audit:parity": "node scripts/audit-parity.mjs",
     "audit:divergence": "node scripts/audit-divergence.mjs",
@@ -26,6 +27,7 @@
     "cheerio": "^1.2.0",
     "fastify": "^5.12.5",
     "next": "^16.3.6",
+    "nodemailer": "^10.0.13",
     "openid-client": "^6.8.8",
     "pdfjs-dist": "^6.3.289",
     "pg": "^8.21.0",
@@ -38,6 +40,7 @@
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
+    "@types/nodemailer": "^8.0.2",
     "@types/pg": "^8.20.0",
     "@types/react": "^19",
     "@types/react-dom": "^19",

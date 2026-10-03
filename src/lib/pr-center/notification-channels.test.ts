@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const { createOutboxEvent } = vi.hoisted(() => ({
   createOutboxEvent: vi.fn(),
@@ -26,6 +26,10 @@ const mockPayload: NotificationPayload = {
 beforeEach(() => {
   vi.clearAllMocks();
   createOutboxEvent.mockResolvedValue({ id: "outbox-1" });
+});
+
+afterEach(() => {
+  vi.unstubAllEnvs();
 });
 
 describe("OutboxNotificationChannel", () => {
@@ -61,6 +65,27 @@ describe("EmailNotificationChannel", () => {
     const result = await channel.send(mockPayload);
     expect(result.status).toBe("skipped");
     expect(result.channel).toBe("email");
+  });
+
+  it("queues email only when the recipient is on the explicit allowlist", async () => {
+    vi.stubEnv("PR_CENTER_EMAIL_ONLY_ALLOWLIST", "user@example.com,other@example.com");
+    const result = await new EmailNotificationChannel(true).send(mockPayload);
+    expect(result.status).toBe("queued");
+    expect(createOutboxEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          eventType: "notification.email.queued",
+          payload: expect.objectContaining({ to: "user@example.com" }),
+        }),
+      }),
+    );
+  });
+
+  it("does not queue email when the recipient is not allowlisted", async () => {
+    vi.stubEnv("PR_CENTER_EMAIL_ONLY_ALLOWLIST", "other@example.com");
+    const result = await new EmailNotificationChannel(true).send(mockPayload);
+    expect(result.status).toBe("skipped");
+    expect(createOutboxEvent).not.toHaveBeenCalled();
   });
 
   it("can be enabled", () => {

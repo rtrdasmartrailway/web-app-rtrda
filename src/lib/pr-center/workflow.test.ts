@@ -22,9 +22,12 @@ describe("PR Center workflow policy", () => {
     );
   });
 
-  it("limits approvals to approval authorities", () => {
-    expect(canApprove("APPROVER")).toBe(true);
+  it("limits approvals to PR operations and scoped administrators", () => {
+    expect(canApprove("PR_OPERATIONS")).toBe(true);
+    expect(canApprove("SCOPED_ADMINISTRATOR")).toBe(true);
+    expect(canApprove("APPROVER")).toBe(false);
     expect(canApprove("EXECUTIVE_READ_ONLY")).toBe(false);
+    expect(canApprove("REQUESTER")).toBe(false);
   });
 
   it("allows idea proposals but restricts review and conversion authority", () => {

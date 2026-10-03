@@ -28,6 +28,15 @@ import {
   PR_CENTER_ROLES,
 } from "./workflow";
 import {
+  APPROVAL_STAGE_STATUSES,
+  getApprovalStage,
+  getFirstApprovalStage,
+  getNextApprovalStage,
+  hasApprovalAuthority,
+  parseApprovalPolicy,
+} from "./approval-policy";
+import { isClamAvAvailable, scanWithClamAv } from "./clamav-scanner";
+import {
   storeFile,
   readFileFromStorage,
   removeFileFromStorage,
@@ -867,6 +876,7 @@ export async function transitionTask(
 ) {
   const task = await prisma.prTask.findFirst({
     where: taskScopeWhere(actor, taskId),
+    include: { request: { select: { departmentId: true } } },
   });
   if (!task) throw new PrCenterError("Task not found", 404, "NOT_FOUND");
   if (task.version !== fromVersion)
@@ -889,6 +899,36 @@ export async function transitionTask(
       },
     });
     throw new PrCenterError("This transition is not allowed", 422, "INVALID_TRANSITION");
+  }
+  if (
+    isApprovalStageStatus(task.status) ||
+    isApprovalStageStatus(to) ||
+    to === "APPROVED"
+  ) {
+    const policy = loadApprovalPolicy();
+    const firstStage = getFirstApprovalStage(policy);
+    const isAuthorizedEntry =
+      (task.status === "IN_PRODUCTION" || task.status === "REVISION_REQUIRED") &&
+      to === firstStage.status;
+    if (!isAuthorizedEntry) {
+      await prisma.prAuditEvent.create({
+        data: {
+          organizationId: actor.organizationId,
+          actorId: actor.id,
+          action: "approval.transition_blocked",
+          entityType: "task",
+          entityId: task.id,
+          correlationId,
+          before: { status: task.status, version: task.version },
+          after: { attemptedStatus: to, policyVersion: policy.version },
+        },
+      });
+      throw new PrCenterError(
+        "Approval stages can only be entered through the configured first stage; approval decisions advance the workflow",
+        422,
+        "APPROVAL_STAGE_BYPASS_BLOCKED",
+      );
+    }
   }
 
   return prisma.$transaction(async (tx) => {
@@ -922,6 +962,25 @@ export async function transitionTask(
     });
     return tx.prTask.findUniqueOrThrow({ where: { id: task.id } });
   });
+}
+
+function loadApprovalPolicy() {
+  try {
+    return parseApprovalPolicy(process.env.PR_CENTER_APPROVAL_POLICY_JSON);
+  } catch (error) {
+    const detail = error instanceof Error ? error.message : "policy validation failed";
+    throw new PrCenterError(
+      `Approval is blocked: ${detail}`,
+      503,
+      "APPROVAL_POLICY_NOT_CONFIGURED",
+    );
+  }
+}
+
+function isApprovalStageStatus(status: string): boolean {
+  return APPROVAL_STAGE_STATUSES.includes(
+    status as (typeof APPROVAL_STAGE_STATUSES)[number],
+  );
 }
 
 export function assertApprovalAuthority(actor: PrCenterActor) {
@@ -1050,14 +1109,7 @@ export async function recordApprovalDecision(
       409,
       "STALE_UPDATE",
     );
-  if (
-    ![
-      "SOURCE_FACT_CHECK",
-      "TECHNICAL_REVIEW",
-      "PR_EDITORIAL_REVIEW",
-      "MANAGEMENT_APPROVAL",
-    ].includes(task.status)
-  )
+  if (!isApprovalStageStatus(task.status))
     throw new PrCenterError(
       "This task is not awaiting approval",
       422,
@@ -1070,7 +1122,51 @@ export async function recordApprovalDecision(
       422,
       "REVISION_REQUIRED",
     );
-  const next = input.decision === "APPROVED" ? "APPROVED" : input.decision;
+  const policy = loadApprovalPolicy();
+  const stage = getApprovalStage(policy, task.status);
+  if (!stage)
+    throw new PrCenterError(
+      "This stage is not required by the approved approval policy",
+      409,
+      "APPROVAL_STAGE_NOT_CONFIGURED",
+    );
+  if (
+    !hasApprovalAuthority({
+      stage,
+      role: actor.role,
+      actorDepartmentId: actor.departmentId,
+      taskDepartmentId: task.request.departmentId,
+    })
+  )
+    throw new PrCenterError(
+      "You are not authorized for this approval stage or department scope",
+      403,
+      "APPROVAL_AUTHORITY_MISMATCH",
+    );
+  if (input.decision !== "APPROVED" && !input.comment?.trim())
+    throw new PrCenterError(
+      "A reason is required for revision or rejection decisions",
+      422,
+      "REASON_REQUIRED",
+    );
+  const priorStageDecision = await prisma.prApproval.findFirst({
+    where: {
+      taskId: task.id,
+      taskRevision: revision.revisionNumber,
+      stage: task.status,
+    },
+    select: { id: true },
+  });
+  if (priorStageDecision)
+    throw new PrCenterError(
+      "A decision already exists for this stage and revision",
+      409,
+      "APPROVAL_ALREADY_RECORDED",
+    );
+  const next =
+    input.decision === "APPROVED"
+      ? (getNextApprovalStage(policy, stage.status)?.status ?? "APPROVED")
+      : input.decision;
   return prisma.$transaction(async (tx) => {
     const updated = await tx.prTask.updateMany({
       where: { id: task.id, version: fromVersion },
@@ -1110,6 +1206,11 @@ export async function recordApprovalDecision(
         decision: input.decision,
         revision: revision.revisionNumber,
         version: fromVersion + 1,
+        approvalPolicyVersion: policy.version,
+        approvalReference: policy.approvalReference,
+        stage: stage.status,
+        authorityRole: actor.role,
+        authorityDepartmentId: actor.departmentId,
       },
       eventType: "pr.approval.recorded",
       correlationId,
@@ -1399,33 +1500,24 @@ export async function recordPublishingEvidence(
 
 type ScanResult = "CLEAN" | "QUARANTINED" | "FAILED";
 
-/**
- * Mock file scanner. In production, this would call an AV/malware engine.
- * Current heuristics:
- *  - SVG files → QUARANTINED (XSS risk vector)
- *  - ZIP archives → QUARANTINED (container risk)
- *  - Everything else → CLEAN
- */
-async function mockScanFile(input: {
-  fileName: string;
-  mimeType: string;
-  sizeBytes: number;
-  checksum: string;
-}): Promise<{ result: ScanResult; reason: string }> {
-  // Simulate async scan latency (no actual delay in tests).
-  if (input.mimeType === "image/svg+xml") {
+async function scanFile(
+  content: Buffer,
+): Promise<{ result: ScanResult; reason: string }> {
+  try {
+    const scan = await scanWithClamAv(content);
     return {
-      result: "QUARANTINED",
-      reason: "SVG files require manual review due to embedded script risk",
+      result: scan.status,
+      reason:
+        scan.status === "CLEAN"
+          ? "ClamAV scan passed"
+          : `ClamAV detected ${scan.signature || "malware"}`,
+    };
+  } catch {
+    return {
+      result: "FAILED",
+      reason: "ClamAV unavailable or scan failed; file remains quarantined",
     };
   }
-  if (input.mimeType === "application/zip") {
-    return {
-      result: "QUARANTINED",
-      reason: "Archive files require manual review for embedded threats",
-    };
-  }
-  return { result: "CLEAN", reason: "No threats detected" };
 }
 
 // ── File upload, download, attachment, and final-asset helpers ──────────────
@@ -1449,16 +1541,12 @@ export async function uploadFile(
       throw new PrCenterError(error.message, error.statusCode, error.code);
     throw error;
   }
-  // Run mock scan synchronously; production would queue this.
-  const scan = await mockScanFile({
-    fileName: stored.fileName,
-    mimeType: stored.mimeType,
-    sizeBytes: stored.sizeBytes,
-    checksum: stored.checksum,
-  });
+  // Scan before exposing the file; non-clean and failed scans remain undownloadable.
+  const scan = await scanFile(input.content);
   return prisma.$transaction(async (tx) => {
     const fileObject = await tx.prFileObject.create({
       data: {
+        organizationId: actor.organizationId,
         storageKey: stored.storageKey,
         fileName: stored.fileName,
         mimeType: stored.mimeType,
@@ -1510,7 +1598,7 @@ export async function downloadFile(
   fileId: string,
 ): Promise<{ buffer: Buffer; fileName: string; mimeType: string }> {
   const fileObject = await prisma.prFileObject.findFirst({
-    where: { id: fileId, deletedAt: null },
+    where: { id: fileId, organizationId: actor.organizationId, deletedAt: null },
   });
   if (!fileObject) throw new PrCenterError("File not found", 404, "NOT_FOUND");
   // Only allow download of clean files.
@@ -1573,7 +1661,12 @@ export async function createAttachment(
       "INVALID_KIND",
     );
   const fileObject = await prisma.prFileObject.findFirst({
-    where: { id: input.fileId, scanStatus: "CLEAN", deletedAt: null },
+    where: {
+      id: input.fileId,
+      organizationId: actor.organizationId,
+      scanStatus: "CLEAN",
+      deletedAt: null,
+    },
   });
   if (!fileObject)
     throw new PrCenterError("File not found or not yet available", 404, "FILE_NOT_FOUND");
@@ -1750,7 +1843,12 @@ export async function assignFinalAsset(
       "STALE_UPDATE",
     );
   const fileObject = await prisma.prFileObject.findFirst({
-    where: { id: input.fileId, scanStatus: "CLEAN", deletedAt: null },
+    where: {
+      id: input.fileId,
+      organizationId: actor.organizationId,
+      scanStatus: "CLEAN",
+      deletedAt: null,
+    },
   });
   if (!fileObject)
     throw new PrCenterError("File not found or not yet clean", 404, "FILE_NOT_FOUND");
@@ -1813,12 +1911,17 @@ export async function evaluateNotificationReminders(
   // Dispatch through external channels for newly created notifications
   const channelResults: Array<{ channel: string; status: string }> = [];
   if (result.totalNotificationsCreated > 0) {
-    // We dispatch a summary notification through channels as evidence
+    const recipient = await prisma.prCenterUser.findFirst({
+      where: { id: actor.id, organizationId: actor.organizationId, active: true },
+      select: { email: true },
+    });
+    // We dispatch a summary notification through channels for operational evidence.
     const dispatches = await dispatchNotification({
       userId: actor.id,
       title: "[SYSTEM] Reminder evaluation completed",
       body: `Created ${result.totalNotificationsCreated} notifications: ${result.dueRemindersCreated} due, ${result.overdueRemindersCreated} overdue, ${result.mandatoryRemindersCreated} mandatory.`,
       target: "system-data",
+      recipientAddress: recipient?.email,
     });
     for (const d of dispatches) {
       channelResults.push({ channel: d.channel, status: d.status });
@@ -2002,16 +2105,9 @@ export async function listQuarantinedFiles(actor: PrCenterActor, take = 50) {
   const limit = Math.min(Math.max(take, 1), 100);
   return prisma.prFileObject.findMany({
     where: {
-      scanStatus: "QUARANTINED",
+      organizationId: actor.organizationId,
+      scanStatus: { in: ["QUARANTINED", "FAILED"] },
       deletedAt: null,
-      attachments: {
-        some: {
-          OR: [
-            { request: { organizationId: actor.organizationId } },
-            { task: { request: { organizationId: actor.organizationId } } },
-          ],
-        },
-      },
     },
     include: {
       attachments: {
@@ -2039,37 +2135,26 @@ export async function reviewQuarantinedFile(
   if (!canManageQuarantine(actor.role))
     throw new PrCenterError("You cannot review quarantined files", 403, "FORBIDDEN");
   const fileObject = await prisma.prFileObject.findFirst({
-    where: { id: fileId, scanStatus: "QUARANTINED", deletedAt: null },
+    where: {
+      id: fileId,
+      organizationId: actor.organizationId,
+      scanStatus: { in: ["QUARANTINED", "FAILED"] },
+      deletedAt: null,
+    },
   });
   if (!fileObject)
     throw new PrCenterError("Quarantined file not found", 404, "NOT_FOUND");
 
-  if (disposition === "approve") {
-    // Clear quarantine → CLEAN
-    return prisma.$transaction(async (tx) => {
-      const updated = await tx.prFileObject.update({
-        where: { id: fileId },
-        data: { scanStatus: "CLEAN", scannedAt: new Date() },
-      });
-      await tx.prAuditEvent.create({
-        data: {
-          organizationId: actor.organizationId,
-          actorId: actor.id,
-          action: "file.quarantine_approved",
-          entityType: "file",
-          entityId: fileId,
-          correlationId,
-          before: { scanStatus: "QUARANTINED" },
-          after: { scanStatus: "CLEAN", reason: reason?.trim() || null },
-        },
-      });
-      return updated;
-    });
-  }
+  if (disposition === "approve")
+    throw new PrCenterError(
+      "Files must pass ClamAV before they can be downloaded; rescan instead of overriding the result",
+      409,
+      "FILE_SCAN_REQUIRED",
+    );
+  if (!reason?.trim())
+    throw new PrCenterError("A deletion reason is required", 422, "REASON_REQUIRED");
 
-  // disposition === "delete"
   return prisma.$transaction(async (tx) => {
-    // Soft-delete the file object
     const updated = await tx.prFileObject.update({
       where: { id: fileId },
       data: { deletedAt: new Date() },
@@ -2082,10 +2167,10 @@ export async function reviewQuarantinedFile(
         entityType: "file",
         entityId: fileId,
         correlationId,
-        before: { scanStatus: "QUARANTINED" },
+        before: { scanStatus: fileObject.scanStatus },
         after: {
           deletedAt: updated.deletedAt?.toISOString(),
-          reason: reason?.trim() || null,
+          reason: reason.trim(),
         },
       },
     });
@@ -2101,18 +2186,20 @@ export async function rescanFile(
   if (!canManageQuarantine(actor.role))
     throw new PrCenterError("You cannot rescan files", 403, "FORBIDDEN");
   const fileObject = await prisma.prFileObject.findFirst({
-    where: { id: fileId, deletedAt: null },
+    where: {
+      id: fileId,
+      organizationId: actor.organizationId,
+      deletedAt: null,
+    },
   });
   if (!fileObject) throw new PrCenterError("File not found", 404, "NOT_FOUND");
   if (fileObject.scanStatus === "CLEAN")
     throw new PrCenterError("File is already clean", 422, "ALREADY_CLEAN");
+  if (!fileObject.organizationId)
+    throw new PrCenterError("File organization is unknown", 423, "FILE_SCOPE_UNKNOWN");
 
-  const scan = await mockScanFile({
-    fileName: fileObject.fileName,
-    mimeType: fileObject.mimeType,
-    sizeBytes: fileObject.sizeBytes,
-    checksum: fileObject.checksum,
-  });
+  const content = await readFileFromStorage(actor.organizationId, fileObject.storageKey);
+  const scan = await scanFile(content);
   return prisma.$transaction(async (tx) => {
     const updated = await tx.prFileObject.update({
       where: { id: fileId },
@@ -2292,18 +2379,19 @@ export async function releaseReadinessCheck(actor: PrCenterActor) {
   });
 
   // 4. File lifecycle: uploaded, scanned, attached
-  const fileCount = await prisma.prFileObject.count();
+  const fileScope = { organizationId: actor.organizationId };
+  const fileCount = await prisma.prFileObject.count({ where: fileScope });
   const quarantinedCount = await prisma.prFileObject.count({
-    where: { scanStatus: "QUARANTINED" },
+    where: { ...fileScope, scanStatus: "QUARANTINED" },
   });
   const pendingFileCount = await prisma.prFileObject.count({
-    where: { scanStatus: "PENDING" },
+    where: { ...fileScope, scanStatus: "PENDING" },
   });
   const failedFileCount = await prisma.prFileObject.count({
-    where: { scanStatus: "FAILED" },
+    where: { ...fileScope, scanStatus: "FAILED" },
   });
   const cleanFileCount = await prisma.prFileObject.count({
-    where: { scanStatus: "CLEAN" },
+    where: { ...fileScope, scanStatus: "CLEAN" },
   });
   checks.push({
     name: "File lifecycle",
@@ -2315,11 +2403,13 @@ export async function releaseReadinessCheck(actor: PrCenterActor) {
       failedFileCount === 0,
     detail: `total=${fileCount}, clean=${cleanFileCount}, pending=${pendingFileCount}, quarantined=${quarantinedCount}, failed=${failedFileCount}`,
   });
+  const scannerReady = await isClamAvAvailable();
   checks.push({
     name: "Malware scanner integration",
-    passed: false,
-    detail:
-      "Uploads still use a heuristic mock scanner; a real scanner is not configured.",
+    passed: scannerReady,
+    detail: scannerReady
+      ? "ClamAV accepted an INSTREAM readiness scan"
+      : "ClamAV is not configured, unreachable, or did not return a clean readiness result.",
   });
 
   // 5. Publishing evidence: schedules and published tasks
@@ -2347,41 +2437,72 @@ export async function releaseReadinessCheck(actor: PrCenterActor) {
     passed: notificationCount > 0,
     detail: `${notificationCount} in-app notification(s)`,
   });
-  checks.push({
-    name: "External notification delivery",
-    passed: false,
-    detail:
-      "Email and LINE adapters only enqueue events; no delivery worker/provider is configured.",
-  });
-
   // 7. Outbox event processing
+  const emailOutboxScope = { eventType: "notification.email.queued" };
   const pendingOutbox = await prisma.prOutboxEvent.count({
-    where: { status: "PENDING" },
+    where: { ...emailOutboxScope, status: "PENDING" },
   });
   const processingOutbox = await prisma.prOutboxEvent.count({
-    where: { status: "PROCESSING" },
+    where: { ...emailOutboxScope, status: "PROCESSING" },
   });
   const failedOutbox = await prisma.prOutboxEvent.count({
-    where: { status: "FAILED" },
+    where: { ...emailOutboxScope, status: "FAILED" },
   });
   const deliveredOutbox = await prisma.prOutboxEvent.count({
-    where: { status: "DELIVERED" },
+    where: { ...emailOutboxScope, status: "DELIVERED" },
   });
   checks.push({
     name: "Outbox events",
     passed: pendingOutbox === 0 && processingOutbox === 0 && failedOutbox === 0,
     detail: `pending=${pendingOutbox}, processing=${processingOutbox}, failed=${failedOutbox}, delivered=${deliveredOutbox}`,
   });
+  let outboxWorkerReady = false;
+  const outboxWorkerUrl = process.env.PR_CENTER_OUTBOX_WORKER_URL;
+  if (outboxWorkerUrl) {
+    try {
+      const response = await fetch(outboxWorkerUrl, {
+        signal: AbortSignal.timeout(5_000),
+      });
+      const workerState = (await response.json().catch(() => null)) as {
+        ready?: unknown;
+      } | null;
+      outboxWorkerReady = response.ok && workerState?.ready === true;
+    } catch {
+      outboxWorkerReady = false;
+    }
+  }
   checks.push({
     name: "Outbox worker",
-    passed: false,
-    detail: "No outbox consumer is deployed to claim, retry, and deliver queued events.",
+    passed: outboxWorkerReady,
+    detail: outboxWorkerReady
+      ? "Email outbox worker reports SMTP ready"
+      : "Email outbox worker or SMTP provider is not ready.",
   });
   checks.push({
-    name: "Approval authority policy",
-    passed: false,
+    name: "External notification delivery",
+    passed:
+      outboxWorkerReady &&
+      deliveredOutbox > 0 &&
+      pendingOutbox === 0 &&
+      failedOutbox === 0,
     detail:
-      "Stage authority, scope, delegation, expiry, recusal, and separation-of-duties policy is not configured.",
+      outboxWorkerReady && deliveredOutbox > 0
+        ? `SMTP ready; delivered=${deliveredOutbox}, pending=${pendingOutbox}, failed=${failedOutbox}`
+        : "A verified SMTP worker and at least one completed email delivery are required.",
+  });
+  let approvalPolicyDetail = "Approval policy is not configured";
+  let approvalPolicyConfigured = false;
+  try {
+    const policy = loadApprovalPolicy();
+    approvalPolicyConfigured = true;
+    approvalPolicyDetail = `version=${policy.version}, owner reference=${policy.approvalReference}`;
+  } catch (error) {
+    if (error instanceof Error) approvalPolicyDetail = error.message;
+  }
+  checks.push({
+    name: "Approval authority policy",
+    passed: approvalPolicyConfigured,
+    detail: approvalPolicyDetail,
   });
   checks.push({
     name: "Backup and restore UAT",

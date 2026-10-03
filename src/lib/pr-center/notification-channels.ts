@@ -77,9 +77,17 @@ export class EmailNotificationChannel implements NotificationChannel {
     if (!this.enabled) {
       return { channel: this.name, status: "skipped" };
     }
+    const allowlist = process.env.PR_CENTER_EMAIL_ONLY_ALLOWLIST || "";
+    if (
+      !payload.recipientAddress ||
+      !allowlist
+        .split(",")
+        .map((address) => address.trim().toLowerCase())
+        .includes(payload.recipientAddress.trim().toLowerCase())
+    ) {
+      return { channel: this.name, status: "skipped" };
+    }
 
-    // Stub: in production, integrate with SMTP or transactional email service.
-    // For now, record the intent in the outbox for audit evidence.
     const idempotencyKey = `notif-email:${payload.userId}:${payload.title}:${Date.now()}`;
     try {
       const event = await prisma.prOutboxEvent.create({
@@ -162,7 +170,7 @@ export class LineNotificationChannel implements NotificationChannel {
 
 let defaultChannels: NotificationChannel[] = [
   new OutboxNotificationChannel(),
-  new EmailNotificationChannel(false), // disabled by default
+  new EmailNotificationChannel(process.env.PR_CENTER_EMAIL_ENABLED === "true"),
   new LineNotificationChannel(false), // disabled by default
 ];
 

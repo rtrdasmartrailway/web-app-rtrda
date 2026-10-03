@@ -52,6 +52,20 @@ services:
       retries: 5
       start_period: 30s
 
+  clamav:
+    image: clamav/clamav:1.4
+    container_name: web-app-rtrda-clamav-test
+    restart: unless-stopped
+    mem_limit: 5g
+    volumes:
+      - clamav-db-data:/var/lib/clamav
+    healthcheck:
+      test: ["CMD-SHELL", "clamdscan --ping=1"]
+      interval: 30s
+      timeout: 10s
+      retries: 10
+      start_period: 300s
+
   pr-center-api:
     build:
       context: .
@@ -67,10 +81,16 @@ services:
       PR_CENTER_API_HOST: 0.0.0.0
       PR_CENTER_API_PORT: 3100
       PR_CENTER_EMAIL_ONLY_ENABLED: "true"
+      PR_CENTER_EMAIL_ENABLED: ${PR_CENTER_EMAIL_ENABLED:-false}
       PR_CENTER_EMAIL_ONLY_ALLOWLIST: nattapol.y@rtrda.or.th,panissa.t@rtrda.or.th
+      PR_CENTER_OUTBOX_WORKER_URL: http://pr-center-outbox-worker:3101/readyz
+      PR_CENTER_CLAMD_HOST: clamav
+      PR_CENTER_CLAMD_PORT: "3310"
       ENTRA_ENV_FILE: /run/secrets/rtrda.env
     depends_on:
       db:
+        condition: service_healthy
+      clamav:
         condition: service_healthy
     volumes:
       - /srv/workspace/rtrda.env:/run/secrets/rtrda.env:ro
@@ -79,6 +99,42 @@ services:
         [
           "CMD-SHELL",
           'node -e "fetch(\"http://127.0.0.1:3100/healthz\").then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"',
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+
+  pr-center-outbox-worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: pr-center-api
+    image: web-app-rtrda:pr-center-api-test
+    container_name: web-app-rtrda-pr-center-outbox-worker-test
+    restart: unless-stopped
+    command: ["npm", "run", "pr-center:outbox-worker"]
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: ${DATABASE_URL:?DATABASE_URL must be set}
+      PR_CENTER_OUTBOX_WORKER_PORT: "3101"
+      PR_CENTER_SMTP_HOST: ${PR_CENTER_SMTP_HOST:-}
+      PR_CENTER_SMTP_PORT: ${PR_CENTER_SMTP_PORT:-587}
+      PR_CENTER_SMTP_SECURE: ${PR_CENTER_SMTP_SECURE:-false}
+      PR_CENTER_SMTP_USER: ${PR_CENTER_SMTP_USER:-}
+      PR_CENTER_SMTP_FROM: ${PR_CENTER_SMTP_FROM:-}
+      PR_CENTER_SMTP_PASSWORD_FILE: /run/secrets/pr-center-smtp-password
+      PR_CENTER_EMAIL_ONLY_ALLOWLIST: nattapol.y@rtrda.or.th,panissa.t@rtrda.or.th
+    volumes:
+      - ${PR_CENTER_SMTP_PASSWORD_HOST_FILE:-/dev/null}:/run/secrets/pr-center-smtp-password:ro
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          'node -e "fetch(''http://127.0.0.1:3101/healthz'').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"',
         ]
       interval: 30s
       timeout: 10s
@@ -108,3 +164,5 @@ volumes:
   rtrda-db-data:
     # Fixed name so every compose checkout (local + CI runner) shares the data.
     name: rtrda-db-data
+  clamav-db-data:
+    name: rtrda-test-clamav-db

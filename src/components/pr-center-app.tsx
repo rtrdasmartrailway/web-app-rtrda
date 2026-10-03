@@ -401,7 +401,7 @@ const ROLE_PAGES: Record<Role, Page[]> = {
     "notifications",
     "help",
   ],
-  approver: ["home", "approvals", "calendar", "notifications"],
+  approver: ["home", "calendar", "notifications"],
   writer: [
     "home",
     "new-request",
@@ -809,7 +809,7 @@ export function PrCenterApp({
       .finally(() => setLoadingRequests(false));
   }, []);
   useEffect(() => {
-    if (actor?.role !== "APPROVER" && actor?.role !== "SCOPED_ADMINISTRATOR") return;
+    if (actor?.role !== "PR_OPERATIONS" && actor?.role !== "SCOPED_ADMINISTRATOR") return;
     fetch("/api/pr-center/approvals", { credentials: "same-origin" })
       .then(async (response) => {
         if (!response.ok) throw new Error("Approval queue unavailable");
@@ -1282,13 +1282,33 @@ export function PrCenterApp({
   ) => {
     const task = approvalTasks.find((item) => item.id === taskId);
     if (!task?.version) return;
+    const comment =
+      decision === "APPROVED"
+        ? ""
+        : window
+            .prompt(
+              state.language === "th"
+                ? "ระบุเหตุผลสำหรับการขอแก้ไข/ปฏิเสธ"
+                : "Enter a reason for requesting revision or rejecting",
+            )
+            ?.trim() || "";
+    if (decision !== "APPROVED" && !comment) return;
     const response = await fetch(`/api/pr-center/tasks/${taskId}/approvals`, {
       method: "POST",
       credentials: "same-origin",
       headers: { "Content-Type": "application/json", "If-Match": String(task.version) },
-      body: JSON.stringify({ decision }),
+      body: JSON.stringify({ decision, ...(comment ? { comment } : {}) }),
     });
-    if (!response.ok) return announce("Approval decision failed");
+    if (!response.ok) {
+      const result = await response.json().catch(() => null);
+      return announce(
+        typeof result?.message === "string"
+          ? result.message
+          : state.language === "th"
+            ? "บันทึกผลอนุมัติไม่สำเร็จ"
+            : "Approval decision failed",
+      );
+    }
     setApprovalTasks((previous) => previous.filter((item) => item.id !== taskId));
     announce("Approval decision saved");
   };
@@ -3095,7 +3115,7 @@ function Approvals({
             </div>
             <div>
               <Status>Awaiting approval</Status>
-              {role === "admin" || role === "approver" ? (
+              {role === "admin" || role === "pr" ? (
                 <>
                   <button onClick={() => onDecision(task.id, "REVISION_REQUIRED")}>
                     Request revision

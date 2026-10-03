@@ -161,6 +161,7 @@ model PrOrganization {
   departments PrDepartment[]
   users       PrCenterUser[]
   requests    PrRequest[]
+  fileObjects PrFileObject[]
   createdAt   DateTime       @default(now())
   updatedAt   DateTime       @updatedAt
 }
@@ -391,20 +392,23 @@ model PrSchedule {
 }
 
 model PrFileObject {
-  id          String           @id @default(uuid()) @db.Uuid
-  storageKey  String           @unique
-  fileName    String
-  mimeType    String
-  sizeBytes   Int
-  checksum    String
-  scanStatus  PrFileScanStatus @default(PENDING)
-  scannedAt   DateTime?
-  deletedAt   DateTime?
-  attachments PrAttachment[]
-  createdAt   DateTime         @default(now())
-  updatedAt   DateTime         @updatedAt
+  id             String           @id @default(uuid()) @db.Uuid
+  organizationId String?          @db.Uuid
+  organization   PrOrganization?  @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  storageKey     String           @unique
+  fileName       String
+  mimeType       String
+  sizeBytes      Int
+  checksum       String
+  scanStatus     PrFileScanStatus @default(PENDING)
+  scannedAt      DateTime?
+  deletedAt      DateTime?
+  attachments    PrAttachment[]
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
 
   @@index([scanStatus])
+  @@index([organizationId, scanStatus, deletedAt])
   @@index([deletedAt])
 }
 
@@ -491,8 +495,10 @@ model PrOutboxEvent {
   attempts       Int            @default(0)
   availableAt    DateTime       @default(now())
   processedAt    DateTime?
+  lockedAt       DateTime?
   lastError      String?
   createdAt      DateTime       @default(now())
 
   @@index([status, availableAt])
+  @@index([status, lockedAt])
 }
