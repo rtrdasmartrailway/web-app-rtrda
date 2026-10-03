@@ -97,6 +97,8 @@ enum PrRequestStatus {
   WITHDRAWN
   CANCELLED
   CLOSED
+  APPROVED
+  REJECTED
 }
 
 enum PrTaskStatus {

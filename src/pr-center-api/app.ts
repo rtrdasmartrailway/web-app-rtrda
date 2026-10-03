@@ -12,9 +12,11 @@ import {
   markNotificationsRead,
   listRequests,
   listApprovalQueue,
+  listRequestApprovalQueue,
   listAssignableUsers,
   listTaskSchedules,
   recordApprovalDecision,
+  recordRequestDecision,
   requestDetail,
   recordPublishingEvidence,
   scheduleTask,
@@ -132,6 +134,9 @@ export function buildPrCenterApi(
     return listRequests(request.prCenterActor!, Number(query.take || 25), query.cursor);
   });
   app.get("/approvals", async (request) => listApprovalQueue(request.prCenterActor!));
+  app.get("/request-approvals", async (request) =>
+    listRequestApprovalQueue(request.prCenterActor!),
+  );
   app.get("/users/assignable", async (request) =>
     listAssignableUsers(request.prCenterActor!),
   );
@@ -301,6 +306,21 @@ export function buildPrCenterApi(
       taskId((request.params as { requestId: string }).requestId),
       expectedVersion(request),
       input.to,
+      correlationId(request),
+    );
+  });
+  app.post("/requests/:requestId/decisions", async (request) => {
+    const input = await body(request);
+    if (input.decision !== "APPROVED" && input.decision !== "REJECTED")
+      throw new PrCenterError("Unknown request decision", 422, "INVALID_DECISION");
+    return recordRequestDecision(
+      request.prCenterActor!,
+      taskId((request.params as { requestId: string }).requestId),
+      expectedVersion(request),
+      {
+        decision: input.decision,
+        reason: typeof input.reason === "string" ? input.reason : undefined,
+      },
       correlationId(request),
     );
   });

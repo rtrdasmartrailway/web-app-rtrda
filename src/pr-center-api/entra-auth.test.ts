@@ -52,6 +52,44 @@ describe("isSessionAuthorityCurrent", () => {
     ).toBe(true);
   });
 
+  it("preserves organization-wide PR authority independently of the user's home department", () => {
+    const organizationPrActor = {
+      ...actor,
+      role: "PR_OPERATIONS" as const,
+      scopeDepartmentId: null,
+    };
+    expect(
+      isSessionAuthorityCurrent(organizationPrActor, {
+        active: true,
+        organizationId: "org-1",
+        departmentId: "dept-1",
+        roles: [{ role: "PR_OPERATIONS", organizationId: "org-1", departmentId: null }],
+      }),
+    ).toBe(true);
+    expect(
+      isSessionAuthorityCurrent(organizationPrActor, {
+        active: true,
+        organizationId: "org-1",
+        departmentId: "dept-1",
+        roles: [
+          { role: "PR_OPERATIONS", organizationId: "org-1", departmentId: "dept-2" },
+        ],
+      }),
+    ).toBe(false);
+    const departmentPrActor = {
+      ...organizationPrActor,
+      scopeDepartmentId: "dept-1",
+    };
+    expect(
+      isSessionAuthorityCurrent(departmentPrActor, {
+        active: true,
+        organizationId: "org-1",
+        departmentId: "dept-1",
+        roles: [{ role: "PR_OPERATIONS", organizationId: "org-1", departmentId: null }],
+      }),
+    ).toBe(false);
+  });
+
   it("revokes a session immediately after disable or role removal", () => {
     expect(
       isSessionAuthorityCurrent(actor, {

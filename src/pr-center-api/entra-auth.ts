@@ -69,7 +69,9 @@ export function isSessionAuthorityCurrent(
       (assigned) =>
         assigned.role === actor.role &&
         assigned.organizationId === actor.organizationId &&
-        (assigned.departmentId === null || assigned.departmentId === user.departmentId),
+        (actor.scopeDepartmentId === undefined
+          ? assigned.departmentId === null || assigned.departmentId === user.departmentId
+          : assigned.departmentId === actor.scopeDepartmentId),
     ),
   );
 }
@@ -205,18 +207,22 @@ export function createEntraAuth() {
         existingByEmail,
         organization.id,
       );
-      const databaseRole = existingUser
-        ? PR_CENTER_ROLES.find((candidate) =>
-            existingUser.roles.some(
+      const databaseRoleAssignment = existingUser
+        ? PR_CENTER_ROLES.map((candidate) => {
+            const assignments = existingUser.roles.filter(
               (assigned) =>
                 assigned.role === candidate &&
                 assigned.organizationId === organization.id &&
                 (assigned.departmentId === null ||
                   assigned.departmentId === existingUser.departmentId),
-            ),
-          )
+            );
+            return (
+              assignments.find((assigned) => assigned.departmentId === null) ??
+              assignments[0]
+            );
+          }).find((assignment) => assignment !== undefined)
         : undefined;
-      const role = tokenRole || databaseRole;
+      const role = tokenRole || databaseRoleAssignment?.role;
       if (!role)
         throw new PrCenterError(
           "Your account is not assigned a PR Center role",
@@ -268,6 +274,9 @@ export function createEntraAuth() {
         organizationId: organization.id,
         departmentId: user.departmentId,
         role,
+        scopeDepartmentId: tokenRole
+          ? null
+          : (databaseRoleAssignment?.departmentId ?? null),
       };
     });
   }

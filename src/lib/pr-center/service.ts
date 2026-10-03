@@ -55,15 +55,21 @@ export type PrCenterActor = {
   organizationId: string;
   departmentId: string | null;
   role: PrCenterRole;
+  /** Effective scope of the selected role grant; null means organization-wide. */
+  scopeDepartmentId?: string | null;
 };
 
+function actorScopeDepartmentId(actor: PrCenterActor): string | null {
+  if (actor.scopeDepartmentId !== undefined) return actor.scopeDepartmentId;
+  return actor.role === "SCOPED_ADMINISTRATOR" ? null : actor.departmentId;
+}
+
 function requestScopeWhere(actor: PrCenterActor): Prisma.PrRequestWhereInput {
+  const departmentId = actorScopeDepartmentId(actor);
   return {
     organizationId: actor.organizationId,
     ...(actor.role === "REQUESTER" ? { requesterId: actor.id } : {}),
-    ...(actor.role !== "SCOPED_ADMINISTRATOR" && actor.departmentId
-      ? { departmentId: actor.departmentId }
-      : {}),
+    ...(departmentId ? { departmentId } : {}),
   };
 }
 
@@ -71,12 +77,11 @@ function requestMatchesActorScope(
   actor: PrCenterActor,
   request: { organizationId: string; departmentId: string; requesterId: string },
 ): boolean {
+  const departmentId = actorScopeDepartmentId(actor);
   return (
     request.organizationId === actor.organizationId &&
     (actor.role !== "REQUESTER" || request.requesterId === actor.id) &&
-    (actor.role === "SCOPED_ADMINISTRATOR" ||
-      !actor.departmentId ||
-      request.departmentId === actor.departmentId)
+    (!departmentId || request.departmentId === departmentId)
   );
 }
 
@@ -426,10 +431,10 @@ export async function transitionRequest(
       },
     });
     if (status === "SUBMITTED") {
-      const operationsRoles = await tx.prUserRole.findMany({
+      const approverRoles = await tx.prUserRole.findMany({
         where: {
-          organizationId: actor.organizationId,
-          role: "PR_OPERATIONS",
+          organizationId: request.organizationId,
+          role: { in: ["PR_OPERATIONS", "SCOPED_ADMINISTRATOR"] },
           OR: [{ departmentId: request.departmentId }, { departmentId: null }],
           user: { active: true },
         },
@@ -437,7 +442,7 @@ export async function transitionRequest(
       });
       const recipients = new Set([
         request.requesterId,
-        ...operationsRoles.map((role) => role.userId),
+        ...approverRoles.map((role) => role.userId),
       ]);
       await tx.prNotification.createMany({
         data: [...recipients].map((userId) => ({
@@ -445,9 +450,9 @@ export async function transitionRequest(
           title:
             userId === request.requesterId
               ? "Request submitted"
-              : "Request ready for review",
-          body: `${request.title} was submitted.`,
-          target: userId === request.requesterId ? "my-requests" : "requests",
+              : "Request awaiting approval",
+          body: `${request.title} was submitted and is waiting for a PR or administrator decision.`,
+          target: userId === request.requesterId ? "my-requests" : "approvals",
         })),
       });
     }
@@ -465,13 +470,12 @@ export async function transitionRequest(
 }
 
 export async function listIdeas(actor: PrCenterActor) {
+  const departmentId = actorScopeDepartmentId(actor);
   return prisma.prContentIdea.findMany({
     where: canReadAllRequests(actor.role)
       ? {
           organizationId: actor.organizationId,
-          ...(actor.role === "SCOPED_ADMINISTRATOR" || !actor.departmentId
-            ? {}
-            : { departmentId: actor.departmentId }),
+          ...(departmentId ? { departmentId } : {}),
         }
       : { organizationId: actor.organizationId, proposerId: actor.id },
     orderBy: { createdAt: "desc" },
@@ -681,8 +685,19 @@ export async function updateTaskAssignment(
     throw new PrCenterError("You cannot assign a task", 403, "FORBIDDEN");
   const task = await prisma.prTask.findFirst({
     where: taskScopeWhere(actor, taskId),
+    include: { request: { select: { status: true } } },
   });
   if (!task) throw new PrCenterError("Task not found", 404, "NOT_FOUND");
+  if (
+    task.request.status === "REJECTED" ||
+    task.request.status === "CANCELLED" ||
+    (task.status === "DRAFT" && task.request.status !== "APPROVED")
+  )
+    throw new PrCenterError(
+      "The request must be approved before assigning this draft task",
+      409,
+      "REQUEST_NOT_APPROVED",
+    );
   if (task.version !== fromVersion)
     throw new PrCenterError(
       "This task has changed. Refresh and try again.",
@@ -690,14 +705,13 @@ export async function updateTaskAssignment(
       "STALE_UPDATE",
     );
   if (input.ownerId) {
+    const ownerDepartmentId = actorScopeDepartmentId(actor);
     const owner = await prisma.prCenterUser.findFirst({
       where: {
         id: input.ownerId,
         organizationId: actor.organizationId,
         active: true,
-        ...(actor.role === "SCOPED_ADMINISTRATOR" || !actor.departmentId
-          ? {}
-          : { departmentId: actor.departmentId }),
+        ...(ownerDepartmentId ? { departmentId: ownerDepartmentId } : {}),
       },
     });
     if (!owner)
@@ -876,9 +890,19 @@ export async function transitionTask(
 ) {
   const task = await prisma.prTask.findFirst({
     where: taskScopeWhere(actor, taskId),
-    include: { request: { select: { departmentId: true } } },
+    include: { request: { select: { departmentId: true, status: true } } },
   });
   if (!task) throw new PrCenterError("Task not found", 404, "NOT_FOUND");
+  if (
+    task.request.status === "REJECTED" ||
+    task.request.status === "CANCELLED" ||
+    (task.status === "DRAFT" && task.request.status !== "APPROVED")
+  )
+    throw new PrCenterError(
+      "The request must be approved before task work can begin",
+      409,
+      "REQUEST_NOT_APPROVED",
+    );
   if (task.version !== fromVersion)
     throw new PrCenterError(
       "This task has changed. Refresh and try again.",
@@ -1081,6 +1105,180 @@ export async function listApprovalQueue(actor: PrCenterActor) {
   });
 }
 
+export async function listRequestApprovalQueue(actor: PrCenterActor) {
+  if (!canApprove(actor.role))
+    throw new PrCenterError(
+      "You cannot view the request approval queue",
+      403,
+      "FORBIDDEN",
+    );
+  return prisma.prRequest.findMany({
+    where: {
+      ...requestScopeWhere(actor),
+      requesterId: { not: actor.id },
+      status: "SUBMITTED",
+      tasks: { every: { status: "DRAFT" } },
+    },
+    include: {
+      department: { select: { name: true } },
+      requester: { select: { displayName: true } },
+      revisions: { orderBy: { revisionNumber: "desc" }, take: 1 },
+    },
+    orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+  });
+}
+
+export async function recordRequestDecision(
+  actor: PrCenterActor,
+  requestId: string,
+  fromVersion: number,
+  input: { decision: "APPROVED" | "REJECTED"; reason?: string },
+  correlationId: string = randomUUID(),
+) {
+  if (!canApprove(actor.role))
+    throw new PrCenterError("You cannot decide this request", 403, "FORBIDDEN");
+  const request = await prisma.prRequest.findFirst({
+    where: { id: requestId, ...requestScopeWhere(actor) },
+    include: { tasks: { select: { id: true, status: true, version: true } } },
+  });
+  if (!request) throw new PrCenterError("Request not found", 404, "NOT_FOUND");
+  if (request.requesterId === actor.id)
+    throw new PrCenterError(
+      "You cannot approve your own request",
+      403,
+      "SELF_APPROVAL_BLOCKED",
+    );
+  if (request.status !== "SUBMITTED")
+    throw new PrCenterError(
+      "This request is not waiting for an intake decision",
+      422,
+      "INVALID_TRANSITION",
+    );
+  if (request.version !== fromVersion)
+    throw new PrCenterError(
+      "This request has changed. Refresh and try again.",
+      409,
+      "STALE_UPDATE",
+    );
+  const reason = input.reason?.trim() || "";
+  if (input.decision === "REJECTED" && !reason)
+    throw new PrCenterError(
+      "A reason is required when rejecting a request",
+      422,
+      "REASON_REQUIRED",
+    );
+  if (reason.length > 5000)
+    throw new PrCenterError("Decision reason is too long", 422, "INVALID_REASON");
+  if (request.tasks.some((task) => task.status !== "DRAFT"))
+    throw new PrCenterError(
+      "Task work has already started; use the task-stage workflow instead",
+      409,
+      "INTAKE_ALREADY_STARTED",
+    );
+
+  return prisma.$transaction(async (tx) => {
+    const updated = await tx.prRequest.updateMany({
+      where: { id: request.id, version: fromVersion, status: "SUBMITTED" },
+      data: {
+        status: input.decision as PrRequestStatus,
+        version: { increment: 1 },
+      },
+    });
+    if (updated.count !== 1)
+      throw new PrCenterError(
+        "This request has changed. Refresh and try again.",
+        409,
+        "STALE_UPDATE",
+      );
+    await tx.prStatusHistory.create({
+      data: {
+        requestId: request.id,
+        fromState: request.status,
+        toState: input.decision,
+        reason: reason || null,
+        actorId: actor.id,
+      },
+    });
+
+    if (input.decision === "REJECTED") {
+      for (const task of request.tasks) {
+        const cancelled = await tx.prTask.updateMany({
+          where: { id: task.id, status: "DRAFT", version: task.version },
+          data: { status: "CANCELLED", version: { increment: 1 } },
+        });
+        if (cancelled.count !== 1)
+          throw new PrCenterError(
+            "A task changed while this request was being rejected. Refresh and try again.",
+            409,
+            "STALE_UPDATE",
+          );
+        await tx.prStatusHistory.create({
+          data: {
+            taskId: task.id,
+            fromState: task.status,
+            toState: "CANCELLED",
+            reason,
+            actorId: actor.id,
+          },
+        });
+      }
+    }
+
+    const notifications: Array<{
+      userId: string;
+      title: string;
+      body: string;
+      target: string;
+    }> = [
+      {
+        userId: request.requesterId,
+        title: input.decision === "APPROVED" ? "Request approved" : "Request rejected",
+        body:
+          input.decision === "APPROVED"
+            ? `${request.title} was approved and is being returned to PR Operations for assignment and planning.`
+            : `${request.title} was rejected. Reason: ${reason}`,
+        target: "my-requests",
+      },
+    ];
+    if (input.decision === "APPROVED") {
+      const operationsRoles = await tx.prUserRole.findMany({
+        where: {
+          organizationId: request.organizationId,
+          role: "PR_OPERATIONS",
+          OR: [{ departmentId: request.departmentId }, { departmentId: null }],
+          user: { active: true },
+        },
+        select: { userId: true },
+      });
+      for (const userId of new Set(operationsRoles.map((role) => role.userId))) {
+        if (userId === actor.id) continue;
+        notifications.push({
+          userId,
+          title: "Approved request ready for PR assignment",
+          body: `${request.title} was approved. Assign an owner and begin planning.`,
+          target: "requests",
+        });
+      }
+    }
+    await tx.prNotification.createMany({ data: notifications });
+    await auditAndOutbox(tx, {
+      actor,
+      action: `request.${input.decision.toLowerCase()}`,
+      entityType: "request",
+      entityId: request.id,
+      after: {
+        status: input.decision,
+        version: fromVersion + 1,
+        reason: reason || null,
+        authorityRole: actor.role,
+      },
+      eventType: `pr.request.${input.decision.toLowerCase()}`,
+      correlationId,
+    });
+    return tx.prRequest.findUniqueOrThrow({ where: { id: request.id } });
+  });
+}
+
 export async function recordApprovalDecision(
   actor: PrCenterActor,
   taskId: string,
@@ -1134,7 +1332,7 @@ export async function recordApprovalDecision(
     !hasApprovalAuthority({
       stage,
       role: actor.role,
-      actorDepartmentId: actor.departmentId,
+      actorDepartmentId: actorScopeDepartmentId(actor),
       taskDepartmentId: task.request.departmentId,
     })
   )
@@ -1210,7 +1408,7 @@ export async function recordApprovalDecision(
         approvalReference: policy.approvalReference,
         stage: stage.status,
         authorityRole: actor.role,
-        authorityDepartmentId: actor.departmentId,
+        authorityDepartmentId: actorScopeDepartmentId(actor),
       },
       eventType: "pr.approval.recorded",
       correlationId,
@@ -1226,9 +1424,9 @@ export async function listAssignableUsers(actor: PrCenterActor) {
     where: {
       organizationId: actor.organizationId,
       active: true,
-      ...(actor.role === "SCOPED_ADMINISTRATOR" || !actor.departmentId
-        ? {}
-        : { departmentId: actor.departmentId }),
+      ...(actorScopeDepartmentId(actor)
+        ? { departmentId: actorScopeDepartmentId(actor)! }
+        : {}),
     },
     select: {
       id: true,

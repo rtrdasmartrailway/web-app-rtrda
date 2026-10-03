@@ -69,7 +69,14 @@ type Request = {
   requestedDate: string;
   taskIds: string[];
   source?: string;
-  status?: "DRAFT" | "SUBMITTED" | "WITHDRAWN" | "CANCELLED" | "CLOSED";
+  status?:
+    | "DRAFT"
+    | "SUBMITTED"
+    | "APPROVED"
+    | "REJECTED"
+    | "WITHDRAWN"
+    | "CANCELLED"
+    | "CLOSED";
   version?: number;
   revisionNumber?: number;
   objective?: string;
@@ -179,6 +186,15 @@ type ApiRequestRecord = {
     dueAt: string | null;
     version: number;
   }>;
+};
+type RequestApprovalItem = {
+  id: string;
+  requestNumber: string;
+  title: string;
+  status: "SUBMITTED";
+  version: number;
+  department: { name: string };
+  requester: { displayName: string };
 };
 
 function mapRequestRecord(request: ApiRequestRecord): Request {
@@ -784,6 +800,7 @@ export function PrCenterApp({
     emptyRequestDraft(users[0]),
   );
   const [approvalTasks, setApprovalTasks] = useState<Task[]>([]);
+  const [approvalRequests, setApprovalRequests] = useState<RequestApprovalItem[]>([]);
   const [notice, setNotice] = useState<string | null>(null);
   const [requestCursor, setRequestCursor] = useState<string | null>(null);
   const [hasMoreRequests, setHasMoreRequests] = useState(false);
@@ -809,7 +826,11 @@ export function PrCenterApp({
       .finally(() => setLoadingRequests(false));
   }, []);
   useEffect(() => {
-    if (actor?.role !== "PR_OPERATIONS" && actor?.role !== "SCOPED_ADMINISTRATOR") return;
+    if (
+      (actor?.role !== "PR_OPERATIONS" && actor?.role !== "SCOPED_ADMINISTRATOR") ||
+      page !== "approvals"
+    )
+      return;
     fetch("/api/pr-center/approvals", { credentials: "same-origin" })
       .then(async (response) => {
         if (!response.ok) throw new Error("Approval queue unavailable");
@@ -837,7 +858,21 @@ export function PrCenterApp({
         );
       })
       .catch(() => setNotice("Unable to load approval queue"));
-  }, [actor?.role]);
+  }, [actor?.role, page]);
+  useEffect(() => {
+    if (
+      (actor?.role !== "PR_OPERATIONS" && actor?.role !== "SCOPED_ADMINISTRATOR") ||
+      page !== "approvals"
+    )
+      return;
+    fetch("/api/pr-center/request-approvals", { credentials: "same-origin" })
+      .then(async (response) => {
+        if (!response.ok) throw new Error("Request approval queue unavailable");
+        const requests = (await response.json()) as RequestApprovalItem[];
+        setApprovalRequests(requests);
+      })
+      .catch(() => setNotice("Unable to load submitted request approvals"));
+  }, [actor?.role, page]);
   useEffect(() => {
     fetch("/api/pr-center/ideas", { credentials: "same-origin" })
       .then(async (response) => {
@@ -1234,8 +1269,8 @@ export function PrCenterApp({
       await refreshNotifications().catch(() => undefined);
       announce(
         state.language === "th"
-          ? "ส่งคำขอให้ทีม PR แล้ว"
-          : "Request submitted to PR Operations",
+          ? "ส่งคำขอเข้าคิวอนุมัติของ PR/Admin แล้ว"
+          : "Request sent to the PR/Admin approval queue",
       );
     } catch (error) {
       announce(error instanceof Error ? error.message : "Request could not be submitted");
@@ -1311,6 +1346,66 @@ export function PrCenterApp({
     }
     setApprovalTasks((previous) => previous.filter((item) => item.id !== taskId));
     announce("Approval decision saved");
+  };
+  const recordRequestDecision = async (
+    requestId: string,
+    decision: "APPROVED" | "REJECTED",
+  ) => {
+    const request = approvalRequests.find((item) => item.id === requestId);
+    if (!request) return;
+    const reason =
+      decision === "REJECTED"
+        ? window
+            .prompt(
+              state.language === "th"
+                ? "ระบุเหตุผลในการปฏิเสธคำขอ"
+                : "Enter a reason for rejecting this request",
+            )
+            ?.trim() || ""
+        : "";
+    if (decision === "REJECTED" && !reason) return;
+    try {
+      const response = await fetch(`/api/pr-center/requests/${requestId}/decisions`, {
+        method: "POST",
+        credentials: "same-origin",
+        headers: {
+          "Content-Type": "application/json",
+          "If-Match": String(request.version),
+        },
+        body: JSON.stringify({ decision, ...(reason ? { reason } : {}) }),
+      });
+      if (!response.ok) {
+        const result = (await response.json().catch(() => null)) as {
+          message?: string;
+        } | null;
+        throw new Error(result?.message || "Request decision could not be saved");
+      }
+      const updated = (await response.json()) as {
+        status: Request["status"];
+        version: number;
+      };
+      setApprovalRequests((previous) => previous.filter((item) => item.id !== requestId));
+      setState((previous) => ({
+        ...previous,
+        requests: previous.requests.map((item) =>
+          item.id === requestId
+            ? { ...item, status: updated.status, version: updated.version }
+            : item,
+        ),
+      }));
+      await refreshNotifications();
+      announce(
+        decision === "APPROVED"
+          ? state.language === "th"
+            ? "อนุมัติคำขอแล้ว และส่งกลับให้ทีม PR จัดเจ้าของงาน/วางแผน"
+            : "Request approved and returned to PR Operations for assignment and planning"
+          : state.language === "th"
+            ? "ปฏิเสธคำขอแล้ว พร้อมแจ้งเหตุผลให้ผู้ส่งคำขอ"
+            : "Request rejected; the requester has been notified with the reason",
+      );
+    } catch (error) {
+      announce(error instanceof Error ? error.message : "Request decision failed");
+    }
   };
   const scheduleTask = async (taskId: string, channel: string, scheduledFor: string) => {
     const task = state.tasks.find((item) => item.id === taskId);
@@ -1728,8 +1823,10 @@ export function PrCenterApp({
           {page === "approvals" && (
             <Approvals
               tasks={approvalTasks}
+              requests={approvalRequests}
               role={currentUser.role}
               onDecision={recordApproval}
+              onRequestDecision={recordRequestDecision}
             />
           )}
           {page === "library" && (
@@ -2261,9 +2358,13 @@ function Requests({
                       {request.status === "DRAFT"
                         ? "Draft"
                         : request.status === "SUBMITTED"
-                          ? "Submitted"
-                          : request.status ||
-                            STATUS_LABELS[requestStatus(request, taskItems)]}
+                          ? "Pending intake approval"
+                          : request.status === "APPROVED"
+                            ? "Approved · PR assignment"
+                            : request.status === "REJECTED"
+                              ? "Rejected"
+                              : request.status ||
+                                STATUS_LABELS[requestStatus(request, taskItems)]}
                     </Status>
                   </td>
                   <td>{request.requestedDate}</td>
@@ -3089,22 +3190,60 @@ function Calendar({
 }
 function Approvals({
   tasks: taskItems,
+  requests,
   role,
   onDecision,
+  onRequestDecision,
 }: {
   tasks: Task[];
+  requests: RequestApprovalItem[];
   role: Role;
   onDecision: (
     taskId: string,
     decision: "APPROVED" | "REVISION_REQUIRED" | "REJECTED",
   ) => void;
+  onRequestDecision: (requestId: string, decision: "APPROVED" | "REJECTED") => void;
 }) {
-  const pendingTasks = taskItems;
+  const canDecide = role === "admin" || role === "pr";
   return (
     <>
       <SectionHeading eyebrow="REVIEW AND APPROVAL" title="Approval Queue" />
+      <h2>Submitted Requests · Intake Decision</h2>
       <section className={styles.list}>
-        {pendingTasks.map((task) => (
+        {requests.map((request) => (
+          <article key={request.id} className={styles.listItem}>
+            <div>
+              <p>
+                {request.requestNumber} · {request.department.name}
+              </p>
+              <h2>{request.title}</h2>
+              <span>Submitted by {request.requester.displayName}</span>
+            </div>
+            <div>
+              <Status>Awaiting intake approval</Status>
+              {canDecide ? (
+                <>
+                  <button onClick={() => onRequestDecision(request.id, "REJECTED")}>
+                    Reject
+                  </button>
+                  <button
+                    className={styles.primary}
+                    onClick={() => onRequestDecision(request.id, "APPROVED")}
+                  >
+                    Approve request
+                  </button>
+                </>
+              ) : (
+                <span>View only for your role</span>
+              )}
+            </div>
+          </article>
+        ))}
+        {requests.length === 0 && <p>No submitted requests awaiting intake decision.</p>}
+      </section>
+      <h2>Task Stage Approvals</h2>
+      <section className={styles.list}>
+        {taskItems.map((task) => (
           <article key={task.id} className={styles.listItem}>
             <div>
               <p>{STATUS_LABELS[task.status]}</p>
@@ -3115,7 +3254,7 @@ function Approvals({
             </div>
             <div>
               <Status>Awaiting approval</Status>
-              {role === "admin" || role === "pr" ? (
+              {canDecide ? (
                 <>
                   <button onClick={() => onDecision(task.id, "REVISION_REQUIRED")}>
                     Request revision
@@ -3133,6 +3272,7 @@ function Approvals({
             </div>
           </article>
         ))}
+        {taskItems.length === 0 && <p>No task-stage approvals are waiting.</p>}
       </section>
     </>
   );
