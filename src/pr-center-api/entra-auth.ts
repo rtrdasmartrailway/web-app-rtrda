@@ -46,6 +46,67 @@ function cookie(name: string, value: string, maxAge: number, sameSite: "Lax" | "
   return `${name}=${value}; Path=/; HttpOnly; Secure; SameSite=${sameSite}; Max-Age=${maxAge}`;
 }
 
+type SessionAuthorityRecord = {
+  active: boolean;
+  organizationId: string;
+  departmentId: string | null;
+  roles: Array<{
+    role: PrCenterRole;
+    organizationId: string;
+    departmentId: string | null;
+  }>;
+};
+
+export function isSessionAuthorityCurrent(
+  actor: PrCenterActor,
+  user: SessionAuthorityRecord | null,
+): boolean {
+  return Boolean(
+    user?.active &&
+    user.organizationId === actor.organizationId &&
+    user.departmentId === actor.departmentId &&
+    user.roles.some(
+      (assigned) =>
+        assigned.role === actor.role &&
+        assigned.organizationId === actor.organizationId &&
+        (assigned.departmentId === null || assigned.departmentId === user.departmentId),
+    ),
+  );
+}
+
+type ExistingIdentity = {
+  id: string;
+  active: boolean;
+  organizationId: string;
+};
+
+export function validateIdentityMapping<T extends ExistingIdentity>(
+  existingBySubject: T | null,
+  existingByEmail: T | null,
+  organizationId: string,
+): T | null {
+  if (existingByEmail && existingByEmail.id !== existingBySubject?.id)
+    throw new PrCenterError(
+      "This email is already linked to a different SSO identity",
+      403,
+      "OIDC_IDENTITY_MISMATCH",
+    );
+  const existingUser = existingBySubject ?? existingByEmail;
+  if (existingUser && !existingUser.active)
+    throw new PrCenterError(
+      "Your PR Center account is disabled. Contact an administrator.",
+      403,
+      "ACCOUNT_DISABLED",
+    );
+  if (existingUser && existingUser.organizationId !== organizationId)
+    throw new PrCenterError(
+      "Your SSO identity is linked to a different organization",
+      403,
+      "OIDC_ORGANIZATION_MISMATCH",
+    );
+  return existingUser;
+}
+
 function config() {
   const tenantId = process.env.ENTRA_TENANT_ID;
   const clientId = process.env.ENTRA_CLIENT_ID;
@@ -130,22 +191,31 @@ export function createEntraAuth() {
           name: "Unassigned",
         },
       });
-      const existingUser = await tx.prCenterUser.findUnique({
+      const ssoSubject = `entra:${oid}`;
+      const existingBySubject = await tx.prCenterUser.findUnique({
+        where: { ssoSubject },
+        include: { roles: true },
+      });
+      const existingByEmail = await tx.prCenterUser.findUnique({
         where: { email },
         include: { roles: true },
       });
-      const databaseRole =
-        existingUser?.active && existingUser.organizationId === organization.id
-          ? PR_CENTER_ROLES.find((candidate) =>
-              existingUser.roles.some(
-                (assigned) =>
-                  assigned.role === candidate &&
-                  assigned.organizationId === organization.id &&
-                  (assigned.departmentId === null ||
-                    assigned.departmentId === existingUser.departmentId),
-              ),
-            )
-          : undefined;
+      const existingUser = validateIdentityMapping(
+        existingBySubject,
+        existingByEmail,
+        organization.id,
+      );
+      const databaseRole = existingUser
+        ? PR_CENTER_ROLES.find((candidate) =>
+            existingUser.roles.some(
+              (assigned) =>
+                assigned.role === candidate &&
+                assigned.organizationId === organization.id &&
+                (assigned.departmentId === null ||
+                  assigned.departmentId === existingUser.departmentId),
+            ),
+          )
+        : undefined;
       const role = tokenRole || databaseRole;
       if (!role)
         throw new PrCenterError(
@@ -153,23 +223,21 @@ export function createEntraAuth() {
           403,
           "OIDC_ROLE_NOT_ASSIGNED",
         );
-      const user = await tx.prCenterUser.upsert({
-        where: { email },
-        update: {
-          ssoSubject: `entra:${oid}`,
-          displayName,
-          active: true,
-          organizationId: organization.id,
-        },
-        create: {
-          organizationId: organization.id,
-          departmentId: department.id,
-          ssoSubject: `entra:${oid}`,
-          email,
-          displayName,
-          active: true,
-        },
-      });
+      const user = existingUser
+        ? await tx.prCenterUser.update({
+            where: { id: existingUser.id },
+            data: { email, displayName, organizationId: organization.id },
+          })
+        : await tx.prCenterUser.create({
+            data: {
+              organizationId: organization.id,
+              departmentId: department.id,
+              ssoSubject,
+              email,
+              displayName,
+              active: true,
+            },
+          });
       if (tokenRole) {
         const existingRole = await tx.prUserRole.findFirst({
           where: {
@@ -209,6 +277,24 @@ export function createEntraAuth() {
       const token = cookies(request)[SESSION_COOKIE];
       const session = token ? sessions.get(token) : undefined;
       if (!session || session.expiresAt <= Date.now()) {
+        if (token) sessions.delete(token);
+        return null;
+      }
+      const user = await prisma.prCenterUser.findFirst({
+        where: {
+          id: session.actor.id,
+          organizationId: session.actor.organizationId,
+        },
+        select: {
+          active: true,
+          organizationId: true,
+          departmentId: true,
+          roles: {
+            select: { role: true, organizationId: true, departmentId: true },
+          },
+        },
+      });
+      if (!isSessionAuthorityCurrent(session.actor, user)) {
         if (token) sessions.delete(token);
         return null;
       }

@@ -155,6 +155,65 @@ type AuditEntry = {
   after: string;
   createdAt: string;
 };
+type ApiRequestRecord = {
+  id: string;
+  title: string;
+  type: "PR" | "OFFSITE";
+  requestedFor: string | null;
+  department: { name: string };
+  requesterId: string;
+  status: Request["status"];
+  version: number;
+  revisions: Array<{
+    revisionNumber: number;
+    objective: string | null;
+    audience: string | null;
+  }>;
+  sources: { url: string }[];
+  tasks: Array<{
+    id: string;
+    title: string;
+    contentType: string;
+    status: string;
+    ownerId: string | null;
+    dueAt: string | null;
+    version: number;
+  }>;
+};
+
+function mapRequestRecord(request: ApiRequestRecord): Request {
+  return {
+    id: request.id,
+    title: request.title,
+    type: request.type.toLowerCase() as RequestType,
+    requesterId: request.requesterId,
+    department: request.department.name,
+    requestedDate: request.requestedFor?.slice(0, 10) || "",
+    taskIds: request.tasks.map((task) => task.id),
+    status: request.status,
+    version: request.version,
+    revisionNumber: request.revisions[0]?.revisionNumber,
+    objective: request.revisions[0]?.objective || undefined,
+    audience: request.revisions[0]?.audience || undefined,
+    source: request.sources[0]?.url,
+  };
+}
+
+function mapRequestTasks(records: ApiRequestRecord[]): Task[] {
+  return records.flatMap((request) =>
+    request.tasks.map((task) => ({
+      id: task.id,
+      requestId: request.id,
+      type: task.contentType,
+      title: task.title,
+      status: task.status.toLowerCase() as StatusId,
+      ownerId: task.ownerId || "",
+      dueDate: task.dueAt?.slice(0, 10) || "",
+      version: task.version,
+    })),
+  );
+}
+
 type PrCenterState = {
   version: 1;
   language: Language;
@@ -726,69 +785,28 @@ export function PrCenterApp({
   );
   const [approvalTasks, setApprovalTasks] = useState<Task[]>([]);
   const [notice, setNotice] = useState<string | null>(null);
+  const [requestCursor, setRequestCursor] = useState<string | null>(null);
+  const [hasMoreRequests, setHasMoreRequests] = useState(false);
+  const [loadingMoreRequests, setLoadingMoreRequests] = useState(false);
+  const [loadingRequests, setLoadingRequests] = useState(true);
   useEffect(() => {
     fetch("/api/pr-center/requests?take=100", { credentials: "same-origin" })
       .then(async (response) => {
         if (!response.ok) throw new Error("Request list unavailable");
-        const records = (await response.json()) as Array<{
-          id: string;
-          title: string;
-          type: "PR" | "OFFSITE";
-          requestedFor: string | null;
-          department: { name: string };
-          requesterId: string;
-          status: Request["status"];
-          version: number;
-          revisions: Array<{
-            revisionNumber: number;
-            objective: string | null;
-            audience: string | null;
-          }>;
-          sources: { url: string }[];
-          tasks: Array<{
-            id: string;
-            title: string;
-            contentType: string;
-            status: string;
-            ownerId: string | null;
-            dueAt: string | null;
-            version: number;
-          }>;
-        }>;
+        const records = (await response.json()) as ApiRequestRecord[];
+        const pageRecords = records.slice(0, 100);
+        setHasMoreRequests(records.length > pageRecords.length);
+        setRequestCursor(pageRecords.at(-1)?.id || null);
         startTransition(() =>
           setState((previous) => ({
             ...previous,
-            requests: records.map((request) => ({
-              id: request.id,
-              title: request.title,
-              type: request.type.toLowerCase() as RequestType,
-              requesterId: request.requesterId,
-              department: request.department.name,
-              requestedDate: request.requestedFor?.slice(0, 10) || "",
-              taskIds: request.tasks.map((task) => task.id),
-              status: request.status,
-              version: request.version,
-              revisionNumber: request.revisions[0]?.revisionNumber,
-              objective: request.revisions[0]?.objective || undefined,
-              audience: request.revisions[0]?.audience || undefined,
-              source: request.sources[0]?.url,
-            })),
-            tasks: records.flatMap((request) =>
-              request.tasks.map((task) => ({
-                id: task.id,
-                requestId: request.id,
-                type: task.contentType,
-                title: task.title,
-                status: task.status.toLowerCase() as StatusId,
-                ownerId: task.ownerId || "u-pr",
-                dueDate: task.dueAt?.slice(0, 10) || "",
-                version: task.version,
-              })),
-            ),
+            requests: pageRecords.map(mapRequestRecord),
+            tasks: mapRequestTasks(pageRecords),
           })),
         );
       })
-      .catch(() => setNotice("Unable to load server requests"));
+      .catch(() => setNotice("Unable to load server requests"))
+      .finally(() => setLoadingRequests(false));
   }, []);
   useEffect(() => {
     if (actor?.role !== "APPROVER" && actor?.role !== "SCOPED_ADMINISTRATOR") return;
@@ -946,6 +964,46 @@ export function PrCenterApp({
     (item) =>
       PHASE_1_PAGES.has(item.id) && ROLE_PAGES[currentUser.role].includes(item.id),
   );
+  const loadMoreRequests = async () => {
+    if (!requestCursor || loadingMoreRequests) return;
+    setLoadingMoreRequests(true);
+    try {
+      const response = await fetch(
+        `/api/pr-center/requests?take=100&cursor=${encodeURIComponent(requestCursor)}`,
+        { credentials: "same-origin" },
+      );
+      if (!response.ok) throw new Error("Unable to load more requests");
+      const records = (await response.json()) as ApiRequestRecord[];
+      const pageRecords = records.slice(0, 100);
+      setRequestCursor(pageRecords.at(-1)?.id || requestCursor);
+      setHasMoreRequests(records.length > pageRecords.length);
+      setState((previous) => ({
+        ...previous,
+        requests: [
+          ...previous.requests,
+          ...pageRecords
+            .map(mapRequestRecord)
+            .filter(
+              (item) => !previous.requests.some((existing) => existing.id === item.id),
+            ),
+        ],
+        tasks: [
+          ...previous.tasks,
+          ...mapRequestTasks(pageRecords).filter(
+            (item) => !previous.tasks.some((existing) => existing.id === item.id),
+          ),
+        ],
+      }));
+    } catch {
+      setNotice(
+        state.language === "th"
+          ? "โหลดคำขอเพิ่มเติมไม่สำเร็จ"
+          : "Unable to load more requests",
+      );
+    } finally {
+      setLoadingMoreRequests(false);
+    }
+  };
   const t = copy[state.language];
   const userNotifications = state.notifications.filter(
     (item) => item.userId === currentUser.id,
@@ -1264,6 +1322,7 @@ export function PrCenterApp({
   };
   const publishTask = async (
     taskId: string,
+    channel: string,
     publishedUrl: string,
     publishedReference: string,
   ) => {
@@ -1276,20 +1335,24 @@ export function PrCenterApp({
         "Content-Type": "application/json",
         "If-Match": String(task.version ?? 0),
       },
-      body: JSON.stringify({ publishedUrl, publishedReference }),
+      body: JSON.stringify({ publishedUrl, publishedReference, channel }),
     });
     if (!response.ok) return announce("Publishing evidence could not be saved");
     setState((previous) => ({
       ...previous,
       tasks: previous.tasks.map((item) =>
         item.id === taskId
-          ? { ...item, status: "published", version: (item.version || 0) + 1 }
+          ? {
+              ...item,
+              status: "published",
+              version: (item.version || 0) + (item.status === "scheduled" ? 1 : 0),
+            }
           : item,
       ),
     }));
     announce("Publishing evidence saved");
   };
-  const assignTaskToMe = async (taskId: string, dueDate: string) => {
+  const assignTask = async (taskId: string, ownerId: string, dueDate: string) => {
     const task = state.tasks.find((item) => item.id === taskId);
     if (!task) return;
     const response = await fetch(`/api/pr-center/tasks/${taskId}`, {
@@ -1299,7 +1362,7 @@ export function PrCenterApp({
         "Content-Type": "application/json",
         "If-Match": String(task.version ?? 0),
       },
-      body: JSON.stringify({ ownerId: currentUser.id, dueAt: dueDate || null }),
+      body: JSON.stringify({ ownerId: ownerId || null, dueAt: dueDate || null }),
     });
     if (!response.ok) return announce("Task assignment failed");
     const updated = (await response.json()) as {
@@ -1405,16 +1468,11 @@ export function PrCenterApp({
       state.language === "th" ? "แปลงแนวคิดเป็นคำขอแล้ว" : "Idea converted to request",
     );
   };
-  const saveMessageHouse = (messageHouse: MessageHouseData) =>
-    updateState((previous) =>
-      addAudit(
-        { ...previous, messageHouse },
-        "system",
-        "message-house",
-        "message_house_updated",
-        previous.messageHouse.vision,
-        messageHouse.vision,
-      ),
+  const saveMessageHouse = (_messageHouse: MessageHouseData) =>
+    announce(
+      state.language === "th"
+        ? "ยังไม่สามารถบันทึก Message House ไปยังเซิร์ฟเวอร์ได้"
+        : "Message House changes cannot be saved to the server yet",
     );
   const updateMasterData = (masterData: MasterData) =>
     updateState((previous) =>
@@ -1613,6 +1671,10 @@ export function PrCenterApp({
               requests={state.requests}
               tasks={state.tasks}
               currentUserId={currentUser.id}
+              hasMore={hasMoreRequests}
+              loadingMore={loadingMoreRequests}
+              loading={loadingRequests}
+              onLoadMore={loadMoreRequests}
             />
           )}
           {page === "requests" && (
@@ -1625,13 +1687,17 @@ export function PrCenterApp({
               requests={state.requests}
               tasks={state.tasks}
               currentUserId={currentUser.id}
+              hasMore={hasMoreRequests}
+              loadingMore={loadingMoreRequests}
+              loading={loadingRequests}
+              onLoadMore={loadMoreRequests}
             />
           )}
           {page === "operations" && (
             <Operations
               tasks={state.tasks}
               onTransition={transitionTask}
-              onAssign={assignTaskToMe}
+              onAssign={assignTask}
               onSchedule={scheduleTask}
               onPublish={publishTask}
             />
@@ -1686,8 +1752,6 @@ export function PrCenterApp({
               state={state}
               data={state.masterData}
               onSave={updateMasterData}
-              onReset={resetData}
-              onImport={importData}
               language={state.language}
             />
           )}
@@ -2084,6 +2148,10 @@ function Requests({
   requests: requestItems,
   tasks: taskItems,
   currentUserId,
+  hasMore,
+  loadingMore,
+  loading,
+  onLoadMore,
 }: {
   t: (typeof copy)[Language];
   onOpenRequest: () => void;
@@ -2093,6 +2161,10 @@ function Requests({
   requests: Request[];
   tasks: Task[];
   currentUserId: string;
+  hasMore: boolean;
+  loadingMore: boolean;
+  loading: boolean;
+  onLoadMore: () => void;
 }) {
   const title = mode === "mine" ? "My Requests" : "All Requests";
   const [query, setQuery] = useState("");
@@ -2183,6 +2255,13 @@ function Requests({
             </tbody>
           </table>
         </div>
+        {loading && visibleRequests.length === 0 && <p>Loading requests…</p>}
+        {!loading && visibleRequests.length === 0 && <p>No requests found.</p>}
+        {hasMore && (
+          <button disabled={loadingMore} onClick={onLoadMore}>
+            {loadingMore ? "Loading…" : "Load more requests"}
+          </button>
+        )}
         {selected && (
           <section className={styles.card} style={{ marginTop: 16 }}>
             <p className={styles.eyebrow}>
@@ -2209,15 +2288,17 @@ function Requests({
             </p>
             {mode === "mine" &&
               selected.requesterId === currentUserId &&
-              selected.status === "DRAFT" && (
+              (selected.status === "DRAFT" || selected.status === "SUBMITTED") && (
                 <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                  <button onClick={() => onEditRequest(selected)}>Edit draft</button>
-                  <button
-                    className={styles.primary}
-                    onClick={() => onSubmitRequest(selected)}
-                  >
-                    Submit request
-                  </button>
+                  <button onClick={() => onEditRequest(selected)}>Edit request</button>
+                  {selected.status === "DRAFT" && (
+                    <button
+                      className={styles.primary}
+                      onClick={() => onSubmitRequest(selected)}
+                    >
+                      Submit request
+                    </button>
+                  )}
                 </div>
               )}
           </section>
@@ -2235,9 +2316,14 @@ function Operations({
 }: {
   tasks: Task[];
   onTransition: (taskId: string, status: StatusId) => void;
-  onAssign: (taskId: string, dueDate: string) => void;
-  onSchedule: (taskId: string, channel: string, scheduledFor: string) => void;
-  onPublish: (taskId: string, publishedUrl: string, publishedReference: string) => void;
+  onAssign: (taskId: string, ownerId: string, dueDate: string) => Promise<void>;
+  onSchedule: (taskId: string, channel: string, scheduledFor: string) => Promise<void>;
+  onPublish: (
+    taskId: string,
+    channel: string,
+    publishedUrl: string,
+    publishedReference: string,
+  ) => Promise<void>;
 }) {
   const [view, setView] = useState<"board" | "table">("board");
   const [status, setStatus] = useState<"all" | StatusId>("all");
@@ -2245,9 +2331,94 @@ function Operations({
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [dueDate, setDueDate] = useState("");
   const [channel, setChannel] = useState("");
+  const [evidenceChannel, setEvidenceChannel] = useState("");
   const [scheduledFor, setScheduledFor] = useState("");
   const [publishedUrl, setPublishedUrl] = useState("");
   const [publishedReference, setPublishedReference] = useState("");
+  const [assigneeId, setAssigneeId] = useState("");
+  const [assignableUsers, setAssignableUsers] = useState<
+    { id: string; displayName: string; department?: { name: string } | null }[]
+  >([]);
+  const [scheduleChoices, setScheduleChoices] = useState<
+    { id: string; channel: string; scheduledFor: string }[]
+  >([]);
+  const [activity, setActivity] = useState<{
+    comments: {
+      id: string;
+      body: string;
+      createdAt: string;
+      author: { displayName: string };
+    }[];
+    statuses: { id: string; fromState: string; toState: string; createdAt: string }[];
+    audit: { id: string; action: string; createdAt: string }[];
+  } | null>(null);
+  const [activityTaskId, setActivityTaskId] = useState<string | null>(null);
+  const [commentBody, setCommentBody] = useState("");
+  const [activityError, setActivityError] = useState("");
+  const loadTaskActivity = async (taskId: string) => {
+    const response = await fetch(`/api/pr-center/tasks/${taskId}/history`, {
+      credentials: "same-origin",
+    });
+    if (!response.ok) throw new Error("Unable to load task history");
+    setActivity(await response.json());
+    setActivityTaskId(taskId);
+  };
+  const loadTaskSchedules = async (taskId: string) => {
+    const response = await fetch(`/api/pr-center/tasks/${taskId}/schedules`, {
+      credentials: "same-origin",
+    });
+    if (!response.ok) throw new Error("Unable to load task schedules");
+    const schedules = (await response.json()) as {
+      id: string;
+      channel: string;
+      scheduledFor: string;
+    }[];
+    setScheduleChoices(schedules);
+    if (schedules[0])
+      setEvidenceChannel((previous) =>
+        schedules.some((schedule) => schedule.channel === previous)
+          ? previous
+          : schedules[0].channel,
+      );
+  };
+  useEffect(() => {
+    fetch("/api/pr-center/users/assignable", { credentials: "same-origin" })
+      .then(async (response) => {
+        if (response.ok) setAssignableUsers(await response.json());
+      })
+      .catch(() => undefined);
+  }, []);
+  useEffect(() => {
+    if (!selectedId) return;
+    fetch(`/api/pr-center/tasks/${selectedId}/history`, {
+      credentials: "same-origin",
+    })
+      .then(async (response) => {
+        if (!response.ok) throw new Error("Unable to load task history");
+        setActivity(await response.json());
+        setActivityTaskId(selectedId);
+      })
+      .catch(() => setActivityError("Unable to load task activity"));
+    fetch(`/api/pr-center/tasks/${selectedId}/schedules`, {
+      credentials: "same-origin",
+    })
+      .then(async (response) => {
+        if (!response.ok) throw new Error("Unable to load task schedules");
+        const schedules = (await response.json()) as {
+          id: string;
+          channel: string;
+          scheduledFor: string;
+        }[];
+        setScheduleChoices(schedules);
+        if (schedules[0])
+          setEvidenceChannel((previous) =>
+            schedules.some((schedule) => schedule.channel === previous)
+              ? previous
+              : schedules[0].channel,
+          );
+      })
+      .catch(() => setScheduleChoices([]));
+  }, [selectedId]);
   const visibleTasks = taskItems.filter(
     (task) =>
       (status === "all" || task.status === status) &&
@@ -2269,6 +2440,7 @@ function Operations({
     ["Scheduled", ["approved", "scheduled", "published", "closed"]],
   ];
   const selected = taskItems.find((task) => task.id === selectedId);
+  const currentActivity = activityTaskId === selected?.id ? activity : null;
   return (
     <>
       <SectionHeading
@@ -2329,6 +2501,7 @@ function Operations({
                       onClick={() => {
                         setSelectedId(task.id);
                         setDueDate(task.dueDate);
+                        setAssigneeId(task.ownerId);
                       }}
                     >
                       Details
@@ -2354,7 +2527,21 @@ function Operations({
             {selected.id} · due {selected.dueDate}
           </p>
           <h2>{selected.title}</h2>
-          <p>Owner: {getUser(selected.ownerId)?.name ?? "Unassigned"}</p>
+          <label>
+            Assign to{" "}
+            <select
+              value={assigneeId || selected.ownerId}
+              onChange={(event) => setAssigneeId(event.target.value)}
+            >
+              <option value="">Unassigned</option>
+              {assignableUsers.map((user) => (
+                <option key={user.id} value={user.id}>
+                  {user.displayName}
+                  {user.department?.name ? ` · ${user.department.name}` : ""}
+                </option>
+              ))}
+            </select>
+          </label>
           <label>
             Due date{" "}
             <input
@@ -2363,8 +2550,16 @@ function Operations({
               onChange={(event) => setDueDate(event.target.value)}
             />
           </label>
-          <button onClick={() => onAssign(selected.id, dueDate || selected.dueDate)}>
-            Assign to me and save due date
+          <button
+            onClick={() =>
+              onAssign(
+                selected.id,
+                assigneeId || selected.ownerId,
+                dueDate || selected.dueDate,
+              )
+            }
+          >
+            Save assignment
           </button>
           {STATUS_TRANSITIONS[selected.status].filter(
             (next) => next !== "scheduled" && next !== "published",
@@ -2389,7 +2584,7 @@ function Operations({
               </select>
             </label>
           )}
-          {selected.status === "approved" && (
+          {(selected.status === "approved" || selected.status === "scheduled") && (
             <>
               <label>
                 Channel{" "}
@@ -2406,35 +2601,127 @@ function Operations({
                   onChange={(event) => setScheduledFor(event.target.value)}
                 />
               </label>
-              <button onClick={() => onSchedule(selected.id, channel, scheduledFor)}>
-                Schedule after gate check
-              </button>
-            </>
-          )}
-          {selected.status === "scheduled" && (
-            <>
-              <label>
-                Published URL{" "}
-                <input
-                  type="url"
-                  value={publishedUrl}
-                  onChange={(event) => setPublishedUrl(event.target.value)}
-                />
-              </label>
-              <label>
-                Publication reference{" "}
-                <input
-                  value={publishedReference}
-                  onChange={(event) => setPublishedReference(event.target.value)}
-                />
-              </label>
               <button
-                onClick={() => onPublish(selected.id, publishedUrl, publishedReference)}
+                onClick={async () => {
+                  await onSchedule(selected.id, channel, scheduledFor);
+                  await loadTaskSchedules(selected.id).catch(() =>
+                    setScheduleChoices([]),
+                  );
+                }}
               >
-                Record publishing evidence
+                Schedule channel
               </button>
             </>
           )}
+          {(selected.status === "scheduled" || selected.status === "published") &&
+            scheduleChoices.length > 0 && (
+              <>
+                <label>
+                  Evidence channel{" "}
+                  <select
+                    value={evidenceChannel}
+                    onChange={(event) => setEvidenceChannel(event.target.value)}
+                  >
+                    {scheduleChoices.map((schedule) => (
+                      <option key={schedule.id} value={schedule.channel}>
+                        {schedule.channel} ·{" "}
+                        {new Date(schedule.scheduledFor).toLocaleString()}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label>
+                  Published URL{" "}
+                  <input
+                    type="url"
+                    value={publishedUrl}
+                    onChange={(event) => setPublishedUrl(event.target.value)}
+                  />
+                </label>
+                <label>
+                  Publication reference{" "}
+                  <input
+                    value={publishedReference}
+                    onChange={(event) => setPublishedReference(event.target.value)}
+                  />
+                </label>
+                <button
+                  onClick={async () => {
+                    await onPublish(
+                      selected.id,
+                      evidenceChannel,
+                      publishedUrl,
+                      publishedReference,
+                    );
+                    await loadTaskSchedules(selected.id).catch(() =>
+                      setScheduleChoices([]),
+                    );
+                  }}
+                >
+                  Record publishing evidence
+                </button>
+              </>
+            )}
+          <section className={styles.card}>
+            <h3>Comments and activity</h3>
+            {activityError && <p role="alert">{activityError}</p>}
+            <form
+              onSubmit={async (event) => {
+                event.preventDefault();
+                const response = await fetch(
+                  `/api/pr-center/tasks/${selected.id}/comments`,
+                  {
+                    method: "POST",
+                    credentials: "same-origin",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ body: commentBody }),
+                  },
+                );
+                if (!response.ok) {
+                  setActivityError("Unable to add comment");
+                  return;
+                }
+                setCommentBody("");
+                setActivityError("");
+                await loadTaskActivity(selected.id).catch(() =>
+                  setActivityError("Unable to reload task activity"),
+                );
+              }}
+            >
+              <label>
+                Add comment{" "}
+                <textarea
+                  value={commentBody}
+                  onChange={(event) => setCommentBody(event.target.value)}
+                  maxLength={5000}
+                  required
+                />
+              </label>
+              <button type="submit" disabled={!commentBody.trim()}>
+                Add comment
+              </button>
+            </form>
+            <ul>
+              {currentActivity?.comments.map((comment) => (
+                <li key={comment.id}>
+                  <b>{comment.author.displayName}</b> ·{" "}
+                  {new Date(comment.createdAt).toLocaleString()}
+                  <p>{comment.body}</p>
+                </li>
+              ))}
+              {currentActivity?.statuses.map((entry) => (
+                <li key={entry.id}>
+                  Status: {entry.fromState} → {entry.toState} ·{" "}
+                  {new Date(entry.createdAt).toLocaleString()}
+                </li>
+              ))}
+              {currentActivity?.audit.map((entry) => (
+                <li key={entry.id}>
+                  {entry.action} · {new Date(entry.createdAt).toLocaleString()}
+                </li>
+              ))}
+            </ul>
+          </section>
           <AttachmentPanel taskId={selected.id} />
         </article>
       )}
@@ -3623,15 +3910,11 @@ function SystemData({
   state,
   data,
   onSave,
-  onReset,
-  onImport,
   language,
 }: {
   state: PrCenterState;
   data: MasterData;
   onSave: (data: MasterData) => void;
-  onReset: () => void;
-  onImport: (file: File) => void;
   language: Language;
 }) {
   const exportData = () => {
@@ -3667,19 +3950,11 @@ function SystemData({
         />
       </section>
       <section className={styles.filterBar}>
-        <label>
-          Import data{" "}
-          <input
-            type="file"
-            accept="application/json"
-            onChange={(event) => {
-              const file = event.target.files?.[0];
-              if (file) onImport(file);
-              event.currentTarget.value = "";
-            }}
-          />
-        </label>
-        <button onClick={onReset}>Reset demo data</button>
+        <p style={{ color: "#6b7280", fontSize: 13 }}>
+          {language === "th"
+            ? "การนำเข้าและการแก้ไขข้อมูลตัวอย่างยังไม่บันทึกไปยังเซิร์ฟเวอร์"
+            : "Import and demo-data edits are local only and are not saved to the server."}
+        </p>
       </section>
     </>
   );

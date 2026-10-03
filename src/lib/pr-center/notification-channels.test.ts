@@ -1,4 +1,13 @@
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+const { createOutboxEvent } = vi.hoisted(() => ({
+  createOutboxEvent: vi.fn(),
+}));
+
+vi.mock("@/lib/db/client", () => ({
+  prisma: { prOutboxEvent: { create: createOutboxEvent } },
+}));
+
 import {
   OutboxNotificationChannel,
   EmailNotificationChannel,
@@ -14,11 +23,30 @@ const mockPayload: NotificationPayload = {
   recipientAddress: "user@example.com",
 };
 
+beforeEach(() => {
+  vi.clearAllMocks();
+  createOutboxEvent.mockResolvedValue({ id: "outbox-1" });
+});
+
 describe("OutboxNotificationChannel", () => {
   it("is always enabled", () => {
     const channel = new OutboxNotificationChannel();
     expect(channel.enabled).toBe(true);
     expect(channel.name).toBe("outbox");
+  });
+
+  it("reports queued rather than delivered until a worker completes delivery", async () => {
+    const result = await new OutboxNotificationChannel().send(mockPayload);
+    expect(result).toEqual({
+      channel: "outbox",
+      status: "queued",
+      outboxEventId: "outbox-1",
+    });
+    expect(createOutboxEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ eventType: "notification.external.queued" }),
+      }),
+    );
   });
 });
 

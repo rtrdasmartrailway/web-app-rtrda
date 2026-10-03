@@ -48,6 +48,33 @@ export type PrCenterActor = {
   role: PrCenterRole;
 };
 
+function requestScopeWhere(actor: PrCenterActor): Prisma.PrRequestWhereInput {
+  return {
+    organizationId: actor.organizationId,
+    ...(actor.role === "REQUESTER" ? { requesterId: actor.id } : {}),
+    ...(actor.role !== "SCOPED_ADMINISTRATOR" && actor.departmentId
+      ? { departmentId: actor.departmentId }
+      : {}),
+  };
+}
+
+function requestMatchesActorScope(
+  actor: PrCenterActor,
+  request: { organizationId: string; departmentId: string; requesterId: string },
+): boolean {
+  return (
+    request.organizationId === actor.organizationId &&
+    (actor.role !== "REQUESTER" || request.requesterId === actor.id) &&
+    (actor.role === "SCOPED_ADMINISTRATOR" ||
+      !actor.departmentId ||
+      request.departmentId === actor.departmentId)
+  );
+}
+
+function taskScopeWhere(actor: PrCenterActor, taskId: string): Prisma.PrTaskWhereInput {
+  return { id: taskId, request: requestScopeWhere(actor) };
+}
+
 export class PrCenterError extends Error {
   constructor(
     message: string,
@@ -233,14 +260,7 @@ export async function createRequest(
 
 export async function listRequests(actor: PrCenterActor, take = 25, cursor?: string) {
   const limit = Math.min(Math.max(take, 1), 100);
-  const where: Prisma.PrRequestWhereInput = canReadAllRequests(actor.role)
-    ? {
-        organizationId: actor.organizationId,
-        ...(actor.role === "SCOPED_ADMINISTRATOR" || !actor.departmentId
-          ? {}
-          : { departmentId: actor.departmentId }),
-      }
-    : { organizationId: actor.organizationId, requesterId: actor.id };
+  const where = requestScopeWhere(actor);
   return prisma.prRequest.findMany({
     where,
     take: limit + 1,
@@ -258,11 +278,7 @@ export async function listRequests(actor: PrCenterActor, take = 25, cursor?: str
 
 async function requestInScope(actor: PrCenterActor, requestId: string) {
   const request = await prisma.prRequest.findFirst({
-    where: {
-      id: requestId,
-      organizationId: actor.organizationId,
-      ...(canReadAllRequests(actor.role) ? {} : { requesterId: actor.id }),
-    },
+    where: { id: requestId, ...requestScopeWhere(actor) },
     include: {
       revisions: { orderBy: { revisionNumber: "desc" } },
       sources: true,
@@ -655,7 +671,7 @@ export async function updateTaskAssignment(
   if (!canManageTasks(actor.role))
     throw new PrCenterError("You cannot assign a task", 403, "FORBIDDEN");
   const task = await prisma.prTask.findFirst({
-    where: { id: taskId, request: { organizationId: actor.organizationId } },
+    where: taskScopeWhere(actor, taskId),
   });
   if (!task) throw new PrCenterError("Task not found", 404, "NOT_FOUND");
   if (task.version !== fromVersion)
@@ -666,7 +682,14 @@ export async function updateTaskAssignment(
     );
   if (input.ownerId) {
     const owner = await prisma.prCenterUser.findFirst({
-      where: { id: input.ownerId, organizationId: actor.organizationId, active: true },
+      where: {
+        id: input.ownerId,
+        organizationId: actor.organizationId,
+        active: true,
+        ...(actor.role === "SCOPED_ADMINISTRATOR" || !actor.departmentId
+          ? {}
+          : { departmentId: actor.departmentId }),
+      },
     });
     if (!owner)
       throw new PrCenterError("Task owner is not available", 422, "INVALID_OWNER");
@@ -732,7 +755,7 @@ export async function addTaskComment(
   correlationId: string = randomUUID(),
 ) {
   const task = await prisma.prTask.findFirst({
-    where: { id: taskId, request: { organizationId: actor.organizationId } },
+    where: taskScopeWhere(actor, taskId),
     include: { request: true },
   });
   if (!task || (!canReadAllRequests(actor.role) && task.request.requesterId !== actor.id))
@@ -764,7 +787,7 @@ export async function addTaskComment(
 
 export async function taskHistory(actor: PrCenterActor, taskId: string) {
   const task = await prisma.prTask.findFirst({
-    where: { id: taskId, request: { organizationId: actor.organizationId } },
+    where: taskScopeWhere(actor, taskId),
     include: { request: true },
   });
   if (!task || (!canReadAllRequests(actor.role) && task.request.requesterId !== actor.id))
@@ -843,7 +866,7 @@ export async function transitionTask(
   correlationId: string = randomUUID(),
 ) {
   const task = await prisma.prTask.findFirst({
-    where: { id: taskId, request: { organizationId: actor.organizationId } },
+    where: taskScopeWhere(actor, taskId),
   });
   if (!task) throw new PrCenterError("Task not found", 404, "NOT_FOUND");
   if (task.version !== fromVersion)
@@ -916,7 +939,7 @@ export async function createTaskRevision(
   if (!canManageTasks(actor.role))
     throw new PrCenterError("You cannot revise this task", 403, "FORBIDDEN");
   const task = await prisma.prTask.findFirst({
-    where: { id: taskId, request: { organizationId: actor.organizationId } },
+    where: taskScopeWhere(actor, taskId),
     include: { revisions: { orderBy: { revisionNumber: "desc" } } },
   });
   if (!task) throw new PrCenterError("Task not found", 404, "NOT_FOUND");
@@ -981,7 +1004,7 @@ export async function listApprovalQueue(actor: PrCenterActor) {
     throw new PrCenterError("You cannot view the approval queue", 403, "FORBIDDEN");
   return prisma.prTask.findMany({
     where: {
-      request: { organizationId: actor.organizationId },
+      request: requestScopeWhere(actor),
       status: {
         in: [
           "SOURCE_FACT_CHECK",
@@ -1008,7 +1031,7 @@ export async function recordApprovalDecision(
 ) {
   assertApprovalAuthority(actor);
   const task = await prisma.prTask.findFirst({
-    where: { id: taskId, request: { organizationId: actor.organizationId } },
+    where: taskScopeWhere(actor, taskId),
     include: {
       request: true,
       revisions: { orderBy: { revisionNumber: "desc" }, take: 1 },
@@ -1095,6 +1118,40 @@ export async function recordApprovalDecision(
   });
 }
 
+export async function listAssignableUsers(actor: PrCenterActor) {
+  if (!canManageTasks(actor.role))
+    throw new PrCenterError("You cannot view assignable users", 403, "FORBIDDEN");
+  return prisma.prCenterUser.findMany({
+    where: {
+      organizationId: actor.organizationId,
+      active: true,
+      ...(actor.role === "SCOPED_ADMINISTRATOR" || !actor.departmentId
+        ? {}
+        : { departmentId: actor.departmentId }),
+    },
+    select: {
+      id: true,
+      displayName: true,
+      department: { select: { name: true } },
+    },
+    orderBy: { displayName: "asc" },
+  });
+}
+
+export async function listTaskSchedules(actor: PrCenterActor, taskId: string) {
+  if (!canManageTasks(actor.role))
+    throw new PrCenterError("You cannot view task schedules", 403, "FORBIDDEN");
+  const task = await prisma.prTask.findFirst({
+    where: taskScopeWhere(actor, taskId),
+    select: { id: true },
+  });
+  if (!task) throw new PrCenterError("Task not found", 404, "NOT_FOUND");
+  return prisma.prSchedule.findMany({
+    where: { taskId, publishedAt: null },
+    orderBy: [{ scheduledFor: "asc" }, { createdAt: "asc" }],
+  });
+}
+
 export async function scheduleTask(
   actor: PrCenterActor,
   taskId: string,
@@ -1112,30 +1169,52 @@ export async function scheduleTask(
     throw new PrCenterError("Schedule time is invalid", 422, "INVALID_SCHEDULE");
   if (idempotencyKey.length < 8 || idempotencyKey.length > 128)
     throw new PrCenterError("Idempotency key is invalid", 422, "INVALID_IDEMPOTENCY_KEY");
-  const existing = await prisma.prSchedule.findUnique({ where: { idempotencyKey } });
-  if (existing) {
-    if (existing.taskId !== taskId)
-      throw new PrCenterError(
-        "Idempotency key is already in use",
-        409,
-        "IDEMPOTENCY_CONFLICT",
-      );
-    return existing;
-  }
   const task = await prisma.prTask.findFirst({
-    where: { id: taskId, request: { organizationId: actor.organizationId } },
+    where: taskScopeWhere(actor, taskId),
     include: {
       request: { include: { sources: true } },
       revisions: { orderBy: { revisionNumber: "desc" }, take: 1 },
     },
   });
   if (!task) throw new PrCenterError("Task not found", 404, "NOT_FOUND");
+  const currentRevision = task.revisions[0]?.revisionNumber ?? 1;
+  const existing = await prisma.prSchedule.findUnique({ where: { idempotencyKey } });
+  if (existing) {
+    if (
+      existing.taskId !== taskId ||
+      existing.channel !== channel ||
+      existing.scheduledFor.getTime() !== input.scheduledFor.getTime() ||
+      existing.taskRevision !== currentRevision
+    )
+      throw new PrCenterError(
+        "Idempotency key is already in use with different parameters",
+        409,
+        "IDEMPOTENCY_CONFLICT",
+      );
+    return existing;
+  }
   if (task.version !== fromVersion)
     throw new PrCenterError(
       "This task has changed. Refresh and try again.",
       409,
       "STALE_UPDATE",
     );
+  const duplicateChannelSchedule = await prisma.prSchedule.findFirst({
+    where: { taskId, channel, taskRevision: currentRevision },
+  });
+  if (duplicateChannelSchedule)
+    throw new PrCenterError(
+      "This task already has a schedule for this channel and revision",
+      409,
+      "CHANNEL_SCHEDULE_EXISTS",
+    );
+  if (task.status !== "APPROVED" && task.status !== "SCHEDULED")
+    throw new PrCenterError(
+      "Only an approved or already-scheduled task can receive a channel schedule",
+      422,
+      "INVALID_TRANSITION",
+    );
+  const firstSchedule = task.status === "APPROVED";
   const revision = task.revisions[0];
   const cleanFinalAsset = revision?.finalAssetId
     ? Boolean(
@@ -1146,7 +1225,7 @@ export async function scheduleTask(
       )
     : false;
   const missing = publicationGate({
-    approved: task.status === "APPROVED",
+    approved: task.status === "APPROVED" || task.status === "SCHEDULED",
     ownerId: task.ownerId,
     channel,
     hasSource: task.request.sources.length > 0,
@@ -1162,8 +1241,16 @@ export async function scheduleTask(
     );
   return prisma.$transaction(async (tx) => {
     const updated = await tx.prTask.updateMany({
-      where: { id: task.id, version: fromVersion, status: "APPROVED" },
-      data: { status: "SCHEDULED", channel, version: { increment: 1 } },
+      where: {
+        id: task.id,
+        version: fromVersion,
+        status: task.status,
+      },
+      data: {
+        ...(firstSchedule ? { status: "SCHEDULED" as const } : {}),
+        channel,
+        version: { increment: 1 },
+      },
     });
     if (updated.count !== 1)
       throw new PrCenterError(
@@ -1175,30 +1262,33 @@ export async function scheduleTask(
       data: {
         taskId: task.id,
         channel,
+        taskRevision: currentRevision,
         scheduledFor: input.scheduledFor,
         idempotencyKey,
       },
     });
-    await tx.prStatusHistory.create({
-      data: {
-        taskId: task.id,
-        fromState: "APPROVED",
-        toState: "SCHEDULED",
-        actorId: actor.id,
-      },
-    });
+    if (firstSchedule)
+      await tx.prStatusHistory.create({
+        data: {
+          taskId: task.id,
+          fromState: "APPROVED",
+          toState: "SCHEDULED",
+          actorId: actor.id,
+        },
+      });
     await auditAndOutbox(tx, {
       actor,
-      action: "task.scheduled",
+      action: firstSchedule ? "task.scheduled" : "task.channel_scheduled",
       entityType: "task",
       entityId: task.id,
       after: {
         scheduleId: schedule.id,
         channel,
+        taskRevision: currentRevision,
         scheduledFor: input.scheduledFor.toISOString(),
         version: fromVersion + 1,
       },
-      eventType: "pr.task.scheduled",
+      eventType: firstSchedule ? "pr.task.scheduled" : "pr.task.channel_scheduled",
       correlationId,
     });
     return schedule;
@@ -1209,7 +1299,7 @@ export async function recordPublishingEvidence(
   actor: PrCenterActor,
   taskId: string,
   fromVersion: number,
-  input: { publishedUrl: string; publishedReference: string },
+  input: { publishedUrl: string; publishedReference: string; channel?: string },
   correlationId: string = randomUUID(),
 ) {
   if (!canManageTasks(actor.role))
@@ -1223,12 +1313,14 @@ export async function recordPublishingEvidence(
       "INVALID_PUBLICATION_EVIDENCE",
     );
   const task = await prisma.prTask.findFirst({
-    where: { id: taskId, request: { organizationId: actor.organizationId } },
+    where: taskScopeWhere(actor, taskId),
     include: {
       schedules: {
-        where: { publishedAt: null },
+        where: {
+          publishedAt: null,
+          ...(input.channel?.trim() ? { channel: input.channel.trim() } : {}),
+        },
         orderBy: { scheduledFor: "desc" },
-        take: 1,
       },
     },
   });
@@ -1240,49 +1332,63 @@ export async function recordPublishingEvidence(
       "STALE_UPDATE",
     );
   const schedule = task.schedules[0];
-  if (task.status !== "SCHEDULED" || !schedule)
+  if (!schedule || (task.status !== "SCHEDULED" && task.status !== "PUBLISHED"))
     throw new PrCenterError(
-      "This task has no pending schedule",
+      "This task has no pending schedule for that channel",
       422,
       "INVALID_TRANSITION",
     );
+  const firstPublication = task.status === "SCHEDULED";
   return prisma.$transaction(async (tx) => {
-    const updated = await tx.prTask.updateMany({
-      where: { id: task.id, version: fromVersion, status: "SCHEDULED" },
-      data: { status: "PUBLISHED", version: { increment: 1 } },
+    if (firstPublication) {
+      const updated = await tx.prTask.updateMany({
+        where: { id: task.id, version: fromVersion, status: "SCHEDULED" },
+        data: { status: "PUBLISHED", version: { increment: 1 } },
+      });
+      if (updated.count !== 1)
+        throw new PrCenterError(
+          "This task has changed. Refresh and try again.",
+          409,
+          "STALE_UPDATE",
+        );
+    }
+    const publishedAt = new Date();
+    const evidence = await tx.prSchedule.updateMany({
+      where: { id: schedule.id, publishedAt: null },
+      data: { publishedUrl, publishedReference, publishedAt },
     });
-    if (updated.count !== 1)
+    if (evidence.count !== 1)
       throw new PrCenterError(
-        "This task has changed. Refresh and try again.",
+        "Publication evidence was already recorded",
         409,
         "STALE_UPDATE",
       );
-    const publishedAt = new Date();
-    await tx.prSchedule.update({
-      where: { id: schedule.id },
-      data: { publishedUrl, publishedReference, publishedAt },
-    });
-    await tx.prStatusHistory.create({
-      data: {
-        taskId: task.id,
-        fromState: "SCHEDULED",
-        toState: "PUBLISHED",
-        actorId: actor.id,
-      },
-    });
+    if (firstPublication)
+      await tx.prStatusHistory.create({
+        data: {
+          taskId: task.id,
+          fromState: "SCHEDULED",
+          toState: "PUBLISHED",
+          actorId: actor.id,
+        },
+      });
     await auditAndOutbox(tx, {
       actor,
-      action: "task.published",
+      action: firstPublication ? "task.published" : "task.publication_evidence_recorded",
       entityType: "task",
       entityId: task.id,
       after: {
         scheduleId: schedule.id,
+        channel: schedule.channel,
+        taskRevision: schedule.taskRevision,
         publishedUrl,
         publishedReference,
         publishedAt: publishedAt.toISOString(),
-        version: fromVersion + 1,
+        version: firstPublication ? fromVersion + 1 : fromVersion,
       },
-      eventType: "pr.task.published",
+      eventType: firstPublication
+        ? "pr.task.published"
+        : "pr.task.publication_evidence_recorded",
       correlationId,
     });
     return { id: schedule.id, publishedUrl, publishedReference, publishedAt };
@@ -1474,20 +1580,13 @@ export async function createAttachment(
   // Authorize scope.
   if (input.requestId) {
     const request = await prisma.prRequest.findFirst({
-      where: {
-        id: input.requestId,
-        organizationId: actor.organizationId,
-        ...(canReadAllRequests(actor.role) ? {} : { requesterId: actor.id }),
-      },
+      where: { id: input.requestId, ...requestScopeWhere(actor) },
     });
     if (!request) throw new PrCenterError("Request not found", 404, "NOT_FOUND");
   }
   if (input.taskId) {
     const task = await prisma.prTask.findFirst({
-      where: {
-        id: input.taskId,
-        request: { organizationId: actor.organizationId },
-      },
+      where: taskScopeWhere(actor, input.taskId),
     });
     if (!task) throw new PrCenterError("Task not found", 404, "NOT_FOUND");
   }
@@ -1541,20 +1640,13 @@ export async function listAttachments(
   // Authorize scope.
   if (input.requestId) {
     const request = await prisma.prRequest.findFirst({
-      where: {
-        id: input.requestId,
-        organizationId: actor.organizationId,
-        ...(canReadAllRequests(actor.role) ? {} : { requesterId: actor.id }),
-      },
+      where: { id: input.requestId, ...requestScopeWhere(actor) },
     });
     if (!request) throw new PrCenterError("Request not found", 404, "NOT_FOUND");
   }
   if (input.taskId) {
     const task = await prisma.prTask.findFirst({
-      where: {
-        id: input.taskId,
-        request: { organizationId: actor.organizationId },
-      },
+      where: taskScopeWhere(actor, input.taskId),
     });
     if (!task) throw new PrCenterError("Task not found", 404, "NOT_FOUND");
   }
@@ -1647,7 +1739,7 @@ export async function assignFinalAsset(
   if (!canAssignFinalAsset(actor.role))
     throw new PrCenterError("You cannot assign final assets", 403, "FORBIDDEN");
   const task = await prisma.prTask.findFirst({
-    where: { id: taskIdArg, request: { organizationId: actor.organizationId } },
+    where: taskScopeWhere(actor, taskIdArg),
     include: { revisions: { orderBy: { revisionNumber: "desc" }, take: 1 } },
   });
   if (!task) throw new PrCenterError("Task not found", 404, "NOT_FOUND");
@@ -2185,8 +2277,8 @@ export async function releaseReadinessCheck(actor: PrCenterActor) {
   });
   checks.push({
     name: "Request lifecycle coverage",
-    passed: true,
-    detail: `withdrawn=${withdrawnCount}, closed=${closedCount}`,
+    passed: withdrawnCount > 0 && closedCount > 0,
+    detail: `withdrawn=${withdrawnCount}, closed=${closedCount}; both outcomes need UAT evidence`,
   });
 
   // 3. Approval decisions recorded
@@ -2195,7 +2287,7 @@ export async function releaseReadinessCheck(actor: PrCenterActor) {
   });
   checks.push({
     name: "Approval decisions",
-    passed: true,
+    passed: approvalCount > 0,
     detail: `${approvalCount} approval(s) recorded`,
   });
 
@@ -2204,10 +2296,30 @@ export async function releaseReadinessCheck(actor: PrCenterActor) {
   const quarantinedCount = await prisma.prFileObject.count({
     where: { scanStatus: "QUARANTINED" },
   });
+  const pendingFileCount = await prisma.prFileObject.count({
+    where: { scanStatus: "PENDING" },
+  });
+  const failedFileCount = await prisma.prFileObject.count({
+    where: { scanStatus: "FAILED" },
+  });
+  const cleanFileCount = await prisma.prFileObject.count({
+    where: { scanStatus: "CLEAN" },
+  });
   checks.push({
     name: "File lifecycle",
-    passed: true,
-    detail: `total=${fileCount}, quarantined=${quarantinedCount}`,
+    passed:
+      fileCount > 0 &&
+      cleanFileCount > 0 &&
+      quarantinedCount === 0 &&
+      pendingFileCount === 0 &&
+      failedFileCount === 0,
+    detail: `total=${fileCount}, clean=${cleanFileCount}, pending=${pendingFileCount}, quarantined=${quarantinedCount}, failed=${failedFileCount}`,
+  });
+  checks.push({
+    name: "Malware scanner integration",
+    passed: false,
+    detail:
+      "Uploads still use a heuristic mock scanner; a real scanner is not configured.",
   });
 
   // 5. Publishing evidence: schedules and published tasks
@@ -2217,10 +2329,13 @@ export async function releaseReadinessCheck(actor: PrCenterActor) {
   const publishedTaskCount = await prisma.prTask.count({
     where: { request: org, status: "PUBLISHED" },
   });
+  const publishedEvidenceCount = await prisma.prSchedule.count({
+    where: { task: { request: org }, publishedAt: { not: null } },
+  });
   checks.push({
     name: "Publishing pipeline",
-    passed: true,
-    detail: `schedules=${scheduleCount}, published=${publishedTaskCount}`,
+    passed: scheduleCount > 0 && publishedEvidenceCount > 0 && publishedTaskCount > 0,
+    detail: `schedules=${scheduleCount}, channelEvidence=${publishedEvidenceCount}, publishedTasks=${publishedTaskCount}`,
   });
 
   // 6. Notification system
@@ -2229,18 +2344,55 @@ export async function releaseReadinessCheck(actor: PrCenterActor) {
   });
   checks.push({
     name: "Notification system",
-    passed: true,
-    detail: `${notificationCount} notification(s)`,
+    passed: notificationCount > 0,
+    detail: `${notificationCount} in-app notification(s)`,
+  });
+  checks.push({
+    name: "External notification delivery",
+    passed: false,
+    detail:
+      "Email and LINE adapters only enqueue events; no delivery worker/provider is configured.",
   });
 
   // 7. Outbox event processing
   const pendingOutbox = await prisma.prOutboxEvent.count({
     where: { status: "PENDING" },
   });
+  const processingOutbox = await prisma.prOutboxEvent.count({
+    where: { status: "PROCESSING" },
+  });
+  const failedOutbox = await prisma.prOutboxEvent.count({
+    where: { status: "FAILED" },
+  });
+  const deliveredOutbox = await prisma.prOutboxEvent.count({
+    where: { status: "DELIVERED" },
+  });
   checks.push({
     name: "Outbox events",
-    passed: true,
-    detail: `pending=${pendingOutbox}`,
+    passed: pendingOutbox === 0 && processingOutbox === 0 && failedOutbox === 0,
+    detail: `pending=${pendingOutbox}, processing=${processingOutbox}, failed=${failedOutbox}, delivered=${deliveredOutbox}`,
+  });
+  checks.push({
+    name: "Outbox worker",
+    passed: false,
+    detail: "No outbox consumer is deployed to claim, retry, and deliver queued events.",
+  });
+  checks.push({
+    name: "Approval authority policy",
+    passed: false,
+    detail:
+      "Stage authority, scope, delegation, expiry, recusal, and separation-of-duties policy is not configured.",
+  });
+  checks.push({
+    name: "Backup and restore UAT",
+    passed: false,
+    detail: "A successful backup restore evidence record is not available to this check.",
+  });
+  checks.push({
+    name: "Role/scope and security UAT",
+    passed: false,
+    detail:
+      "Role-by-action scope, IDOR, CSRF/session, and disabled-account UAT evidence is not recorded.",
   });
 
   const allPassed = checks.every((c) => c.passed);

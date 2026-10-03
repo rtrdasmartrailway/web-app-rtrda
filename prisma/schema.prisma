@@ -377,6 +377,7 @@ model PrSchedule {
   id                 String    @id @default(uuid()) @db.Uuid
   taskId             String    @db.Uuid
   channel            String
+  taskRevision       Int       @default(1)
   scheduledFor       DateTime
   idempotencyKey     String    @unique
   publishedUrl       String?

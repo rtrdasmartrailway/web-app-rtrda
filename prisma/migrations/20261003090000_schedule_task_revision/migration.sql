@@ -1,0 +1,1 @@
+ALTER TABLE "PrSchedule" ADD COLUMN "taskRevision" INTEGER NOT NULL DEFAULT 1;

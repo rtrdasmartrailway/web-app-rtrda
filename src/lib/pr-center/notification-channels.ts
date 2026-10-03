@@ -19,7 +19,7 @@ export interface NotificationChannel {
 
 export type DeliveryResult = {
   channel: string;
-  status: "delivered" | "skipped" | "failed";
+  status: "queued" | "delivered" | "skipped" | "failed";
   outboxEventId?: string;
   error?: string;
 };
@@ -37,7 +37,7 @@ export class OutboxNotificationChannel implements NotificationChannel {
         data: {
           aggregateType: "notification",
           aggregateId: payload.userId,
-          eventType: "notification.external.delivered",
+          eventType: "notification.external.queued",
           payload: {
             channel: this.name,
             title: payload.title,
@@ -50,7 +50,7 @@ export class OutboxNotificationChannel implements NotificationChannel {
       });
       return {
         channel: this.name,
-        status: "delivered",
+        status: "queued",
         outboxEventId: event.id,
       };
     } catch (error) {
@@ -98,7 +98,7 @@ export class EmailNotificationChannel implements NotificationChannel {
       });
       return {
         channel: this.name,
-        status: "delivered",
+        status: "queued",
         outboxEventId: event.id,
       };
     } catch (error) {
@@ -145,7 +145,7 @@ export class LineNotificationChannel implements NotificationChannel {
       });
       return {
         channel: this.name,
-        status: "delivered",
+        status: "queued",
         outboxEventId: event.id,
       };
     } catch (error) {

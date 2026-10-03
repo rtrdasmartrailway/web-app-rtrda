@@ -12,6 +12,8 @@ import {
   markNotificationsRead,
   listRequests,
   listApprovalQueue,
+  listAssignableUsers,
+  listTaskSchedules,
   recordApprovalDecision,
   requestDetail,
   recordPublishingEvidence,
@@ -130,6 +132,9 @@ export function buildPrCenterApi(
     return listRequests(request.prCenterActor!, Number(query.take || 25), query.cursor);
   });
   app.get("/approvals", async (request) => listApprovalQueue(request.prCenterActor!));
+  app.get("/users/assignable", async (request) =>
+    listAssignableUsers(request.prCenterActor!),
+  );
   app.get("/requests/:requestId", async (request) =>
     requestDetail(
       request.prCenterActor!,
@@ -299,6 +304,12 @@ export function buildPrCenterApi(
       correlationId(request),
     );
   });
+  app.get("/tasks/:taskId/schedules", async (request) =>
+    listTaskSchedules(
+      request.prCenterActor!,
+      taskId((request.params as { taskId: string }).taskId),
+    ),
+  );
   app.post("/tasks/:taskId/transitions", async (request) => {
     const input = await body(request);
     const to = input.to;
@@ -371,6 +382,7 @@ export function buildPrCenterApi(
         publishedUrl: typeof input.publishedUrl === "string" ? input.publishedUrl : "",
         publishedReference:
           typeof input.publishedReference === "string" ? input.publishedReference : "",
+        channel: typeof input.channel === "string" ? input.channel : undefined,
       },
       correlationId(request),
     );
