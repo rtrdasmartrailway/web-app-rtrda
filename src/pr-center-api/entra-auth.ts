@@ -81,8 +81,8 @@ export function createEntraAuth() {
   async function provision(claims: Record<string, unknown>): Promise<PrCenterActor> {
     const oid = typeof claims.oid === "string" ? claims.oid : "";
     const tid = typeof claims.tid === "string" ? claims.tid : "";
-    const roles = Array.isArray(claims.roles) ? claims.roles : [];
-    const role = roles.find(
+    const tokenRoles = Array.isArray(claims.roles) ? claims.roles : [];
+    const tokenRole = tokenRoles.find(
       (value): value is PrCenterRole =>
         typeof value === "string" && PR_CENTER_ROLES.includes(value as PrCenterRole),
     );
@@ -98,14 +98,10 @@ export function createEntraAuth() {
         403,
         "OIDC_TENANT_MISMATCH",
       );
-    if (!role)
-      throw new PrCenterError(
-        "Your account is not assigned a PR Center role",
-        403,
-        "OIDC_ROLE_NOT_ASSIGNED",
-      );
     const email =
-      typeof claims.preferred_username === "string" ? claims.preferred_username : "";
+      typeof claims.preferred_username === "string"
+        ? claims.preferred_username.trim().toLowerCase()
+        : "";
     const displayName =
       typeof claims.name === "string" ? claims.name : email || "RTRDA user";
     if (!email)
@@ -134,6 +130,29 @@ export function createEntraAuth() {
           name: "Unassigned",
         },
       });
+      const existingUser = await tx.prCenterUser.findUnique({
+        where: { email },
+        include: { roles: true },
+      });
+      const databaseRole =
+        existingUser?.active && existingUser.organizationId === organization.id
+          ? PR_CENTER_ROLES.find((candidate) =>
+              existingUser.roles.some(
+                (assigned) =>
+                  assigned.role === candidate &&
+                  assigned.organizationId === organization.id &&
+                  (assigned.departmentId === null ||
+                    assigned.departmentId === existingUser.departmentId),
+              ),
+            )
+          : undefined;
+      const role = tokenRole || databaseRole;
+      if (!role)
+        throw new PrCenterError(
+          "Your account is not assigned a PR Center role",
+          403,
+          "OIDC_ROLE_NOT_ASSIGNED",
+        );
       const user = await tx.prCenterUser.upsert({
         where: { email },
         update: {
@@ -151,18 +170,20 @@ export function createEntraAuth() {
           active: true,
         },
       });
-      const existingRole = await tx.prUserRole.findFirst({
-        where: {
-          userId: user.id,
-          role,
-          organizationId: organization.id,
-          departmentId: null,
-        },
-      });
-      if (!existingRole)
-        await tx.prUserRole.create({
-          data: { userId: user.id, role, organizationId: organization.id },
+      if (tokenRole) {
+        const existingRole = await tx.prUserRole.findFirst({
+          where: {
+            userId: user.id,
+            role,
+            organizationId: organization.id,
+            departmentId: null,
+          },
         });
+        if (!existingRole)
+          await tx.prUserRole.create({
+            data: { userId: user.id, role, organizationId: organization.id },
+          });
+      }
       await tx.prAuditEvent.create({
         data: {
           organizationId: organization.id,
