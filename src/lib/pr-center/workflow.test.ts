@@ -8,6 +8,7 @@ import {
   canRemoveAttachment,
   canAssignFinalAsset,
   canManageAccess,
+  canManageQuarantine,
   publicationGate,
 } from "./workflow";
 
@@ -88,5 +89,13 @@ describe("PR Center workflow policy", () => {
     expect(canManageAccess("REQUESTER")).toBe(false);
     expect(canManageAccess("APPROVER")).toBe(false);
     expect(canManageAccess("EXECUTIVE_READ_ONLY")).toBe(false);
+  });
+
+  it("allows SCOPED_ADMINISTRATOR and PR_OPERATIONS to manage quarantine", () => {
+    expect(canManageQuarantine("SCOPED_ADMINISTRATOR")).toBe(true);
+    expect(canManageQuarantine("PR_OPERATIONS")).toBe(true);
+    expect(canManageQuarantine("REQUESTER")).toBe(false);
+    expect(canManageQuarantine("APPROVER")).toBe(false);
+    expect(canManageQuarantine("EXECUTIVE_READ_ONLY")).toBe(false);
   });
 });

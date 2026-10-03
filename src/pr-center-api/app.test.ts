@@ -231,3 +231,70 @@ describe("Notification policy route guards", () => {
     await app.close();
   });
 });
+
+describe("Quarantine management route guards", () => {
+  const adminActor = {
+    ...mockActor,
+    role: "SCOPED_ADMINISTRATOR" as const,
+  };
+
+  it("rejects unauthenticated quarantine list", async () => {
+    const app = buildPrCenterApi(async () => null);
+    const response = await app.inject({ method: "GET", url: "/admin/quarantine" });
+    expect(response.statusCode).toBe(401);
+    await app.close();
+  });
+
+  it("rejects non-admin/operations role from listing quarantined files", async () => {
+    const requesterActor = { ...mockActor, role: "REQUESTER" as const };
+    const app = buildPrCenterApi(async () => requesterActor);
+    const response = await app.inject({ method: "GET", url: "/admin/quarantine" });
+    expect(response.statusCode).toBe(403);
+    const body = response.json();
+    expect(body.error).toBe("FORBIDDEN");
+    await app.close();
+  });
+
+  it("rejects unauthenticated quarantine review", async () => {
+    const app = buildPrCenterApi(async () => null);
+    const response = await app.inject({
+      method: "POST",
+      url: "/admin/quarantine/some-id/review",
+      payload: { disposition: "approve" },
+    });
+    expect(response.statusCode).toBe(401);
+    await app.close();
+  });
+
+  it("rejects invalid disposition in quarantine review", async () => {
+    const app = buildPrCenterApi(async () => adminActor);
+    const response = await app.inject({
+      method: "POST",
+      url: "/admin/quarantine/some-id/review",
+      payload: { disposition: "invalid" },
+    });
+    expect(response.statusCode).toBe(422);
+    const body = response.json();
+    expect(body.error).toBe("INVALID_DISPOSITION");
+    await app.close();
+  });
+
+  it("rejects unauthenticated quarantine rescan", async () => {
+    const app = buildPrCenterApi(async () => null);
+    const response = await app.inject({
+      method: "POST",
+      url: "/admin/quarantine/some-id/rescan",
+    });
+    expect(response.statusCode).toBe(401);
+    await app.close();
+  });
+
+  it("allows PR_OPERATIONS to list quarantined files", async () => {
+    const opsActor = { ...mockActor, role: "PR_OPERATIONS" as const };
+    const app = buildPrCenterApi(async () => opsActor);
+    const response = await app.inject({ method: "GET", url: "/admin/quarantine" });
+    // Should not be 403 - will be 200 (even if empty result from DB)
+    expect(response.statusCode).not.toBe(403);
+    await app.close();
+  });
+});

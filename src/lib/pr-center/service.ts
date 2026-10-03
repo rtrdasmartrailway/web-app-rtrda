@@ -19,6 +19,7 @@ import {
   canRemoveAttachment,
   canAssignFinalAsset,
   canManageAccess,
+  canManageQuarantine,
   publicationGate,
   type PrCenterRole,
   type PrTaskStatus as WorkflowStatus,
@@ -27,6 +28,7 @@ import {
 import {
   storeFile,
   readFileFromStorage,
+  removeFileFromStorage,
   FileValidationError,
   type StoredFile,
 } from "./file-storage";
@@ -1235,6 +1237,33 @@ export async function recordPublishingEvidence(
   });
 }
 
+// ── File scanning (mock) ────────────────────────────────────────────────
+
+type ScanResult = "CLEAN" | "QUARANTINED" | "FAILED";
+
+/**
+ * Mock file scanner. In production, this would call an AV/malware engine.
+ * Current heuristics:
+ *  - SVG files → QUARANTINED (XSS risk vector)
+ *  - ZIP archives → QUARANTINED (container risk)
+ *  - Everything else → CLEAN
+ */
+async function mockScanFile(input: {
+  fileName: string;
+  mimeType: string;
+  sizeBytes: number;
+  checksum: string;
+}): Promise<{ result: ScanResult; reason: string }> {
+  // Simulate async scan latency (no actual delay in tests).
+  if (input.mimeType === "image/svg+xml") {
+    return { result: "QUARANTINED", reason: "SVG files require manual review due to embedded script risk" };
+  }
+  if (input.mimeType === "application/zip") {
+    return { result: "QUARANTINED", reason: "Archive files require manual review for embedded threats" };
+  }
+  return { result: "CLEAN", reason: "No threats detected" };
+}
+
 // ── File upload, download, attachment, and final-asset helpers ──────────────
 
 export async function uploadFile(
@@ -1256,6 +1285,13 @@ export async function uploadFile(
       throw new PrCenterError(error.message, error.statusCode, error.code);
     throw error;
   }
+  // Run mock scan synchronously; production would queue this.
+  const scan = await mockScanFile({
+    fileName: stored.fileName,
+    mimeType: stored.mimeType,
+    sizeBytes: stored.sizeBytes,
+    checksum: stored.checksum,
+  });
   return prisma.$transaction(async (tx) => {
     const fileObject = await tx.prFileObject.create({
       data: {
@@ -1264,11 +1300,11 @@ export async function uploadFile(
         mimeType: stored.mimeType,
         sizeBytes: stored.sizeBytes,
         checksum: stored.checksum,
-        // Phase 1 placeholder: auto-mark clean until a real scanner is wired.
-        scanStatus: "CLEAN",
+        scanStatus: scan.result,
         scannedAt: new Date(),
       },
     });
+    // Audit: file uploaded
     await tx.prAuditEvent.create({
       data: {
         organizationId: actor.organizationId,
@@ -1282,6 +1318,22 @@ export async function uploadFile(
           mimeType: stored.mimeType,
           sizeBytes: stored.sizeBytes,
           checksum: stored.checksum,
+          scanStatus: scan.result,
+        },
+      },
+    });
+    // Audit: scan result (always record scan outcome)
+    await tx.prAuditEvent.create({
+      data: {
+        organizationId: actor.organizationId,
+        actorId: actor.id,
+        action: "file.scan_completed",
+        entityType: "file",
+        entityId: fileObject.id,
+        correlationId,
+        after: {
+          scanStatus: scan.result,
+          reason: scan.reason,
         },
       },
     });
@@ -1294,7 +1346,7 @@ export async function downloadFile(
   fileId: string,
 ): Promise<{ buffer: Buffer; fileName: string; mimeType: string }> {
   const fileObject = await prisma.prFileObject.findFirst({
-    where: { id: fileId },
+    where: { id: fileId, deletedAt: null },
   });
   if (!fileObject) throw new PrCenterError("File not found", 404, "NOT_FOUND");
   // Only allow download of clean files.
@@ -1354,7 +1406,7 @@ export async function createAttachment(
   if (!kind || kind.length > 100)
     throw new PrCenterError("Attachment kind is required (max 100 characters)", 422, "INVALID_KIND");
   const fileObject = await prisma.prFileObject.findFirst({
-    where: { id: input.fileId, scanStatus: "CLEAN" },
+    where: { id: input.fileId, scanStatus: "CLEAN", deletedAt: null },
   });
   if (!fileObject)
     throw new PrCenterError(
@@ -1383,12 +1435,23 @@ export async function createAttachment(
     if (!task) throw new PrCenterError("Task not found", 404, "NOT_FOUND");
   }
   return prisma.$transaction(async (tx) => {
+    // Auto-increment version when replacing evidence for same target+kind
+    const where: Record<string, unknown> = { kind };
+    if (input.taskId) where.taskId = input.taskId;
+    if (input.requestId) where.requestId = input.requestId;
+    const latest = await tx.prAttachment.findFirst({
+      where,
+      orderBy: { version: "desc" },
+      select: { version: true },
+    });
+    const nextVersion = (latest?.version ?? 0) + 1;
     const attachment = await tx.prAttachment.create({
       data: {
         requestId: input.requestId || null,
         taskId: input.taskId || null,
         fileId: input.fileId,
         kind,
+        version: nextVersion,
       },
       include: { file: true },
     });
@@ -1483,6 +1546,19 @@ export async function removeAttachment(
     throw new PrCenterError("Attachment not found", 404, "NOT_FOUND");
   return prisma.$transaction(async (tx) => {
     await tx.prAttachment.delete({ where: { id: attachmentId } });
+    // Check if the file is orphaned (no remaining attachments)
+    const remainingAttachments = await tx.prAttachment.count({
+      where: { fileId: attachment.fileId },
+    });
+    let fileRemoved = false;
+    if (remainingAttachments === 0) {
+      // Soft-delete the orphaned file object
+      await tx.prFileObject.update({
+        where: { id: attachment.fileId },
+        data: { deletedAt: new Date() },
+      });
+      fileRemoved = true;
+    }
     await tx.prAuditEvent.create({
       data: {
         organizationId: actor.organizationId,
@@ -1496,10 +1572,11 @@ export async function removeAttachment(
           requestId: attachment.requestId,
           taskId: attachment.taskId,
           kind: attachment.kind,
+          orphanedFileCleanedUp: fileRemoved,
         },
       },
     });
-    return { id: attachmentId, removed: true };
+    return { id: attachmentId, removed: true, orphanedFileCleanedUp: fileRemoved };
   });
 }
 
@@ -1524,7 +1601,7 @@ export async function assignFinalAsset(
       "STALE_UPDATE",
     );
   const fileObject = await prisma.prFileObject.findFirst({
-    where: { id: input.fileId, scanStatus: "CLEAN" },
+    where: { id: input.fileId, scanStatus: "CLEAN", deletedAt: null },
   });
   if (!fileObject)
     throw new PrCenterError(
@@ -1749,5 +1826,146 @@ export async function listAccessAuditEvents(actor: PrCenterActor, take = 100) {
     include: { actor: { select: { displayName: true, email: true } } },
     orderBy: { createdAt: "desc" },
     take: limit,
+  });
+}
+
+// ── Quarantine management (SCOPED_ADMINISTRATOR + PR_OPERATIONS) ───────────
+
+export async function listQuarantinedFiles(
+  actor: PrCenterActor,
+  take = 50,
+) {
+  if (!canManageQuarantine(actor.role))
+    throw new PrCenterError("You cannot review quarantined files", 403, "FORBIDDEN");
+  const limit = Math.min(Math.max(take, 1), 100);
+  return prisma.prFileObject.findMany({
+    where: {
+      scanStatus: "QUARANTINED",
+      deletedAt: null,
+      attachments: {
+        some: {
+          OR: [
+            { request: { organizationId: actor.organizationId } },
+            { task: { request: { organizationId: actor.organizationId } } },
+          ],
+        },
+      },
+    },
+    include: {
+      attachments: {
+        select: {
+          id: true,
+          kind: true,
+          version: true,
+          requestId: true,
+          taskId: true,
+        },
+      },
+    },
+    orderBy: { createdAt: "desc" },
+    take: limit,
+  });
+}
+
+export async function reviewQuarantinedFile(
+  actor: PrCenterActor,
+  fileId: string,
+  disposition: "approve" | "delete",
+  reason: string | undefined,
+  correlationId: string = randomUUID(),
+) {
+  if (!canManageQuarantine(actor.role))
+    throw new PrCenterError("You cannot review quarantined files", 403, "FORBIDDEN");
+  const fileObject = await prisma.prFileObject.findFirst({
+    where: { id: fileId, scanStatus: "QUARANTINED", deletedAt: null },
+  });
+  if (!fileObject)
+    throw new PrCenterError("Quarantined file not found", 404, "NOT_FOUND");
+
+  if (disposition === "approve") {
+    // Clear quarantine → CLEAN
+    return prisma.$transaction(async (tx) => {
+      const updated = await tx.prFileObject.update({
+        where: { id: fileId },
+        data: { scanStatus: "CLEAN", scannedAt: new Date() },
+      });
+      await tx.prAuditEvent.create({
+        data: {
+          organizationId: actor.organizationId,
+          actorId: actor.id,
+          action: "file.quarantine_approved",
+          entityType: "file",
+          entityId: fileId,
+          correlationId,
+          before: { scanStatus: "QUARANTINED" },
+          after: { scanStatus: "CLEAN", reason: reason?.trim() || null },
+        },
+      });
+      return updated;
+    });
+  }
+
+  // disposition === "delete"
+  return prisma.$transaction(async (tx) => {
+    // Soft-delete the file object
+    const updated = await tx.prFileObject.update({
+      where: { id: fileId },
+      data: { deletedAt: new Date() },
+    });
+    await tx.prAuditEvent.create({
+      data: {
+        organizationId: actor.organizationId,
+        actorId: actor.id,
+        action: "file.quarantine_deleted",
+        entityType: "file",
+        entityId: fileId,
+        correlationId,
+        before: { scanStatus: "QUARANTINED" },
+        after: { deletedAt: updated.deletedAt?.toISOString(), reason: reason?.trim() || null },
+      },
+    });
+    return updated;
+  });
+}
+
+export async function rescanFile(
+  actor: PrCenterActor,
+  fileId: string,
+  correlationId: string = randomUUID(),
+) {
+  if (!canManageQuarantine(actor.role))
+    throw new PrCenterError("You cannot rescan files", 403, "FORBIDDEN");
+  const fileObject = await prisma.prFileObject.findFirst({
+    where: { id: fileId, deletedAt: null },
+  });
+  if (!fileObject)
+    throw new PrCenterError("File not found", 404, "NOT_FOUND");
+  if (fileObject.scanStatus === "CLEAN")
+    throw new PrCenterError("File is already clean", 422, "ALREADY_CLEAN");
+
+  const scan = await mockScanFile({
+    fileName: fileObject.fileName,
+    mimeType: fileObject.mimeType,
+    sizeBytes: fileObject.sizeBytes,
+    checksum: fileObject.checksum,
+  });
+  return prisma.$transaction(async (tx) => {
+    const updated = await tx.prFileObject.update({
+      where: { id: fileId },
+      data: { scanStatus: scan.result, scannedAt: new Date() },
+    });
+    await tx.prAuditEvent.create({
+      data: {
+        organizationId: actor.organizationId,
+        actorId: actor.id,
+        action: "file.scan_completed",
+        entityType: "file",
+        entityId: fileId,
+        correlationId,
+        before: { scanStatus: fileObject.scanStatus },
+        after: { scanStatus: scan.result, reason: scan.reason, rescan: true },
+      },
+    });
+    return updated;
   });
 }

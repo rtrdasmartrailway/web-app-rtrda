@@ -2283,6 +2283,7 @@ function AttachmentPanel({ taskId }: { taskId: string }) {
     Array<{
       id: string;
       kind: string;
+      version: number;
       file: {
         id: string;
         fileName: string;
@@ -2415,36 +2416,72 @@ function AttachmentPanel({ taskId }: { taskId: string }) {
       {!loading && attachments.length === 0 && (
         <p style={{ fontSize: 13, color: "#6b7280" }}>No files attached.</p>
       )}
-      {attachments.map((att) => (
-        <div
-          key={att.id}
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 8,
-            padding: "4px 0",
-            fontSize: 13,
-          }}
-        >
-          <span>{att.file.fileName}</span>
-          <span style={{ color: "#6b7280" }}>{formatSize(att.file.sizeBytes)}</span>
-          <span style={{ color: "#6b7280" }}>{att.kind}</span>
-          <button
-            type="button"
-            onClick={() => handleDownload(att.file.id)}
-            style={{ fontSize: 12 }}
+      {attachments.map((att) => {
+        const isClean = att.file.scanStatus === "CLEAN";
+        return (
+          <div
+            key={att.id}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
+              padding: "4px 0",
+              fontSize: 13,
+            }}
           >
-            Download
-          </button>
-          <button
-            type="button"
-            onClick={() => handleRemove(att.id)}
-            style={{ fontSize: 12, color: "#dc2626" }}
-          >
-            Remove
-          </button>
-        </div>
-      ))}
+            <span>{att.file.fileName}</span>
+            <span style={{ color: "#6b7280" }}>{formatSize(att.file.sizeBytes)}</span>
+            <span style={{ color: "#6b7280" }}>{att.kind} v{att.version}</span>
+            <span
+              style={{
+                display: "inline-block",
+                padding: "1px 6px",
+                borderRadius: 4,
+                fontSize: 11,
+                fontWeight: 600,
+                color: "#fff",
+                backgroundColor:
+                  att.file.scanStatus === "CLEAN"
+                    ? "#16a34a"
+                    : att.file.scanStatus === "PENDING"
+                      ? "#d97706"
+                      : att.file.scanStatus === "QUARANTINED"
+                        ? "#dc2626"
+                        : "#6b7280",
+              }}
+            >
+              {att.file.scanStatus}
+            </span>
+            <button
+              type="button"
+              onClick={() => handleDownload(att.file.id)}
+              disabled={!isClean}
+              style={{
+                fontSize: 12,
+                opacity: isClean ? 1 : 0.4,
+                cursor: isClean ? "pointer" : "not-allowed",
+              }}
+              title={isClean ? "Download" : "File must be CLEAN to download"}
+            >
+              Download
+            </button>
+            <button
+              type="button"
+              onClick={() => handleRemove(att.id)}
+              disabled={!isClean}
+              style={{
+                fontSize: 12,
+                color: "#dc2626",
+                opacity: isClean ? 1 : 0.4,
+                cursor: isClean ? "pointer" : "not-allowed",
+              }}
+              title={isClean ? "Remove" : "File must be CLEAN to remove"}
+            >
+              Remove
+            </button>
+          </div>
+        );
+      })}
       <label
         style={{
           display: "inline-block",

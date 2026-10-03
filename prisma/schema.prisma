@@ -398,11 +398,13 @@ model PrFileObject {
   checksum    String
   scanStatus  PrFileScanStatus @default(PENDING)
   scannedAt   DateTime?
+  deletedAt   DateTime?
   attachments PrAttachment[]
   createdAt   DateTime         @default(now())
   updatedAt   DateTime         @updatedAt
 
   @@index([scanStatus])
+  @@index([deletedAt])
 }
 
 model PrAttachment {

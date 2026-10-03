@@ -35,6 +35,9 @@ import {
   toggleUserActive,
   listAccessAuditEvents,
   evaluateNotificationReminders,
+  listQuarantinedFiles,
+  reviewQuarantinedFile,
+  rescanFile,
   PrCenterError,
   type PrCenterActor,
 } from "@/lib/pr-center/service";
@@ -504,6 +507,30 @@ export function buildPrCenterApi(
     const query = request.query as { take?: string };
     return listAccessAuditEvents(request.prCenterActor!, Number(query.take || 100));
   });
+  // ── Quarantine management routes ─────────────────────────────────────
+  app.get("/admin/quarantine", async (request) => {
+    const query = request.query as { take?: string };
+    return listQuarantinedFiles(request.prCenterActor!, Number(query.take || 50));
+  });
+  app.post("/admin/quarantine/:fileId/review", async (request) => {
+    const input = await body(request);
+    if (input.disposition !== "approve" && input.disposition !== "delete")
+      throw new PrCenterError("Disposition must be 'approve' or 'delete'", 422, "INVALID_DISPOSITION");
+    return reviewQuarantinedFile(
+      request.prCenterActor!,
+      (request.params as { fileId: string }).fileId,
+      input.disposition,
+      typeof input.reason === "string" ? input.reason : undefined,
+      correlationId(request),
+    );
+  });
+  app.post("/admin/quarantine/:fileId/rescan", async (request) =>
+    rescanFile(
+      request.prCenterActor!,
+      (request.params as { fileId: string }).fileId,
+      correlationId(request),
+    ),
+  );
   return app;
 }
 
