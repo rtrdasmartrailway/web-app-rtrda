@@ -465,3 +465,36 @@ describe("Message House current route", () => {
     await app.close();
   });
 });
+
+describe("Calendar route", () => {
+  it("requires an authenticated actor", async () => {
+    const app = buildPrCenterApi(async () => null);
+    const response = await app.inject({
+      method: "GET",
+      url: "/calendar?from=2026-10-01T00:00:00.000Z&to=2026-10-08T00:00:00.000Z",
+    });
+
+    expect(response.statusCode).toBe(401);
+    await app.close();
+  });
+
+  it("rejects invalid and overlong ranges before querying the database", async () => {
+    const app = buildPrCenterApi(async () => mockActor);
+    const [invalidResponse, overlongResponse] = await Promise.all([
+      app.inject({
+        method: "GET",
+        url: "/calendar?from=nope&to=2026-10-08T00:00:00.000Z",
+      }),
+      app.inject({
+        method: "GET",
+        url: "/calendar?from=2026-10-01T00:00:00.000Z&to=2026-12-01T00:00:00.000Z",
+      }),
+    ]);
+
+    expect(invalidResponse.statusCode).toBe(422);
+    expect(invalidResponse.json().error).toBe("INVALID_CALENDAR_RANGE");
+    expect(overlongResponse.statusCode).toBe(422);
+    expect(overlongResponse.json().error).toBe("INVALID_CALENDAR_RANGE");
+    await app.close();
+  });
+});

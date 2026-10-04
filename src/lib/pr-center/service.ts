@@ -1479,6 +1479,89 @@ export async function listAssignableUsers(actor: PrCenterActor) {
   });
 }
 
+export async function listCalendarEntries(actor: PrCenterActor, from: Date, to: Date) {
+  const rangeMilliseconds = to.getTime() - from.getTime();
+  if (
+    !Number.isFinite(from.getTime()) ||
+    !Number.isFinite(to.getTime()) ||
+    rangeMilliseconds <= 0 ||
+    rangeMilliseconds > 45 * 24 * 60 * 60 * 1000
+  ) {
+    throw new PrCenterError(
+      "Calendar range must be valid and no longer than 45 days",
+      422,
+      "INVALID_CALENDAR_RANGE",
+    );
+  }
+
+  const requestScope = requestScopeWhere(actor);
+  const [schedules, drafts] = await Promise.all([
+    prisma.prSchedule.findMany({
+      where: {
+        OR: [
+          { scheduledFor: { gte: from, lt: to }, publishedAt: null },
+          { publishedAt: { gte: from, lt: to } },
+        ],
+        task: { request: requestScope },
+      },
+      select: {
+        id: true,
+        taskId: true,
+        channel: true,
+        taskRevision: true,
+        scheduledFor: true,
+        publishedAt: true,
+        task: {
+          select: {
+            title: true,
+            request: { select: { requestNumber: true } },
+          },
+        },
+      },
+      orderBy: [{ scheduledFor: "asc" }, { createdAt: "asc" }],
+    }),
+    prisma.prTask.findMany({
+      where: {
+        status: "DRAFT",
+        dueAt: { gte: from, lt: to },
+        request: requestScope,
+      },
+      select: {
+        id: true,
+        title: true,
+        contentType: true,
+        dueAt: true,
+        request: { select: { requestNumber: true } },
+      },
+      orderBy: [{ dueAt: "asc" }, { createdAt: "asc" }],
+    }),
+  ]);
+
+  return [
+    ...schedules.map((schedule) => ({
+      id: schedule.id,
+      taskId: schedule.taskId,
+      title: schedule.task.title,
+      requestNumber: schedule.task.request.requestNumber,
+      channel: schedule.channel,
+      taskRevision: schedule.taskRevision,
+      date: schedule.publishedAt ?? schedule.scheduledFor,
+      status: schedule.publishedAt ? ("PUBLISHED" as const) : ("SCHEDULED" as const),
+    })),
+    ...drafts.map((task) => ({
+      id: task.id,
+      taskId: task.id,
+      title: task.title,
+      requestNumber: task.request.requestNumber,
+      channel: null,
+      taskRevision: null,
+      date: task.dueAt!,
+      status: "DRAFT" as const,
+      contentType: task.contentType,
+    })),
+  ].sort((left, right) => left.date.getTime() - right.date.getTime());
+}
+
 export async function listTaskSchedules(actor: PrCenterActor, taskId: string) {
   if (!canManageTasks(actor.role))
     throw new PrCenterError("You cannot view task schedules", 403, "FORBIDDEN");

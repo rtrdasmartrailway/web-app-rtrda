@@ -5,6 +5,7 @@ import {
   addTaskComment,
   convertIdea,
   currentMessageHouse,
+  listCalendarEntries,
   messageHouseHistory,
   createTaskRevision,
   listIdeas,
@@ -183,6 +184,14 @@ export function buildPrCenterApi(
   app.get("/message-house/history", async (request) =>
     messageHouseHistory(request.prCenterActor!),
   );
+  app.get("/calendar", async (request) => {
+    const query = request.query as { from?: string; to?: string };
+    return listCalendarEntries(
+      request.prCenterActor!,
+      new Date(query.from ?? ""),
+      new Date(query.to ?? ""),
+    );
+  });
   app.get("/notifications", async (request) => listNotifications(request.prCenterActor!));
   app.post("/notifications/read", async (request) => {
     const input = await body(request);

@@ -3,6 +3,7 @@
 import { startTransition, useEffect, useState } from "react";
 import Image from "next/image";
 import type { CreateContentIdeaInput } from "@/lib/pr-center/idea-input";
+import { parseCalendarEntries, type CalendarEntry } from "@/lib/pr-center/calendar-view";
 import {
   parseCurrentMessageHouse,
   parseMessageHouseHistory,
@@ -1911,9 +1912,7 @@ export function PrCenterApp({
               onPublish={publishTask}
             />
           )}
-          {page === "calendar" && (
-            <Calendar tasks={state.tasks} language={state.language} onNavigate={go} />
-          )}
+          {page === "calendar" && <Calendar language={state.language} />}
           {page === "approvals" && (
             <Approvals
               tasks={approvalTasks}
@@ -3169,72 +3168,175 @@ function AttachmentPanel({ taskId }: { taskId: string }) {
   );
 }
 
-function Calendar({
-  tasks,
-  language,
-  onNavigate,
-}: {
-  tasks: Task[];
-  language: Language;
-  onNavigate: (page: Page) => void;
-}) {
-  const [month, setMonth] = useState(new Date(2026, 8, 1));
+function Calendar({ language }: { language: Language }) {
+  const [anchorDate, setAnchorDate] = useState(() => {
+    const now = new Date();
+    return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+  });
   const [view, setView] = useState<"month" | "week">("month");
-  const [status, setStatus] = useState<"all" | StatusId>("all");
-  const [selectedId, setSelectedId] = useState<string | null>(null);
-  const visibleTasks = tasks.filter((task) => status === "all" || task.status === status);
-  const firstDay = new Date(month.getFullYear(), month.getMonth(), 1);
-  const start = new Date(firstDay);
-  start.setDate(1 - ((firstDay.getDay() + 6) % 7));
+  const [statusFilter, setStatusFilter] = useState<"ALL" | CalendarEntry["status"]>(
+    "ALL",
+  );
+  const [selectedKey, setSelectedKey] = useState<string | null>(null);
+  const [result, setResult] = useState<{
+    key: string;
+    entries: CalendarEntry[];
+    failed: boolean;
+  } | null>(null);
+
+  const firstOfMonth = new Date(
+    Date.UTC(anchorDate.getUTCFullYear(), anchorDate.getUTCMonth(), 1),
+  );
+  const rangeStart = new Date(firstOfMonth);
+  let dayCount = 42;
+  if (view === "month") {
+    rangeStart.setUTCDate(1 - ((firstOfMonth.getUTCDay() + 6) % 7));
+  } else {
+    rangeStart.setTime(anchorDate.getTime());
+    rangeStart.setUTCDate(rangeStart.getUTCDate() - ((rangeStart.getUTCDay() + 6) % 7));
+    dayCount = 7;
+  }
+  const rangeEnd = new Date(rangeStart);
+  rangeEnd.setUTCDate(rangeEnd.getUTCDate() + dayCount);
+  const from = rangeStart.toISOString();
+  const to = rangeEnd.toISOString();
+  const rangeKey = `${from}|${to}`;
+
+  useEffect(() => {
+    const controller = new AbortController();
+    fetch(
+      `/api/pr-center/calendar?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`,
+      { credentials: "same-origin", signal: controller.signal },
+    )
+      .then(async (response) => {
+        if (!response.ok) throw new Error("Calendar unavailable");
+        return parseCalendarEntries(await response.json());
+      })
+      .then((entries) => {
+        if (!controller.signal.aborted)
+          setResult({ key: rangeKey, entries, failed: false });
+      })
+      .catch(() => {
+        if (!controller.signal.aborted)
+          setResult({ key: rangeKey, entries: [], failed: true });
+      });
+    return () => controller.abort();
+  }, [from, rangeKey, to]);
+
+  const currentResult = result?.key === rangeKey ? result : null;
+  const entries = currentResult?.entries ?? [];
+  const visibleEntries = entries.filter(
+    (entry) => statusFilter === "ALL" || entry.status === statusFilter,
+  );
   const days = Array.from(
-    { length: view === "month" ? 35 : 7 },
-    (_, index) =>
-      new Date(start.getFullYear(), start.getMonth(), start.getDate() + index),
+    { length: dayCount },
+    (_, index) => new Date(rangeStart.getTime() + index * 24 * 60 * 60 * 1000),
   );
-  const monthLabel = month.toLocaleDateString(
-    language === "th" ? "th-TH-u-ca-buddhist" : "en-GB",
-    { month: "long", year: "numeric" },
-  );
-  const selected = tasks.find((task) => task.id === selectedId);
+  const locale = language === "th" ? "th-TH-u-ca-buddhist" : "en-GB";
+  const monthLabel = anchorDate.toLocaleDateString(locale, {
+    month: "long",
+    year: "numeric",
+    timeZone: "UTC",
+  });
+  const formatTime = (value: string) =>
+    new Date(value).toLocaleTimeString(locale, {
+      hour: "2-digit",
+      minute: "2-digit",
+      hourCycle: "h23",
+      timeZone: "UTC",
+    });
+  const entryKey = (entry: CalendarEntry) => `${entry.status}:${entry.id}`;
+  const selected = visibleEntries.find((entry) => entryKey(entry) === selectedKey);
+  const statusLabelFor = (status: CalendarEntry["status"]) =>
+    status === "DRAFT"
+      ? language === "th"
+        ? "กำหนดส่งฉบับร่าง"
+        : "Draft due"
+      : status === "SCHEDULED"
+        ? language === "th"
+          ? "กำหนดเผยแพร่"
+          : "Scheduled"
+        : language === "th"
+          ? "เผยแพร่แล้ว"
+          : "Published";
+  const moveRange = (direction: -1 | 1) => {
+    setAnchorDate((current) => {
+      if (view === "month")
+        return new Date(
+          Date.UTC(current.getUTCFullYear(), current.getUTCMonth() + direction, 1),
+        );
+      const next = new Date(current);
+      next.setUTCDate(next.getUTCDate() + direction * 7);
+      return next;
+    });
+  };
+
   return (
     <>
       <SectionHeading
-        eyebrow="CONTENT CALENDAR"
+        eyebrow={language === "th" ? "ปฏิทินเนื้อหา" : "CONTENT CALENDAR"}
         title={monthLabel}
         action={
           <div className={styles.segmented}>
-            <button
-              onClick={() =>
-                setMonth(new Date(month.getFullYear(), month.getMonth() - 1, 1))
-              }
-            >
-              Previous
+            <button type="button" onClick={() => moveRange(-1)}>
+              {language === "th" ? "ก่อนหน้า" : "Previous"}
             </button>
-            <button onClick={() => setView("month")}>Month</button>
-            <button onClick={() => setView("week")}>Week</button>
-            <button
-              onClick={() =>
-                setMonth(new Date(month.getFullYear(), month.getMonth() + 1, 1))
-              }
-            >
-              Next
+            <button type="button" onClick={() => setView("month")}>
+              {language === "th" ? "เดือน" : "Month"}
+            </button>
+            <button type="button" onClick={() => setView("week")}>
+              {language === "th" ? "สัปดาห์" : "Week"}
+            </button>
+            <button type="button" onClick={() => moveRange(1)}>
+              {language === "th" ? "ถัดไป" : "Next"}
             </button>
           </div>
         }
       />
+      <p role="note">
+        {language === "th"
+          ? "เวลาแสดงเป็น UTC จนกว่าจะกำหนดเขตเวลาขององค์กร · วันฉบับร่างคือกำหนดส่ง ไม่ใช่กำหนดเผยแพร่"
+          : "Times are shown in UTC until the organization timezone is approved · Draft dates are due dates, not publication commitments."}
+      </p>
       <section className={styles.filterBar}>
-        <select
-          value={status}
-          onChange={(event) => setStatus(event.target.value as "all" | StatusId)}
-        >
-          <option value="all">All task statuses</option>
-          {Object.entries(STATUS_LABELS).map(([id, name]) => (
-            <option key={id} value={id}>
-              {name}
+        <label>
+          {language === "th" ? "สถานะ" : "Status"}
+          <select
+            value={statusFilter}
+            onChange={(event) =>
+              setStatusFilter(event.target.value as "ALL" | CalendarEntry["status"])
+            }
+          >
+            <option value="ALL">{language === "th" ? "ทั้งหมด" : "All"}</option>
+            <option value="SCHEDULED">
+              {language === "th" ? "กำหนดเผยแพร่" : "Scheduled"}
             </option>
-          ))}
-        </select>
+            <option value="PUBLISHED">
+              {language === "th" ? "เผยแพร่แล้ว" : "Published"}
+            </option>
+            <option value="DRAFT">
+              {language === "th" ? "ฉบับร่าง / กำหนดส่ง" : "Draft due"}
+            </option>
+          </select>
+        </label>
       </section>
+      {currentResult === null && (
+        <p role="status" aria-live="polite">
+          {language === "th" ? "กำลังโหลดปฏิทิน…" : "Loading calendar…"}
+        </p>
+      )}
+      {currentResult?.failed && (
+        <p role="alert">
+          {language === "th" ? "โหลดปฏิทินไม่สำเร็จ" : "Calendar could not be loaded."}
+        </p>
+      )}
+      {currentResult && !currentResult.failed && entries.length === 0 && (
+        <p role="status">
+          {language === "th"
+            ? "ไม่มีรายการในช่วงเวลานี้"
+            : "No entries in this date range."}
+        </p>
+      )}
       <article className={styles.card}>
         <div className={styles.calendarWeek}>
           {(language === "th"
@@ -3245,39 +3347,58 @@ function Calendar({
           ))}
         </div>
         <div className={styles.calendar}>
-          {days.map((day) => (
-            <div
-              key={day.toISOString()}
-              className={day.getMonth() !== month.getMonth() ? styles.mutedDay : ""}
-            >
-              <b>{day.getDate()}</b>
-              {visibleTasks
-                .filter((task) => task.dueDate === day.toISOString().slice(0, 10))
-                .map((task) => (
+          {days.map((day) => {
+            const dayKey = day.toISOString().slice(0, 10);
+            const dayEntries = visibleEntries.filter(
+              (entry) => new Date(entry.date).toISOString().slice(0, 10) === dayKey,
+            );
+            return (
+              <div
+                key={dayKey}
+                className={
+                  day.getUTCMonth() !== anchorDate.getUTCMonth() ? styles.mutedDay : ""
+                }
+              >
+                <b>
+                  {day.toLocaleDateString(locale, { day: "numeric", timeZone: "UTC" })}
+                </b>
+                {dayEntries.map((entry) => (
                   <button
-                    key={task.id}
-                    className={`${styles.event} ${task.type.includes("Video") ? styles.videoEvent : ""}`}
-                    onClick={() => setSelectedId(task.id)}
+                    type="button"
+                    key={entryKey(entry)}
+                    className={`${styles.event} ${entry.contentType?.includes("Video") ? styles.videoEvent : ""}`}
+                    onClick={() => setSelectedKey(entryKey(entry))}
                   >
-                    {task.type}: {task.title}
+                    {statusLabelFor(entry.status)} · {formatTime(entry.date)} ·{" "}
+                    {entry.channel ? `${entry.channel}: ` : ""}
+                    {entry.title}
                   </button>
                 ))}
-            </div>
-          ))}
+              </div>
+            );
+          })}
         </div>
       </article>
       {selected && (
         <article className={styles.card}>
-          <p className={styles.eyebrow}>{selected.id}</p>
+          <p className={styles.eyebrow}>{selected.requestNumber}</p>
           <h2>{selected.title}</h2>
           <p>
-            {selected.type} · {statusLabel(selected.status, language)} ·{" "}
-            {formatDate(selected.dueDate, language)}
+            {statusLabelFor(selected.status)} · {formatTime(selected.date)} UTC
+            {selected.channel ? ` · ${selected.channel}` : ""}
           </p>
-          <p>Owner: {getUser(selected.ownerId)?.name ?? "Unassigned"}</p>
-          <button className={styles.primary} onClick={() => onNavigate("operations")}>
-            {language === "th" ? "เปิดงานในกระดานผลิต" : "Open in production board"}
-          </button>
+          {selected.status === "DRAFT" && (
+            <p>
+              {language === "th"
+                ? "วันที่นี้เป็นกำหนดส่งงานฉบับร่าง ไม่ใช่กำหนดเผยแพร่ที่ยืนยันแล้ว"
+                : "This is a draft due date, not a confirmed publication date."}
+            </p>
+          )}
+          {selected.taskRevision !== null && (
+            <p>
+              {language === "th" ? "ฉบับงาน" : "Task revision"} {selected.taskRevision}
+            </p>
+          )}
         </article>
       )}
     </>
