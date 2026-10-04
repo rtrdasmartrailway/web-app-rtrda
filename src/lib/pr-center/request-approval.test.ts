@@ -80,7 +80,7 @@ describe("request intake approval", () => {
       expect.objectContaining({
         where: expect.objectContaining({
           organizationId: "org-1",
-          requesterId: requesterActor.id,
+          OR: [{ requesterId: requesterActor.id }],
         }),
         include: expect.objectContaining({
           statusHistory: expect.objectContaining({
@@ -96,7 +96,7 @@ describe("request intake approval", () => {
     expect(prWhere).toEqual(
       expect.objectContaining({
         organizationId: "org-1",
-        departmentId: "dept-1",
+        OR: [{ requesterId: prActor.id }, { departmentId: "dept-1" }],
       }),
     );
     expect(prWhere).not.toHaveProperty("requesterId");
@@ -111,7 +111,7 @@ describe("request intake approval", () => {
       expect.objectContaining({
         where: expect.objectContaining({
           organizationId: "org-1",
-          requesterId: adminActor.id,
+          OR: [{ requesterId: adminActor.id }],
         }),
       }),
     );
@@ -134,7 +134,7 @@ describe("request intake approval", () => {
         where: expect.objectContaining({
           id: requestRecord.id,
           organizationId: adminActor.organizationId,
-          requesterId: adminActor.id,
+          OR: [{ requesterId: adminActor.id }],
         }),
       }),
     );
@@ -153,7 +153,7 @@ describe("request intake approval", () => {
     expect(result.statusHistory[0]?.reason).toBe("Missing required information");
     expect(mockPrisma.prRequest.findFirst).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: expect.objectContaining({ requesterId: requesterActor.id }),
+        where: expect.objectContaining({ OR: [{ requesterId: requesterActor.id }] }),
         include: expect.objectContaining({
           statusHistory: expect.objectContaining({
             where: { toState: "REJECTED" },
@@ -195,7 +195,7 @@ describe("request intake approval", () => {
     expect(mockPrisma.prRequest.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
         where: expect.objectContaining({
-          departmentId: "dept-2",
+          OR: [{ departmentId: "dept-2" }],
           status: "SUBMITTED",
           requesterId: { not: prActor.id },
           tasks: { every: { status: "DRAFT" } },

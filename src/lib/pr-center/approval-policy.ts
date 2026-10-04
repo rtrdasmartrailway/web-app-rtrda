@@ -139,15 +139,13 @@ export function getNextApprovalStage(
 
 export function hasApprovalAuthority(input: {
   stage: ApprovalPolicyStage;
-  role: PrCenterRole;
-  actorDepartmentId: string | null;
+  roleGrants: ReadonlyArray<{ role: PrCenterRole; departmentId: string | null }>;
   taskDepartmentId: string | null;
 }): boolean {
-  if (!input.stage.roles.includes(input.role)) return false;
-  if (input.stage.departmentScope === "ORGANIZATION") return true;
-  return Boolean(
-    input.actorDepartmentId &&
-    input.taskDepartmentId &&
-    input.actorDepartmentId === input.taskDepartmentId,
-  );
+  return input.roleGrants.some((grant) => {
+    if (!input.stage.roles.includes(grant.role)) return false;
+    if (grant.departmentId === null) return true;
+    if (input.stage.departmentScope === "ORGANIZATION") return false;
+    return grant.departmentId === input.taskDepartmentId;
+  });
 }

@@ -88,7 +88,7 @@ describe("listCalendarEntries", () => {
           { scheduledFor: { gte: from, lt: to }, publishedAt: null },
           { publishedAt: { gte: from, lt: to } },
         ],
-        task: { request: { organizationId: "org-1", departmentId: "dept-1" } },
+        task: { request: { organizationId: "org-1", OR: [{ departmentId: "dept-1" }] } },
       },
       select: {
         id: true,
@@ -110,7 +110,7 @@ describe("listCalendarEntries", () => {
       where: {
         status: "DRAFT",
         dueAt: { gte: from, lt: to },
-        request: { organizationId: "org-1", departmentId: "dept-1" },
+        request: { organizationId: "org-1", OR: [{ departmentId: "dept-1" }] },
       },
       select: {
         id: true,
@@ -129,13 +129,11 @@ describe("listCalendarEntries", () => {
 
     expect(mocks.scheduleFindMany.mock.calls[0][0].where.task.request).toEqual({
       organizationId: "org-1",
-      requesterId: "requester-1",
-      departmentId: "dept-1",
+      OR: [{ requesterId: "requester-1" }],
     });
     expect(mocks.taskFindMany.mock.calls[0][0].where.request).toEqual({
       organizationId: "org-1",
-      requesterId: "requester-1",
-      departmentId: "dept-1",
+      OR: [{ requesterId: "requester-1" }],
     });
   });
 

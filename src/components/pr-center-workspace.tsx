@@ -15,6 +15,22 @@ type PrCenterSession = {
     | "APPROVER"
     | "EXECUTIVE_READ_ONLY"
     | "SCOPED_ADMINISTRATOR";
+  roles: Array<
+    | "REQUESTER"
+    | "PR_OPERATIONS"
+    | "APPROVER"
+    | "EXECUTIVE_READ_ONLY"
+    | "SCOPED_ADMINISTRATOR"
+  >;
+  roleGrants: Array<{
+    role:
+      | "REQUESTER"
+      | "PR_OPERATIONS"
+      | "APPROVER"
+      | "EXECUTIVE_READ_ONLY"
+      | "SCOPED_ADMINISTRATOR";
+    departmentId: string | null;
+  }>;
 };
 type Page =
   | "Home"
@@ -141,7 +157,15 @@ export function PrCenterWorkspace() {
 
   // Preserve the established PR Center visual workspace once access is granted.
   if (signedIn && session)
-    return <PrCenterApp key={`${session.userId}:${session.role}`} actor={session} />;
+    return (
+      <PrCenterApp
+        key={`${session.userId}:${session.roles.join(",")}:${session.roleGrants
+          .map((grant) => `${grant.role}:${grant.departmentId ?? "*"}`)
+          .sort()
+          .join(",")}`}
+        actor={session}
+      />
+    );
 
   return (
     <main className={styles.shell}>

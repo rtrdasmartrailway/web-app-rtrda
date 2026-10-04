@@ -43,6 +43,12 @@ type Role =
   | "designer"
   | "video"
   | "requester";
+type PrCenterRoleCode =
+  | "REQUESTER"
+  | "PR_OPERATIONS"
+  | "APPROVER"
+  | "EXECUTIVE_READ_ONLY"
+  | "SCOPED_ADMINISTRATOR";
 type StatusId =
   | "draft"
   | "waiting_for_information"
@@ -554,6 +560,14 @@ const ROLE_PAGES: Record<Role, Page[]> = {
   ],
 };
 
+const DISPLAY_ROLE_BY_PR_ROLE: Record<PrCenterRoleCode, Role> = {
+  REQUESTER: "requester",
+  PR_OPERATIONS: "pr",
+  APPROVER: "approver",
+  EXECUTIVE_READ_ONLY: "executive",
+  SCOPED_ADMINISTRATOR: "admin",
+};
+
 const defaultState: PrCenterState = {
   version: 1,
   language: "th",
@@ -868,12 +882,9 @@ export function PrCenterApp({
     userId: string;
     displayName: string;
     departmentName: string;
-    role:
-      | "REQUESTER"
-      | "PR_OPERATIONS"
-      | "APPROVER"
-      | "EXECUTIVE_READ_ONLY"
-      | "SCOPED_ADMINISTRATOR";
+    role: PrCenterRoleCode;
+    roles?: PrCenterRoleCode[];
+    roleGrants?: Array<{ role: PrCenterRoleCode; departmentId: string | null }>;
   };
 }) {
   const latestActorId = useRef(actor?.userId);
@@ -1065,21 +1076,25 @@ export function PrCenterApp({
     ? {
         id: actor.userId,
         name: actor.displayName,
-        role: (
-          {
-            REQUESTER: "requester",
-            PR_OPERATIONS: "pr",
-            APPROVER: "approver",
-            EXECUTIVE_READ_ONLY: "executive",
-            SCOPED_ADMINISTRATOR: "admin",
-          } as const
-        )[actor.role],
+        role: DISPLAY_ROLE_BY_PR_ROLE[actor.role],
         department: actor.departmentName,
         active: true,
       }
     : (getUser(state.currentUserId) ?? users[0]);
+  const actorUiRoles: Role[] = actor
+    ? [
+        ...new Set(
+          (actor.roles?.length ? actor.roles : [actor.role]).map(
+            (role) => DISPLAY_ROLE_BY_PR_ROLE[role],
+          ),
+        ),
+      ]
+    : [currentUser.role];
+  const visibleRolePages = [...new Set(actorUiRoles.flatMap((role) => ROLE_PAGES[role]))];
+  const hasUiRole = (...roles: Role[]) =>
+    actorUiRoles.some((role) => roles.includes(role));
   const visiblePages = pages.filter(
-    (item) => isPageEnabled(item.id) && ROLE_PAGES[currentUser.role].includes(item.id),
+    (item) => isPageEnabled(item.id) && visibleRolePages.includes(item.id),
   );
   const loadMoreRequests = async () => {
     if (!requestCursor || loadingMoreRequests || loadingRequests) return;
@@ -1189,7 +1204,7 @@ export function PrCenterApp({
     }
   };
   const go = (next: Page) => {
-    if (!isPageEnabled(next) || !ROLE_PAGES[currentUser.role].includes(next)) return;
+    if (!isPageEnabled(next) || !visibleRolePages.includes(next)) return;
     setPage(next);
     if (next === "message-house") void loadMessageHouse();
     setSidebarOpen(false);
@@ -2125,6 +2140,7 @@ export function PrCenterApp({
             <Ideas
               ideas={ideasOwnerId === actor?.userId ? state.ideas : []}
               currentUser={currentUser}
+              canReview={hasUiRole("pr", "admin")}
               onCreate={createIdea}
               onStatus={updateIdeaStatus}
               onConvert={convertIdea}
@@ -3804,6 +3820,7 @@ function Library({
 function Ideas({
   ideas,
   currentUser,
+  canReview,
   onCreate,
   onStatus,
   onConvert,
@@ -3817,6 +3834,7 @@ function Ideas({
 }: {
   ideas: Idea[];
   currentUser: User;
+  canReview: boolean;
   onCreate: (input: CreateContentIdeaInput) => Promise<boolean>;
   onStatus: (id: string, status: IdeaStatus) => Promise<void>;
   onConvert: (id: string) => Promise<void>;
@@ -4109,7 +4127,7 @@ function Ideas({
             )}
             <footer>
               <span>{getUser(idea.authorId)?.name ?? "Unknown"}</span>
-              {(currentUser.role === "pr" || currentUser.role === "admin") && (
+              {canReview && (
                 <select
                   value=""
                   onChange={async (event) => {
@@ -4127,18 +4145,17 @@ function Ideas({
                   ))}
                 </select>
               )}
-              {idea.status === "accepted" &&
-                (currentUser.role === "pr" || currentUser.role === "admin") && (
-                  <button
-                    className={styles.primary}
-                    onClick={async () => {
-                      await onConvert(idea.id);
-                      await onRefresh();
-                    }}
-                  >
-                    {language === "th" ? "แปลงเป็นคำขอ" : "Convert to request"}
-                  </button>
-                )}
+              {idea.status === "accepted" && canReview && (
+                <button
+                  className={styles.primary}
+                  onClick={async () => {
+                    await onConvert(idea.id);
+                    await onRefresh();
+                  }}
+                >
+                  {language === "th" ? "แปลงเป็นคำขอ" : "Convert to request"}
+                </button>
+              )}
               {idea.requestId && (
                 <span>
                   {language === "th" ? "คำขอ" : "Request"}: {idea.requestId}
@@ -4428,6 +4445,7 @@ function Directory({
     userId: string;
     displayName: string;
     role: string;
+    roleGrants?: Array<{ role: string; departmentId: string | null }>;
   };
 }) {
   const [users, setUsers] = useState<
@@ -4444,6 +4462,11 @@ function Directory({
   const [error, setError] = useState<string | null>(null);
   const [grantTarget, setGrantTarget] = useState<string | null>(null);
   const [grantRole, setGrantRole] = useState<string>("REQUESTER");
+  const [grantDepartmentId, setGrantDepartmentId] = useState("");
+  const isOrganizationAdmin =
+    actor.roleGrants?.some(
+      (grant) => grant.role === "SCOPED_ADMINISTRATOR" && grant.departmentId === null,
+    ) ?? false;
   const [notice, setNotice] = useState<string | null>(null);
 
   const reload = () => {
@@ -4482,7 +4505,7 @@ function Directory({
       method: "POST",
       credentials: "same-origin",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ role: grantRole }),
+      body: JSON.stringify({ role: grantRole, departmentId: grantDepartmentId || null }),
     });
     if (!res.ok) {
       const err = await res.json().catch(() => null);
@@ -4556,7 +4579,14 @@ function Directory({
                   {user.active ? "Deactivate" : "Activate"}
                 </button>
                 <button
-                  onClick={() => setGrantTarget(grantTarget === user.id ? null : user.id)}
+                  onClick={() => {
+                    const nextTarget = grantTarget === user.id ? null : user.id;
+                    setGrantTarget(nextTarget);
+                    if (nextTarget)
+                      setGrantDepartmentId(
+                        isOrganizationAdmin ? "" : (user.department?.id ?? ""),
+                      );
+                  }}
                   style={{ fontSize: 12 }}
                 >
                   + Grant role
@@ -4585,7 +4615,7 @@ function Directory({
                     fontSize: 12,
                   }}
                 >
-                  {r.role}
+                  {r.role} · {r.departmentId ? `dept ${r.departmentId}` : "org-wide"}
                   <button
                     onClick={() => handleRevoke(r.id)}
                     style={{
@@ -4606,6 +4636,25 @@ function Directory({
               <div
                 style={{ marginTop: 8, display: "flex", gap: 8, alignItems: "center" }}
               >
+                {isOrganizationAdmin ? (
+                  <select
+                    aria-label="Role scope"
+                    value={grantDepartmentId}
+                    onChange={(event) => setGrantDepartmentId(event.target.value)}
+                    style={{ fontSize: 12 }}
+                  >
+                    <option value="">Organization-wide</option>
+                    {user.department && (
+                      <option value={user.department.id}>
+                        Department: {user.department.name}
+                      </option>
+                    )}
+                  </select>
+                ) : (
+                  <span style={{ fontSize: 12 }}>
+                    Scope: {user.department?.name || "No department"}
+                  </span>
+                )}
                 <select
                   value={grantRole}
                   onChange={(e) => setGrantRole(e.target.value)}

@@ -2,8 +2,12 @@ import { randomBytes } from "node:crypto";
 import * as oidc from "openid-client";
 import type { FastifyRequest } from "fastify";
 import { prisma } from "@/lib/db/client";
-import { PrCenterError, type PrCenterActor } from "@/lib/pr-center/service";
-import { PR_CENTER_ROLES, type PrCenterRole } from "@/lib/pr-center/workflow";
+import {
+  PrCenterError,
+  type PrCenterActor,
+  type PrCenterRoleGrant,
+} from "@/lib/pr-center/service";
+import type { PrCenterRole } from "@/lib/pr-center/workflow";
 
 const SESSION_COOKIE = "rtrda_pr_center_oidc_session";
 const STATE_COOKIE = "rtrda_pr_center_oidc_state";
@@ -48,6 +52,7 @@ function cookie(name: string, value: string, maxAge: number, sameSite: "Lax" | "
 
 type SessionAuthorityRecord = {
   active: boolean;
+  email: string;
   organizationId: string;
   departmentId: string | null;
   roles: Array<{
@@ -61,18 +66,34 @@ export function isSessionAuthorityCurrent(
   actor: PrCenterActor,
   user: SessionAuthorityRecord | null,
 ): boolean {
-  return Boolean(
-    user?.active &&
-    user.organizationId === actor.organizationId &&
-    user.departmentId === actor.departmentId &&
-    user.roles.some(
-      (assigned) =>
-        assigned.role === actor.role &&
-        assigned.organizationId === actor.organizationId &&
-        (actor.scopeDepartmentId === undefined
-          ? assigned.departmentId === null || assigned.departmentId === user.departmentId
-          : assigned.departmentId === actor.scopeDepartmentId),
-    ),
+  if (
+    !user?.active ||
+    !isAllowedOrganizationEmail(user.email) ||
+    user.organizationId !== actor.organizationId ||
+    user.departmentId !== actor.departmentId
+  )
+    return false;
+
+  const expectedGrants = actor.roleGrants ?? [
+    {
+      role: actor.role,
+      departmentId:
+        actor.scopeDepartmentId !== undefined
+          ? actor.scopeDepartmentId
+          : actor.role === "SCOPED_ADMINISTRATOR"
+            ? null
+            : actor.departmentId,
+    },
+  ];
+  const currentGrants = user.roles
+    .filter((assigned) => assigned.organizationId === actor.organizationId)
+    .map(({ role, departmentId }) => ({ role, departmentId }));
+  const key = (grant: PrCenterRoleGrant) => `${grant.role}:${grant.departmentId ?? "*"}`;
+  const expected = expectedGrants.map(key).sort();
+  const current = currentGrants.map(key).sort();
+  return (
+    expected.length === current.length &&
+    expected.every((grant, index) => grant === current[index])
   );
 }
 
@@ -121,19 +142,24 @@ export function isAllowedOrganizationEmail(email: string): boolean {
 
 export function resolvePrCenterLoginRole(
   email: string,
-  tokenRole: PrCenterRole | undefined,
-  databaseRoleAssignment: { role: PrCenterRole; departmentId: string | null } | undefined,
-): { role: PrCenterRole; autoProvisionRequester: boolean } {
-  if (!isAllowedOrganizationEmail(email) && !tokenRole && !databaseRoleAssignment)
+  databaseRoleAssignments: ReadonlyArray<PrCenterRoleGrant>,
+): {
+  role: PrCenterRole;
+  roleGrants: PrCenterRoleGrant[];
+  autoProvisionRequester: boolean;
+} {
+  if (!isAllowedOrganizationEmail(email))
     throw new PrCenterError(
-      "Only @rtrda.or.th users or accounts with an assigned PR Center role may access PR Center",
+      "Only @rtrda.or.th users may access PR Center",
       403,
       "OIDC_ACCESS_NOT_ALLOWED",
     );
-  if (tokenRole) return { role: tokenRole, autoProvisionRequester: false };
-  if (databaseRoleAssignment)
-    return { role: databaseRoleAssignment.role, autoProvisionRequester: false };
-  return { role: "REQUESTER", autoProvisionRequester: true };
+  const roleGrants = [...databaseRoleAssignments];
+  const autoProvisionRequester = !roleGrants.some((grant) => grant.role === "REQUESTER");
+  if (autoProvisionRequester) roleGrants.push({ role: "REQUESTER", departmentId: null });
+  const role =
+    roleGrants.find((grant) => grant.role !== "REQUESTER")?.role ?? "REQUESTER";
+  return { role, roleGrants, autoProvisionRequester };
 }
 
 function config() {
@@ -171,11 +197,6 @@ export function createEntraAuth() {
   async function provision(claims: Record<string, unknown>): Promise<PrCenterActor> {
     const oid = typeof claims.oid === "string" ? claims.oid : "";
     const tid = typeof claims.tid === "string" ? claims.tid : "";
-    const tokenRoles = Array.isArray(claims.roles) ? claims.roles : [];
-    const tokenRole = tokenRoles.find(
-      (value): value is PrCenterRole =>
-        typeof value === "string" && PR_CENTER_ROLES.includes(value as PrCenterRole),
-    );
     if (!oid)
       throw new PrCenterError(
         "Your Entra account has no stable subject identifier",
@@ -234,27 +255,19 @@ export function createEntraAuth() {
         existingByEmail,
         organization.id,
       );
-      const databaseRoleAssignment = existingUser
-        ? PR_CENTER_ROLES.map((candidate) => {
-            const assignments = existingUser.roles.filter(
-              (assigned) =>
-                assigned.role === candidate &&
-                assigned.organizationId === organization.id &&
-                (assigned.departmentId === null ||
-                  assigned.departmentId === existingUser.departmentId),
-            );
-            return (
-              assignments.find((assigned) => assigned.departmentId === null) ??
-              assignments[0]
-            );
-          }).find((assignment) => assignment !== undefined)
-        : undefined;
-      const loginRole = resolvePrCenterLoginRole(
-        email,
-        tokenRole,
-        databaseRoleAssignment,
+      const eligibleAssignments = existingUser
+        ? existingUser.roles.filter(
+            (assigned) => assigned.organizationId === organization.id,
+          )
+        : [];
+      const databaseRoleAssignments = eligibleAssignments.map(
+        ({ role, departmentId }) => ({
+          role,
+          departmentId,
+        }),
       );
-      const { role, autoProvisionRequester } = loginRole;
+      const loginRole = resolvePrCenterLoginRole(email, databaseRoleAssignments);
+      const { role, roleGrants, autoProvisionRequester } = loginRole;
       const user = existingUser
         ? await tx.prCenterUser.update({
             where: { id: existingUser.id },
@@ -277,18 +290,18 @@ export function createEntraAuth() {
               active: true,
             },
           });
-      if (tokenRole || autoProvisionRequester) {
+      if (autoProvisionRequester) {
         const existingRole = await tx.prUserRole.findFirst({
           where: {
             userId: user.id,
-            role,
+            role: "REQUESTER",
             organizationId: organization.id,
             departmentId: null,
           },
         });
         if (!existingRole)
           await tx.prUserRole.create({
-            data: { userId: user.id, role, organizationId: organization.id },
+            data: { userId: user.id, role: "REQUESTER", organizationId: organization.id },
           });
       }
       await tx.prAuditEvent.create({
@@ -299,7 +312,7 @@ export function createEntraAuth() {
           entityType: "session",
           entityId: user.id,
           correlationId: randomBytes(16).toString("hex"),
-          after: { role },
+          after: { roles: roleGrants },
         },
       });
       return {
@@ -307,9 +320,9 @@ export function createEntraAuth() {
         organizationId: organization.id,
         departmentId: user.departmentId,
         role,
-        scopeDepartmentId: tokenRole
-          ? null
-          : (databaseRoleAssignment?.departmentId ?? null),
+        roleGrants,
+        scopeDepartmentId:
+          roleGrants.find((grant) => grant.role !== "REQUESTER")?.departmentId ?? null,
       };
     });
   }
@@ -329,6 +342,7 @@ export function createEntraAuth() {
         },
         select: {
           active: true,
+          email: true,
           organizationId: true,
           departmentId: true,
           roles: {

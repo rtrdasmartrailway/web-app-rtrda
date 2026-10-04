@@ -67,14 +67,14 @@ describe("idea reviewer scope", () => {
     await transitionIdea(actor, "idea-1", 3, "UNDER_REVIEW", undefined, "corr-1");
 
     expect(mocks.findFirst).toHaveBeenCalledWith({
-      where: { id: "idea-1", organizationId: "org-1", departmentId: "dept-1" },
+      where: { id: "idea-1", organizationId: "org-1", OR: [{ departmentId: "dept-1" }] },
     });
     expect(mocks.transactionClient.prContentIdea.updateMany).toHaveBeenCalledWith(
       expect.objectContaining({
         where: {
           id: "idea-1",
           organizationId: "org-1",
-          departmentId: "dept-1",
+          OR: [{ departmentId: "dept-1" }],
           version: 3,
         },
       }),
@@ -119,7 +119,7 @@ describe("idea reviewer scope", () => {
         where: {
           id: "idea-1",
           organizationId: "org-1",
-          departmentId: "dept-1",
+          OR: [{ departmentId: "dept-1" }],
           version: 3,
         },
         data: expect.objectContaining({
@@ -215,14 +215,14 @@ describe("idea reviewer scope", () => {
     await convertIdea(actor, "idea-1", 3, "corr-2");
 
     expect(mocks.findFirst).toHaveBeenCalledWith({
-      where: { id: "idea-1", organizationId: "org-1", departmentId: "dept-1" },
+      where: { id: "idea-1", organizationId: "org-1", OR: [{ departmentId: "dept-1" }] },
     });
     expect(mocks.transactionClient.prContentIdea.updateMany).toHaveBeenCalledWith(
       expect.objectContaining({
         where: {
           id: "idea-1",
           organizationId: "org-1",
-          departmentId: "dept-1",
+          OR: [{ departmentId: "dept-1" }],
           status: "ACCEPTED",
           version: 3,
         },

@@ -50,77 +50,90 @@ export const TASK_TRANSITIONS = {
 
 export type PrTaskStatus = keyof typeof TASK_TRANSITIONS;
 
+export type PrCenterRoleInput = PrCenterRole | readonly PrCenterRole[];
+
+function includesAnyRole(
+  input: PrCenterRoleInput,
+  allowed: readonly PrCenterRole[],
+): boolean {
+  const roles = typeof input === "string" ? [input] : input;
+  return roles.some((role) => allowed.includes(role));
+}
+
 const WRITE_ROLES: PrCenterRole[] = ["PR_OPERATIONS", "SCOPED_ADMINISTRATOR"];
 
-export function canManageTasks(role: PrCenterRole): boolean {
-  return WRITE_ROLES.includes(role);
+export function canManageTasks(role: PrCenterRoleInput): boolean {
+  return includesAnyRole(role, WRITE_ROLES);
 }
 
 export function canTransitionTask(
-  role: PrCenterRole,
+  role: PrCenterRoleInput,
   from: PrTaskStatus,
   to: PrTaskStatus,
 ): boolean {
   // Scheduling and publishing must pass the guarded publication commands.
   if (to === "SCHEDULED" || to === "PUBLISHED") return false;
-  return WRITE_ROLES.includes(role) && TASK_TRANSITIONS[from].includes(to as never);
+  return canManageTasks(role) && TASK_TRANSITIONS[from].includes(to as never);
 }
 
-export function canApprove(role: PrCenterRole): boolean {
+export function canApprove(role: PrCenterRoleInput): boolean {
   // Approval authority is restricted to PR operations and scoped administrators.
-  return role === "PR_OPERATIONS" || role === "SCOPED_ADMINISTRATOR";
+  return includesAnyRole(role, ["PR_OPERATIONS", "SCOPED_ADMINISTRATOR"]);
 }
 
-export function canDecideRequestIntake(role: PrCenterRole): boolean {
-  return role === "PR_OPERATIONS";
+export function canDecideRequestIntake(role: PrCenterRoleInput): boolean {
+  return includesAnyRole(role, ["PR_OPERATIONS"]);
 }
 
-export function canReadAllRequests(role: PrCenterRole): boolean {
-  return role === "PR_OPERATIONS";
+export function canReadAllRequests(role: PrCenterRoleInput): boolean {
+  return includesAnyRole(role, ["PR_OPERATIONS"]);
 }
 
-export function canCreateRequest(role: PrCenterRole): boolean {
-  return role === "REQUESTER" || role === "SCOPED_ADMINISTRATOR";
+export function canCreateRequest(role: PrCenterRoleInput): boolean {
+  return includesAnyRole(role, ["REQUESTER", "SCOPED_ADMINISTRATOR"]);
 }
 
-export function canCreateIdea(role: PrCenterRole): boolean {
-  return (
-    role === "REQUESTER" || role === "PR_OPERATIONS" || role === "SCOPED_ADMINISTRATOR"
-  );
+export function canCreateIdea(role: PrCenterRoleInput): boolean {
+  return includesAnyRole(role, ["REQUESTER", "PR_OPERATIONS", "SCOPED_ADMINISTRATOR"]);
 }
 
-export function canReviewIdeas(role: PrCenterRole): boolean {
-  return role === "PR_OPERATIONS" || role === "SCOPED_ADMINISTRATOR";
+export function canReviewIdeas(role: PrCenterRoleInput): boolean {
+  return includesAnyRole(role, ["PR_OPERATIONS", "SCOPED_ADMINISTRATOR"]);
 }
 
-export function canAttachFiles(role: PrCenterRole): boolean {
+export function canAttachFiles(role: PrCenterRoleInput): boolean {
   // Requesters can attach to their own requests; PR_OPERATIONS and admins
   // can attach to any request/task in scope.
-  return role !== "EXECUTIVE_READ_ONLY";
+  return includesAnyRole(role, [
+    "REQUESTER",
+    "PR_OPERATIONS",
+    "APPROVER",
+    "SCOPED_ADMINISTRATOR",
+  ]);
 }
 
-export function canRemoveAttachment(role: PrCenterRole): boolean {
-  return role === "PR_OPERATIONS" || role === "SCOPED_ADMINISTRATOR";
+export function canRemoveAttachment(role: PrCenterRoleInput): boolean {
+  return includesAnyRole(role, ["PR_OPERATIONS", "SCOPED_ADMINISTRATOR"]);
 }
 
-export function canAssignFinalAsset(role: PrCenterRole): boolean {
-  return role === "PR_OPERATIONS" || role === "SCOPED_ADMINISTRATOR";
+export function canAssignFinalAsset(role: PrCenterRoleInput): boolean {
+  return includesAnyRole(role, ["PR_OPERATIONS", "SCOPED_ADMINISTRATOR"]);
 }
 
-export function canManageAccess(role: PrCenterRole): boolean {
-  return role === "SCOPED_ADMINISTRATOR";
+export function canManageAccess(role: PrCenterRoleInput): boolean {
+  return includesAnyRole(role, ["SCOPED_ADMINISTRATOR"]);
 }
 
-export function canManageQuarantine(role: PrCenterRole): boolean {
-  return role === "SCOPED_ADMINISTRATOR" || role === "PR_OPERATIONS";
+export function canManageQuarantine(role: PrCenterRoleInput): boolean {
+  return includesAnyRole(role, ["SCOPED_ADMINISTRATOR", "PR_OPERATIONS"]);
 }
 
-export function canExportAudit(role: PrCenterRole): boolean {
-  return role === "SCOPED_ADMINISTRATOR";
+export function canExportAudit(role: PrCenterRoleInput): boolean {
+  return includesAnyRole(role, ["SCOPED_ADMINISTRATOR"]);
 }
 
-export function canRestoreRequests(role: PrCenterRole): boolean {
-  return role === "SCOPED_ADMINISTRATOR";
+export function canRestoreRequests(role: PrCenterRoleInput): boolean {
+  return includesAnyRole(role, ["SCOPED_ADMINISTRATOR"]);
 }
 
 export function publicationGate(input: {

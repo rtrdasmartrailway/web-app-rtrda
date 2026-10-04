@@ -56,52 +56,144 @@ export type PrCenterActor = {
   id: string;
   organizationId: string;
   departmentId: string | null;
+  /** Display/legacy role only. Authorization must use every role grant below. */
   role: PrCenterRole;
-  /** Effective scope of the selected role grant; null means organization-wide. */
+  roleGrants?: PrCenterRoleGrant[];
+  /** Legacy single-grant scope for service tests and older internal callers. */
   scopeDepartmentId?: string | null;
 };
 
-function actorScopeDepartmentId(actor: PrCenterActor): string | null {
-  if (actor.scopeDepartmentId !== undefined) return actor.scopeDepartmentId;
-  return actor.role === "SCOPED_ADMINISTRATOR" ? null : actor.departmentId;
+export type PrCenterRoleGrant = {
+  role: PrCenterRole;
+  /** null is organization-wide; a string limits the grant to that department. */
+  departmentId: string | null;
+};
+
+function actorRoleGrants(actor: PrCenterActor): PrCenterRoleGrant[] {
+  if (actor.roleGrants?.length) return actor.roleGrants;
+  return [
+    {
+      role: actor.role,
+      departmentId:
+        actor.scopeDepartmentId !== undefined
+          ? actor.scopeDepartmentId
+          : actor.role === "SCOPED_ADMINISTRATOR"
+            ? null
+            : actor.departmentId,
+    },
+  ];
+}
+
+function actorRoles(actor: PrCenterActor): PrCenterRole[] {
+  return [...new Set(actorRoleGrants(actor).map((grant) => grant.role))];
+}
+
+function actorHasRole(actor: PrCenterActor, role: PrCenterRole): boolean {
+  return actorRoleGrants(actor).some((grant) => grant.role === role);
+}
+
+function actorHasOrganizationWideRole(
+  actor: PrCenterActor,
+  roles: readonly PrCenterRole[],
+): boolean {
+  return actorRoleGrants(actor).some(
+    (grant) => roles.includes(grant.role) && grant.departmentId === null,
+  );
+}
+
+function canManageDepartmentScope(
+  actor: PrCenterActor,
+  departmentId: string | null,
+): boolean {
+  const administratorGrants = actorRoleGrants(actor).filter(
+    (grant) => grant.role === "SCOPED_ADMINISTRATOR",
+  );
+  return administratorGrants.some(
+    (grant) =>
+      grant.departmentId === null ||
+      (departmentId !== null && grant.departmentId === departmentId),
+  );
+}
+
+function assertCanManageDepartmentScope(
+  actor: PrCenterActor,
+  departmentId: string | null,
+) {
+  if (!canManageDepartmentScope(actor, departmentId))
+    throw new PrCenterError(
+      "Requested department is outside your administrator scope",
+      403,
+      "FORBIDDEN",
+    );
+}
+
+function assertCanManageUserScope(
+  actor: PrCenterActor,
+  user: { departmentId: string | null },
+) {
+  assertCanManageDepartmentScope(actor, user.departmentId);
+}
+
+function roleDepartmentScopes(
+  actor: PrCenterActor,
+  roles: readonly PrCenterRole[],
+): { organizationWide: boolean; departmentIds: string[] } {
+  const grants = actorRoleGrants(actor).filter(
+    (grant) => roles.includes(grant.role) && grant.role !== "REQUESTER",
+  );
+  const organizationWide = grants.some((grant) => grant.departmentId === null);
+  const departmentIds = [
+    ...new Set(
+      grants.flatMap((grant) => (grant.departmentId ? [grant.departmentId] : [])),
+    ),
+  ];
+  return { organizationWide, departmentIds };
+}
+
+function roleDepartmentClauses(
+  actor: PrCenterActor,
+  roles: readonly PrCenterRole[],
+): Array<{ departmentId?: string }> {
+  const scopes = roleDepartmentScopes(actor, roles);
+  if (scopes.organizationWide) return [{}];
+  return scopes.departmentIds.map((departmentId) => ({ departmentId }));
+}
+
+function requestScopeWhere(actor: PrCenterActor): Prisma.PrRequestWhereInput {
+  const clauses: Prisma.PrRequestWhereInput[] = [];
+  if (actorHasRole(actor, "REQUESTER")) clauses.push({ requesterId: actor.id });
+  clauses.push(
+    ...roleDepartmentClauses(actor, [
+      "PR_OPERATIONS",
+      "APPROVER",
+      "SCOPED_ADMINISTRATOR",
+    ]),
+  );
+  return { organizationId: actor.organizationId, OR: clauses };
+}
+
+function requestReadWhere(actor: PrCenterActor): Prisma.PrRequestWhereInput {
+  const clauses: Prisma.PrRequestWhereInput[] = [{ requesterId: actor.id }];
+  clauses.push(...roleDepartmentClauses(actor, ["PR_OPERATIONS"]));
+  return { organizationId: actor.organizationId, OR: clauses };
 }
 
 function ideaScopeWhere(
   actor: PrCenterActor,
   ideaId: string,
 ): Prisma.PrContentIdeaWhereInput {
-  const departmentId = actorScopeDepartmentId(actor);
+  const reviewerScopes = roleDepartmentClauses(actor, [
+    "PR_OPERATIONS",
+    "SCOPED_ADMINISTRATOR",
+  ]);
+  const clauses: Prisma.PrContentIdeaWhereInput[] = canReviewIdeas(actorRoles(actor))
+    ? reviewerScopes.map((scope) => scope)
+    : [{ proposerId: actor.id }];
   return {
     id: ideaId,
     organizationId: actor.organizationId,
-    ...(departmentId ? { departmentId } : {}),
+    OR: clauses,
   };
-}
-
-function requestScopeWhere(actor: PrCenterActor): Prisma.PrRequestWhereInput {
-  const departmentId = actorScopeDepartmentId(actor);
-  return {
-    organizationId: actor.organizationId,
-    ...(actor.role === "REQUESTER" ? { requesterId: actor.id } : {}),
-    ...(departmentId ? { departmentId } : {}),
-  };
-}
-
-function requestReadWhere(actor: PrCenterActor): Prisma.PrRequestWhereInput {
-  if (canReadAllRequests(actor.role)) return requestScopeWhere(actor);
-  return { organizationId: actor.organizationId, requesterId: actor.id };
-}
-
-function requestMatchesActorScope(
-  actor: PrCenterActor,
-  request: { organizationId: string; departmentId: string; requesterId: string },
-): boolean {
-  const departmentId = actorScopeDepartmentId(actor);
-  return (
-    request.organizationId === actor.organizationId &&
-    (actor.role !== "REQUESTER" || request.requesterId === actor.id) &&
-    (!departmentId || request.departmentId === departmentId)
-  );
 }
 
 function taskScopeWhere(actor: PrCenterActor, taskId: string): Prisma.PrTaskWhereInput {
@@ -132,6 +224,8 @@ export async function sessionProfile(actor: PrCenterActor) {
     displayName: user.displayName,
     departmentName: user.department?.name || "",
     role: actor.role,
+    roles: actorRoles(actor),
+    roleGrants: actorRoleGrants(actor),
   };
 }
 
@@ -221,7 +315,7 @@ export async function createRequest(
   input: CreateRequestInput,
   correlationId: string = randomUUID(),
 ) {
-  if (!canCreateRequest(actor.role))
+  if (!canCreateRequest(actorRoles(actor)))
     throw new PrCenterError("You cannot create a request", 403, "FORBIDDEN");
   if (!actor.departmentId)
     throw new PrCenterError("An active department is required", 403, "SCOPE_REQUIRED");
@@ -353,7 +447,7 @@ export async function updateRequestDraft(
   correlationId: string = randomUUID(),
 ) {
   const request = await requestInScope(actor, requestId);
-  if (request.requesterId !== actor.id && actor.role !== "SCOPED_ADMINISTRATOR")
+  if (request.requesterId !== actor.id && !actorHasRole(actor, "SCOPED_ADMINISTRATOR"))
     throw new PrCenterError("You cannot amend this request", 403, "FORBIDDEN");
   if (request.status !== "DRAFT" && request.status !== "SUBMITTED")
     throw new PrCenterError(
@@ -432,7 +526,7 @@ export async function transitionRequest(
   correlationId: string = randomUUID(),
 ) {
   const request = await requestInScope(actor, requestId);
-  if (request.requesterId !== actor.id && actor.role !== "SCOPED_ADMINISTRATOR")
+  if (request.requesterId !== actor.id && !actorHasRole(actor, "SCOPED_ADMINISTRATOR"))
     throw new PrCenterError("You cannot update this request", 403, "FORBIDDEN");
   const allowed =
     (status === "SUBMITTED" && request.status === "DRAFT") ||
@@ -542,28 +636,28 @@ export async function listIdeas(
       "INVALID_IDEA_LIST_QUERY",
     );
   }
-  const departmentId = actorScopeDepartmentId(actor);
+  const ideaClauses: Prisma.PrContentIdeaWhereInput[] = [{ proposerId: actor.id }];
+  ideaClauses.push(
+    ...roleDepartmentClauses(actor, ["PR_OPERATIONS", "SCOPED_ADMINISTRATOR"]),
+  );
+  const searchClauses: Prisma.PrContentIdeaWhereInput[] = search
+    ? [
+        { title: { contains: search, mode: "insensitive" } },
+        { rationale: { contains: search, mode: "insensitive" } },
+        { audience: { contains: search, mode: "insensitive" } },
+        { pillar: { contains: search, mode: "insensitive" } },
+        { channel: { contains: search, mode: "insensitive" } },
+        { priority: { contains: search, mode: "insensitive" } },
+        { campaign: { contains: search, mode: "insensitive" } },
+      ]
+    : [];
   const where: Prisma.PrContentIdeaWhereInput = {
-    ...(canReviewIdeas(actor.role)
-      ? {
-          organizationId: actor.organizationId,
-          ...(departmentId ? { departmentId } : {}),
-        }
-      : { organizationId: actor.organizationId, proposerId: actor.id }),
+    organizationId: actor.organizationId,
+    AND: [
+      { OR: ideaClauses },
+      ...(searchClauses.length > 0 ? [{ OR: searchClauses }] : []),
+    ],
     ...(status ? { status: status as (typeof allowedStatuses)[number] } : {}),
-    ...(search
-      ? {
-          OR: [
-            { title: { contains: search, mode: "insensitive" as const } },
-            { rationale: { contains: search, mode: "insensitive" as const } },
-            { audience: { contains: search, mode: "insensitive" as const } },
-            { pillar: { contains: search, mode: "insensitive" as const } },
-            { channel: { contains: search, mode: "insensitive" as const } },
-            { priority: { contains: search, mode: "insensitive" as const } },
-            { campaign: { contains: search, mode: "insensitive" as const } },
-          ],
-        }
-      : {}),
   };
   const rows = await prisma.prContentIdea.findMany({
     where,
@@ -600,7 +694,7 @@ export async function createIdea(
   input: unknown,
   correlationId: string = randomUUID(),
 ) {
-  if (!canCreateIdea(actor.role) || !actor.departmentId)
+  if (!canCreateIdea(actorRoles(actor)) || !actor.departmentId)
     throw new PrCenterError("You cannot create an idea", 403, "FORBIDDEN");
   let ideaInput;
   try {
@@ -653,7 +747,7 @@ export async function transitionIdea(
   reason: string | undefined,
   correlationId: string = randomUUID(),
 ) {
-  if (!canReviewIdeas(actor.role))
+  if (!canReviewIdeas(actorRoles(actor)))
     throw new PrCenterError("You cannot review an idea", 403, "FORBIDDEN");
   const ideaScope = ideaScopeWhere(actor, ideaId);
   const idea = await prisma.prContentIdea.findFirst({ where: ideaScope });
@@ -719,7 +813,7 @@ export async function convertIdea(
   fromVersion: number,
   correlationId: string = randomUUID(),
 ) {
-  if (!canReviewIdeas(actor.role))
+  if (!canReviewIdeas(actorRoles(actor)))
     throw new PrCenterError("You cannot convert an idea", 403, "FORBIDDEN");
   const ideaScope = ideaScopeWhere(actor, ideaId);
   const idea = await prisma.prContentIdea.findFirst({ where: ideaScope });
@@ -796,7 +890,7 @@ export async function convertIdea(
 }
 
 function assertCanReadMessageHouse(actor: PrCenterActor) {
-  if (actor.role !== "PR_OPERATIONS" && actor.role !== "SCOPED_ADMINISTRATOR")
+  if (!canManageTasks(actorRoles(actor)))
     throw new PrCenterError("You cannot view Message House", 403, "FORBIDDEN");
 }
 
@@ -847,7 +941,7 @@ export async function updateTaskAssignment(
   input: { ownerId: string | null; dueAt: Date | null },
   correlationId: string = randomUUID(),
 ) {
-  if (!canManageTasks(actor.role))
+  if (!canManageTasks(actorRoles(actor)))
     throw new PrCenterError("You cannot assign a task", 403, "FORBIDDEN");
   const task = await prisma.prTask.findFirst({
     where: taskScopeWhere(actor, taskId),
@@ -871,13 +965,18 @@ export async function updateTaskAssignment(
       "STALE_UPDATE",
     );
   if (input.ownerId) {
-    const ownerDepartmentId = actorScopeDepartmentId(actor);
+    const ownerScope = roleDepartmentScopes(actor, [
+      "PR_OPERATIONS",
+      "SCOPED_ADMINISTRATOR",
+    ]);
     const owner = await prisma.prCenterUser.findFirst({
       where: {
         id: input.ownerId,
         organizationId: actor.organizationId,
         active: true,
-        ...(ownerDepartmentId ? { departmentId: ownerDepartmentId } : {}),
+        ...(!ownerScope.organizationWide
+          ? { departmentId: { in: ownerScope.departmentIds } }
+          : {}),
       },
     });
     if (!owner)
@@ -947,7 +1046,10 @@ export async function addTaskComment(
     where: taskScopeWhere(actor, taskId),
     include: { request: true },
   });
-  if (!task || (!canReadAllRequests(actor.role) && task.request.requesterId !== actor.id))
+  if (
+    !task ||
+    (!canReadAllRequests(actorRoles(actor)) && task.request.requesterId !== actor.id)
+  )
     throw new PrCenterError("Task not found", 404, "NOT_FOUND");
   const text = body.trim();
   if (text.length < 1 || text.length > 5000)
@@ -979,7 +1081,10 @@ export async function taskHistory(actor: PrCenterActor, taskId: string) {
     where: taskScopeWhere(actor, taskId),
     include: { request: true },
   });
-  if (!task || (!canReadAllRequests(actor.role) && task.request.requesterId !== actor.id))
+  if (
+    !task ||
+    (!canReadAllRequests(actorRoles(actor)) && task.request.requesterId !== actor.id)
+  )
     throw new PrCenterError("Task not found", 404, "NOT_FOUND");
   const [comments, statuses, audit] = await Promise.all([
     prisma.prComment.findMany({
@@ -1037,7 +1142,7 @@ export async function markNotificationsRead(
 export async function listAuditEvents(actor: PrCenterActor, take = 100) {
   const limit = Math.min(Math.max(take, 1), 100);
   return prisma.prAuditEvent.findMany({
-    where: canReadAllRequests(actor.role)
+    where: canReadAllRequests(actorRoles(actor))
       ? { organizationId: actor.organizationId }
       : { organizationId: actor.organizationId, actorId: actor.id },
     include: { actor: { select: { displayName: true } } },
@@ -1075,7 +1180,7 @@ export async function transitionTask(
       409,
       "STALE_UPDATE",
     );
-  if (!canTransitionTask(actor.role, task.status as WorkflowStatus, to)) {
+  if (!canTransitionTask(actorRoles(actor), task.status as WorkflowStatus, to)) {
     await prisma.prAuditEvent.create({
       data: {
         organizationId: actor.organizationId,
@@ -1174,7 +1279,7 @@ function isApprovalStageStatus(status: string): boolean {
 }
 
 export function assertApprovalAuthority(actor: PrCenterActor) {
-  if (!canApprove(actor.role))
+  if (!canApprove(actorRoles(actor)))
     throw new PrCenterError("You cannot record an approval decision", 403, "FORBIDDEN");
 }
 
@@ -1185,7 +1290,7 @@ export async function createTaskRevision(
   input: { body?: string; keyMessage?: string; changeSummary?: string },
   correlationId: string = randomUUID(),
 ) {
-  if (!canManageTasks(actor.role))
+  if (!canManageTasks(actorRoles(actor)))
     throw new PrCenterError("You cannot revise this task", 403, "FORBIDDEN");
   const task = await prisma.prTask.findFirst({
     where: taskScopeWhere(actor, taskId),
@@ -1249,7 +1354,7 @@ export async function createTaskRevision(
 }
 
 export async function listApprovalQueue(actor: PrCenterActor) {
-  if (!canApprove(actor.role))
+  if (!canApprove(actorRoles(actor)))
     throw new PrCenterError("You cannot view the approval queue", 403, "FORBIDDEN");
   return prisma.prTask.findMany({
     where: {
@@ -1272,7 +1377,7 @@ export async function listApprovalQueue(actor: PrCenterActor) {
 }
 
 export async function listRequestApprovalQueue(actor: PrCenterActor) {
-  if (!canDecideRequestIntake(actor.role))
+  if (!canDecideRequestIntake(actorRoles(actor)))
     throw new PrCenterError(
       "You cannot view the request approval queue",
       403,
@@ -1301,7 +1406,7 @@ export async function recordRequestDecision(
   input: { decision: "APPROVED" | "REJECTED"; reason?: string },
   correlationId: string = randomUUID(),
 ) {
-  if (!canDecideRequestIntake(actor.role))
+  if (!canDecideRequestIntake(actorRoles(actor)))
     throw new PrCenterError("You cannot decide this request", 403, "FORBIDDEN");
   const request = await prisma.prRequest.findFirst({
     where: { id: requestId, ...requestScopeWhere(actor) },
@@ -1497,8 +1602,7 @@ export async function recordApprovalDecision(
   if (
     !hasApprovalAuthority({
       stage,
-      role: actor.role,
-      actorDepartmentId: actorScopeDepartmentId(actor),
+      roleGrants: actorRoleGrants(actor),
       taskDepartmentId: task.request.departmentId,
     })
   )
@@ -1573,8 +1677,10 @@ export async function recordApprovalDecision(
         approvalPolicyVersion: policy.version,
         approvalReference: policy.approvalReference,
         stage: stage.status,
-        authorityRole: actor.role,
-        authorityDepartmentId: actorScopeDepartmentId(actor),
+        authorityRoles: actorRoleGrants(actor).map((grant) => ({
+          role: grant.role,
+          departmentId: grant.departmentId,
+        })),
       },
       eventType: "pr.approval.recorded",
       correlationId,
@@ -1584,14 +1690,18 @@ export async function recordApprovalDecision(
 }
 
 export async function listAssignableUsers(actor: PrCenterActor) {
-  if (!canManageTasks(actor.role))
+  if (!canManageTasks(actorRoles(actor)))
     throw new PrCenterError("You cannot view assignable users", 403, "FORBIDDEN");
+  const ownerScope = roleDepartmentScopes(actor, [
+    "PR_OPERATIONS",
+    "SCOPED_ADMINISTRATOR",
+  ]);
   return prisma.prCenterUser.findMany({
     where: {
       organizationId: actor.organizationId,
       active: true,
-      ...(actorScopeDepartmentId(actor)
-        ? { departmentId: actorScopeDepartmentId(actor)! }
+      ...(!ownerScope.organizationWide
+        ? { departmentId: { in: ownerScope.departmentIds } }
         : {}),
     },
     select: {
@@ -1687,7 +1797,7 @@ export async function listCalendarEntries(actor: PrCenterActor, from: Date, to: 
 }
 
 export async function listTaskSchedules(actor: PrCenterActor, taskId: string) {
-  if (!canManageTasks(actor.role))
+  if (!canManageTasks(actorRoles(actor)))
     throw new PrCenterError("You cannot view task schedules", 403, "FORBIDDEN");
   const task = await prisma.prTask.findFirst({
     where: taskScopeWhere(actor, taskId),
@@ -1707,7 +1817,7 @@ export async function scheduleTask(
   input: { channel: string; scheduledFor: Date; idempotencyKey: string },
   correlationId: string = randomUUID(),
 ) {
-  if (!canManageTasks(actor.role))
+  if (!canManageTasks(actorRoles(actor)))
     throw new PrCenterError("You cannot schedule this task", 403, "FORBIDDEN");
   const channel = input.channel.trim();
   const idempotencyKey = input.idempotencyKey.trim();
@@ -1850,7 +1960,7 @@ export async function recordPublishingEvidence(
   input: { publishedUrl: string; publishedReference: string; channel?: string },
   correlationId: string = randomUUID(),
 ) {
-  if (!canManageTasks(actor.role))
+  if (!canManageTasks(actorRoles(actor)))
     throw new PrCenterError("You cannot publish this task", 403, "FORBIDDEN");
   const publishedUrl = assertUrl(input.publishedUrl.trim());
   const publishedReference = input.publishedReference.trim();
@@ -1978,7 +2088,7 @@ export async function uploadFile(
   },
   correlationId: string = randomUUID(),
 ) {
-  if (!canAttachFiles(actor.role))
+  if (!canAttachFiles(actorRoles(actor)))
     throw new PrCenterError("You cannot upload files", 403, "FORBIDDEN");
   let stored: StoredFile;
   try {
@@ -2076,7 +2186,7 @@ export async function downloadFile(
     attachment.request?.requesterId ?? attachment.task?.request.requesterId;
   if (orgId !== actor.organizationId)
     throw new PrCenterError("File not found", 404, "NOT_FOUND");
-  if (!canReadAllRequests(actor.role) && requesterId !== actor.id)
+  if (!canReadAllRequests(actorRoles(actor)) && requesterId !== actor.id)
     throw new PrCenterError("You cannot access this file", 403, "FORBIDDEN");
   const buffer = await readFileFromStorage(actor.organizationId, fileObject.storageKey);
   return { buffer, fileName: fileObject.fileName, mimeType: fileObject.mimeType };
@@ -2092,7 +2202,7 @@ export async function createAttachment(
   },
   correlationId: string = randomUUID(),
 ) {
-  if (!canAttachFiles(actor.role))
+  if (!canAttachFiles(actorRoles(actor)))
     throw new PrCenterError("You cannot attach files", 403, "FORBIDDEN");
   if (!input.requestId && !input.taskId)
     throw new PrCenterError(
@@ -2217,7 +2327,7 @@ export async function removeAttachment(
   attachmentId: string,
   correlationId: string = randomUUID(),
 ) {
-  if (!canRemoveAttachment(actor.role))
+  if (!canRemoveAttachment(actorRoles(actor)))
     throw new PrCenterError("You cannot remove attachments", 403, "FORBIDDEN");
   const attachment = await prisma.prAttachment.findFirst({
     where: { id: attachmentId },
@@ -2276,7 +2386,7 @@ export async function assignFinalAsset(
   input: { fileId: string; revisionNumber?: number },
   correlationId: string = randomUUID(),
 ) {
-  if (!canAssignFinalAsset(actor.role))
+  if (!canAssignFinalAsset(actorRoles(actor)))
     throw new PrCenterError("You cannot assign final assets", 403, "FORBIDDEN");
   const task = await prisma.prTask.findFirst({
     where: taskScopeWhere(actor, taskIdArg),
@@ -2346,7 +2456,7 @@ export async function evaluateNotificationReminders(
 ): Promise<
   PolicyEvaluationResult & { channelResults: Array<{ channel: string; status: string }> }
 > {
-  if (actor.role !== "SCOPED_ADMINISTRATOR")
+  if (!actorHasOrganizationWideRole(actor, ["SCOPED_ADMINISTRATOR"]))
     throw new PrCenterError(
       "Only administrators can trigger reminder evaluation",
       403,
@@ -2381,13 +2491,24 @@ export async function evaluateNotificationReminders(
 // ── Access Administration (SCOPED_ADMINISTRATOR only) ────────────────────
 
 export async function listAdminUsers(actor: PrCenterActor) {
-  if (!canManageAccess(actor.role))
+  if (!canManageAccess(actorRoles(actor)))
     throw new PrCenterError("You cannot view user directory", 403, "FORBIDDEN");
+  const adminScope = roleDepartmentScopes(actor, ["SCOPED_ADMINISTRATOR"]);
   return prisma.prCenterUser.findMany({
-    where: { organizationId: actor.organizationId },
+    where: {
+      organizationId: actor.organizationId,
+      ...(!adminScope.organizationWide
+        ? { departmentId: { in: adminScope.departmentIds } }
+        : {}),
+    },
     include: {
       department: { select: { id: true, name: true } },
-      roles: { select: { id: true, role: true, departmentId: true } },
+      roles: {
+        ...(!adminScope.organizationWide
+          ? { where: { departmentId: { in: adminScope.departmentIds } } }
+          : {}),
+        select: { id: true, role: true, departmentId: true },
+      },
     },
     orderBy: { displayName: "asc" },
   });
@@ -2400,14 +2521,16 @@ export async function grantRole(
   departmentId: string | null,
   correlationId: string = randomUUID(),
 ) {
-  if (!canManageAccess(actor.role))
+  if (!canManageAccess(actorRoles(actor)))
     throw new PrCenterError("You cannot grant roles", 403, "FORBIDDEN");
   if (!PR_CENTER_ROLES.includes(role))
     throw new PrCenterError("Invalid role code", 422, "INVALID_ROLE");
+  assertCanManageDepartmentScope(actor, departmentId ?? null);
   const user = await prisma.prCenterUser.findFirst({
     where: { id: userId, organizationId: actor.organizationId },
   });
   if (!user) throw new PrCenterError("User not found", 404, "NOT_FOUND");
+  assertCanManageUserScope(actor, user);
   if (departmentId) {
     const dept = await prisma.prDepartment.findFirst({
       where: { id: departmentId, organizationId: actor.organizationId },
@@ -2446,7 +2569,12 @@ export async function grantRole(
         entityType: "user",
         entityId: userId,
         correlationId,
-        after: { roleId: granted.id, role, departmentId: departmentId ?? null },
+        after: {
+          roleId: granted.id,
+          role,
+          departmentId: departmentId ?? null,
+          authorityRoles: actorRoleGrants(actor),
+        },
       },
     });
     return granted;
@@ -2458,13 +2586,15 @@ export async function revokeRole(
   roleId: string,
   correlationId: string = randomUUID(),
 ) {
-  if (!canManageAccess(actor.role))
+  if (!canManageAccess(actorRoles(actor)))
     throw new PrCenterError("You cannot revoke roles", 403, "FORBIDDEN");
   const roleRecord = await prisma.prUserRole.findFirst({
     where: { id: roleId, organizationId: actor.organizationId },
-    include: { user: { select: { id: true, displayName: true } } },
+    include: { user: { select: { id: true, displayName: true, departmentId: true } } },
   });
   if (!roleRecord) throw new PrCenterError("Role assignment not found", 404, "NOT_FOUND");
+  assertCanManageDepartmentScope(actor, roleRecord.departmentId);
+  assertCanManageUserScope(actor, roleRecord.user);
   return prisma.$transaction(async (tx) => {
     await tx.prUserRole.delete({ where: { id: roleId } });
     await tx.prAuditEvent.create({
@@ -2475,7 +2605,12 @@ export async function revokeRole(
         entityType: "user",
         entityId: roleRecord.userId,
         correlationId,
-        before: { roleId, role: roleRecord.role, departmentId: roleRecord.departmentId },
+        before: {
+          roleId,
+          role: roleRecord.role,
+          departmentId: roleRecord.departmentId,
+          authorityRoles: actorRoleGrants(actor),
+        },
       },
     });
     return { id: roleId, removed: true };
@@ -2487,12 +2622,13 @@ export async function toggleUserActive(
   userId: string,
   correlationId: string = randomUUID(),
 ) {
-  if (!canManageAccess(actor.role))
+  if (!canManageAccess(actorRoles(actor)))
     throw new PrCenterError("You cannot modify user status", 403, "FORBIDDEN");
   const user = await prisma.prCenterUser.findFirst({
     where: { id: userId, organizationId: actor.organizationId },
   });
   if (!user) throw new PrCenterError("User not found", 404, "NOT_FOUND");
+  assertCanManageUserScope(actor, user);
   if (user.id === actor.id)
     throw new PrCenterError(
       "You cannot deactivate yourself",
@@ -2513,8 +2649,8 @@ export async function toggleUserActive(
         entityType: "user",
         entityId: userId,
         correlationId,
-        before: { active: user.active },
-        after: { active: nextActive },
+        before: { active: user.active, authorityRoles: actorRoleGrants(actor) },
+        after: { active: nextActive, authorityRoles: actorRoleGrants(actor) },
       },
     });
     return { id: userId, active: updated.active };
@@ -2522,12 +2658,14 @@ export async function toggleUserActive(
 }
 
 export async function listAccessAuditEvents(actor: PrCenterActor, take = 100) {
-  if (!canManageAccess(actor.role))
+  if (!canManageAccess(actorRoles(actor)))
     throw new PrCenterError("You cannot view access audit events", 403, "FORBIDDEN");
   const limit = Math.min(Math.max(take, 1), 500);
+  const organizationWide = actorHasOrganizationWideRole(actor, ["SCOPED_ADMINISTRATOR"]);
   return prisma.prAuditEvent.findMany({
     where: {
       organizationId: actor.organizationId,
+      ...(!organizationWide ? { actorId: actor.id } : {}),
       action: {
         in: [
           "access.role_granted",
@@ -2547,7 +2685,7 @@ export async function listAccessAuditEvents(actor: PrCenterActor, take = 100) {
 // ── Quarantine management (SCOPED_ADMINISTRATOR + PR_OPERATIONS) ───────────
 
 export async function listQuarantinedFiles(actor: PrCenterActor, take = 50) {
-  if (!canManageQuarantine(actor.role))
+  if (!canManageQuarantine(actorRoles(actor)))
     throw new PrCenterError("You cannot review quarantined files", 403, "FORBIDDEN");
   const limit = Math.min(Math.max(take, 1), 100);
   return prisma.prFileObject.findMany({
@@ -2579,7 +2717,7 @@ export async function reviewQuarantinedFile(
   reason: string | undefined,
   correlationId: string = randomUUID(),
 ) {
-  if (!canManageQuarantine(actor.role))
+  if (!canManageQuarantine(actorRoles(actor)))
     throw new PrCenterError("You cannot review quarantined files", 403, "FORBIDDEN");
   const fileObject = await prisma.prFileObject.findFirst({
     where: {
@@ -2630,7 +2768,7 @@ export async function rescanFile(
   fileId: string,
   correlationId: string = randomUUID(),
 ) {
-  if (!canManageQuarantine(actor.role))
+  if (!canManageQuarantine(actorRoles(actor)))
     throw new PrCenterError("You cannot rescan files", 403, "FORBIDDEN");
   const fileObject = await prisma.prFileObject.findFirst({
     where: {
@@ -2679,7 +2817,7 @@ export async function exportAuditEvents(
     actorId?: string;
   },
 ) {
-  if (!canExportAudit(actor.role))
+  if (!canExportAudit(actorRoles(actor)))
     throw new PrCenterError("You cannot export audit events", 403, "FORBIDDEN");
   const where: Prisma.PrAuditEventWhereInput = {
     organizationId: actor.organizationId,
@@ -2730,7 +2868,7 @@ export async function restoreRequest(
   reason: string | undefined,
   correlationId: string = randomUUID(),
 ) {
-  if (!canRestoreRequests(actor.role))
+  if (!canRestoreRequests(actorRoles(actor)))
     throw new PrCenterError("You cannot restore requests", 403, "FORBIDDEN");
   const request = await prisma.prRequest.findFirst({
     where: { id: requestId, organizationId: actor.organizationId },
@@ -2789,7 +2927,7 @@ export async function restoreRequest(
 // ── UAT / release readiness check ────────────────────────────────────
 
 export async function releaseReadinessCheck(actor: PrCenterActor) {
-  if (!canExportAudit(actor.role))
+  if (!canExportAudit(actorRoles(actor)))
     throw new PrCenterError("You cannot view release readiness", 403, "FORBIDDEN");
   const org = { organizationId: actor.organizationId };
   const checks: { name: string; passed: boolean; detail: string }[] = [];

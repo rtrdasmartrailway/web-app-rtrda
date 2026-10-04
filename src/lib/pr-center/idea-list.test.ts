@@ -53,16 +53,20 @@ describe("listIdeas pagination and scope", () => {
     expect(mocks.findMany).toHaveBeenCalledWith({
       where: {
         organizationId: "org-1",
-        departmentId: "dept-1",
         status: "PROPOSED",
-        OR: [
-          { title: { contains: "launch", mode: "insensitive" } },
-          { rationale: { contains: "launch", mode: "insensitive" } },
-          { audience: { contains: "launch", mode: "insensitive" } },
-          { pillar: { contains: "launch", mode: "insensitive" } },
-          { channel: { contains: "launch", mode: "insensitive" } },
-          { priority: { contains: "launch", mode: "insensitive" } },
-          { campaign: { contains: "launch", mode: "insensitive" } },
+        AND: [
+          { OR: [{ proposerId: "user-1" }, { departmentId: "dept-1" }] },
+          {
+            OR: [
+              { title: { contains: "launch", mode: "insensitive" } },
+              { rationale: { contains: "launch", mode: "insensitive" } },
+              { audience: { contains: "launch", mode: "insensitive" } },
+              { pillar: { contains: "launch", mode: "insensitive" } },
+              { channel: { contains: "launch", mode: "insensitive" } },
+              { priority: { contains: "launch", mode: "insensitive" } },
+              { campaign: { contains: "launch", mode: "insensitive" } },
+            ],
+          },
         ],
       },
       orderBy: [{ createdAt: "desc" }, { id: "desc" }],
@@ -104,7 +108,7 @@ describe("listIdeas pagination and scope", () => {
       expect.objectContaining({
         where: expect.objectContaining({
           organizationId: "org-1",
-          departmentId: "dept-1",
+          AND: [{ OR: [{ proposerId: "user-1" }, { departmentId: "dept-1" }] }],
           status: "REJECTED",
         }),
         select: expect.objectContaining({ decisionReason: true }),
@@ -117,7 +121,7 @@ describe("listIdeas pagination and scope", () => {
 
     expect(mocks.findMany.mock.calls[0][0].where).toEqual({
       organizationId: "org-1",
-      proposerId: "user-1",
+      AND: [{ OR: [{ proposerId: "user-1" }] }],
     });
   });
 
@@ -141,7 +145,7 @@ describe("listIdeas pagination and scope", () => {
     });
     expect(mocks.findMany.mock.calls[0][0].where).toEqual({
       organizationId: "org-1",
-      proposerId: "user-1",
+      AND: [{ OR: [{ proposerId: "user-1" }] }],
     });
   });
 
@@ -156,7 +160,7 @@ describe("listIdeas pagination and scope", () => {
 
     expect(mocks.findMany.mock.calls[0][0].where).toEqual({
       organizationId: "org-1",
-      departmentId: "dept-review",
+      AND: [{ OR: [{ proposerId: "admin-1" }, { departmentId: "dept-review" }] }],
     });
   });
 
