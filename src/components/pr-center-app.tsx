@@ -4467,6 +4467,19 @@ function Directory({
     actor.roleGrants?.some(
       (grant) => grant.role === "SCOPED_ADMINISTRATOR" && grant.departmentId === null,
     ) ?? false;
+  const activeOrganizationAdmins = users.filter(
+    (user) =>
+      user.active &&
+      user.roles.some(
+        (grant) => grant.role === "SCOPED_ADMINISTRATOR" && grant.departmentId === null,
+      ),
+  ).length;
+  const isLastOrganizationAdmin = (user: (typeof users)[number]) =>
+    user.active &&
+    activeOrganizationAdmins <= 1 &&
+    user.roles.some(
+      (grant) => grant.role === "SCOPED_ADMINISTRATOR" && grant.departmentId === null,
+    );
   const [notice, setNotice] = useState<string | null>(null);
 
   const reload = () => {
@@ -4525,7 +4538,8 @@ function Directory({
       credentials: "same-origin",
     });
     if (!res.ok) {
-      setError("Revoke failed");
+      const err = await res.json().catch(() => null);
+      setError(err?.message || "Revoke failed");
       return;
     }
     setNotice("Role revoked");
@@ -4573,7 +4587,12 @@ function Directory({
               <div style={{ display: "flex", gap: 8 }}>
                 <button
                   onClick={() => handleToggleActive(user.id)}
-                  disabled={user.id === actor.userId}
+                  disabled={user.id === actor.userId || isLastOrganizationAdmin(user)}
+                  title={
+                    isLastOrganizationAdmin(user)
+                      ? "At least one active organization-wide administrator must remain"
+                      : undefined
+                  }
                   style={{ fontSize: 12, color: user.active ? "#dc2626" : "#16a34a" }}
                 >
                   {user.active ? "Deactivate" : "Activate"}
@@ -4587,6 +4606,12 @@ function Directory({
                         isOrganizationAdmin ? "" : (user.department?.id ?? ""),
                       );
                   }}
+                  disabled={user.id === actor.userId}
+                  title={
+                    user.id === actor.userId
+                      ? "You cannot grant roles to your own account"
+                      : undefined
+                  }
                   style={{ fontSize: 12 }}
                 >
                   + Grant role
@@ -4618,6 +4643,20 @@ function Directory({
                   {r.role} · {r.departmentId ? `dept ${r.departmentId}` : "org-wide"}
                   <button
                     onClick={() => handleRevoke(r.id)}
+                    disabled={
+                      user.active &&
+                      r.role === "SCOPED_ADMINISTRATOR" &&
+                      r.departmentId === null &&
+                      activeOrganizationAdmins <= 1
+                    }
+                    title={
+                      user.active &&
+                      r.role === "SCOPED_ADMINISTRATOR" &&
+                      r.departmentId === null &&
+                      activeOrganizationAdmins <= 1
+                        ? "At least one active organization-wide administrator must remain"
+                        : undefined
+                    }
                     style={{
                       fontSize: 11,
                       color: "#dc2626",

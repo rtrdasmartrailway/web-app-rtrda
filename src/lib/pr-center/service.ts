@@ -1,10 +1,10 @@
 import { randomUUID } from "node:crypto";
-import type {
+import {
   Prisma,
-  PrContentIdeaStatus,
-  PrApprovalDecision,
-  PrRequestStatus,
-  PrTaskStatus,
+  type PrContentIdeaStatus,
+  type PrApprovalDecision,
+  type PrRequestStatus,
+  type PrTaskStatus,
 } from "@/generated/prisma/client";
 import { prisma } from "@/lib/db/client";
 import {
@@ -2526,6 +2526,52 @@ export async function evaluateNotificationReminders(
 
 // ── Access Administration (SCOPED_ADMINISTRATOR only) ────────────────────
 
+async function assertActiveOrganizationAdministratorRemains(
+  tx: Prisma.TransactionClient,
+  organizationId: string,
+  excluded: { roleId?: string; userId?: string },
+) {
+  const remaining = await tx.prUserRole.count({
+    where: {
+      organizationId,
+      role: "SCOPED_ADMINISTRATOR",
+      departmentId: null,
+      user: { active: true },
+      ...(excluded.roleId ? { id: { not: excluded.roleId } } : {}),
+      ...(excluded.userId ? { userId: { not: excluded.userId } } : {}),
+    },
+  });
+  if (remaining === 0)
+    throw new PrCenterError(
+      "At least one active organization-wide administrator must remain",
+      422,
+      "LAST_ORGANIZATION_ADMIN",
+    );
+}
+
+async function runSerializableAccessTransaction<T>(
+  work: (tx: Prisma.TransactionClient) => Promise<T>,
+): Promise<T> {
+  try {
+    return await prisma.$transaction(work, {
+      isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
+    });
+  } catch (error) {
+    if (
+      typeof error === "object" &&
+      error !== null &&
+      "code" in error &&
+      error.code === "P2034"
+    )
+      throw new PrCenterError(
+        "Access changed concurrently. Refresh and try again.",
+        409,
+        "STALE_ACCESS_ADMIN_WRITE",
+      );
+    throw error;
+  }
+}
+
 export async function listAdminUsers(actor: PrCenterActor) {
   if (!canManageAccess(actorRoles(actor)))
     throw new PrCenterError("You cannot view user directory", 403, "FORBIDDEN");
@@ -2561,6 +2607,12 @@ export async function grantRole(
     throw new PrCenterError("You cannot grant roles", 403, "FORBIDDEN");
   if (!PR_CENTER_ROLES.includes(role))
     throw new PrCenterError("Invalid role code", 422, "INVALID_ROLE");
+  if (userId === actor.id)
+    throw new PrCenterError(
+      "You cannot grant roles to your own account",
+      422,
+      "SELF_GRANT_BLOCKED",
+    );
   assertCanManageDepartmentScope(actor, departmentId ?? null);
   const user = await prisma.prCenterUser.findFirst({
     where: { id: userId, organizationId: actor.organizationId },
@@ -2626,12 +2678,22 @@ export async function revokeRole(
     throw new PrCenterError("You cannot revoke roles", 403, "FORBIDDEN");
   const roleRecord = await prisma.prUserRole.findFirst({
     where: { id: roleId, organizationId: actor.organizationId },
-    include: { user: { select: { id: true, displayName: true, departmentId: true } } },
+    include: {
+      user: { select: { id: true, displayName: true, departmentId: true, active: true } },
+    },
   });
   if (!roleRecord) throw new PrCenterError("Role assignment not found", 404, "NOT_FOUND");
   assertCanManageDepartmentScope(actor, roleRecord.departmentId);
   assertCanManageUserScope(actor, roleRecord.user);
-  return prisma.$transaction(async (tx) => {
+  return runSerializableAccessTransaction(async (tx) => {
+    if (
+      roleRecord.role === "SCOPED_ADMINISTRATOR" &&
+      roleRecord.departmentId === null &&
+      roleRecord.user.active
+    )
+      await assertActiveOrganizationAdministratorRemains(tx, actor.organizationId, {
+        roleId,
+      });
     await tx.prUserRole.delete({ where: { id: roleId } });
     await tx.prAuditEvent.create({
       data: {
@@ -2672,7 +2734,22 @@ export async function toggleUserActive(
       "SELF_DEACTIVATION_BLOCKED",
     );
   const nextActive = !user.active;
-  return prisma.$transaction(async (tx) => {
+  return runSerializableAccessTransaction(async (tx) => {
+    if (!nextActive) {
+      const orgAdminGrant = await tx.prUserRole.findFirst({
+        where: {
+          userId,
+          organizationId: actor.organizationId,
+          role: "SCOPED_ADMINISTRATOR",
+          departmentId: null,
+        },
+        select: { id: true },
+      });
+      if (orgAdminGrant)
+        await assertActiveOrganizationAdministratorRemains(tx, actor.organizationId, {
+          userId,
+        });
+    }
     const updated = await tx.prCenterUser.update({
       where: { id: userId },
       data: { active: nextActive },
