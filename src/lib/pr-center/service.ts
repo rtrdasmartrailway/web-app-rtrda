@@ -21,7 +21,6 @@ import {
   canAssignFinalAsset,
   canManageAccess,
   canManageQuarantine,
-  canExportAudit,
   canRestoreRequests,
   publicationGate,
   type PrCenterRole,
@@ -176,6 +175,39 @@ function requestReadWhere(actor: PrCenterActor): Prisma.PrRequestWhereInput {
   const clauses: Prisma.PrRequestWhereInput[] = [{ requesterId: actor.id }];
   clauses.push(...roleDepartmentClauses(actor, ["PR_OPERATIONS"]));
   return { organizationId: actor.organizationId, OR: clauses };
+}
+
+function canReadRequestRecord(
+  actor: PrCenterActor,
+  request: { organizationId: string; departmentId: string; requesterId: string },
+): boolean {
+  if (request.organizationId !== actor.organizationId) return false;
+  if (request.requesterId === actor.id) return true;
+  const scope = roleDepartmentScopes(actor, ["PR_OPERATIONS"]);
+  return scope.organizationWide || scope.departmentIds.includes(request.departmentId);
+}
+
+function quarantinedFileScope(actor: PrCenterActor): {
+  fileWhere: Prisma.PrFileObjectWhereInput;
+  attachmentWhere?: Prisma.PrAttachmentWhereInput;
+} {
+  const scope = roleDepartmentScopes(actor, ["PR_OPERATIONS", "SCOPED_ADMINISTRATOR"]);
+  if (scope.organizationWide) return { fileWhere: {} };
+  if (scope.departmentIds.length === 0) return { fileWhere: { id: "__out_of_scope__" } };
+  const requestScope: Prisma.PrRequestWhereInput = {
+    organizationId: actor.organizationId,
+    departmentId: { in: scope.departmentIds },
+  };
+  const attachmentWhere: Prisma.PrAttachmentWhereInput = {
+    OR: [
+      { request: { is: requestScope } },
+      { task: { is: { request: { is: requestScope } } } },
+    ],
+  };
+  return {
+    fileWhere: { attachments: { some: attachmentWhere, every: attachmentWhere } },
+    attachmentWhere,
+  };
 }
 
 function ideaScopeWhere(
@@ -2169,24 +2201,28 @@ export async function downloadFile(
   const attachment = await prisma.prAttachment.findFirst({
     where: { fileId },
     include: {
-      request: { select: { organizationId: true, requesterId: true } },
+      request: {
+        select: { organizationId: true, departmentId: true, requesterId: true },
+      },
       task: {
         select: {
           request: {
-            select: { organizationId: true, requesterId: true },
+            select: { organizationId: true, departmentId: true, requesterId: true },
           },
         },
       },
     },
   });
   if (!attachment) throw new PrCenterError("File not found", 404, "NOT_FOUND");
-  const orgId =
-    attachment.request?.organizationId ?? attachment.task?.request.organizationId;
-  const requesterId =
-    attachment.request?.requesterId ?? attachment.task?.request.requesterId;
-  if (orgId !== actor.organizationId)
+  const linkedRequests = [attachment.request, attachment.task?.request].filter(
+    (request): request is NonNullable<typeof request> => Boolean(request),
+  );
+  if (
+    linkedRequests.length === 0 ||
+    linkedRequests.some((request) => request.organizationId !== actor.organizationId)
+  )
     throw new PrCenterError("File not found", 404, "NOT_FOUND");
-  if (!canReadAllRequests(actorRoles(actor)) && requesterId !== actor.id)
+  if (!linkedRequests.every((request) => canReadRequestRecord(actor, request)))
     throw new PrCenterError("You cannot access this file", 403, "FORBIDDEN");
   const buffer = await readFileFromStorage(actor.organizationId, fileObject.storageKey);
   return { buffer, fileName: fileObject.fileName, mimeType: fileObject.mimeType };
@@ -2688,14 +2724,17 @@ export async function listQuarantinedFiles(actor: PrCenterActor, take = 50) {
   if (!canManageQuarantine(actorRoles(actor)))
     throw new PrCenterError("You cannot review quarantined files", 403, "FORBIDDEN");
   const limit = Math.min(Math.max(take, 1), 100);
+  const scope = quarantinedFileScope(actor);
   return prisma.prFileObject.findMany({
     where: {
       organizationId: actor.organizationId,
       scanStatus: { in: ["QUARANTINED", "FAILED"] },
       deletedAt: null,
+      ...scope.fileWhere,
     },
     include: {
       attachments: {
+        ...(scope.attachmentWhere ? { where: scope.attachmentWhere } : {}),
         select: {
           id: true,
           kind: true,
@@ -2719,12 +2758,14 @@ export async function reviewQuarantinedFile(
 ) {
   if (!canManageQuarantine(actorRoles(actor)))
     throw new PrCenterError("You cannot review quarantined files", 403, "FORBIDDEN");
+  const scope = quarantinedFileScope(actor);
   const fileObject = await prisma.prFileObject.findFirst({
     where: {
       id: fileId,
       organizationId: actor.organizationId,
       scanStatus: { in: ["QUARANTINED", "FAILED"] },
       deletedAt: null,
+      ...scope.fileWhere,
     },
   });
   if (!fileObject)
@@ -2756,6 +2797,7 @@ export async function reviewQuarantinedFile(
         after: {
           deletedAt: updated.deletedAt?.toISOString(),
           reason: reason.trim(),
+          authorityRoles: actorRoleGrants(actor),
         },
       },
     });
@@ -2770,11 +2812,13 @@ export async function rescanFile(
 ) {
   if (!canManageQuarantine(actorRoles(actor)))
     throw new PrCenterError("You cannot rescan files", 403, "FORBIDDEN");
+  const scope = quarantinedFileScope(actor);
   const fileObject = await prisma.prFileObject.findFirst({
     where: {
       id: fileId,
       organizationId: actor.organizationId,
       deletedAt: null,
+      ...scope.fileWhere,
     },
   });
   if (!fileObject) throw new PrCenterError("File not found", 404, "NOT_FOUND");
@@ -2799,7 +2843,12 @@ export async function rescanFile(
         entityId: fileId,
         correlationId,
         before: { scanStatus: fileObject.scanStatus },
-        after: { scanStatus: scan.result, reason: scan.reason, rescan: true },
+        after: {
+          scanStatus: scan.result,
+          reason: scan.reason,
+          rescan: true,
+          authorityRoles: actorRoleGrants(actor),
+        },
       },
     });
     return updated;
@@ -2816,8 +2865,9 @@ export async function exportAuditEvents(
     entityType?: string;
     actorId?: string;
   },
+  correlationId: string = randomUUID(),
 ) {
-  if (!canExportAudit(actorRoles(actor)))
+  if (!actorHasOrganizationWideRole(actor, ["SCOPED_ADMINISTRATOR"]))
     throw new PrCenterError("You cannot export audit events", 403, "FORBIDDEN");
   const where: Prisma.PrAuditEventWhereInput = {
     organizationId: actor.organizationId,
@@ -2837,6 +2887,17 @@ export async function exportAuditEvents(
     include: { actor: { select: { displayName: true, email: true } } },
     orderBy: { createdAt: "desc" },
     take: 5000,
+  });
+  await prisma.prAuditEvent.create({
+    data: {
+      organizationId: actor.organizationId,
+      actorId: actor.id,
+      action: "audit.exported",
+      entityType: "audit_export",
+      entityId: correlationId,
+      correlationId,
+      after: { filters, count: events.length, authorityRoles: actorRoleGrants(actor) },
+    },
   });
   return {
     exportedAt: new Date().toISOString(),
@@ -2870,8 +2931,10 @@ export async function restoreRequest(
 ) {
   if (!canRestoreRequests(actorRoles(actor)))
     throw new PrCenterError("You cannot restore requests", 403, "FORBIDDEN");
+  const roleScope = roleDepartmentClauses(actor, ["SCOPED_ADMINISTRATOR"]);
+  const restoreScope = { organizationId: actor.organizationId, OR: roleScope };
   const request = await prisma.prRequest.findFirst({
-    where: { id: requestId, organizationId: actor.organizationId },
+    where: { id: requestId, ...restoreScope },
   });
   if (!request) throw new PrCenterError("Request not found", 404, "NOT_FOUND");
   if (request.status !== "WITHDRAWN" && request.status !== "CANCELLED")
@@ -2888,7 +2951,7 @@ export async function restoreRequest(
     );
   return prisma.$transaction(async (tx) => {
     const updated = await tx.prRequest.updateMany({
-      where: { id: request.id, version: fromVersion },
+      where: { id: request.id, version: fromVersion, ...restoreScope },
       data: { status: "DRAFT", version: { increment: 1 } },
     });
     if (updated.count !== 1)
@@ -2927,7 +2990,7 @@ export async function restoreRequest(
 // ── UAT / release readiness check ────────────────────────────────────
 
 export async function releaseReadinessCheck(actor: PrCenterActor) {
-  if (!canExportAudit(actorRoles(actor)))
+  if (!actorHasOrganizationWideRole(actor, ["SCOPED_ADMINISTRATOR"]))
     throw new PrCenterError("You cannot view release readiness", 403, "FORBIDDEN");
   const org = { organizationId: actor.organizationId };
   const checks: { name: string; passed: boolean; detail: string }[] = [];
