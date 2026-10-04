@@ -434,3 +434,34 @@ describe("Content Ideas create route", () => {
     await app.close();
   });
 });
+
+describe("Message House current route", () => {
+  it("requires an authenticated actor", async () => {
+    const app = buildPrCenterApi(async () => null);
+    const response = await app.inject({ method: "GET", url: "/message-house/current" });
+
+    expect(response.statusCode).toBe(401);
+    await app.close();
+  });
+
+  it("requires an authenticated actor to read version history", async () => {
+    const app = buildPrCenterApi(async () => null);
+    const response = await app.inject({ method: "GET", url: "/message-house/history" });
+
+    expect(response.statusCode).toBe(401);
+    await app.close();
+  });
+
+  it("denies current and historical content to roles without page access", async () => {
+    const requesterActor = { ...mockActor, role: "REQUESTER" as const };
+    const app = buildPrCenterApi(async () => requesterActor);
+    const [currentResponse, historyResponse] = await Promise.all([
+      app.inject({ method: "GET", url: "/message-house/current" }),
+      app.inject({ method: "GET", url: "/message-house/history" }),
+    ]);
+
+    expect(currentResponse.statusCode).toBe(403);
+    expect(historyResponse.statusCode).toBe(403);
+    await app.close();
+  });
+});

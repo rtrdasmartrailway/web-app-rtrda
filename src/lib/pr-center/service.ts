@@ -671,7 +671,13 @@ export async function convertIdea(
   });
 }
 
+function assertCanReadMessageHouse(actor: PrCenterActor) {
+  if (actor.role !== "PR_OPERATIONS" && actor.role !== "SCOPED_ADMINISTRATOR")
+    throw new PrCenterError("You cannot view Message House", 403, "FORBIDDEN");
+}
+
 export async function currentMessageHouse(actor: PrCenterActor) {
+  assertCanReadMessageHouse(actor);
   return prisma.prMessageHouseVersion.findFirst({
     where: {
       organizationId: actor.organizationId,
@@ -679,6 +685,34 @@ export async function currentMessageHouse(actor: PrCenterActor) {
       effectiveAt: { lte: new Date() },
     },
     orderBy: [{ effectiveAt: "desc" }, { versionNumber: "desc" }],
+    select: {
+      versionNumber: true,
+      vision: true,
+      positioning: true,
+      pillars: true,
+      foundation: true,
+      effectiveAt: true,
+    },
+  });
+}
+
+export async function messageHouseHistory(actor: PrCenterActor) {
+  assertCanReadMessageHouse(actor);
+  return prisma.prMessageHouseVersion.findMany({
+    where: {
+      organizationId: actor.organizationId,
+      status: { in: ["APPROVED", "SUPERSEDED"] },
+      effectiveAt: { lte: new Date() },
+    },
+    orderBy: [{ effectiveAt: "desc" }, { versionNumber: "desc" }],
+    select: {
+      versionNumber: true,
+      vision: true,
+      positioning: true,
+      pillars: true,
+      foundation: true,
+      effectiveAt: true,
+    },
   });
 }
 

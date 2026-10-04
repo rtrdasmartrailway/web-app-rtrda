@@ -3,6 +3,11 @@
 import { startTransition, useEffect, useState } from "react";
 import Image from "next/image";
 import type { CreateContentIdeaInput } from "@/lib/pr-center/idea-input";
+import {
+  parseCurrentMessageHouse,
+  parseMessageHouseHistory,
+  type CurrentMessageHouse,
+} from "@/lib/pr-center/message-house-view";
 import styles from "./pr-center-app.module.css";
 
 type Page =
@@ -146,7 +151,18 @@ type MessageHouseData = {
   pillars: string[];
   foundation: string;
   pillarByTask: Record<string, string>;
+  versionNumber?: number;
+  effectiveAt?: string;
 };
+function emptyMessageHouse(): MessageHouseData {
+  return {
+    vision: "",
+    positioning: "",
+    pillars: [],
+    foundation: "",
+    pillarByTask: {},
+  };
+}
 type MasterData = {
   contentTypes: string[];
   channels: string[];
@@ -627,17 +643,7 @@ const defaultState: PrCenterState = {
       createdAt: "2026-09-05T08:00:00.000Z",
     },
   ],
-  messageHouse: {
-    vision: "Rail technology for a safer, sustainable Thailand",
-    positioning: "Trusted national rail technology partner",
-    pillars: ["Safety and standards", "Research to reality", "National impact"],
-    foundation: "Evidence · People · Partnership · Public value",
-    pillarByTask: {
-      "TASK-040": "Safety and standards",
-      "TASK-041": "Research to reality",
-      "TASK-042": "National impact",
-    },
-  },
+  messageHouse: emptyMessageHouse(),
   masterData: {
     contentTypes: ["Website News", "Facebook Post", "Short Video", "PR Content"],
     channels: ["Website", "Facebook", "TikTok", "YouTube", "LinkedIn", "Internal"],
@@ -829,6 +835,15 @@ export function PrCenterApp({
   const [hasMoreRequests, setHasMoreRequests] = useState(false);
   const [loadingMoreRequests, setLoadingMoreRequests] = useState(false);
   const [loadingRequests, setLoadingRequests] = useState(true);
+  const [messageHouseStatus, setMessageHouseStatus] = useState<
+    "loading" | "empty" | "loaded" | "error"
+  >("loading");
+  const [messageHouseHistory, setMessageHouseHistory] = useState<CurrentMessageHouse[]>(
+    [],
+  );
+  const [messageHouseHistoryStatus, setMessageHouseHistoryStatus] = useState<
+    "loading" | "loaded" | "error"
+  >("loading");
   useEffect(() => {
     fetch("/api/pr-center/requests?take=100", { credentials: "same-origin" })
       .then(async (response) => {
@@ -936,22 +951,6 @@ export function PrCenterApp({
             requestId: idea.convertedRequestId || undefined,
             version: idea.version,
           })),
-        }));
-      })
-      .catch(() => undefined);
-    fetch("/api/pr-center/message-house/current", { credentials: "same-origin" })
-      .then(async (response) => {
-        if (!response.ok) throw new Error("Message house unavailable");
-        const messageHouse = (await response.json()) as {
-          vision: string;
-          positioning: string;
-          pillars: string[];
-          foundation: string;
-        } | null;
-        if (!messageHouse) return;
-        setState((previous) => ({
-          ...previous,
-          messageHouse: { ...previous.messageHouse, ...messageHouse },
         }));
       })
       .catch(() => undefined);
@@ -1080,9 +1079,44 @@ export function PrCenterApp({
     (item) => item.userId === currentUser.id,
   );
   const unreadCount = userNotifications.filter((item) => !item.read).length;
+  const loadMessageHouse = async () => {
+    setMessageHouseStatus("loading");
+    setMessageHouseHistoryStatus("loading");
+    setMessageHouseHistory([]);
+    setState((previous) => ({ ...previous, messageHouse: emptyMessageHouse() }));
+
+    try {
+      const response = await fetch("/api/pr-center/message-house/current", {
+        credentials: "same-origin",
+      });
+      if (!response.ok) throw new Error("Message House unavailable");
+      const current = parseCurrentMessageHouse(await response.json());
+      setState((previous) => ({
+        ...previous,
+        messageHouse: current ? { ...current, pillarByTask: {} } : emptyMessageHouse(),
+      }));
+      setMessageHouseStatus(current ? "loaded" : "empty");
+    } catch {
+      setState((previous) => ({ ...previous, messageHouse: emptyMessageHouse() }));
+      setMessageHouseStatus("error");
+    }
+
+    try {
+      const response = await fetch("/api/pr-center/message-house/history", {
+        credentials: "same-origin",
+      });
+      if (!response.ok) throw new Error("Message House history unavailable");
+      setMessageHouseHistory(parseMessageHouseHistory(await response.json()));
+      setMessageHouseHistoryStatus("loaded");
+    } catch {
+      setMessageHouseHistory([]);
+      setMessageHouseHistoryStatus("error");
+    }
+  };
   const go = (next: Page) => {
     if (!isPageEnabled(next) || !ROLE_PAGES[currentUser.role].includes(next)) return;
     setPage(next);
+    if (next === "message-house") void loadMessageHouse();
     setSidebarOpen(false);
   };
 
@@ -1649,12 +1683,6 @@ export function PrCenterApp({
       state.language === "th" ? "แปลงแนวคิดเป็นคำขอแล้ว" : "Idea converted to request",
     );
   };
-  const saveMessageHouse = (_messageHouse: MessageHouseData) =>
-    announce(
-      state.language === "th"
-        ? "ยังไม่สามารถบันทึก Message House ไปยังเซิร์ฟเวอร์ได้"
-        : "Message House changes cannot be saved to the server yet",
-    );
   const updateMasterData = (masterData: MasterData) =>
     updateState((previous) =>
       addAudit(
@@ -1911,9 +1939,10 @@ export function PrCenterApp({
           {page === "message-house" && (
             <MessageHouse
               data={state.messageHouse}
-              editable={false}
-              onSave={saveMessageHouse}
-              tasks={state.tasks}
+              status={messageHouseStatus}
+              history={messageHouseHistory}
+              historyStatus={messageHouseHistoryStatus}
+              onRefresh={loadMessageHouse}
               language={state.language}
             />
           )}
@@ -3695,139 +3724,145 @@ function Ideas({
 }
 function MessageHouse({
   data,
-  editable,
-  onSave,
-  tasks,
+  status,
+  history,
+  historyStatus,
+  onRefresh,
   language,
 }: {
   data: MessageHouseData;
-  editable: boolean;
-  onSave: (data: MessageHouseData) => void;
-  tasks: Task[];
+  status: "loading" | "empty" | "loaded" | "error";
+  history: CurrentMessageHouse[];
+  historyStatus: "loading" | "loaded" | "error";
+  onRefresh: () => void;
   language: Language;
 }) {
-  const [editing, setEditing] = useState(false);
-  const [draft, setDraft] = useState(data);
+  const thai = language === "th";
   return (
     <>
       <SectionHeading
-        eyebrow="COMMUNICATION STRATEGY"
+        eyebrow={thai ? "กลยุทธ์การสื่อสาร" : "COMMUNICATION STRATEGY"}
         title="Message House"
         action={
-          editable ? (
+          <div style={{ alignItems: "center", display: "flex", gap: 8 }}>
+            <span>{thai ? "อ่านอย่างเดียว" : "Read only"}</span>
             <button
-              className={styles.primary}
-              onClick={() => {
-                setDraft(data);
-                setEditing(!editing);
-              }}
+              type="button"
+              onClick={onRefresh}
+              disabled={status === "loading" || historyStatus === "loading"}
             >
-              {editing ? "Cancel" : "Edit message house"}
+              {thai ? "รีเฟรช" : "Refresh"}
             </button>
-          ) : (
-            <span>View only</span>
-          )
+          </div>
         }
       />
-      {editing && (
-        <section className={styles.card}>
-          <label>
-            Vision
-            <input
-              value={draft.vision}
-              onChange={(event) => setDraft({ ...draft, vision: event.target.value })}
-            />
-          </label>
-          <label>
-            Positioning
-            <input
-              value={draft.positioning}
-              onChange={(event) =>
-                setDraft({ ...draft, positioning: event.target.value })
-              }
-            />
-          </label>
-          {draft.pillars.map((pillar, index) => (
-            <label key={index}>
-              Pillar {index + 1}
-              <input
-                value={pillar}
-                onChange={(event) =>
-                  setDraft({
-                    ...draft,
-                    pillars: draft.pillars.map((item, itemIndex) =>
-                      itemIndex === index ? event.target.value : item,
-                    ),
-                  })
-                }
-              />
-            </label>
-          ))}
-          <label>
-            Foundation
-            <input
-              value={draft.foundation}
-              onChange={(event) => setDraft({ ...draft, foundation: event.target.value })}
-            />
-          </label>
-          <button
-            className={styles.primary}
-            onClick={() => {
-              onSave(draft);
-              setEditing(false);
-            }}
-          >
-            Save message house
-          </button>
-          <h2>{language === "th" ? "จัดกลุ่มงานตามเสาหลัก" : "Map work to pillars"}</h2>
-          {tasks.map((task) => (
-            <label key={task.id}>
-              {task.title}
-              <select
-                value={draft.pillarByTask[task.id] ?? ""}
-                onChange={(event) =>
-                  setDraft({
-                    ...draft,
-                    pillarByTask: {
-                      ...draft.pillarByTask,
-                      [task.id]: event.target.value,
-                    },
-                  })
-                }
-              >
-                <option value="">Unmapped</option>
-                {draft.pillars.map((pillar) => (
-                  <option key={pillar} value={pillar}>
-                    {pillar}
-                  </option>
-                ))}
-              </select>
-            </label>
-          ))}
+      {status === "loading" && (
+        <section className={styles.card} role="status" aria-live="polite">
+          {thai ? "กำลังโหลด Message House…" : "Loading Message House…"}
         </section>
       )}
-      <article className={`${styles.card} ${styles.messageHouse}`}>
-        <div className={styles.roof}>
-          <b>Vision / Mission</b>
-          <span>{data.vision}</span>
-        </div>
-        <div className={styles.positioning}>
-          <b>Brand positioning</b>
-          <span>{data.positioning}</span>
-        </div>
-        <div className={styles.pillars}>
-          {data.pillars.map((pillar) => (
-            <div key={pillar}>
-              <b>{pillar}</b>
-              <span>
-                {tasks.filter((task) => data.pillarByTask[task.id] === pillar).length}{" "}
-                {language === "th" ? "งานที่เชื่อมโยง" : "mapped work items"}
-              </span>
-            </div>
-          ))}
-        </div>
-        <div className={styles.foundation}>{data.foundation}</div>
-      </article>
+      {status === "error" && (
+        <section className={styles.card} role="alert">
+          {thai
+            ? "โหลด Message House ไม่สำเร็จ จึงไม่แสดงข้อมูลตัวอย่าง"
+            : "Message House could not be loaded; no sample content is shown."}
+        </section>
+      )}
+      {status === "empty" && (
+        <section className={styles.card} role="status">
+          {thai
+            ? "ยังไม่มี Message House ฉบับที่อนุมัติและมีผลใช้งาน"
+            : "No approved and effective Message House version is available."}
+        </section>
+      )}
+      {status === "loaded" && (
+        <article className={`${styles.card} ${styles.messageHouse}`}>
+          <p>
+            <strong>
+              {thai ? "เวอร์ชัน" : "Version"} {data.versionNumber}
+            </strong>
+            {data.effectiveAt && (
+              <>
+                {" · "}
+                {thai ? "มีผลตั้งแต่" : "Effective"}{" "}
+                <time dateTime={data.effectiveAt}>
+                  {new Date(data.effectiveAt).toLocaleDateString(
+                    thai ? "th-TH-u-ca-buddhist" : "en-GB",
+                    { year: "numeric", month: "long", day: "numeric" },
+                  )}
+                </time>
+              </>
+            )}
+          </p>
+          <div className={styles.roof}>
+            <b>{thai ? "วิสัยทัศน์ / พันธกิจ" : "Vision / Mission"}</b>
+            <span>{data.vision}</span>
+          </div>
+          <div className={styles.positioning}>
+            <b>{thai ? "จุดยืนขององค์กร" : "Brand positioning"}</b>
+            <span>{data.positioning}</span>
+          </div>
+          <h2>{thai ? "เสาหลักการสื่อสาร" : "Communication pillars"}</h2>
+          <div className={styles.pillars}>
+            {data.pillars.map((pillar, index) => (
+              <div key={`${index}-${pillar}`}>
+                <b>{pillar}</b>
+              </div>
+            ))}
+          </div>
+          <div className={styles.foundation}>
+            <strong>{thai ? "หลักการสนับสนุน" : "Foundation"}</strong>
+            <p>{data.foundation}</p>
+          </div>
+        </article>
+      )}
+      {historyStatus === "loading" && (
+        <p role="status" aria-live="polite">
+          {thai ? "กำลังโหลดประวัติเวอร์ชัน…" : "Loading version history…"}
+        </p>
+      )}
+      {historyStatus === "error" && (
+        <p role="alert">
+          {thai ? "โหลดประวัติเวอร์ชันไม่สำเร็จ" : "Version history could not be loaded."}
+        </p>
+      )}
+      {historyStatus === "loaded" && (
+        <details className={styles.card}>
+          <summary>{thai ? "ประวัติเวอร์ชัน" : "Version history"}</summary>
+          {history.filter((version) => version.versionNumber !== data.versionNumber)
+            .length === 0 ? (
+            <p>{thai ? "ไม่มีเวอร์ชันก่อนหน้า" : "No earlier effective versions."}</p>
+          ) : (
+            history
+              .filter((version) => version.versionNumber !== data.versionNumber)
+              .map((version) => (
+                <details key={version.versionNumber}>
+                  <summary>
+                    {thai ? "เวอร์ชัน" : "Version"} {version.versionNumber} ·{" "}
+                    {new Date(version.effectiveAt).toLocaleDateString(
+                      thai ? "th-TH-u-ca-buddhist" : "en-GB",
+                      { year: "numeric", month: "long", day: "numeric" },
+                    )}
+                  </summary>
+                  <section className={styles.messageHouse}>
+                    <h3>{thai ? "วิสัยทัศน์ / พันธกิจ" : "Vision / Mission"}</h3>
+                    <p>{version.vision}</p>
+                    <h3>{thai ? "จุดยืนขององค์กร" : "Brand positioning"}</h3>
+                    <p>{version.positioning}</p>
+                    <h3>{thai ? "เสาหลักการสื่อสาร" : "Communication pillars"}</h3>
+                    <ul>
+                      {version.pillars.map((pillar, index) => (
+                        <li key={`${version.versionNumber}-${index}`}>{pillar}</li>
+                      ))}
+                    </ul>
+                    <h3>{thai ? "หลักการสนับสนุน" : "Foundation"}</h3>
+                    <p>{version.foundation}</p>
+                  </section>
+                </details>
+              ))
+          )}
+        </details>
+      )}
     </>
   );
 }

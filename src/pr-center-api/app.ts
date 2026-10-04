@@ -5,6 +5,7 @@ import {
   addTaskComment,
   convertIdea,
   currentMessageHouse,
+  messageHouseHistory,
   createTaskRevision,
   listIdeas,
   listNotifications,
@@ -178,6 +179,9 @@ export function buildPrCenterApi(
   );
   app.get("/message-house/current", async (request) =>
     currentMessageHouse(request.prCenterActor!),
+  );
+  app.get("/message-house/history", async (request) =>
+    messageHouseHistory(request.prCenterActor!),
   );
   app.get("/notifications", async (request) => listNotifications(request.prCenterActor!));
   app.post("/notifications/read", async (request) => {
