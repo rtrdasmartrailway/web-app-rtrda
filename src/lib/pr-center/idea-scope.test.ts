@@ -128,6 +128,21 @@ describe("idea reviewer scope", () => {
         }),
       }),
     );
+    expect(mocks.transactionClient.prAuditEvent.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        organizationId: "org-1",
+        actorId: "reviewer-1",
+        action: "idea.transitioned",
+        entityId: "idea-1",
+        correlationId: "corr-reject",
+        after: {
+          from: "UNDER_REVIEW",
+          to: "REJECTED",
+          version: 4,
+          reason: "Needs a clearer public benefit.",
+        },
+      }),
+    });
   });
 
   it("denies conversion to non-reviewers before reading the idea", async () => {

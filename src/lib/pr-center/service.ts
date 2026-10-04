@@ -700,7 +700,12 @@ export async function transitionIdea(
       action: "idea.transitioned",
       entityType: "content_idea",
       entityId: idea.id,
-      after: { from: idea.status, to, version: fromVersion + 1 },
+      after: {
+        from: idea.status,
+        to,
+        version: fromVersion + 1,
+        reason: decisionReason || null,
+      },
       eventType: "pr.idea.transitioned",
       correlationId,
     });
