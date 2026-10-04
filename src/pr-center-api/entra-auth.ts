@@ -124,11 +124,11 @@ export function resolvePrCenterLoginRole(
   tokenRole: PrCenterRole | undefined,
   databaseRoleAssignment: { role: PrCenterRole; departmentId: string | null } | undefined,
 ): { role: PrCenterRole; autoProvisionRequester: boolean } {
-  if (!isAllowedOrganizationEmail(email))
+  if (!isAllowedOrganizationEmail(email) && !tokenRole && !databaseRoleAssignment)
     throw new PrCenterError(
-      "Only @rtrda.or.th accounts may access PR Center",
+      "Only @rtrda.or.th users or accounts with an assigned PR Center role may access PR Center",
       403,
-      "OIDC_DOMAIN_NOT_ALLOWED",
+      "OIDC_ACCESS_NOT_ALLOWED",
     );
   if (tokenRole) return { role: tokenRole, autoProvisionRequester: false };
   if (databaseRoleAssignment)
@@ -199,12 +199,6 @@ export function createEntraAuth() {
         "Your Entra account has no organization email",
         403,
         "OIDC_MISSING_EMAIL",
-      );
-    if (!isAllowedOrganizationEmail(email))
-      throw new PrCenterError(
-        "Only @rtrda.or.th accounts may access PR Center",
-        403,
-        "OIDC_DOMAIN_NOT_ALLOWED",
       );
     return prisma.$transaction(async (tx) => {
       const organization = await tx.prOrganization.upsert({

@@ -32,15 +32,26 @@ describe("organization-domain requester access", () => {
     ).toEqual({ role: "PR_OPERATIONS", autoProvisionRequester: false });
   });
 
-  it("blocks even a role-assigned account when its email is outside the organization domain", () => {
+  it("allows a non-domain account when Entra assigns it an approved PR Center role", () => {
+    expect(
+      resolvePrCenterLoginRole("staff@outside.example", "PR_OPERATIONS", undefined),
+    ).toEqual({ role: "PR_OPERATIONS", autoProvisionRequester: false });
+  });
+
+  it("allows a non-domain account when it has a database role assignment", () => {
+    expect(
+      resolvePrCenterLoginRole("staff@outside.example", undefined, {
+        role: "SCOPED_ADMINISTRATOR",
+        departmentId: null,
+      }),
+    ).toEqual({ role: "SCOPED_ADMINISTRATOR", autoProvisionRequester: false });
+  });
+
+  it("blocks a non-domain account without an assigned role", () => {
     expect(() =>
-      resolvePrCenterLoginRole(
-        "staff@outside.example",
-        "SCOPED_ADMINISTRATOR",
-        undefined,
-      ),
+      resolvePrCenterLoginRole("staff@outside.example", undefined, undefined),
     ).toThrow(
-      expect.objectContaining({ code: "OIDC_DOMAIN_NOT_ALLOWED", statusCode: 403 }),
+      expect.objectContaining({ code: "OIDC_ACCESS_NOT_ALLOWED", statusCode: 403 }),
     );
   });
 });
