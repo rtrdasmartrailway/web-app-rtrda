@@ -25,6 +25,8 @@ vi.mock("@/lib/db/client", () => ({ prisma: mockPrisma }));
 
 import {
   listRequestApprovalQueue,
+  listRequests,
+  requestDetail,
   recordRequestDecision,
   transitionRequest,
   transitionTask,
@@ -70,8 +72,109 @@ beforeEach(() => {
 });
 
 describe("request intake approval", () => {
-  it("only lists pending requests for PR or administrator approvers", async () => {
+  it("shows each owner their own requests and PR Operations its assigned scope", async () => {
+    mockPrisma.prRequest.findMany.mockResolvedValue([]);
+
+    await listRequests(requesterActor);
+    expect(mockPrisma.prRequest.findMany).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          organizationId: "org-1",
+          requesterId: requesterActor.id,
+        }),
+        include: expect.objectContaining({
+          statusHistory: expect.objectContaining({
+            where: { toState: "REJECTED" },
+            select: { reason: true },
+          }),
+        }),
+      }),
+    );
+
+    await listRequests(prActor);
+    const prWhere = mockPrisma.prRequest.findMany.mock.calls.at(-1)?.[0].where;
+    expect(prWhere).toEqual(
+      expect.objectContaining({
+        organizationId: "org-1",
+        departmentId: "dept-1",
+      }),
+    );
+    expect(prWhere).not.toHaveProperty("requesterId");
+
+    const adminActor: PrCenterActor = {
+      ...prActor,
+      id: "admin-user",
+      role: "SCOPED_ADMINISTRATOR",
+    };
+    await listRequests(adminActor);
+    expect(mockPrisma.prRequest.findMany).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          organizationId: "org-1",
+          requesterId: adminActor.id,
+        }),
+      }),
+    );
+  });
+
+  it("does not let a non-owner non-PR role open another user's request", async () => {
+    const adminActor: PrCenterActor = {
+      ...prActor,
+      id: "admin-user",
+      role: "SCOPED_ADMINISTRATOR",
+    };
+    mockPrisma.prRequest.findFirst.mockResolvedValueOnce(null);
+
+    await expect(requestDetail(adminActor, requestRecord.id)).rejects.toMatchObject({
+      statusCode: 404,
+      code: "NOT_FOUND",
+    });
+    expect(mockPrisma.prRequest.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          id: requestRecord.id,
+          organizationId: adminActor.organizationId,
+          requesterId: adminActor.id,
+        }),
+      }),
+    );
+  });
+
+  it("returns the persisted rejection comment to the request owner", async () => {
+    const requestWithReason = {
+      ...requestRecord,
+      status: "REJECTED",
+      statusHistory: [{ reason: "Missing required information" }],
+    };
+    mockPrisma.prRequest.findFirst.mockResolvedValueOnce(requestWithReason);
+
+    const result = await requestDetail(requesterActor, requestRecord.id);
+
+    expect(result.statusHistory[0]?.reason).toBe("Missing required information");
+    expect(mockPrisma.prRequest.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({ requesterId: requesterActor.id }),
+        include: expect.objectContaining({
+          statusHistory: expect.objectContaining({
+            where: { toState: "REJECTED" },
+            select: { reason: true },
+          }),
+        }),
+      }),
+    );
+  });
+
+  it("only lists pending requests for PR Operations; requesters and administrators are denied", async () => {
     await expect(listRequestApprovalQueue(requesterActor)).rejects.toMatchObject({
+      statusCode: 403,
+      code: "FORBIDDEN",
+    });
+    const adminActor: PrCenterActor = {
+      ...prActor,
+      id: "admin-user",
+      role: "SCOPED_ADMINISTRATOR",
+    };
+    await expect(listRequestApprovalQueue(adminActor)).rejects.toMatchObject({
       statusCode: 403,
       code: "FORBIDDEN",
     });
@@ -101,7 +204,7 @@ describe("request intake approval", () => {
     );
   });
 
-  it("routes newly submitted requests to scoped PR and administrator approval queues", async () => {
+  it("routes newly submitted requests to scoped PR-only intake queues", async () => {
     mockPrisma.prRequest.findFirst.mockResolvedValue({
       ...requestRecord,
       status: "DRAFT",
@@ -113,10 +216,7 @@ describe("request intake approval", () => {
       status: "SUBMITTED",
       version: 2,
     });
-    mockPrisma.prUserRole.findMany.mockResolvedValue([
-      { userId: "pr-recipient" },
-      { userId: "admin-recipient" },
-    ]);
+    mockPrisma.prUserRole.findMany.mockResolvedValue([{ userId: "pr-recipient" }]);
 
     await transitionRequest(requesterActor, requestRecord.id, 1, "SUBMITTED");
 
@@ -124,7 +224,7 @@ describe("request intake approval", () => {
       expect.objectContaining({
         where: expect.objectContaining({
           organizationId: requestRecord.organizationId,
-          role: { in: ["PR_OPERATIONS", "SCOPED_ADMINISTRATOR"] },
+          role: "PR_OPERATIONS",
           OR: [{ departmentId: requestRecord.departmentId }, { departmentId: null }],
         }),
       }),
@@ -133,7 +233,6 @@ describe("request intake approval", () => {
       data: expect.arrayContaining([
         expect.objectContaining({ userId: "requester-1", target: "my-requests" }),
         expect.objectContaining({ userId: "pr-recipient", target: "approvals" }),
-        expect.objectContaining({ userId: "admin-recipient", target: "approvals" }),
       ]),
     });
   });
@@ -171,6 +270,18 @@ describe("request intake approval", () => {
     });
   });
 
+  it("denies administrators the request-intake decision endpoint", async () => {
+    const adminActor: PrCenterActor = {
+      ...prActor,
+      id: "admin-user",
+      role: "SCOPED_ADMINISTRATOR",
+    };
+    await expect(
+      recordRequestDecision(adminActor, requestRecord.id, 2, { decision: "APPROVED" }),
+    ).rejects.toMatchObject({ statusCode: 403, code: "FORBIDDEN" });
+    expect(mockPrisma.prRequest.findFirst).not.toHaveBeenCalled();
+  });
+
   it("requires a reason before rejecting a submitted request", async () => {
     await expect(
       recordRequestDecision(prActor, requestRecord.id, 2, { decision: "REJECTED" }),
@@ -190,6 +301,24 @@ describe("request intake approval", () => {
       reason: "Missing required information",
     });
 
+    expect(mockPrisma.prStatusHistory.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        requestId: requestRecord.id,
+        fromState: "SUBMITTED",
+        toState: "REJECTED",
+        reason: "Missing required information",
+        actorId: prActor.id,
+      }),
+    });
+    expect(mockPrisma.prNotification.createMany).toHaveBeenCalledWith({
+      data: expect.arrayContaining([
+        expect.objectContaining({
+          userId: requesterActor.id,
+          target: "my-requests",
+          body: expect.stringContaining("Missing required information"),
+        }),
+      ]),
+    });
     expect(mockPrisma.prTask.updateMany).toHaveBeenCalledWith({
       where: { id: "task-1", status: "DRAFT", version: 4 },
       data: { status: "CANCELLED", version: { increment: 1 } },

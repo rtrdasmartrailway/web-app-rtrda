@@ -140,7 +140,8 @@ export function PrCenterWorkspace() {
     new URLSearchParams(window.location.search).get("signin") === "failed";
 
   // Preserve the established PR Center visual workspace once access is granted.
-  if (signedIn && session) return <PrCenterApp actor={session} />;
+  if (signedIn && session)
+    return <PrCenterApp key={`${session.userId}:${session.role}`} actor={session} />;
 
   return (
     <main className={styles.shell}>

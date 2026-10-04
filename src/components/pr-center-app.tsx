@@ -86,6 +86,7 @@ type Request = {
     | "CANCELLED"
     | "CLOSED";
   version?: number;
+  rejectionReason?: string;
   revisionNumber?: number;
   objective?: string;
   audience?: string;
@@ -240,6 +241,7 @@ type ApiRequestRecord = {
     audience: string | null;
   }>;
   sources: { url: string }[];
+  statusHistory: { reason: string | null }[];
   tasks: Array<{
     id: string;
     title: string;
@@ -271,6 +273,7 @@ function mapRequestRecord(request: ApiRequestRecord): Request {
     taskIds: request.tasks.map((task) => task.id),
     status: request.status,
     version: request.version,
+    rejectionReason: request.statusHistory[0]?.reason || undefined,
     revisionNumber: request.revisions[0]?.revisionNumber,
     objective: request.revisions[0]?.objective || undefined,
     audience: request.revisions[0]?.audience || undefined,
@@ -372,6 +375,8 @@ const copy = {
     recentRequests: "คำขอล่าสุด",
     viewAll: "ดูทั้งหมด",
     role: "บทบาทตัวอย่าง",
+    refresh: "รีเฟรชสถานะ",
+    rejectionReason: "เหตุผล/ความคิดเห็นที่ปฏิเสธ",
   },
   en: {
     greeting: "Welcome, Communications Team",
@@ -388,6 +393,8 @@ const copy = {
     recentRequests: "Recent requests",
     viewAll: "View all",
     role: "Demo role",
+    refresh: "Refresh status",
+    rejectionReason: "Rejection reason / comment",
   },
 };
 
@@ -483,9 +490,9 @@ const STATUS_TRANSITIONS: Record<StatusId, StatusId[]> = {
 };
 
 const ROLE_PAGES: Record<Role, Page[]> = {
-  admin: pages.map(({ id }) => id),
-  pr: pages.map(({ id }) => id),
-  executive: ["home", "requests", "calendar", "notifications"],
+  admin: pages.filter(({ id }) => id !== "requests").map(({ id }) => id),
+  pr: pages.filter(({ id }) => id !== "new-request").map(({ id }) => id),
+  executive: ["home", "calendar", "notifications"],
   project_owner: [
     "home",
     "new-request",
@@ -956,11 +963,7 @@ export function PrCenterApp({
       .catch(() => setNotice("Unable to load approval queue"));
   }, [actor?.role, page]);
   useEffect(() => {
-    if (
-      (actor?.role !== "PR_OPERATIONS" && actor?.role !== "SCOPED_ADMINISTRATOR") ||
-      page !== "approvals"
-    )
-      return;
+    if (actor?.role !== "PR_OPERATIONS" || page !== "approvals") return;
     fetch("/api/pr-center/request-approvals", { credentials: "same-origin" })
       .then(async (response) => {
         if (!response.ok) throw new Error("Request approval queue unavailable");
@@ -1070,7 +1073,7 @@ export function PrCenterApp({
     (item) => isPageEnabled(item.id) && ROLE_PAGES[currentUser.role].includes(item.id),
   );
   const loadMoreRequests = async () => {
-    if (!requestCursor || loadingMoreRequests) return;
+    if (!requestCursor || loadingMoreRequests || loadingRequests) return;
     setLoadingMoreRequests(true);
     try {
       const response = await fetch(
@@ -1107,6 +1110,34 @@ export function PrCenterApp({
       );
     } finally {
       setLoadingMoreRequests(false);
+    }
+  };
+  const refreshRequests = async () => {
+    if (loadingRequests || loadingMoreRequests) return;
+    setLoadingRequests(true);
+    try {
+      const response = await fetch("/api/pr-center/requests?take=100", {
+        credentials: "same-origin",
+        cache: "no-store",
+      });
+      if (!response.ok) throw new Error("Unable to refresh requests");
+      const records = (await response.json()) as ApiRequestRecord[];
+      const pageRecords = records.slice(0, 100);
+      setRequestCursor(pageRecords.at(-1)?.id || null);
+      setHasMoreRequests(records.length > pageRecords.length);
+      setState((previous) => ({
+        ...previous,
+        requests: pageRecords.map(mapRequestRecord),
+        tasks: mapRequestTasks(pageRecords),
+      }));
+    } catch {
+      setNotice(
+        state.language === "th"
+          ? "รีเฟรชสถานะคำขอไม่สำเร็จ"
+          : "Unable to refresh request status",
+      );
+    } finally {
+      setLoadingRequests(false);
     }
   };
   const t = copy[state.language];
@@ -1927,9 +1958,11 @@ export function PrCenterApp({
             <input placeholder={t.search} />
           </label>
           <div className={styles.topActions}>
-            <button className={styles.topRequest} onClick={openRequest}>
-              + {t.newRequest}
-            </button>
+            {(actor?.role === "REQUESTER" || actor?.role === "SCOPED_ADMINISTRATOR") && (
+              <button className={styles.topRequest} onClick={openRequest}>
+                + {t.newRequest}
+              </button>
+            )}
             <button
               className={styles.bell}
               onClick={() => go("notifications")}
@@ -1968,6 +2001,9 @@ export function PrCenterApp({
               t={t}
               onNavigate={go}
               onOpenRequest={openRequest}
+              canCreateRequest={
+                actor?.role === "REQUESTER" || actor?.role === "SCOPED_ADMINISTRATOR"
+              }
               requests={state.requests}
               tasks={state.tasks}
             />
@@ -1980,7 +2016,10 @@ export function PrCenterApp({
               requests={state.requests}
             />
           )}
-          {page === "new-request" && <NewRequest t={t} onOpenRequest={openRequest} />}
+          {page === "new-request" &&
+            (actor?.role === "REQUESTER" || actor?.role === "SCOPED_ADMINISTRATOR") && (
+              <NewRequest t={t} onOpenRequest={openRequest} />
+            )}
           {page === "my-requests" && (
             <Requests
               t={t}
@@ -1988,10 +2027,14 @@ export function PrCenterApp({
               onEditRequest={editRequest}
               onSubmitRequest={submitRequest}
               mode="mine"
+              canCreate={
+                actor?.role === "REQUESTER" || actor?.role === "SCOPED_ADMINISTRATOR"
+              }
               requests={state.requests}
               tasks={state.tasks}
               currentUserId={currentUser.id}
               hasMore={hasMoreRequests}
+              onRefresh={refreshRequests}
               loadingMore={loadingMoreRequests}
               loading={loadingRequests}
               onLoadMore={loadMoreRequests}
@@ -2004,10 +2047,12 @@ export function PrCenterApp({
               onEditRequest={editRequest}
               onSubmitRequest={submitRequest}
               mode="all"
+              canCreate={false}
               requests={state.requests}
               tasks={state.tasks}
               currentUserId={currentUser.id}
               hasMore={hasMoreRequests}
+              onRefresh={refreshRequests}
               loadingMore={loadingMoreRequests}
               loading={loadingRequests}
               onLoadMore={loadMoreRequests}
@@ -2116,12 +2161,14 @@ function Dashboard({
   t,
   onNavigate,
   onOpenRequest,
+  canCreateRequest,
   requests: requestItems,
   tasks: taskItems,
 }: {
   t: (typeof copy)[Language];
   onNavigate: (page: Page) => void;
   onOpenRequest: () => void;
+  canCreateRequest: boolean;
   requests: Request[];
   tasks: Task[];
 }) {
@@ -2174,9 +2221,11 @@ function Dashboard({
           <button className={styles.heroSecondary} onClick={() => onNavigate("calendar")}>
             View calendar
           </button>
-          <button className={styles.primary} onClick={onOpenRequest}>
-            + {t.newRequest}
-          </button>
+          {canCreateRequest && (
+            <button className={styles.primary} onClick={onOpenRequest}>
+              + {t.newRequest}
+            </button>
+          )}
         </div>
       </section>
       <section className={styles.metrics}>
@@ -2472,10 +2521,12 @@ function Requests({
   onEditRequest,
   onSubmitRequest,
   mode,
+  canCreate,
   requests: requestItems,
   tasks: taskItems,
   currentUserId,
   hasMore,
+  onRefresh,
   loadingMore,
   loading,
   onLoadMore,
@@ -2485,10 +2536,12 @@ function Requests({
   onEditRequest: (request: Request) => void;
   onSubmitRequest: (request: Request) => void;
   mode: "all" | "mine";
+  canCreate: boolean;
   requests: Request[];
   tasks: Task[];
   currentUserId: string;
   hasMore: boolean;
+  onRefresh: () => Promise<void>;
   loadingMore: boolean;
   loading: boolean;
   onLoadMore: () => void;
@@ -2515,9 +2568,20 @@ function Requests({
         eyebrow="WORK INTAKE"
         title={title}
         action={
-          <button className={styles.primary} onClick={onOpenRequest}>
-            + {t.newRequest}
-          </button>
+          <div style={{ display: "flex", gap: 8 }}>
+            <button
+              type="button"
+              disabled={loading || loadingMore}
+              onClick={() => void onRefresh()}
+            >
+              {t.refresh}
+            </button>
+            {canCreate && (
+              <button className={styles.primary} onClick={onOpenRequest}>
+                + {t.newRequest}
+              </button>
+            )}
+          </div>
         }
       />
       <section className={styles.filterBar}>
@@ -2589,7 +2653,7 @@ function Requests({
         {loading && visibleRequests.length === 0 && <p>Loading requests…</p>}
         {!loading && visibleRequests.length === 0 && <p>No requests found.</p>}
         {hasMore && (
-          <button disabled={loadingMore} onClick={onLoadMore}>
+          <button disabled={loadingMore || loading} onClick={onLoadMore}>
             {loadingMore ? "Loading…" : "Load more requests"}
           </button>
         )}
@@ -2599,6 +2663,11 @@ function Requests({
               {selected.id} · {selected.department}
             </p>
             <h2>{selected.title}</h2>
+            {selected.status === "REJECTED" && selected.rejectionReason && (
+              <p>
+                <strong>{t.rejectionReason}:</strong> {selected.rejectionReason}
+              </p>
+            )}
             <p>{selected.objective || "No communication objective provided."}</p>
             <p>
               {selected.source
@@ -3536,7 +3605,8 @@ function Approvals({
   ) => void;
   onRequestDecision: (requestId: string, decision: "APPROVED" | "REJECTED") => void;
 }) {
-  const canDecide = role === "admin" || role === "pr";
+  const canDecideRequests = role === "pr";
+  const canDecideTasks = role === "admin" || role === "pr";
   return (
     <>
       <SectionHeading eyebrow="REVIEW AND APPROVAL" title="Approval Queue" />
@@ -3553,7 +3623,7 @@ function Approvals({
             </div>
             <div>
               <Status>Awaiting intake approval</Status>
-              {canDecide ? (
+              {canDecideRequests ? (
                 <>
                   <button onClick={() => onRequestDecision(request.id, "REJECTED")}>
                     Reject
@@ -3586,7 +3656,7 @@ function Approvals({
             </div>
             <div>
               <Status>Awaiting approval</Status>
-              {canDecide ? (
+              {canDecideTasks ? (
                 <>
                   <button onClick={() => onDecision(task.id, "REVISION_REQUIRED")}>
                     Request revision

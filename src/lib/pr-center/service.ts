@@ -9,6 +9,7 @@ import type {
 import { prisma } from "@/lib/db/client";
 import {
   canApprove,
+  canDecideRequestIntake,
   canCreateRequest,
   canCreateIdea,
   canManageTasks,
@@ -84,6 +85,11 @@ function requestScopeWhere(actor: PrCenterActor): Prisma.PrRequestWhereInput {
     ...(actor.role === "REQUESTER" ? { requesterId: actor.id } : {}),
     ...(departmentId ? { departmentId } : {}),
   };
+}
+
+function requestReadWhere(actor: PrCenterActor): Prisma.PrRequestWhereInput {
+  if (canReadAllRequests(actor.role)) return requestScopeWhere(actor);
+  return { organizationId: actor.organizationId, requesterId: actor.id };
 }
 
 function requestMatchesActorScope(
@@ -287,7 +293,7 @@ export async function createRequest(
 
 export async function listRequests(actor: PrCenterActor, take = 25, cursor?: string) {
   const limit = Math.min(Math.max(take, 1), 100);
-  const where = requestScopeWhere(actor);
+  const where = requestReadWhere(actor);
   return prisma.prRequest.findMany({
     where,
     take: limit + 1,
@@ -297,6 +303,12 @@ export async function listRequests(actor: PrCenterActor, take = 25, cursor?: str
       department: { select: { name: true } },
       requester: { select: { displayName: true } },
       sources: { select: { url: true } },
+      statusHistory: {
+        where: { toState: "REJECTED" },
+        orderBy: { createdAt: "desc" },
+        take: 1,
+        select: { reason: true },
+      },
       tasks: true,
       revisions: { orderBy: { revisionNumber: "desc" }, take: 1 },
     },
@@ -305,10 +317,16 @@ export async function listRequests(actor: PrCenterActor, take = 25, cursor?: str
 
 async function requestInScope(actor: PrCenterActor, requestId: string) {
   const request = await prisma.prRequest.findFirst({
-    where: { id: requestId, ...requestScopeWhere(actor) },
+    where: { id: requestId, ...requestReadWhere(actor) },
     include: {
       revisions: { orderBy: { revisionNumber: "desc" } },
       sources: true,
+      statusHistory: {
+        where: { toState: "REJECTED" },
+        orderBy: { createdAt: "desc" },
+        take: 1,
+        select: { reason: true },
+      },
       tasks: true,
     },
   });
@@ -447,7 +465,7 @@ export async function transitionRequest(
       const approverRoles = await tx.prUserRole.findMany({
         where: {
           organizationId: request.organizationId,
-          role: { in: ["PR_OPERATIONS", "SCOPED_ADMINISTRATOR"] },
+          role: "PR_OPERATIONS",
           OR: [{ departmentId: request.departmentId }, { departmentId: null }],
           user: { active: true },
         },
@@ -464,7 +482,7 @@ export async function transitionRequest(
             userId === request.requesterId
               ? "Request submitted"
               : "Request awaiting approval",
-          body: `${request.title} was submitted and is waiting for a PR or administrator decision.`,
+          body: `${request.title} was submitted and is waiting for PR review.`,
           target: userId === request.requesterId ? "my-requests" : "approvals",
         })),
       });
@@ -1231,7 +1249,7 @@ export async function listApprovalQueue(actor: PrCenterActor) {
 }
 
 export async function listRequestApprovalQueue(actor: PrCenterActor) {
-  if (!canApprove(actor.role))
+  if (!canDecideRequestIntake(actor.role))
     throw new PrCenterError(
       "You cannot view the request approval queue",
       403,
@@ -1260,7 +1278,7 @@ export async function recordRequestDecision(
   input: { decision: "APPROVED" | "REJECTED"; reason?: string },
   correlationId: string = randomUUID(),
 ) {
-  if (!canApprove(actor.role))
+  if (!canDecideRequestIntake(actor.role))
     throw new PrCenterError("You cannot decide this request", 403, "FORBIDDEN");
   const request = await prisma.prRequest.findFirst({
     where: { id: requestId, ...requestScopeWhere(actor) },

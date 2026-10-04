@@ -27,7 +27,7 @@ const prActor = { ...requester, id: "pr-1", role: "PR_OPERATIONS" as const };
 afterEach(() => vi.clearAllMocks());
 
 describe("request intake approval API", () => {
-  it("requires authentication and leaves role authorization to the service", async () => {
+  it("requires authentication and forwards the PR identity to the queue service", async () => {
     const anonymousApp = buildPrCenterApi(async () => null);
     const anonymous = await anonymousApp.inject({
       method: "GET",
@@ -37,14 +37,14 @@ describe("request intake approval API", () => {
     await anonymousApp.close();
 
     listQueue.mockResolvedValue([]);
-    const requesterApp = buildPrCenterApi(async () => requester);
-    const response = await requesterApp.inject({
+    const prApp = buildPrCenterApi(async () => prActor);
+    const response = await prApp.inject({
       method: "GET",
       url: "/request-approvals",
     });
     expect(response.statusCode).toBe(200);
-    expect(listQueue).toHaveBeenCalledWith(requester);
-    await requesterApp.close();
+    expect(listQueue).toHaveBeenCalledWith(prActor);
+    await prApp.close();
   });
 
   it("lists the queue for PR and forwards versioned decisions", async () => {
@@ -85,6 +85,16 @@ describe("request intake approval API", () => {
     expect(response.statusCode).toBe(422);
     expect(response.json().error).toBe("INVALID_DECISION");
     expect(decideRequest).not.toHaveBeenCalled();
+    await app.close();
+  });
+
+  it("does not expose a hard-delete route for user requests", async () => {
+    const app = buildPrCenterApi(async () => prActor);
+    const response = await app.inject({
+      method: "DELETE",
+      url: `/requests/${requestId}`,
+    });
+    expect(response.statusCode).toBe(404);
     await app.close();
   });
 });

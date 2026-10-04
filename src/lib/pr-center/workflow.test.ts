@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
   canApprove,
+  canDecideRequestIntake,
+  canReadAllRequests,
   canCreateIdea,
   canCreateRequest,
   canReviewIdeas,
@@ -37,6 +39,16 @@ describe("PR Center workflow policy", () => {
     expect(canApprove("APPROVER")).toBe(false);
     expect(canApprove("EXECUTIVE_READ_ONLY")).toBe(false);
     expect(canApprove("REQUESTER")).toBe(false);
+  });
+
+  it("restricts request visibility and intake decisions to PR Operations", () => {
+    expect(canReadAllRequests("PR_OPERATIONS")).toBe(true);
+    expect(canReadAllRequests("SCOPED_ADMINISTRATOR")).toBe(false);
+    expect(canReadAllRequests("REQUESTER")).toBe(false);
+    expect(canReadAllRequests("EXECUTIVE_READ_ONLY")).toBe(false);
+    expect(canDecideRequestIntake("PR_OPERATIONS")).toBe(true);
+    expect(canDecideRequestIntake("SCOPED_ADMINISTRATOR")).toBe(false);
+    expect(canDecideRequestIntake("REQUESTER")).toBe(false);
   });
 
   it("allows idea proposals but restricts review and conversion authority", () => {

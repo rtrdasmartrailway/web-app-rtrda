@@ -71,8 +71,12 @@ export function canApprove(role: PrCenterRole): boolean {
   return role === "PR_OPERATIONS" || role === "SCOPED_ADMINISTRATOR";
 }
 
+export function canDecideRequestIntake(role: PrCenterRole): boolean {
+  return role === "PR_OPERATIONS";
+}
+
 export function canReadAllRequests(role: PrCenterRole): boolean {
-  return role !== "REQUESTER";
+  return role === "PR_OPERATIONS";
 }
 
 export function canCreateRequest(role: PrCenterRole): boolean {
