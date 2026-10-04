@@ -3,6 +3,8 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_PR_CENTER_PHASE2_PAGES: "ideas"
     image: web-app-rtrda:test
     container_name: web-app-rtrda-test
     restart: unless-stopped

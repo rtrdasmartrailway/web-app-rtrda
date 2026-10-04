@@ -412,3 +412,25 @@ describe("Release readiness route guards", () => {
     await app.close();
   });
 });
+
+describe("Content Ideas create route", () => {
+  it("rejects malformed structured metadata before any database write", async () => {
+    const app = buildPrCenterApi(async () => mockActor);
+    const response = await app.inject({
+      method: "POST",
+      url: "/ideas",
+      payload: {
+        title: "A valid idea",
+        rationale: "A valid rationale",
+        pillar: 12,
+      },
+    });
+
+    expect(response.statusCode).toBe(422);
+    expect(response.json()).toMatchObject({
+      error: "INVALID_IDEA",
+      message: "Idea pillar must be text",
+    });
+    await app.close();
+  });
+});

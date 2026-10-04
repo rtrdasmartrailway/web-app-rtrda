@@ -2,6 +2,7 @@
 
 import { startTransition, useEffect, useState } from "react";
 import Image from "next/image";
+import type { CreateContentIdeaInput } from "@/lib/pr-center/idea-input";
 import styles from "./pr-center-app.module.css";
 
 type Page =
@@ -130,6 +131,12 @@ type Idea = {
   authorId: string;
   status: IdeaStatus;
   createdAt: string;
+  audience?: string;
+  pillar?: string;
+  channel?: string;
+  priority?: string;
+  campaign?: string;
+  evidenceUrls?: string[];
   requestId?: string;
   version?: number;
 };
@@ -276,6 +283,22 @@ const PHASE_1_PAGES = new Set<Page>([
   "directory",
   "settings",
 ]);
+const PHASE_2_PAGE_IDS = new Set<Page>([
+  "library",
+  "ideas",
+  "message-house",
+  "help",
+  "system-data",
+]);
+const PHASE_2_PAGES = new Set<Page>(
+  (process.env.NEXT_PUBLIC_PR_CENTER_PHASE2_PAGES || "")
+    .split(",")
+    .map((page) => page.trim())
+    .filter((page): page is Page => PHASE_2_PAGE_IDS.has(page as Page)),
+);
+function isPageEnabled(page: Page) {
+  return PHASE_1_PAGES.has(page) || PHASE_2_PAGES.has(page);
+}
 
 const copy = {
   th: {
@@ -882,6 +905,12 @@ export function PrCenterApp({
           title: string;
           rationale: string;
           proposerId: string;
+          audience: string | null;
+          pillar: string | null;
+          channel: string | null;
+          priority: string | null;
+          campaign: string | null;
+          evidenceUrls: unknown;
           status: string;
           createdAt: string;
           convertedRequestId: string | null;
@@ -896,6 +925,14 @@ export function PrCenterApp({
             authorId: idea.proposerId,
             status: idea.status.toLowerCase() as IdeaStatus,
             createdAt: idea.createdAt,
+            audience: idea.audience || undefined,
+            pillar: idea.pillar || undefined,
+            channel: idea.channel || undefined,
+            priority: idea.priority || undefined,
+            campaign: idea.campaign || undefined,
+            evidenceUrls: Array.isArray(idea.evidenceUrls)
+              ? idea.evidenceUrls.filter((url): url is string => typeof url === "string")
+              : [],
             requestId: idea.convertedRequestId || undefined,
             version: idea.version,
           })),
@@ -939,7 +976,7 @@ export function PrCenterApp({
             userId: notification.userId,
             title: notification.title,
             message: notification.body,
-            target: PHASE_1_PAGES.has(notification.target as Page)
+            target: isPageEnabled(notification.target as Page)
               ? (notification.target as Page)
               : "home",
             createdAt: notification.createdAt,
@@ -996,8 +1033,7 @@ export function PrCenterApp({
       }
     : (getUser(state.currentUserId) ?? users[0]);
   const visiblePages = pages.filter(
-    (item) =>
-      PHASE_1_PAGES.has(item.id) && ROLE_PAGES[currentUser.role].includes(item.id),
+    (item) => isPageEnabled(item.id) && ROLE_PAGES[currentUser.role].includes(item.id),
   );
   const loadMoreRequests = async () => {
     if (!requestCursor || loadingMoreRequests) return;
@@ -1045,7 +1081,7 @@ export function PrCenterApp({
   );
   const unreadCount = userNotifications.filter((item) => !item.read).length;
   const go = (next: Page) => {
-    if (!PHASE_1_PAGES.has(next) || !ROLE_PAGES[currentUser.role].includes(next)) return;
+    if (!isPageEnabled(next) || !ROLE_PAGES[currentUser.role].includes(next)) return;
     setPage(next);
     setSidebarOpen(false);
   };
@@ -1499,35 +1535,65 @@ export function PrCenterApp({
       ),
     }));
   };
-  const createIdea = async (title: string, summary: string) => {
-    const response = await fetch("/api/pr-center/ideas", {
-      method: "POST",
-      credentials: "same-origin",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ title, rationale: summary }),
-    });
-    if (!response.ok) return announce("Idea could not be saved");
-    const idea = (await response.json()) as {
-      id: string;
-      status: string;
-      version: number;
-      createdAt: string;
-    };
-    setState((previous) => ({
-      ...previous,
-      ideas: [
-        {
-          id: idea.id,
-          title,
-          summary,
-          authorId: currentUser.id,
-          status: idea.status.toLowerCase() as IdeaStatus,
-          createdAt: idea.createdAt,
-          version: idea.version,
-        },
-        ...previous.ideas,
-      ],
-    }));
+  const createIdea = async (input: CreateContentIdeaInput): Promise<boolean> => {
+    try {
+      const response = await fetch("/api/pr-center/ideas", {
+        method: "POST",
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(input),
+      });
+      if (!response.ok) {
+        const result = (await response.json().catch(() => null)) as {
+          message?: string;
+        } | null;
+        announce(result?.message || "Idea could not be saved");
+        return false;
+      }
+      const idea = (await response.json()) as {
+        id: string;
+        title: string;
+        rationale: string;
+        proposerId: string;
+        audience: string | null;
+        pillar: string | null;
+        channel: string | null;
+        priority: string | null;
+        campaign: string | null;
+        evidenceUrls: unknown;
+        status: string;
+        version: number;
+        createdAt: string;
+      };
+      setState((previous) => ({
+        ...previous,
+        ideas: [
+          {
+            id: idea.id,
+            title: idea.title,
+            summary: idea.rationale,
+            authorId: idea.proposerId || currentUser.id,
+            status: idea.status.toLowerCase() as IdeaStatus,
+            createdAt: idea.createdAt,
+            audience: idea.audience || undefined,
+            pillar: idea.pillar || undefined,
+            channel: idea.channel || undefined,
+            priority: idea.priority || undefined,
+            campaign: idea.campaign || undefined,
+            evidenceUrls: Array.isArray(idea.evidenceUrls)
+              ? idea.evidenceUrls.filter((url): url is string => typeof url === "string")
+              : [],
+            version: idea.version,
+          },
+          ...previous.ideas,
+        ],
+      }));
+      announce(state.language === "th" ? "บันทึกแนวคิดแล้ว" : "Idea saved");
+      return true;
+    } catch {
+      announce("Idea could not be saved. Check your connection and try again.");
+      return false;
+    }
   };
   const updateIdeaStatus = async (id: string, status: IdeaStatus) => {
     const idea = state.ideas.find((item) => item.id === id);
@@ -3368,7 +3434,7 @@ function Ideas({
 }: {
   ideas: Idea[];
   currentUser: User;
-  onCreate: (title: string, summary: string) => void;
+  onCreate: (input: CreateContentIdeaInput) => Promise<boolean>;
   onStatus: (id: string, status: IdeaStatus) => void;
   onConvert: (id: string) => void;
   language: Language;
@@ -3378,10 +3444,29 @@ function Ideas({
   const [status, setStatus] = useState<"all" | IdeaStatus>("all");
   const [title, setTitle] = useState("");
   const [summary, setSummary] = useState("");
+  const [audience, setAudience] = useState("");
+  const [pillar, setPillar] = useState("");
+  const [channel, setChannel] = useState("");
+  const [priority, setPriority] = useState("");
+  const [campaign, setCampaign] = useState("");
+  const [evidenceText, setEvidenceText] = useState("");
+  const [saving, setSaving] = useState(false);
   const visible = ideas.filter(
     (idea) =>
       (status === "all" || idea.status === status) &&
-      `${idea.title} ${idea.summary}`.toLowerCase().includes(query.toLowerCase()),
+      [
+        idea.title,
+        idea.summary,
+        idea.audience,
+        idea.pillar,
+        idea.channel,
+        idea.priority,
+        idea.campaign,
+      ]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase()
+        .includes(query.toLowerCase()),
   );
   return (
     <>
@@ -3397,29 +3482,115 @@ function Ideas({
       {open && (
         <form
           className={styles.card}
-          onSubmit={(event) => {
+          onSubmit={async (event) => {
             event.preventDefault();
-            onCreate(title.trim(), summary.trim());
-            setTitle("");
-            setSummary("");
-            setOpen(false);
+            setSaving(true);
+            try {
+              const saved = await onCreate({
+                title: title.trim(),
+                rationale: summary.trim(),
+                audience,
+                pillar,
+                channel,
+                priority,
+                campaign,
+                evidenceUrls: evidenceText
+                  .split(/\r?\n/)
+                  .map((url) => url.trim())
+                  .filter(Boolean),
+              });
+              if (!saved) return;
+              setTitle("");
+              setSummary("");
+              setAudience("");
+              setPillar("");
+              setChannel("");
+              setPriority("");
+              setCampaign("");
+              setEvidenceText("");
+              setOpen(false);
+            } finally {
+              setSaving(false);
+            }
           }}
         >
-          <h2>Propose an idea</h2>
-          <input
-            value={title}
-            onChange={(event) => setTitle(event.target.value)}
-            placeholder="Idea title"
-            required
-          />{" "}
-          <textarea
-            value={summary}
-            onChange={(event) => setSummary(event.target.value)}
-            placeholder="Audience, channel, and angle"
-            required
-          />{" "}
-          <button className={styles.primary} type="submit">
-            Save idea
+          <h2>{language === "th" ? "เสนอแนวคิดเนื้อหา" : "Propose an idea"}</h2>
+          <label>
+            {language === "th" ? "ชื่อแนวคิด" : "Idea title"}
+            <input
+              value={title}
+              onChange={(event) => setTitle(event.target.value)}
+              maxLength={300}
+              required
+            />
+          </label>
+          <label>
+            {language === "th" ? "เหตุผลและแนวทาง" : "Rationale and angle"}
+            <textarea
+              value={summary}
+              onChange={(event) => setSummary(event.target.value)}
+              maxLength={5000}
+              required
+            />
+          </label>
+          <label>
+            {language === "th" ? "กลุ่มเป้าหมาย" : "Audience"}
+            <input
+              value={audience}
+              onChange={(event) => setAudience(event.target.value)}
+              maxLength={500}
+            />
+          </label>
+          <label>
+            {language === "th" ? "เสาหลักเนื้อหา" : "Content pillar"}
+            <input
+              value={pillar}
+              onChange={(event) => setPillar(event.target.value)}
+              maxLength={100}
+            />
+          </label>
+          <label>
+            {language === "th" ? "ช่องทาง" : "Channel"}
+            <input
+              value={channel}
+              onChange={(event) => setChannel(event.target.value)}
+              maxLength={100}
+            />
+          </label>
+          <label>
+            {language === "th" ? "ลำดับความสำคัญ" : "Priority"}
+            <input
+              value={priority}
+              onChange={(event) => setPriority(event.target.value)}
+              maxLength={40}
+            />
+          </label>
+          <label>
+            {language === "th" ? "แคมเปญ" : "Campaign"}
+            <input
+              value={campaign}
+              onChange={(event) => setCampaign(event.target.value)}
+              maxLength={200}
+            />
+          </label>
+          <label>
+            {language === "th"
+              ? "ลิงก์หลักฐาน (HTTPS หนึ่งลิงก์ต่อบรรทัด)"
+              : "Evidence links (one HTTPS URL per line)"}
+            <textarea
+              value={evidenceText}
+              onChange={(event) => setEvidenceText(event.target.value)}
+              placeholder="https://…"
+            />
+          </label>
+          <button className={styles.primary} type="submit" disabled={saving}>
+            {saving
+              ? language === "th"
+                ? "กำลังบันทึก…"
+                : "Saving…"
+              : language === "th"
+                ? "บันทึกแนวคิด"
+                : "Save idea"}
           </button>
         </form>
       )}
@@ -3451,6 +3622,41 @@ function Ideas({
             </p>
             <h2>{idea.title}</h2>
             <p>{idea.summary}</p>
+            {[
+              idea.audience,
+              idea.pillar,
+              idea.channel,
+              idea.priority,
+              idea.campaign,
+            ].some(Boolean) && (
+              <p>
+                {[
+                  idea.audience &&
+                    `${language === "th" ? "กลุ่มเป้าหมาย" : "Audience"}: ${idea.audience}`,
+                  idea.pillar &&
+                    `${language === "th" ? "เสาหลักเนื้อหา" : "Pillar"}: ${idea.pillar}`,
+                  idea.channel &&
+                    `${language === "th" ? "ช่องทาง" : "Channel"}: ${idea.channel}`,
+                  idea.priority &&
+                    `${language === "th" ? "ลำดับความสำคัญ" : "Priority"}: ${idea.priority}`,
+                  idea.campaign &&
+                    `${language === "th" ? "แคมเปญ" : "Campaign"}: ${idea.campaign}`,
+                ]
+                  .filter(Boolean)
+                  .join(" · ")}
+              </p>
+            )}
+            {!!idea.evidenceUrls?.length && (
+              <ul>
+                {idea.evidenceUrls.map((url) => (
+                  <li key={url}>
+                    <a href={url} target="_blank" rel="noopener noreferrer">
+                      {url}
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            )}
             <footer>
               <span>{getUser(idea.authorId)?.name ?? "Unknown"}</span>
               {(currentUser.role === "pr" || currentUser.role === "admin") && (

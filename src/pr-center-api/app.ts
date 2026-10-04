@@ -149,14 +149,7 @@ export function buildPrCenterApi(
   app.get("/ideas", async (request) => listIdeas(request.prCenterActor!));
   app.post("/ideas", async (request, reply) => {
     const input = await body(request);
-    const idea = await createIdea(
-      request.prCenterActor!,
-      {
-        title: typeof input.title === "string" ? input.title : "",
-        rationale: typeof input.rationale === "string" ? input.rationale : "",
-      },
-      correlationId(request),
-    );
+    const idea = await createIdea(request.prCenterActor!, input, correlationId(request));
     return reply.status(201).send(idea);
   });
   app.post("/ideas/:ideaId/transitions", async (request) => {

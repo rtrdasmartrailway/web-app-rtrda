@@ -49,6 +49,7 @@ import {
   type PolicyEvaluationResult,
 } from "./notification-policy";
 import { dispatchNotification } from "./notification-channels";
+import { normalizeCreateIdeaInput } from "./idea-input";
 
 export type PrCenterActor = {
   id: string;
@@ -484,32 +485,35 @@ export async function listIdeas(actor: PrCenterActor) {
 
 export async function createIdea(
   actor: PrCenterActor,
-  input: { title: string; rationale: string },
+  input: unknown,
   correlationId: string = randomUUID(),
 ) {
   if (!canCreateIdea(actor.role) || !actor.departmentId)
     throw new PrCenterError("You cannot create an idea", 403, "FORBIDDEN");
-  const title = input.title.trim();
-  const rationale = input.rationale.trim();
-  if (
-    title.length < 3 ||
-    title.length > 300 ||
-    rationale.length < 3 ||
-    rationale.length > 5000
-  )
+  let ideaInput;
+  try {
+    ideaInput = normalizeCreateIdeaInput(input);
+  } catch (error) {
     throw new PrCenterError(
-      "Idea title and rationale must be between 3 and 5000 characters",
+      error instanceof Error ? error.message : "Invalid idea data",
       422,
       "INVALID_IDEA",
     );
+  }
   return prisma.$transaction(async (tx) => {
     const idea = await tx.prContentIdea.create({
       data: {
         organizationId: actor.organizationId,
         departmentId: actor.departmentId!,
         proposerId: actor.id,
-        title,
-        rationale,
+        title: ideaInput.title,
+        rationale: ideaInput.rationale,
+        audience: ideaInput.audience,
+        pillar: ideaInput.pillar,
+        channel: ideaInput.channel,
+        priority: ideaInput.priority,
+        campaign: ideaInput.campaign,
+        evidenceUrls: ideaInput.evidenceUrls,
       },
     });
     await auditAndOutbox(tx, {
@@ -517,7 +521,11 @@ export async function createIdea(
       action: "idea.created",
       entityType: "content_idea",
       entityId: idea.id,
-      after: { status: idea.status, version: idea.version },
+      after: {
+        status: idea.status,
+        version: idea.version,
+        evidenceCount: ideaInput.evidenceUrls.length,
+      },
       eventType: "pr.idea.created",
       correlationId,
     });

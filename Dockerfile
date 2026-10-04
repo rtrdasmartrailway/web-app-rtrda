@@ -23,6 +23,7 @@ COPY . .
 RUN npm test
 RUN npm run lint
 RUN npm run typecheck
+ARG NEXT_PUBLIC_PR_CENTER_PHASE2_PAGES=""
 RUN npm run build
 
 FROM deps AS pr-center-api
