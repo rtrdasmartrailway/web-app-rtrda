@@ -441,7 +441,7 @@ model PrComment {
   body      String
   request   PrRequest?     @relation(fields: [requestId], references: [id], onDelete: Cascade)
   task      PrTask?        @relation(fields: [taskId], references: [id], onDelete: Cascade)
-  idea      PrContentIdea? @relation(fields: [ideaId], references: [id], onDelete: Cascade)
+  idea      PrContentIdea? @relation(fields: [ideaId], references: [id], onDelete: Restrict)
   author    PrCenterUser   @relation(fields: [authorId], references: [id], onDelete: Restrict)
   createdAt DateTime       @default(now())
   updatedAt DateTime       @updatedAt
