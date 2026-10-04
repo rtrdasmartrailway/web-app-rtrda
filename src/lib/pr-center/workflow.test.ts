@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   canApprove,
   canCreateIdea,
+  canCreateRequest,
   canReviewIdeas,
   canTransitionTask,
   canAttachFiles,
@@ -20,6 +21,14 @@ describe("PR Center workflow policy", () => {
     expect(canTransitionTask("PR_OPERATIONS", "DRAFT", "COMMUNICATION_PLANNING")).toBe(
       true,
     );
+  });
+
+  it("allows requesters to submit but does not grant submission authority to approval-only roles", () => {
+    expect(canCreateRequest("REQUESTER")).toBe(true);
+    expect(canCreateRequest("SCOPED_ADMINISTRATOR")).toBe(true);
+    expect(canCreateRequest("PR_OPERATIONS")).toBe(false);
+    expect(canCreateRequest("APPROVER")).toBe(false);
+    expect(canCreateRequest("EXECUTIVE_READ_ONLY")).toBe(false);
   });
 
   it("limits approvals to PR operations and scoped administrators", () => {

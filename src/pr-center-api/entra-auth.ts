@@ -109,6 +109,33 @@ export function validateIdentityMapping<T extends ExistingIdentity>(
   return existingUser;
 }
 
+export function isAllowedOrganizationEmail(email: string): boolean {
+  const normalized = email.trim().toLowerCase();
+  const at = normalized.indexOf("@");
+  return (
+    at > 0 &&
+    at === normalized.lastIndexOf("@") &&
+    normalized.slice(at + 1) === "rtrda.or.th"
+  );
+}
+
+export function resolvePrCenterLoginRole(
+  email: string,
+  tokenRole: PrCenterRole | undefined,
+  databaseRoleAssignment: { role: PrCenterRole; departmentId: string | null } | undefined,
+): { role: PrCenterRole; autoProvisionRequester: boolean } {
+  if (!isAllowedOrganizationEmail(email))
+    throw new PrCenterError(
+      "Only @rtrda.or.th accounts may access PR Center",
+      403,
+      "OIDC_DOMAIN_NOT_ALLOWED",
+    );
+  if (tokenRole) return { role: tokenRole, autoProvisionRequester: false };
+  if (databaseRoleAssignment)
+    return { role: databaseRoleAssignment.role, autoProvisionRequester: false };
+  return { role: "REQUESTER", autoProvisionRequester: true };
+}
+
 function config() {
   const tenantId = process.env.ENTRA_TENANT_ID;
   const clientId = process.env.ENTRA_CLIENT_ID;
@@ -173,6 +200,12 @@ export function createEntraAuth() {
         403,
         "OIDC_MISSING_EMAIL",
       );
+    if (!isAllowedOrganizationEmail(email))
+      throw new PrCenterError(
+        "Only @rtrda.or.th accounts may access PR Center",
+        403,
+        "OIDC_DOMAIN_NOT_ALLOWED",
+      );
     return prisma.$transaction(async (tx) => {
       const organization = await tx.prOrganization.upsert({
         where: { code: "RTRDA" },
@@ -222,17 +255,23 @@ export function createEntraAuth() {
             );
           }).find((assignment) => assignment !== undefined)
         : undefined;
-      const role = tokenRole || databaseRoleAssignment?.role;
-      if (!role)
-        throw new PrCenterError(
-          "Your account is not assigned a PR Center role",
-          403,
-          "OIDC_ROLE_NOT_ASSIGNED",
-        );
+      const loginRole = resolvePrCenterLoginRole(
+        email,
+        tokenRole,
+        databaseRoleAssignment,
+      );
+      const { role, autoProvisionRequester } = loginRole;
       const user = existingUser
         ? await tx.prCenterUser.update({
             where: { id: existingUser.id },
-            data: { email, displayName, organizationId: organization.id },
+            data: {
+              email,
+              displayName,
+              organizationId: organization.id,
+              ...(autoProvisionRequester && !existingUser.departmentId
+                ? { departmentId: department.id }
+                : {}),
+            },
           })
         : await tx.prCenterUser.create({
             data: {
@@ -244,7 +283,7 @@ export function createEntraAuth() {
               active: true,
             },
           });
-      if (tokenRole) {
+      if (tokenRole || autoProvisionRequester) {
         const existingRole = await tx.prUserRole.findFirst({
           where: {
             userId: user.id,

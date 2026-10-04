@@ -1,5 +1,49 @@
 import { describe, expect, it } from "vitest";
-import { isSessionAuthorityCurrent, validateIdentityMapping } from "./entra-auth";
+import {
+  isAllowedOrganizationEmail,
+  isSessionAuthorityCurrent,
+  resolvePrCenterLoginRole,
+  validateIdentityMapping,
+} from "./entra-auth";
+
+describe("organization-domain requester access", () => {
+  it("allows only a non-empty address at the exact rtrda.or.th domain", () => {
+    expect(isAllowedOrganizationEmail("staff@rtrda.or.th")).toBe(true);
+    expect(isAllowedOrganizationEmail("STAFF@RTRDA.OR.TH")).toBe(true);
+    expect(isAllowedOrganizationEmail("staff@sub.rtrda.or.th")).toBe(false);
+    expect(isAllowedOrganizationEmail("staff@rtrda.or.th.evil.test")).toBe(false);
+    expect(isAllowedOrganizationEmail("staff@evilrtrda.or.th")).toBe(false);
+    expect(isAllowedOrganizationEmail("@rtrda.or.th")).toBe(false);
+  });
+
+  it("gives a domain-approved user without a role the least-privilege requester role", () => {
+    expect(resolvePrCenterLoginRole("staff@rtrda.or.th", undefined, undefined)).toEqual({
+      role: "REQUESTER",
+      autoProvisionRequester: true,
+    });
+  });
+
+  it("preserves an existing explicit role instead of auto-provisioning", () => {
+    expect(
+      resolvePrCenterLoginRole("staff@rtrda.or.th", undefined, {
+        role: "PR_OPERATIONS",
+        departmentId: null,
+      }),
+    ).toEqual({ role: "PR_OPERATIONS", autoProvisionRequester: false });
+  });
+
+  it("blocks even a role-assigned account when its email is outside the organization domain", () => {
+    expect(() =>
+      resolvePrCenterLoginRole(
+        "staff@outside.example",
+        "SCOPED_ADMINISTRATOR",
+        undefined,
+      ),
+    ).toThrow(
+      expect.objectContaining({ code: "OIDC_DOMAIN_NOT_ALLOWED", statusCode: 403 }),
+    );
+  });
+});
 
 const identity = {
   id: "user-1",
