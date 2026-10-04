@@ -2596,15 +2596,34 @@ export async function listAdminUsers(actor: PrCenterActor) {
   });
 }
 
+function normalizeAccessAdminReason(reason: unknown): string {
+  if (typeof reason !== "string" || !reason.trim())
+    throw new PrCenterError(
+      "A reason is required for access administration changes",
+      422,
+      "REASON_REQUIRED",
+    );
+  const normalized = reason.trim();
+  if (normalized.length > 1000)
+    throw new PrCenterError(
+      "Access administration reason is too long",
+      422,
+      "INVALID_REASON",
+    );
+  return normalized;
+}
+
 export async function grantRole(
   actor: PrCenterActor,
   userId: string,
   role: PrCenterRole,
   departmentId: string | null,
+  reason: unknown,
   correlationId: string = randomUUID(),
 ) {
   if (!canManageAccess(actorRoles(actor)))
     throw new PrCenterError("You cannot grant roles", 403, "FORBIDDEN");
+  const accessReason = normalizeAccessAdminReason(reason);
   if (!PR_CENTER_ROLES.includes(role))
     throw new PrCenterError("Invalid role code", 422, "INVALID_ROLE");
   if (userId === actor.id)
@@ -2661,6 +2680,7 @@ export async function grantRole(
           roleId: granted.id,
           role,
           departmentId: departmentId ?? null,
+          reason: accessReason,
           authorityRoles: actorRoleGrants(actor),
         },
       },
@@ -2672,10 +2692,12 @@ export async function grantRole(
 export async function revokeRole(
   actor: PrCenterActor,
   roleId: string,
+  reason: unknown,
   correlationId: string = randomUUID(),
 ) {
   if (!canManageAccess(actorRoles(actor)))
     throw new PrCenterError("You cannot revoke roles", 403, "FORBIDDEN");
+  const accessReason = normalizeAccessAdminReason(reason);
   const roleRecord = await prisma.prUserRole.findFirst({
     where: { id: roleId, organizationId: actor.organizationId },
     include: {
@@ -2707,6 +2729,7 @@ export async function revokeRole(
           roleId,
           role: roleRecord.role,
           departmentId: roleRecord.departmentId,
+          reason: accessReason,
           authorityRoles: actorRoleGrants(actor),
         },
       },
@@ -2718,10 +2741,12 @@ export async function revokeRole(
 export async function toggleUserActive(
   actor: PrCenterActor,
   userId: string,
+  reason: unknown,
   correlationId: string = randomUUID(),
 ) {
   if (!canManageAccess(actorRoles(actor)))
     throw new PrCenterError("You cannot modify user status", 403, "FORBIDDEN");
+  const accessReason = normalizeAccessAdminReason(reason);
   const user = await prisma.prCenterUser.findFirst({
     where: { id: userId, organizationId: actor.organizationId },
   });
@@ -2763,7 +2788,11 @@ export async function toggleUserActive(
         entityId: userId,
         correlationId,
         before: { active: user.active, authorityRoles: actorRoleGrants(actor) },
-        after: { active: nextActive, authorityRoles: actorRoleGrants(actor) },
+        after: {
+          active: nextActive,
+          reason: accessReason,
+          authorityRoles: actorRoleGrants(actor),
+        },
       },
     });
     return { id: userId, active: updated.active };

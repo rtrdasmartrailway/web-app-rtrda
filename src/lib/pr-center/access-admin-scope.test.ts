@@ -55,6 +55,20 @@ beforeEach(() => {
 });
 
 describe("scoped access administration", () => {
+  it.each(["", "   ", "x".repeat(1001)])(
+    "rejects an empty or oversized access reason",
+    async (reason) => {
+      await expect(
+        grantRole(scopedAdministrator, "user-1", "PR_OPERATIONS", "dept-1", reason),
+      ).rejects.toMatchObject({
+        statusCode: 422,
+        code: reason.trim() ? "INVALID_REASON" : "REASON_REQUIRED",
+      });
+      expect(mockPrisma.prCenterUser.findFirst).not.toHaveBeenCalled();
+      expect(mockPrisma.prUserRole.create).not.toHaveBeenCalled();
+    },
+  );
+
   it("filters directory users and nested role assignments to the administrator's department", async () => {
     await listAdminUsers(scopedAdministrator);
 
@@ -78,14 +92,27 @@ describe("scoped access administration", () => {
     "denies a scoped administrator granting an organization-wide or other-department role (%s)",
     async (departmentId) => {
       await expect(
-        grantRole(scopedAdministrator, "user-1", "PR_OPERATIONS", departmentId),
+        grantRole(
+          scopedAdministrator,
+          "user-1",
+          "PR_OPERATIONS",
+          departmentId,
+          "role assignment",
+        ),
       ).rejects.toMatchObject({ statusCode: 403, code: "FORBIDDEN" });
       expect(mockPrisma.prUserRole.create).not.toHaveBeenCalled();
     },
   );
 
   it("allows an in-scope grant and records the grant scope and actor authority", async () => {
-    await grantRole(scopedAdministrator, "user-1", "PR_OPERATIONS", "dept-1", "corr-1");
+    await grantRole(
+      scopedAdministrator,
+      "user-1",
+      "PR_OPERATIONS",
+      "dept-1",
+      "coverage assignment",
+      "corr-1",
+    );
 
     expect(mockPrisma.prUserRole.create).toHaveBeenCalledWith({
       data: {
@@ -103,6 +130,7 @@ describe("scoped access administration", () => {
           after: expect.objectContaining({
             role: "PR_OPERATIONS",
             departmentId: "dept-1",
+            reason: "coverage assignment",
             authorityRoles: [{ role: "SCOPED_ADMINISTRATOR", departmentId: "dept-1" }],
           }),
         }),
@@ -120,7 +148,9 @@ describe("scoped access administration", () => {
       user: { id: "user-1", displayName: "User", departmentId: "dept-1" },
     });
 
-    await expect(revokeRole(scopedAdministrator, "grant-2")).rejects.toMatchObject({
+    await expect(
+      revokeRole(scopedAdministrator, "grant-2", "scope correction"),
+    ).rejects.toMatchObject({
       statusCode: 403,
       code: "FORBIDDEN",
     });
@@ -137,7 +167,9 @@ describe("scoped access administration", () => {
       user: { id: "user-1", displayName: "User", departmentId: "dept-1" },
     });
 
-    await expect(revokeRole(scopedAdministrator, "grant-1", "corr-2")).resolves.toEqual({
+    await expect(
+      revokeRole(scopedAdministrator, "grant-1", "assignment ended", "corr-2"),
+    ).resolves.toEqual({
       id: "grant-1",
       removed: true,
     });
@@ -155,6 +187,7 @@ describe("scoped access administration", () => {
           before: expect.objectContaining({
             role: "PR_OPERATIONS",
             departmentId: "dept-1",
+            reason: "assignment ended",
             authorityRoles: [{ role: "SCOPED_ADMINISTRATOR", departmentId: "dept-1" }],
           }),
         }),
@@ -170,14 +203,26 @@ describe("scoped access administration", () => {
     });
 
     await expect(
-      grantRole(scopedAdministrator, "user-2", "PR_OPERATIONS", "dept-1"),
+      grantRole(
+        scopedAdministrator,
+        "user-2",
+        "PR_OPERATIONS",
+        "dept-1",
+        "role assignment",
+      ),
     ).rejects.toMatchObject({ statusCode: 403, code: "FORBIDDEN" });
     expect(mockPrisma.prUserRole.create).not.toHaveBeenCalled();
   });
 
   it("blocks role grants to the administrator's own account", async () => {
     await expect(
-      grantRole(organizationAdministrator, "org-admin-1", "PR_OPERATIONS", null),
+      grantRole(
+        organizationAdministrator,
+        "org-admin-1",
+        "PR_OPERATIONS",
+        null,
+        "role assignment",
+      ),
     ).rejects.toMatchObject({ statusCode: 422, code: "SELF_GRANT_BLOCKED" });
     expect(mockPrisma.prCenterUser.findFirst).not.toHaveBeenCalled();
     expect(mockPrisma.prUserRole.create).not.toHaveBeenCalled();
@@ -200,7 +245,7 @@ describe("scoped access administration", () => {
     mockPrisma.prUserRole.count.mockResolvedValue(0);
 
     await expect(
-      revokeRole(organizationAdministrator, "org-admin-grant"),
+      revokeRole(organizationAdministrator, "org-admin-grant", "admin transition"),
     ).rejects.toMatchObject({ statusCode: 422, code: "LAST_ORGANIZATION_ADMIN" });
     expect(mockPrisma.prUserRole.delete).not.toHaveBeenCalled();
     expect(mockPrisma.prAuditEvent.create).not.toHaveBeenCalled();
@@ -223,11 +268,41 @@ describe("scoped access administration", () => {
     mockPrisma.prUserRole.count.mockResolvedValue(1);
 
     await expect(
-      revokeRole(organizationAdministrator, "org-admin-grant"),
+      revokeRole(organizationAdministrator, "org-admin-grant", "admin transition"),
     ).resolves.toMatchObject({ removed: true });
     expect(mockPrisma.prUserRole.delete).toHaveBeenCalledWith({
       where: { id: "org-admin-grant" },
     });
+  });
+
+  it("stores the reason for user activation in the access audit", async () => {
+    mockPrisma.prCenterUser.findFirst.mockResolvedValue({
+      id: "user-2",
+      organizationId: "org-1",
+      departmentId: "dept-1",
+      active: false,
+    });
+    mockPrisma.prCenterUser.update.mockResolvedValue({ id: "user-2", active: true });
+
+    await toggleUserActive(
+      organizationAdministrator,
+      "user-2",
+      "Reactivated after approved leave",
+      "corr-activate",
+    );
+
+    expect(mockPrisma.prAuditEvent.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          action: "access.user_activated",
+          correlationId: "corr-activate",
+          after: expect.objectContaining({
+            active: true,
+            reason: "Reactivated after approved leave",
+          }),
+        }),
+      }),
+    );
   });
 
   it("prevents deactivating the last active organization-wide administrator", async () => {
@@ -241,7 +316,7 @@ describe("scoped access administration", () => {
     mockPrisma.prUserRole.count.mockResolvedValue(0);
 
     await expect(
-      toggleUserActive(organizationAdministrator, "admin-2"),
+      toggleUserActive(organizationAdministrator, "admin-2", "account maintenance"),
     ).rejects.toMatchObject({ statusCode: 422, code: "LAST_ORGANIZATION_ADMIN" });
     expect(mockPrisma.prCenterUser.update).not.toHaveBeenCalled();
     expect(mockPrisma.prAuditEvent.create).not.toHaveBeenCalled();
@@ -258,7 +333,9 @@ describe("scoped access administration", () => {
     });
     mockPrisma.$transaction.mockRejectedValue({ code: "P2034" });
 
-    await expect(revokeRole(scopedAdministrator, "role-1")).rejects.toMatchObject({
+    await expect(
+      revokeRole(scopedAdministrator, "role-1", "assignment ended"),
+    ).rejects.toMatchObject({
       statusCode: 409,
       code: "STALE_ACCESS_ADMIN_WRITE",
     });

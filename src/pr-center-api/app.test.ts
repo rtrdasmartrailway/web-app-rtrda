@@ -159,6 +159,21 @@ describe("Access administration route guards", () => {
     await app.close();
   });
 
+  it.each([
+    ["POST", "/admin/users/some-id/roles", { role: "REQUESTER" }],
+    ["DELETE", "/admin/roles/some-role-id", {}],
+    ["PATCH", "/admin/users/some-id/active", {}],
+  ] as const)(
+    "requires an access-change reason for %s %s",
+    async (method, url, payload) => {
+      const app = buildPrCenterApi(async () => adminActor);
+      const response = await app.inject({ method, url, payload });
+      expect(response.statusCode).toBe(422);
+      expect(response.json().error).toBe("REASON_REQUIRED");
+      await app.close();
+    },
+  );
+
   it("rejects non-admin role from revoking roles", async () => {
     const app = buildPrCenterApi(async () => mockActor);
     const response = await app.inject({

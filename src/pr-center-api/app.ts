@@ -551,24 +551,35 @@ export function buildPrCenterApi(
       (request.params as { userId: string }).userId,
       input.role as PrCenterRole,
       typeof input.departmentId === "string" ? input.departmentId : null,
+      input.reason,
       correlationId(request),
     );
     return reply.status(201).send(result);
   });
-  app.delete("/admin/roles/:roleId", async (request) =>
-    revokeRole(
+  app.delete("/admin/roles/:roleId", async (request) => {
+    const input =
+      request.body && typeof request.body === "object" && !Array.isArray(request.body)
+        ? (request.body as Record<string, unknown>)
+        : {};
+    return revokeRole(
       request.prCenterActor!,
       (request.params as { roleId: string }).roleId,
+      input.reason,
       correlationId(request),
-    ),
-  );
-  app.patch("/admin/users/:userId/active", async (request) =>
-    toggleUserActive(
+    );
+  });
+  app.patch("/admin/users/:userId/active", async (request) => {
+    const input =
+      request.body && typeof request.body === "object" && !Array.isArray(request.body)
+        ? (request.body as Record<string, unknown>)
+        : {};
+    return toggleUserActive(
       request.prCenterActor!,
       (request.params as { userId: string }).userId,
+      input.reason,
       correlationId(request),
-    ),
-  );
+    );
+  });
   app.get("/admin/access-audit", async (request) => {
     const query = request.query as { take?: string };
     return listAccessAuditEvents(request.prCenterActor!, Number(query.take || 100));

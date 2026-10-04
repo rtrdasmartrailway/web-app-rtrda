@@ -2174,7 +2174,9 @@ export function PrCenterApp({
           {page === "history" && (
             <History audit={state.audit} language={state.language} />
           )}
-          {page === "directory" && actor && <Directory actor={actor} />}
+          {page === "directory" && actor && (
+            <Directory actor={actor} language={state.language} />
+          )}
           {page === "settings" && actor && <Settings language={state.language} />}
           {page === "system-data" && (
             <SystemData
@@ -4440,6 +4442,7 @@ function History({ audit, language }: { audit: AuditEntry[]; language: Language 
 }
 function Directory({
   actor,
+  language,
 }: {
   actor: {
     userId: string;
@@ -4447,6 +4450,7 @@ function Directory({
     role: string;
     roleGrants?: Array<{ role: string; departmentId: string | null }>;
   };
+  language: Language;
 }) {
   const [users, setUsers] = useState<
     Array<{
@@ -4463,6 +4467,7 @@ function Directory({
   const [grantTarget, setGrantTarget] = useState<string | null>(null);
   const [grantRole, setGrantRole] = useState<string>("REQUESTER");
   const [grantDepartmentId, setGrantDepartmentId] = useState("");
+  const [accessReason, setAccessReason] = useState("");
   const isOrganizationAdmin =
     actor.roleGrants?.some(
       (grant) => grant.role === "SCOPED_ADMINISTRATOR" && grant.departmentId === null,
@@ -4514,11 +4519,18 @@ function Directory({
   const handleGrant = async (userId: string) => {
     setNotice(null);
     setError(null);
+    const reason = accessReason.trim();
+    if (!reason)
+      return setError(language === "th" ? "กรุณาระบุเหตุผล" : "A reason is required");
     const res = await fetch(`/api/pr-center/admin/users/${userId}/roles`, {
       method: "POST",
       credentials: "same-origin",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ role: grantRole, departmentId: grantDepartmentId || null }),
+      body: JSON.stringify({
+        role: grantRole,
+        departmentId: grantDepartmentId || null,
+        reason,
+      }),
     });
     if (!res.ok) {
       const err = await res.json().catch(() => null);
@@ -4527,15 +4539,21 @@ function Directory({
     }
     setNotice("Role granted");
     setGrantTarget(null);
+    setAccessReason("");
     reload();
   };
 
   const handleRevoke = async (roleId: string) => {
     setNotice(null);
     setError(null);
+    const reason = accessReason.trim();
+    if (!reason)
+      return setError(language === "th" ? "กรุณาระบุเหตุผล" : "A reason is required");
     const res = await fetch(`/api/pr-center/admin/roles/${roleId}`, {
       method: "DELETE",
       credentials: "same-origin",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ reason }),
     });
     if (!res.ok) {
       const err = await res.json().catch(() => null);
@@ -4543,15 +4561,21 @@ function Directory({
       return;
     }
     setNotice("Role revoked");
+    setAccessReason("");
     reload();
   };
 
   const handleToggleActive = async (userId: string) => {
     setNotice(null);
     setError(null);
+    const reason = accessReason.trim();
+    if (!reason)
+      return setError(language === "th" ? "กรุณาระบุเหตุผล" : "A reason is required");
     const res = await fetch(`/api/pr-center/admin/users/${userId}/active`, {
       method: "PATCH",
       credentials: "same-origin",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ reason }),
     });
     if (!res.ok) {
       const err = await res.json().catch(() => null);
@@ -4559,12 +4583,32 @@ function Directory({
       return;
     }
     setNotice("User status updated");
+    setAccessReason("");
     reload();
   };
 
   return (
     <>
       <SectionHeading eyebrow="ACCESS ADMINISTRATION" title="User Directory" />
+      <label style={{ display: "grid", gap: 4, margin: "8px 0 16px" }}>
+        <span>
+          {language === "th"
+            ? "เหตุผลในการเปลี่ยนสิทธิ์ (จำเป็น)"
+            : "Reason for access change (required)"}
+        </span>
+        <textarea
+          value={accessReason}
+          maxLength={1000}
+          onChange={(event) => setAccessReason(event.target.value)}
+          aria-required="true"
+          rows={2}
+        />
+        <small>
+          {language === "th"
+            ? "ไม่ใส่รหัสผ่านหรือข้อมูลส่วนบุคคลที่อ่อนไหว"
+            : "Do not include passwords or sensitive personal information."}
+        </small>
+      </label>
       {notice && (
         <p style={{ color: "#16a34a", fontSize: 13, margin: "4px 0" }}>{notice}</p>
       )}
@@ -4587,7 +4631,11 @@ function Directory({
               <div style={{ display: "flex", gap: 8 }}>
                 <button
                   onClick={() => handleToggleActive(user.id)}
-                  disabled={user.id === actor.userId || isLastOrganizationAdmin(user)}
+                  disabled={
+                    user.id === actor.userId ||
+                    isLastOrganizationAdmin(user) ||
+                    !accessReason.trim()
+                  }
                   title={
                     isLastOrganizationAdmin(user)
                       ? "At least one active organization-wide administrator must remain"
@@ -4644,10 +4692,11 @@ function Directory({
                   <button
                     onClick={() => handleRevoke(r.id)}
                     disabled={
-                      user.active &&
-                      r.role === "SCOPED_ADMINISTRATOR" &&
-                      r.departmentId === null &&
-                      activeOrganizationAdmins <= 1
+                      !accessReason.trim() ||
+                      (user.active &&
+                        r.role === "SCOPED_ADMINISTRATOR" &&
+                        r.departmentId === null &&
+                        activeOrganizationAdmins <= 1)
                     }
                     title={
                       user.active &&
@@ -4708,6 +4757,7 @@ function Directory({
                 <button
                   onClick={() => handleGrant(user.id)}
                   className={styles.primary}
+                  disabled={!accessReason.trim()}
                   style={{ fontSize: 12 }}
                 >
                   Confirm grant
