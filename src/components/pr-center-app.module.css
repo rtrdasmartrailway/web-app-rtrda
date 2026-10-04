@@ -245,6 +245,18 @@
 .primary:hover {
   background: #0c55bb;
 }
+.secondaryButton {
+  background: #fff;
+  border: 1px solid var(--pc-line);
+  border-radius: 6px;
+  color: var(--pc-ink);
+  font-weight: 600;
+  padding: 10px 15px;
+}
+.secondaryButton:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
 .metrics {
   display: grid;
   gap: 16px;

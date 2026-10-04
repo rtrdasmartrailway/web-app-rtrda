@@ -1,8 +1,9 @@
 "use client";
 
-import { startTransition, useEffect, useState } from "react";
+import { startTransition, useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import type { CreateContentIdeaInput } from "@/lib/pr-center/idea-input";
+import { parseIdeaListPage, type IdeaListRecord } from "@/lib/pr-center/idea-view";
 import { parseCalendarEntries, type CalendarEntry } from "@/lib/pr-center/calendar-view";
 import {
   parseCurrentMessageHouse,
@@ -146,6 +147,44 @@ type Idea = {
   requestId?: string;
   version?: number;
 };
+const IDEAS_PAGE_SIZE = 50;
+function mapIdeaRecord(idea: IdeaListRecord): Idea {
+  return {
+    id: idea.id,
+    title: idea.title,
+    summary: idea.rationale,
+    authorId: idea.proposerId,
+    status: idea.status.toLowerCase() as IdeaStatus,
+    createdAt: idea.createdAt,
+    audience: idea.audience || undefined,
+    pillar: idea.pillar || undefined,
+    channel: idea.channel || undefined,
+    priority: idea.priority || undefined,
+    campaign: idea.campaign || undefined,
+    evidenceUrls: idea.evidenceUrls,
+    requestId: idea.convertedRequestId || undefined,
+    version: idea.version,
+  };
+}
+async function fetchIdeaPage(
+  offset: number,
+  search = "",
+  status = "",
+  signal?: AbortSignal,
+) {
+  const query = new URLSearchParams({
+    take: String(IDEAS_PAGE_SIZE),
+    offset: String(offset),
+  });
+  if (search.trim()) query.set("search", search.trim());
+  if (status) query.set("status", status);
+  const response = await fetch(`/api/pr-center/ideas?${query.toString()}`, {
+    credentials: "same-origin",
+    signal,
+  });
+  if (!response.ok) throw new Error("Idea list unavailable");
+  return parseIdeaListPage(await response.json());
+}
 type MessageHouseData = {
   vision: string;
   positioning: string;
@@ -821,6 +860,7 @@ export function PrCenterApp({
       | "SCOPED_ADMINISTRATOR";
   };
 }) {
+  const latestActorId = useRef(actor?.userId);
   const [page, setPage] = useState<Page>("home");
   const [state, setState] = useState<PrCenterState>(cloneDefaultState);
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -836,6 +876,23 @@ export function PrCenterApp({
   const [hasMoreRequests, setHasMoreRequests] = useState(false);
   const [loadingMoreRequests, setLoadingMoreRequests] = useState(false);
   const [loadingRequests, setLoadingRequests] = useState(true);
+  const [ideaNextOffset, setIdeaNextOffset] = useState<number | null>(null);
+  const [ideasOwnerId, setIdeasOwnerId] = useState<string | null>(null);
+  const [loadingMoreIdeas, setLoadingMoreIdeas] = useState(false);
+  const [ideaListStatus, setIdeaListStatus] = useState<"loading" | "loaded" | "error">(
+    "loading",
+  );
+  const [ideaSearch, setIdeaSearch] = useState("");
+  const [ideaStatusFilter, setIdeaStatusFilter] = useState("");
+  const latestIdeaFilters = useRef({ search: ideaSearch, status: ideaStatusFilter });
+  const changeIdeaFilters = (search: string, status: "all" | IdeaStatus) => {
+    const nextStatus = status === "all" ? "" : status.toUpperCase();
+    latestIdeaFilters.current = { search, status: nextStatus };
+    setIdeaListStatus("loading");
+    setIdeaNextOffset(null);
+    setIdeaSearch(search);
+    setIdeaStatusFilter(nextStatus);
+  };
   const [messageHouseStatus, setMessageHouseStatus] = useState<
     "loading" | "empty" | "loaded" | "error"
   >("loading");
@@ -913,49 +970,26 @@ export function PrCenterApp({
       .catch(() => setNotice("Unable to load submitted request approvals"));
   }, [actor?.role, page]);
   useEffect(() => {
-    fetch("/api/pr-center/ideas", { credentials: "same-origin" })
-      .then(async (response) => {
-        if (!response.ok) throw new Error("Idea list unavailable");
-        const ideas = (await response.json()) as Array<{
-          id: string;
-          title: string;
-          rationale: string;
-          proposerId: string;
-          audience: string | null;
-          pillar: string | null;
-          channel: string | null;
-          priority: string | null;
-          campaign: string | null;
-          evidenceUrls: unknown;
-          status: string;
-          createdAt: string;
-          convertedRequestId: string | null;
-          version: number;
-        }>;
-        setState((previous) => ({
-          ...previous,
-          ideas: ideas.map((idea) => ({
-            id: idea.id,
-            title: idea.title,
-            summary: idea.rationale,
-            authorId: idea.proposerId,
-            status: idea.status.toLowerCase() as IdeaStatus,
-            createdAt: idea.createdAt,
-            audience: idea.audience || undefined,
-            pillar: idea.pillar || undefined,
-            channel: idea.channel || undefined,
-            priority: idea.priority || undefined,
-            campaign: idea.campaign || undefined,
-            evidenceUrls: Array.isArray(idea.evidenceUrls)
-              ? idea.evidenceUrls.filter((url): url is string => typeof url === "string")
-              : [],
-            requestId: idea.convertedRequestId || undefined,
-            version: idea.version,
-          })),
-        }));
+    latestActorId.current = actor?.userId;
+  }, [actor?.userId]);
+  useEffect(() => {
+    if (!actor?.userId) return;
+    const controller = new AbortController();
+    fetchIdeaPage(0, ideaSearch, ideaStatusFilter, controller.signal)
+      .then((page) => {
+        if (controller.signal.aborted) return;
+        setState((previous) => ({ ...previous, ideas: page.items.map(mapIdeaRecord) }));
+        setIdeasOwnerId(actor.userId);
+        setIdeaNextOffset(page.nextOffset);
+        setIdeaListStatus("loaded");
       })
-      .catch(() => undefined);
-  }, []);
+      .catch(() => {
+        if (controller.signal.aborted) return;
+        setIdeaListStatus("error");
+        setNotice("Unable to load Content Ideas");
+      });
+    return () => controller.abort();
+  }, [actor?.userId, ideaSearch, ideaStatusFilter]);
   useEffect(() => {
     fetch("/api/pr-center/notifications", { credentials: "same-origin" })
       .then(async (response) => {
@@ -1684,6 +1718,82 @@ export function PrCenterApp({
       state.language === "th" ? "แปลงแนวคิดเป็นคำขอแล้ว" : "Idea converted to request",
     );
   };
+  const refreshIdeas = async () => {
+    if (!actor?.userId) return;
+    setIdeaListStatus("loading");
+    const requestedFilters = { search: ideaSearch, status: ideaStatusFilter };
+    try {
+      const page = await fetchIdeaPage(
+        0,
+        requestedFilters.search,
+        requestedFilters.status,
+      );
+      if (
+        latestActorId.current !== actor.userId ||
+        latestIdeaFilters.current.search !== requestedFilters.search ||
+        latestIdeaFilters.current.status !== requestedFilters.status
+      )
+        return;
+      setState((previous) => ({ ...previous, ideas: page.items.map(mapIdeaRecord) }));
+      setIdeasOwnerId(actor.userId);
+      setIdeaNextOffset(page.nextOffset);
+      setIdeaListStatus("loaded");
+    } catch {
+      if (
+        latestActorId.current !== actor.userId ||
+        latestIdeaFilters.current.search !== requestedFilters.search ||
+        latestIdeaFilters.current.status !== requestedFilters.status
+      )
+        return;
+      setIdeaListStatus("error");
+      setNotice("Unable to refresh Content Ideas");
+    }
+  };
+  const loadMoreIdeas = async () => {
+    if (
+      !actor?.userId ||
+      ideasOwnerId !== actor.userId ||
+      ideaNextOffset === null ||
+      loadingMoreIdeas
+    )
+      return;
+    setLoadingMoreIdeas(true);
+    const requestedFilters = { search: ideaSearch, status: ideaStatusFilter };
+    try {
+      const page = await fetchIdeaPage(
+        ideaNextOffset,
+        requestedFilters.search,
+        requestedFilters.status,
+      );
+      if (
+        latestActorId.current !== actor.userId ||
+        latestIdeaFilters.current.search !== requestedFilters.search ||
+        latestIdeaFilters.current.status !== requestedFilters.status
+      )
+        return;
+      const nextIdeas = page.items.map(mapIdeaRecord);
+      setState((previous) => {
+        const existingIds = new Set(previous.ideas.map((idea) => idea.id));
+        return {
+          ...previous,
+          ideas: [
+            ...previous.ideas,
+            ...nextIdeas.filter((idea) => !existingIds.has(idea.id)),
+          ],
+        };
+      });
+      setIdeaNextOffset(page.nextOffset);
+    } catch {
+      if (
+        latestActorId.current === actor?.userId &&
+        latestIdeaFilters.current.search === requestedFilters.search &&
+        latestIdeaFilters.current.status === requestedFilters.status
+      )
+        setNotice("Unable to load more Content Ideas");
+    } finally {
+      setLoadingMoreIdeas(false);
+    }
+  };
   const updateMasterData = (masterData: MasterData) =>
     updateState((previous) =>
       addAudit(
@@ -1927,12 +2037,18 @@ export function PrCenterApp({
           )}
           {page === "ideas" && (
             <Ideas
-              ideas={state.ideas}
+              ideas={ideasOwnerId === actor?.userId ? state.ideas : []}
               currentUser={currentUser}
               onCreate={createIdea}
               onStatus={updateIdeaStatus}
               onConvert={convertIdea}
               language={state.language}
+              listStatus={ideasOwnerId === actor?.userId ? ideaListStatus : "loading"}
+              hasMore={ideasOwnerId === actor?.userId && ideaNextOffset !== null}
+              loadingMore={loadingMoreIdeas}
+              onLoadMore={loadMoreIdeas}
+              onRefresh={refreshIdeas}
+              onFilters={changeIdeaFilters}
             />
           )}
           {page === "message-house" && (
@@ -3581,13 +3697,25 @@ function Ideas({
   onStatus,
   onConvert,
   language,
+  listStatus,
+  hasMore,
+  loadingMore,
+  onLoadMore,
+  onRefresh,
+  onFilters,
 }: {
   ideas: Idea[];
   currentUser: User;
   onCreate: (input: CreateContentIdeaInput) => Promise<boolean>;
-  onStatus: (id: string, status: IdeaStatus) => void;
-  onConvert: (id: string) => void;
+  onStatus: (id: string, status: IdeaStatus) => Promise<void>;
+  onConvert: (id: string) => Promise<void>;
   language: Language;
+  listStatus: "loading" | "loaded" | "error";
+  hasMore: boolean;
+  loadingMore: boolean;
+  onLoadMore: () => Promise<void>;
+  onRefresh: () => Promise<void>;
+  onFilters: (search: string, status: "all" | IdeaStatus) => void;
 }) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
@@ -3624,9 +3752,18 @@ function Ideas({
         eyebrow="COLLABORATION"
         title="Content Ideas"
         action={
-          <button className={styles.primary} onClick={() => setOpen(!open)}>
-            + Propose idea
-          </button>
+          <div style={{ alignItems: "center", display: "flex", gap: 8 }}>
+            <button
+              className={styles.secondaryButton}
+              onClick={() => void onRefresh()}
+              disabled={listStatus === "loading"}
+            >
+              {language === "th" ? "รีเฟรช" : "Refresh"}
+            </button>
+            <button className={styles.primary} onClick={() => setOpen(!open)}>
+              + Propose idea
+            </button>
+          </div>
         }
       />
       {open && (
@@ -3659,6 +3796,7 @@ function Ideas({
               setCampaign("");
               setEvidenceText("");
               setOpen(false);
+              await onRefresh();
             } finally {
               setSaving(false);
             }
@@ -3747,12 +3885,21 @@ function Ideas({
       <section className={styles.filterBar}>
         <input
           value={query}
-          onChange={(event) => setQuery(event.target.value)}
-          placeholder="Filter ideas"
+          onChange={(event) => {
+            const value = event.target.value;
+            setQuery(value);
+            onFilters(value, status);
+          }}
+          maxLength={100}
+          placeholder={language === "th" ? "ค้นหาแนวคิด" : "Search ideas"}
         />
         <select
           value={status}
-          onChange={(event) => setStatus(event.target.value as "all" | IdeaStatus)}
+          onChange={(event) => {
+            const value = event.target.value as "all" | IdeaStatus;
+            setStatus(value);
+            onFilters(query, value);
+          }}
         >
           <option value="all">All statuses</option>
           {["proposed", "under_review", "accepted", "converted", "archived"].map(
@@ -3764,6 +3911,33 @@ function Ideas({
           )}
         </select>
       </section>
+      <p>
+        {language === "th"
+          ? "ระบบค้นหาและกรองตามสิทธิ์ของคุณ กดโหลดเพิ่มเพื่อดูผลลัพธ์หน้าถัดไป"
+          : "Search and status filters are applied within your authorized scope; load more for the next page."}
+      </p>
+      {listStatus === "loading" && (
+        <p>{language === "th" ? "กำลังโหลดแนวคิด…" : "Loading ideas…"}</p>
+      )}
+      {listStatus === "error" && (
+        <p>
+          {language === "th" ? "โหลดรายการไม่สำเร็จ" : "Unable to load ideas."}{" "}
+          <button className={styles.secondaryButton} onClick={() => void onRefresh()}>
+            {language === "th" ? "ลองอีกครั้ง" : "Retry"}
+          </button>
+        </p>
+      )}
+      {listStatus === "loaded" && visible.length === 0 && (
+        <p>
+          {ideas.length === 0
+            ? language === "th"
+              ? "ยังไม่มีแนวคิด"
+              : "No ideas yet."
+            : language === "th"
+              ? "ไม่พบแนวคิดที่ตรงกับตัวกรองในรายการที่โหลด"
+              : "No loaded ideas match these filters."}
+        </p>
+      )}
       <section className={styles.ideaGrid}>
         {visible.map((idea) => (
           <article key={idea.id} className={styles.card}>
@@ -3812,10 +3986,12 @@ function Ideas({
               {(currentUser.role === "pr" || currentUser.role === "admin") && (
                 <select
                   value=""
-                  onChange={(event) =>
-                    event.target.value &&
-                    onStatus(idea.id, event.target.value as IdeaStatus)
-                  }
+                  onChange={async (event) => {
+                    const nextStatus = event.target.value as IdeaStatus;
+                    if (!nextStatus) return;
+                    await onStatus(idea.id, nextStatus);
+                    await onRefresh();
+                  }}
                 >
                   <option value="">{idea.status.replace("_", " ")}</option>
                   {IDEA_TRANSITIONS[idea.status].map((value) => (
@@ -3827,7 +4003,13 @@ function Ideas({
               )}
               {idea.status === "accepted" &&
                 (currentUser.role === "pr" || currentUser.role === "admin") && (
-                  <button className={styles.primary} onClick={() => onConvert(idea.id)}>
+                  <button
+                    className={styles.primary}
+                    onClick={async () => {
+                      await onConvert(idea.id);
+                      await onRefresh();
+                    }}
+                  >
                     {language === "th" ? "แปลงเป็นคำขอ" : "Convert to request"}
                   </button>
                 )}
@@ -3840,6 +4022,30 @@ function Ideas({
           </article>
         ))}
       </section>
+      {listStatus === "loaded" && (
+        <div className={styles.filterBar}>
+          <span>
+            {language === "th"
+              ? `โหลดแล้ว ${ideas.length} แนวคิด`
+              : `Loaded ${ideas.length} ideas`}
+          </span>
+          {hasMore && (
+            <button
+              className={styles.secondaryButton}
+              disabled={loadingMore}
+              onClick={() => void onLoadMore()}
+            >
+              {loadingMore
+                ? language === "th"
+                  ? "กำลังโหลด…"
+                  : "Loading…"
+                : language === "th"
+                  ? "โหลดเพิ่ม"
+                  : "Load more"}
+            </button>
+          )}
+        </div>
+      )}
     </>
   );
 }

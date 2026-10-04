@@ -498,3 +498,31 @@ describe("Calendar route", () => {
     await app.close();
   });
 });
+
+describe("Content Ideas list route", () => {
+  it("requires authentication", async () => {
+    const app = buildPrCenterApi(async () => null);
+    const response = await app.inject({ method: "GET", url: "/ideas?take=50&offset=0" });
+
+    expect(response.statusCode).toBe(401);
+    await app.close();
+  });
+
+  it("validates pagination, search, and status filters before any database read", async () => {
+    const app = buildPrCenterApi(async () => mockActor);
+    const [invalidPagination, invalidStatus, overlongSearch] = await Promise.all([
+      app.inject({ method: "GET", url: "/ideas?take=101&offset=0" }),
+      app.inject({ method: "GET", url: "/ideas?status=INVALID" }),
+      app.inject({
+        method: "GET",
+        url: `/ideas?search=${"x".repeat(101)}`,
+      }),
+    ]);
+
+    for (const response of [invalidPagination, invalidStatus, overlongSearch]) {
+      expect(response.statusCode).toBe(422);
+      expect(response.json().error).toBe("INVALID_IDEA_LIST_QUERY");
+    }
+    await app.close();
+  });
+});

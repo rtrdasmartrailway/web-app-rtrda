@@ -148,7 +148,20 @@ export function buildPrCenterApi(
       taskId((request.params as { requestId: string }).requestId),
     ),
   );
-  app.get("/ideas", async (request) => listIdeas(request.prCenterActor!));
+  app.get("/ideas", async (request) => {
+    const query = request.query as {
+      take?: string;
+      offset?: string;
+      search?: string;
+      status?: string;
+    };
+    return listIdeas(request.prCenterActor!, {
+      take: query.take === undefined ? 50 : Number(query.take),
+      offset: query.offset === undefined ? 0 : Number(query.offset),
+      search: query.search,
+      status: query.status,
+    });
+  });
   app.post("/ideas", async (request, reply) => {
     const input = await body(request);
     const idea = await createIdea(request.prCenterActor!, input, correlationId(request));

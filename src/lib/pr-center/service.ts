@@ -65,6 +65,18 @@ function actorScopeDepartmentId(actor: PrCenterActor): string | null {
   return actor.role === "SCOPED_ADMINISTRATOR" ? null : actor.departmentId;
 }
 
+function ideaScopeWhere(
+  actor: PrCenterActor,
+  ideaId: string,
+): Prisma.PrContentIdeaWhereInput {
+  const departmentId = actorScopeDepartmentId(actor);
+  return {
+    id: ideaId,
+    organizationId: actor.organizationId,
+    ...(departmentId ? { departmentId } : {}),
+  };
+}
+
 function requestScopeWhere(actor: PrCenterActor): Prisma.PrRequestWhereInput {
   const departmentId = actorScopeDepartmentId(actor);
   return {
@@ -470,17 +482,90 @@ export async function transitionRequest(
   });
 }
 
-export async function listIdeas(actor: PrCenterActor) {
+export async function listIdeas(
+  actor: PrCenterActor,
+  pagination: { take?: number; offset?: number; search?: string; status?: string } = {},
+) {
+  const take = pagination.take ?? 50;
+  const offset = pagination.offset ?? 0;
+  const rawSearch: unknown = pagination.search;
+  const search = typeof rawSearch === "string" ? rawSearch.trim() : "";
+  const status = pagination.status || undefined;
+  const allowedStatuses = [
+    "PROPOSED",
+    "UNDER_REVIEW",
+    "ACCEPTED",
+    "CONVERTED",
+    "ARCHIVED",
+  ] as const;
+  if (
+    !Number.isSafeInteger(take) ||
+    take < 1 ||
+    take > 100 ||
+    !Number.isSafeInteger(offset) ||
+    offset < 0 ||
+    offset > 100_000 ||
+    (rawSearch !== undefined && typeof rawSearch !== "string") ||
+    search.length > 100 ||
+    (status !== undefined &&
+      !allowedStatuses.includes(status as (typeof allowedStatuses)[number]))
+  ) {
+    throw new PrCenterError(
+      "Idea list filters are invalid",
+      422,
+      "INVALID_IDEA_LIST_QUERY",
+    );
+  }
   const departmentId = actorScopeDepartmentId(actor);
-  return prisma.prContentIdea.findMany({
-    where: canReadAllRequests(actor.role)
+  const where: Prisma.PrContentIdeaWhereInput = {
+    ...(canReadAllRequests(actor.role)
       ? {
           organizationId: actor.organizationId,
           ...(departmentId ? { departmentId } : {}),
         }
-      : { organizationId: actor.organizationId, proposerId: actor.id },
-    orderBy: { createdAt: "desc" },
+      : { organizationId: actor.organizationId, proposerId: actor.id }),
+    ...(status ? { status: status as (typeof allowedStatuses)[number] } : {}),
+    ...(search
+      ? {
+          OR: [
+            { title: { contains: search, mode: "insensitive" as const } },
+            { rationale: { contains: search, mode: "insensitive" as const } },
+            { audience: { contains: search, mode: "insensitive" as const } },
+            { pillar: { contains: search, mode: "insensitive" as const } },
+            { channel: { contains: search, mode: "insensitive" as const } },
+            { priority: { contains: search, mode: "insensitive" as const } },
+            { campaign: { contains: search, mode: "insensitive" as const } },
+          ],
+        }
+      : {}),
+  };
+  const rows = await prisma.prContentIdea.findMany({
+    where,
+    orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+    skip: offset,
+    take: take + 1,
+    select: {
+      id: true,
+      title: true,
+      rationale: true,
+      proposerId: true,
+      audience: true,
+      pillar: true,
+      channel: true,
+      priority: true,
+      campaign: true,
+      evidenceUrls: true,
+      status: true,
+      createdAt: true,
+      convertedRequestId: true,
+      version: true,
+    },
   });
+  const hasMore = rows.length > take;
+  return {
+    items: rows.slice(0, take),
+    nextOffset: hasMore ? offset + take : null,
+  };
 }
 
 export async function createIdea(
@@ -543,9 +628,8 @@ export async function transitionIdea(
 ) {
   if (!canReviewIdeas(actor.role))
     throw new PrCenterError("You cannot review an idea", 403, "FORBIDDEN");
-  const idea = await prisma.prContentIdea.findFirst({
-    where: { id: ideaId, organizationId: actor.organizationId },
-  });
+  const ideaScope = ideaScopeWhere(actor, ideaId);
+  const idea = await prisma.prContentIdea.findFirst({ where: ideaScope });
   if (!idea) throw new PrCenterError("Idea not found", 404, "NOT_FOUND");
   if (idea.version !== fromVersion)
     throw new PrCenterError(
@@ -561,7 +645,7 @@ export async function transitionIdea(
     );
   return prisma.$transaction(async (tx) => {
     const updated = await tx.prContentIdea.updateMany({
-      where: { id: idea.id, version: fromVersion },
+      where: { ...ideaScope, version: fromVersion },
       data: {
         status: to as PrContentIdeaStatus,
         reviewerId: actor.id,
@@ -596,9 +680,8 @@ export async function convertIdea(
 ) {
   if (!canReviewIdeas(actor.role))
     throw new PrCenterError("You cannot convert an idea", 403, "FORBIDDEN");
-  const idea = await prisma.prContentIdea.findFirst({
-    where: { id: ideaId, organizationId: actor.organizationId },
-  });
+  const ideaScope = ideaScopeWhere(actor, ideaId);
+  const idea = await prisma.prContentIdea.findFirst({ where: ideaScope });
   if (!idea) throw new PrCenterError("Idea not found", 404, "NOT_FOUND");
   if (idea.version !== fromVersion)
     throw new PrCenterError(
@@ -640,7 +723,7 @@ export async function convertIdea(
       include: { tasks: true },
     });
     const updated = await tx.prContentIdea.updateMany({
-      where: { id: idea.id, status: "ACCEPTED", version: fromVersion },
+      where: { ...ideaScope, status: "ACCEPTED", version: fromVersion },
       data: {
         status: "CONVERTED",
         reviewerId: actor.id,

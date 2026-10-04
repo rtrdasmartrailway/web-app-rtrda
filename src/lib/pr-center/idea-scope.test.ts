@@ -1,0 +1,114 @@
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+const mocks = vi.hoisted(() => {
+  const transactionClient = {
+    prContentIdea: {
+      updateMany: vi.fn(),
+      findUniqueOrThrow: vi.fn(),
+    },
+    prRequest: { create: vi.fn() },
+    prAuditEvent: { create: vi.fn() },
+    prOutboxEvent: { create: vi.fn() },
+  };
+  const transaction = vi.fn(
+    async (callback: (client: typeof transactionClient) => unknown) =>
+      callback(transactionClient),
+  );
+  return {
+    transactionClient,
+    transaction,
+    findFirst: vi.fn(),
+  };
+});
+
+vi.mock("@/lib/db/client", () => ({
+  prisma: {
+    $transaction: mocks.transaction,
+    prContentIdea: { findFirst: mocks.findFirst },
+  },
+}));
+
+import { convertIdea, transitionIdea } from "./service";
+
+const actor = {
+  id: "reviewer-1",
+  organizationId: "org-1",
+  departmentId: "dept-home",
+  scopeDepartmentId: "dept-1",
+  role: "PR_OPERATIONS" as const,
+};
+
+describe("idea reviewer scope", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mocks.transactionClient.prContentIdea.updateMany.mockResolvedValue({ count: 1 });
+    mocks.transactionClient.prContentIdea.findUniqueOrThrow.mockResolvedValue({
+      id: "idea-1",
+      status: "UNDER_REVIEW",
+      version: 4,
+    });
+    mocks.transactionClient.prRequest.create.mockResolvedValue({
+      id: "request-1",
+      tasks: [{ id: "task-1" }],
+    });
+    mocks.transactionClient.prAuditEvent.create.mockResolvedValue({ id: "audit-1" });
+    mocks.transactionClient.prOutboxEvent.create.mockResolvedValue({ id: "outbox-1" });
+  });
+
+  it("scopes idea review lookup and optimistic update to the role grant department", async () => {
+    mocks.findFirst.mockResolvedValue({
+      id: "idea-1",
+      organizationId: "org-1",
+      departmentId: "dept-1",
+      status: "PROPOSED",
+      version: 3,
+    });
+
+    await transitionIdea(actor, "idea-1", 3, "UNDER_REVIEW", undefined, "corr-1");
+
+    expect(mocks.findFirst).toHaveBeenCalledWith({
+      where: { id: "idea-1", organizationId: "org-1", departmentId: "dept-1" },
+    });
+    expect(mocks.transactionClient.prContentIdea.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          id: "idea-1",
+          organizationId: "org-1",
+          departmentId: "dept-1",
+          version: 3,
+        },
+      }),
+    );
+  });
+
+  it("scopes accepted-idea conversion and its conditional update to the grant department", async () => {
+    mocks.findFirst.mockResolvedValue({
+      id: "idea-1",
+      organizationId: "org-1",
+      departmentId: "dept-1",
+      proposerId: "author-1",
+      title: "Idea",
+      rationale: "Rationale",
+      audience: "Public",
+      status: "ACCEPTED",
+      version: 3,
+    });
+
+    await convertIdea(actor, "idea-1", 3, "corr-2");
+
+    expect(mocks.findFirst).toHaveBeenCalledWith({
+      where: { id: "idea-1", organizationId: "org-1", departmentId: "dept-1" },
+    });
+    expect(mocks.transactionClient.prContentIdea.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          id: "idea-1",
+          organizationId: "org-1",
+          departmentId: "dept-1",
+          status: "ACCEPTED",
+          version: 3,
+        },
+      }),
+    );
+  });
+});
