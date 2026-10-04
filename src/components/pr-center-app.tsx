@@ -1722,22 +1722,26 @@ export function PrCenterApp({
   const updateIdeaStatus = async (id: string, status: IdeaStatus) => {
     const idea = state.ideas.find((item) => item.id === id);
     if (!idea?.version) return;
-    const reason =
-      status === "rejected"
-        ? window
-            .prompt(
-              state.language === "th"
+    const requiresReason = status === "accepted" || status === "rejected";
+    const reason = requiresReason
+      ? window
+          .prompt(
+            status === "rejected"
+              ? state.language === "th"
                 ? "ระบุเหตุผลในการปฏิเสธแนวคิด ผู้เสนอจะเห็นเหตุผลนี้"
-                : "Enter a rejection reason. The proposer will be able to see it.",
-            )
-            ?.trim() || ""
-        : "";
-    if (status === "rejected" && !reason) return;
+                : "Enter a rejection reason. The proposer will be able to see it."
+              : state.language === "th"
+                ? "ระบุเหตุผลในการยอมรับแนวคิด ผู้เสนอจะเห็นเหตุผลนี้"
+                : "Enter an acceptance rationale. The proposer will be able to see it.",
+          )
+          ?.trim() || ""
+      : "";
+    if (requiresReason && !reason) return;
     if (reason.length > 5000)
       return announce(
         state.language === "th"
           ? "เหตุผลยาวเกิน 5,000 ตัวอักษร"
-          : "Rejection reason must be 5,000 characters or fewer",
+          : "Decision reason must be 5,000 characters or fewer",
       );
     const response = await fetch(`/api/pr-center/ideas/${id}/transitions`, {
       method: "POST",
@@ -1768,7 +1772,7 @@ export function PrCenterApp({
           ? {
               ...item,
               status: updated.status.toLowerCase() as IdeaStatus,
-              decisionReason: status === "rejected" ? reason : null,
+              decisionReason: requiresReason ? reason : item.decisionReason,
               version: updated.version,
             }
           : item,
@@ -4084,14 +4088,19 @@ function Ideas({
             </p>
             <h2>{idea.title}</h2>
             <p>{idea.summary}</p>
-            {idea.status === "rejected" && idea.decisionReason && (
-              <p role="note">
-                <strong>
-                  {language === "th" ? "เหตุผลที่ปฏิเสธ" : "Rejection reason"}:
-                </strong>{" "}
-                {idea.decisionReason}
-              </p>
-            )}
+            {(idea.status === "rejected" ||
+              idea.status === "accepted" ||
+              idea.status === "converted" ||
+              idea.status === "archived") &&
+              idea.decisionReason && (
+                <p role="note">
+                  <strong>
+                    {language === "th" ? "เหตุผลประกอบการตัดสินใจ" : "Decision rationale"}
+                    :
+                  </strong>{" "}
+                  {idea.decisionReason}
+                </p>
+              )}
             {[
               idea.audience,
               idea.pillar,

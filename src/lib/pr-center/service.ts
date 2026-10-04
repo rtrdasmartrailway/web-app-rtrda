@@ -797,9 +797,9 @@ export async function transitionIdea(
       "INVALID_TRANSITION",
     );
   const decisionReason = reason?.trim() || "";
-  if (to === "REJECTED" && !decisionReason)
+  if ((to === "ACCEPTED" || to === "REJECTED") && !decisionReason)
     throw new PrCenterError(
-      "A reason is required when rejecting an idea",
+      "A reason is required when accepting or rejecting an idea",
       422,
       "REASON_REQUIRED",
     );
@@ -811,7 +811,7 @@ export async function transitionIdea(
       data: {
         status: to as PrContentIdeaStatus,
         reviewerId: actor.id,
-        decisionReason: decisionReason || null,
+        decisionReason: decisionReason || idea.decisionReason || null,
         version: { increment: 1 },
       },
     });
@@ -2623,7 +2623,6 @@ export async function grantRole(
 ) {
   if (!canManageAccess(actorRoles(actor)))
     throw new PrCenterError("You cannot grant roles", 403, "FORBIDDEN");
-  const accessReason = normalizeAccessAdminReason(reason);
   if (!PR_CENTER_ROLES.includes(role))
     throw new PrCenterError("Invalid role code", 422, "INVALID_ROLE");
   if (userId === actor.id)
@@ -2632,6 +2631,7 @@ export async function grantRole(
       422,
       "SELF_GRANT_BLOCKED",
     );
+  const accessReason = normalizeAccessAdminReason(reason);
   assertCanManageDepartmentScope(actor, departmentId ?? null);
   const user = await prisma.prCenterUser.findFirst({
     where: { id: userId, organizationId: actor.organizationId },

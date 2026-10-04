@@ -81,20 +81,23 @@ describe("idea reviewer scope", () => {
     );
   });
 
-  it("requires a non-empty reason when an idea is rejected", async () => {
-    mocks.findFirst.mockResolvedValue({
-      id: "idea-1",
-      organizationId: "org-1",
-      departmentId: "dept-1",
-      status: "UNDER_REVIEW",
-      version: 3,
-    });
+  it.each(["ACCEPTED", "REJECTED"] as const)(
+    "requires a non-empty reason when an idea is %s",
+    async (to) => {
+      mocks.findFirst.mockResolvedValue({
+        id: "idea-1",
+        organizationId: "org-1",
+        departmentId: "dept-1",
+        status: "UNDER_REVIEW",
+        version: 3,
+      });
 
-    await expect(
-      transitionIdea(actor, "idea-1", 3, "REJECTED", "  ", "corr-reject"),
-    ).rejects.toMatchObject({ statusCode: 422, code: "REASON_REQUIRED" });
-    expect(mocks.transactionClient.prContentIdea.updateMany).not.toHaveBeenCalled();
-  });
+      await expect(
+        transitionIdea(actor, "idea-1", 3, to, "  ", "corr-decision"),
+      ).rejects.toMatchObject({ statusCode: 422, code: "REASON_REQUIRED" });
+      expect(mocks.transactionClient.prContentIdea.updateMany).not.toHaveBeenCalled();
+    },
+  );
 
   it("persists a trimmed rejection reason with the rejected status", async () => {
     mocks.findFirst.mockResolvedValue({
@@ -143,6 +146,67 @@ describe("idea reviewer scope", () => {
         },
       }),
     });
+  });
+
+  it("persists and audits the trimmed acceptance rationale", async () => {
+    mocks.findFirst.mockResolvedValue({
+      id: "idea-1",
+      organizationId: "org-1",
+      departmentId: "dept-1",
+      status: "UNDER_REVIEW",
+      version: 3,
+    });
+
+    await transitionIdea(
+      actor,
+      "idea-1",
+      3,
+      "ACCEPTED",
+      "  Fits the approved safety campaign.  ",
+      "corr-accept",
+    );
+
+    expect(mocks.transactionClient.prContentIdea.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          status: "ACCEPTED",
+          decisionReason: "Fits the approved safety campaign.",
+        }),
+      }),
+    );
+    expect(mocks.transactionClient.prAuditEvent.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          correlationId: "corr-accept",
+          after: expect.objectContaining({
+            to: "ACCEPTED",
+            reason: "Fits the approved safety campaign.",
+          }),
+        }),
+      }),
+    );
+  });
+
+  it("preserves an acceptance rationale when archiving the accepted idea", async () => {
+    mocks.findFirst.mockResolvedValue({
+      id: "idea-1",
+      organizationId: "org-1",
+      departmentId: "dept-1",
+      status: "ACCEPTED",
+      version: 4,
+      decisionReason: "Fits the approved safety campaign.",
+    });
+
+    await transitionIdea(actor, "idea-1", 4, "ARCHIVED", undefined, "corr-archive");
+
+    expect(mocks.transactionClient.prContentIdea.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          status: "ARCHIVED",
+          decisionReason: "Fits the approved safety campaign.",
+        }),
+      }),
+    );
   });
 
   it("denies conversion to non-reviewers before reading the idea", async () => {

@@ -140,7 +140,7 @@ describe("Access administration route guards", () => {
     const response = await app.inject({
       method: "POST",
       url: "/admin/users/some-id/roles",
-      payload: { role: "REQUESTER" },
+      payload: {},
     });
     expect(response.statusCode).toBe(403);
     await app.close();

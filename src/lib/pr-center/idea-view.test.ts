@@ -27,19 +27,20 @@ describe("parseIdeaListPage", () => {
     });
   });
 
-  it("parses a rejected idea's decision reason for its authorized proposer/reviewer view", () => {
-    const rejected = parseIdeaListPage({
-      items: [
-        { ...record, status: "REJECTED", decisionReason: "Needs a clearer benefit." },
-      ],
-      nextOffset: null,
-    });
+  it.each(["ACCEPTED", "REJECTED"] as const)(
+    "parses a %s idea's decision rationale for its authorized proposer/reviewer view",
+    (status) => {
+      const decided = parseIdeaListPage({
+        items: [{ ...record, status, decisionReason: "Fits the approved campaign." }],
+        nextOffset: null,
+      });
 
-    expect(rejected.items[0]).toMatchObject({
-      status: "REJECTED",
-      decisionReason: "Needs a clearer benefit.",
-    });
-  });
+      expect(decided.items[0]).toMatchObject({
+        status,
+        decisionReason: "Fits the approved campaign.",
+      });
+    },
+  );
 
   it("accepts the final page and rejects malformed list payloads", () => {
     expect(parseIdeaListPage({ items: [], nextOffset: null })).toEqual({

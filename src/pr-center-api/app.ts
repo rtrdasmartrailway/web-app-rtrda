@@ -54,7 +54,6 @@ import {
   TASK_TRANSITIONS,
   type PrCenterRole,
   type PrTaskStatus,
-  PR_CENTER_ROLES,
 } from "@/lib/pr-center/workflow";
 
 export type ActorResolver = (request: FastifyRequest) => Promise<PrCenterActor | null>;
@@ -540,12 +539,10 @@ export function buildPrCenterApi(
   // ── Access Administration routes (SCOPED_ADMINISTRATOR only) ────────────
   app.get("/admin/users", async (request) => listAdminUsers(request.prCenterActor!));
   app.post("/admin/users/:userId/roles", async (request, reply) => {
-    const input = await body(request);
-    if (
-      typeof input.role !== "string" ||
-      !PR_CENTER_ROLES.includes(input.role as PrCenterRole)
-    )
-      throw new PrCenterError("A valid role is required", 422, "INVALID_ROLE");
+    const input =
+      request.body && typeof request.body === "object" && !Array.isArray(request.body)
+        ? (request.body as Record<string, unknown>)
+        : {};
     const result = await grantRole(
       request.prCenterActor!,
       (request.params as { userId: string }).userId,
