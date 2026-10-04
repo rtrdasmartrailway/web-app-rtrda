@@ -130,6 +130,60 @@ describe("idea reviewer scope", () => {
     );
   });
 
+  it("denies conversion to non-reviewers before reading the idea", async () => {
+    await expect(
+      convertIdea({ ...actor, role: "REQUESTER" }, "idea-1", 3, "corr-3"),
+    ).rejects.toMatchObject({ statusCode: 403, code: "FORBIDDEN" });
+    expect(mocks.findFirst).not.toHaveBeenCalled();
+    expect(mocks.transaction).not.toHaveBeenCalled();
+  });
+
+  it("rejects a repeated conversion without creating another request", async () => {
+    mocks.findFirst.mockResolvedValue({
+      id: "idea-1",
+      organizationId: "org-1",
+      departmentId: "dept-1",
+      status: "CONVERTED",
+      version: 4,
+      convertedRequestId: "request-1",
+    });
+
+    await expect(convertIdea(actor, "idea-1", 4, "corr-repeat")).rejects.toMatchObject({
+      statusCode: 422,
+      code: "INVALID_TRANSITION",
+    });
+    expect(mocks.transaction).not.toHaveBeenCalled();
+    expect(mocks.transactionClient.prRequest.create).not.toHaveBeenCalled();
+  });
+
+  it("rejects a stale conversion before starting a transaction", async () => {
+    mocks.findFirst.mockResolvedValue({
+      id: "idea-1",
+      organizationId: "org-1",
+      departmentId: "dept-1",
+      status: "ACCEPTED",
+      version: 4,
+    });
+
+    await expect(convertIdea(actor, "idea-1", 3, "corr-stale")).rejects.toMatchObject({
+      statusCode: 409,
+      code: "STALE_UPDATE",
+    });
+    expect(mocks.transaction).not.toHaveBeenCalled();
+  });
+
+  it("returns not found for an idea outside the reviewer grant scope", async () => {
+    mocks.findFirst.mockResolvedValue(null);
+
+    await expect(
+      convertIdea(actor, "idea-outside", 3, "corr-scope"),
+    ).rejects.toMatchObject({
+      statusCode: 404,
+      code: "NOT_FOUND",
+    });
+    expect(mocks.transaction).not.toHaveBeenCalled();
+  });
+
   it("scopes accepted-idea conversion and its conditional update to the grant department", async () => {
     mocks.findFirst.mockResolvedValue({
       id: "idea-1",
