@@ -270,6 +270,7 @@ model PrContentIdea {
   convertedRequestId String?             @unique @db.Uuid
   version            Int                 @default(1)
   convertedRequest   PrRequest?          @relation("PrIdeaConversion", fields: [convertedRequestId], references: [id], onDelete: Restrict)
+  comments           PrComment[]
   createdAt          DateTime            @default(now())
   updatedAt          DateTime            @updatedAt
 
@@ -432,16 +433,20 @@ model PrAttachment {
 }
 
 model PrComment {
-  id        String       @id @default(uuid()) @db.Uuid
-  requestId String?      @db.Uuid
-  taskId    String?      @db.Uuid
-  authorId  String       @db.Uuid
+  id        String         @id @default(uuid()) @db.Uuid
+  requestId String?        @db.Uuid
+  taskId    String?        @db.Uuid
+  ideaId    String?        @db.Uuid
+  authorId  String         @db.Uuid
   body      String
-  request   PrRequest?   @relation(fields: [requestId], references: [id], onDelete: Cascade)
-  task      PrTask?      @relation(fields: [taskId], references: [id], onDelete: Cascade)
-  author    PrCenterUser @relation(fields: [authorId], references: [id], onDelete: Restrict)
-  createdAt DateTime     @default(now())
-  updatedAt DateTime     @updatedAt
+  request   PrRequest?     @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  task      PrTask?        @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  idea      PrContentIdea? @relation(fields: [ideaId], references: [id], onDelete: Cascade)
+  author    PrCenterUser   @relation(fields: [authorId], references: [id], onDelete: Restrict)
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+
+  @@index([ideaId, createdAt])
 }
 
 model PrStatusHistory {

@@ -541,3 +541,46 @@ describe("Content Ideas list route", () => {
     await app.close();
   });
 });
+
+describe("Content Idea comment routes", () => {
+  it("requires authentication to read or add comments", async () => {
+    const app = buildPrCenterApi(async () => null);
+    const [readResponse, addResponse] = await Promise.all([
+      app.inject({ method: "GET", url: "/ideas/idea-1/comments" }),
+      app.inject({
+        method: "POST",
+        url: "/ideas/idea-1/comments",
+        payload: { body: "Hi" },
+      }),
+    ]);
+
+    expect(readResponse.statusCode).toBe(401);
+    expect(addResponse.statusCode).toBe(401);
+    await app.close();
+  });
+
+  it("rejects empty comments and exposes no comment edit/delete route", async () => {
+    const ideaId = "00000000-0000-4000-8000-000000000001";
+    const commentId = "00000000-0000-4000-8000-000000000002";
+    const app = buildPrCenterApi(async () => mockActor);
+    const [emptyResponse, editResponse, deleteResponse] = await Promise.all([
+      app.inject({
+        method: "POST",
+        url: `/ideas/${ideaId}/comments`,
+        payload: { body: "   " },
+      }),
+      app.inject({
+        method: "PATCH",
+        url: `/ideas/${ideaId}/comments/${commentId}`,
+        payload: { body: "x" },
+      }),
+      app.inject({ method: "DELETE", url: `/ideas/${ideaId}/comments/${commentId}` }),
+    ]);
+
+    expect(emptyResponse.statusCode).toBe(422);
+    expect(emptyResponse.json().error).toBe("INVALID_COMMENT");
+    expect(editResponse.statusCode).toBe(404);
+    expect(deleteResponse.statusCode).toBe(404);
+    await app.close();
+  });
+});

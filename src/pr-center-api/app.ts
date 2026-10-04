@@ -2,6 +2,8 @@ import Fastify, { type FastifyInstance, type FastifyRequest } from "fastify";
 import {
   createRequest,
   createIdea,
+  addIdeaComment,
+  listIdeaComments,
   addTaskComment,
   convertIdea,
   currentMessageHouse,
@@ -165,6 +167,22 @@ export function buildPrCenterApi(
     const input = await body(request);
     const idea = await createIdea(request.prCenterActor!, input, correlationId(request));
     return reply.status(201).send(idea);
+  });
+  app.get("/ideas/:ideaId/comments", async (request) =>
+    listIdeaComments(
+      request.prCenterActor!,
+      taskId((request.params as { ideaId: string }).ideaId),
+    ),
+  );
+  app.post("/ideas/:ideaId/comments", async (request, reply) => {
+    const input = await body(request);
+    const comment = await addIdeaComment(
+      request.prCenterActor!,
+      taskId((request.params as { ideaId: string }).ideaId),
+      input.body,
+      correlationId(request),
+    );
+    return reply.status(201).send(comment);
   });
   app.post("/ideas/:ideaId/transitions", async (request) => {
     const input = await body(request);

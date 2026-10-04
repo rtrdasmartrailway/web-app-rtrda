@@ -3823,6 +3823,153 @@ function Library({
     </>
   );
 }
+type IdeaComment = {
+  id: string;
+  body: string;
+  authorId: string;
+  createdAt: string;
+  author: { displayName: string };
+};
+
+function IdeaComments({ ideaId, language }: { ideaId: string; language: Language }) {
+  const [open, setOpen] = useState(false);
+  const [loaded, setLoaded] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [comments, setComments] = useState<IdeaComment[]>([]);
+  const [draft, setDraft] = useState("");
+  const [error, setError] = useState("");
+
+  const loadComments = async () => {
+    setLoading(true);
+    setError("");
+    try {
+      const response = await fetch(`/api/pr-center/ideas/${ideaId}/comments`, {
+        credentials: "same-origin",
+      });
+      if (!response.ok) throw new Error("Unable to load comments");
+      setComments((await response.json()) as IdeaComment[]);
+      setLoaded(true);
+    } catch {
+      setError(
+        language === "th" ? "โหลดความคิดเห็นไม่สำเร็จ" : "Unable to load comments.",
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const toggle = async () => {
+    if (open) {
+      setOpen(false);
+      return;
+    }
+    setOpen(true);
+    if (!loaded) await loadComments();
+  };
+
+  return (
+    <section>
+      <button
+        type="button"
+        className={styles.secondaryButton}
+        aria-expanded={open}
+        onClick={() => void toggle()}
+      >
+        {language === "th"
+          ? `ความคิดเห็น${loaded ? ` (${comments.length})` : ""}`
+          : `Comments${loaded ? ` (${comments.length})` : ""}`}
+      </button>
+      {open && (
+        <div>
+          {loading && <p>{language === "th" ? "กำลังโหลด…" : "Loading…"}</p>}
+          {error && (
+            <p role="alert">
+              {error}{" "}
+              <button
+                type="button"
+                className={styles.secondaryButton}
+                onClick={() => void loadComments()}
+              >
+                {language === "th" ? "ลองอีกครั้ง" : "Retry"}
+              </button>
+            </p>
+          )}
+          {loaded && comments.length === 0 && (
+            <p>{language === "th" ? "ยังไม่มีความคิดเห็น" : "No comments yet."}</p>
+          )}
+          {comments.map((comment) => (
+            <article key={comment.id}>
+              <p>
+                <strong>{comment.author.displayName}</strong>
+                {" · "}
+                {new Date(comment.createdAt).toLocaleString(
+                  language === "th" ? "th-TH" : "en-US",
+                )}
+              </p>
+              <p style={{ whiteSpace: "pre-wrap" }}>{comment.body}</p>
+            </article>
+          ))}
+          <form
+            onSubmit={async (event) => {
+              event.preventDefault();
+              const body = draft.trim();
+              if (!body || saving) return;
+              setSaving(true);
+              setError("");
+              try {
+                const response = await fetch(`/api/pr-center/ideas/${ideaId}/comments`, {
+                  method: "POST",
+                  credentials: "same-origin",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ body }),
+                });
+                if (!response.ok) throw new Error("Unable to add comment");
+                const saved = (await response.json()) as IdeaComment;
+                setComments((current) => [...current, saved]);
+                setLoaded(true);
+                setDraft("");
+              } catch {
+                setError(
+                  language === "th"
+                    ? "ส่งความคิดเห็นไม่สำเร็จ"
+                    : "Unable to add comment.",
+                );
+              } finally {
+                setSaving(false);
+              }
+            }}
+          >
+            <label>
+              {language === "th" ? "เพิ่มความคิดเห็น" : "Add a comment"}
+              <textarea
+                value={draft}
+                onChange={(event) => setDraft(event.target.value)}
+                maxLength={2000}
+                rows={3}
+                required
+              />
+            </label>
+            <button
+              type="submit"
+              className={styles.secondaryButton}
+              disabled={saving || !draft.trim()}
+            >
+              {saving
+                ? language === "th"
+                  ? "กำลังส่ง…"
+                  : "Sending…"
+                : language === "th"
+                  ? "ส่งความคิดเห็น"
+                  : "Add comment"}
+            </button>
+          </form>
+        </div>
+      )}
+    </section>
+  );
+}
+
 function Ideas({
   ideas,
   currentUser,
@@ -4173,6 +4320,9 @@ function Ideas({
                 </span>
               )}
             </footer>
+            {(canReview || idea.authorId === currentUser.id) && (
+              <IdeaComments ideaId={idea.id} language={language} />
+            )}
           </article>
         ))}
       </section>

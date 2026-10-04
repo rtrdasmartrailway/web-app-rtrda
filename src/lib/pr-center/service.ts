@@ -228,6 +228,18 @@ function ideaScopeWhere(
   };
 }
 
+function ideaCommentScopeWhere(
+  actor: PrCenterActor,
+  ideaId: string,
+): Prisma.PrContentIdeaWhereInput {
+  const scopes: Prisma.PrContentIdeaWhereInput[] = [{ proposerId: actor.id }];
+  if (canReviewIdeas(actorRoles(actor)))
+    scopes.push(
+      ...roleDepartmentClauses(actor, ["PR_OPERATIONS", "SCOPED_ADMINISTRATOR"]),
+    );
+  return { id: ideaId, organizationId: actor.organizationId, OR: scopes };
+}
+
 function taskScopeWhere(actor: PrCenterActor, taskId: string): Prisma.PrTaskWhereInput {
   return { id: taskId, request: requestScopeWhere(actor) };
 }
@@ -719,6 +731,75 @@ export async function listIdeas(
     items: rows.slice(0, take),
     nextOffset: hasMore ? offset + take : null,
   };
+}
+
+export async function listIdeaComments(actor: PrCenterActor, ideaId: string) {
+  const idea = await prisma.prContentIdea.findFirst({
+    where: ideaCommentScopeWhere(actor, ideaId),
+    select: { id: true },
+  });
+  if (!idea) throw new PrCenterError("Idea not found", 404, "NOT_FOUND");
+  return prisma.prComment.findMany({
+    where: { ideaId: idea.id },
+    orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+    select: {
+      id: true,
+      ideaId: true,
+      body: true,
+      authorId: true,
+      createdAt: true,
+      author: { select: { displayName: true } },
+    },
+  });
+}
+
+export async function addIdeaComment(
+  actor: PrCenterActor,
+  ideaId: string,
+  rawBody: unknown,
+  correlationId: string = randomUUID(),
+) {
+  if (typeof rawBody !== "string")
+    throw new PrCenterError("A comment is required", 422, "INVALID_COMMENT");
+  const commentBody = rawBody.trim();
+  if (!commentBody)
+    throw new PrCenterError("A comment is required", 422, "INVALID_COMMENT");
+  if (commentBody.length > 2000)
+    throw new PrCenterError(
+      "A comment must be 2,000 characters or fewer",
+      422,
+      "INVALID_COMMENT",
+    );
+
+  const idea = await prisma.prContentIdea.findFirst({
+    where: ideaCommentScopeWhere(actor, ideaId),
+    select: { id: true },
+  });
+  if (!idea) throw new PrCenterError("Idea not found", 404, "NOT_FOUND");
+
+  return prisma.$transaction(async (tx) => {
+    const comment = await tx.prComment.create({
+      data: { ideaId: idea.id, authorId: actor.id, body: commentBody },
+      select: {
+        id: true,
+        ideaId: true,
+        body: true,
+        authorId: true,
+        createdAt: true,
+        author: { select: { displayName: true } },
+      },
+    });
+    await auditAndOutbox(tx, {
+      actor,
+      action: "idea.comment_added",
+      entityType: "content_idea",
+      entityId: idea.id,
+      after: { commentId: comment.id },
+      eventType: "pr.idea.comment_added",
+      correlationId,
+    });
+    return comment;
+  });
 }
 
 export async function createIdea(
