@@ -13,6 +13,7 @@ const record = {
   campaign: null,
   evidenceUrls: ["https://example.com/source"],
   status: "PROPOSED",
+  decisionReason: null,
   createdAt: "2026-10-01T00:00:00.000Z",
   convertedRequestId: null,
   version: 1,
@@ -23,6 +24,20 @@ describe("parseIdeaListPage", () => {
     expect(parseIdeaListPage({ items: [record], nextOffset: 50 })).toEqual({
       items: [record],
       nextOffset: 50,
+    });
+  });
+
+  it("parses a rejected idea's decision reason for its authorized proposer/reviewer view", () => {
+    const rejected = parseIdeaListPage({
+      items: [
+        { ...record, status: "REJECTED", decisionReason: "Needs a clearer benefit." },
+      ],
+      nextOffset: null,
+    });
+
+    expect(rejected.items[0]).toMatchObject({
+      status: "REJECTED",
+      decisionReason: "Needs a clearer benefit.",
     });
   });
 

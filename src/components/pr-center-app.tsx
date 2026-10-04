@@ -124,11 +124,18 @@ type Notification = {
   createdAt: string;
   read: boolean;
 };
-type IdeaStatus = "proposed" | "under_review" | "accepted" | "converted" | "archived";
+type IdeaStatus =
+  | "proposed"
+  | "under_review"
+  | "accepted"
+  | "rejected"
+  | "converted"
+  | "archived";
 const IDEA_TRANSITIONS: Record<IdeaStatus, IdeaStatus[]> = {
-  proposed: ["under_review", "archived"],
-  under_review: ["accepted", "archived"],
+  proposed: ["under_review", "rejected", "archived"],
+  under_review: ["accepted", "rejected", "archived"],
   accepted: ["archived"],
+  rejected: [],
   converted: ["archived"],
   archived: [],
 };
@@ -145,6 +152,7 @@ type Idea = {
   priority?: string;
   campaign?: string;
   evidenceUrls?: string[];
+  decisionReason?: string | null;
   requestId?: string;
   version?: number;
 };
@@ -163,6 +171,7 @@ function mapIdeaRecord(idea: IdeaListRecord): Idea {
     priority: idea.priority || undefined,
     campaign: idea.campaign || undefined,
     evidenceUrls: idea.evidenceUrls,
+    decisionReason: idea.decisionReason,
     requestId: idea.convertedRequestId || undefined,
     version: idea.version,
   };
@@ -1698,13 +1707,44 @@ export function PrCenterApp({
   const updateIdeaStatus = async (id: string, status: IdeaStatus) => {
     const idea = state.ideas.find((item) => item.id === id);
     if (!idea?.version) return;
+    const reason =
+      status === "rejected"
+        ? window
+            .prompt(
+              state.language === "th"
+                ? "ระบุเหตุผลในการปฏิเสธแนวคิด ผู้เสนอจะเห็นเหตุผลนี้"
+                : "Enter a rejection reason. The proposer will be able to see it.",
+            )
+            ?.trim() || ""
+        : "";
+    if (status === "rejected" && !reason) return;
+    if (reason.length > 5000)
+      return announce(
+        state.language === "th"
+          ? "เหตุผลยาวเกิน 5,000 ตัวอักษร"
+          : "Rejection reason must be 5,000 characters or fewer",
+      );
     const response = await fetch(`/api/pr-center/ideas/${id}/transitions`, {
       method: "POST",
       credentials: "same-origin",
       headers: { "Content-Type": "application/json", "If-Match": String(idea.version) },
-      body: JSON.stringify({ to: status.toUpperCase() }),
+      body: JSON.stringify({
+        to: status.toUpperCase(),
+        ...(reason ? { reason } : {}),
+      }),
     });
-    if (!response.ok) return announce("Idea transition failed");
+    if (!response.ok) {
+      const result = (await response.json().catch(() => null)) as {
+        message?: unknown;
+      } | null;
+      return announce(
+        typeof result?.message === "string"
+          ? result.message
+          : state.language === "th"
+            ? "เปลี่ยนสถานะแนวคิดไม่สำเร็จ"
+            : "Idea transition failed",
+      );
+    }
     const updated = (await response.json()) as { status: string; version: number };
     setState((previous) => ({
       ...previous,
@@ -1713,6 +1753,7 @@ export function PrCenterApp({
           ? {
               ...item,
               status: updated.status.toLowerCase() as IdeaStatus,
+              decisionReason: status === "rejected" ? reason : null,
               version: updated.version,
             }
           : item,
@@ -3816,6 +3857,8 @@ function Ideas({
         .toLowerCase()
         .includes(query.toLowerCase()),
   );
+  const ideaStatusLabel = (value: IdeaStatus) =>
+    language === "th" && value === "rejected" ? "ปฏิเสธ" : value.replace("_", " ");
   return (
     <>
       <SectionHeading
@@ -3972,13 +4015,18 @@ function Ideas({
           }}
         >
           <option value="all">All statuses</option>
-          {["proposed", "under_review", "accepted", "converted", "archived"].map(
-            (value) => (
-              <option key={value} value={value}>
-                {value.replace("_", " ")}
-              </option>
-            ),
-          )}
+          {[
+            "proposed",
+            "under_review",
+            "accepted",
+            "rejected",
+            "converted",
+            "archived",
+          ].map((value) => (
+            <option key={value} value={value}>
+              {ideaStatusLabel(value as IdeaStatus)}
+            </option>
+          ))}
         </select>
       </section>
       <p>
@@ -4012,10 +4060,18 @@ function Ideas({
         {visible.map((idea) => (
           <article key={idea.id} className={styles.card}>
             <p className={styles.eyebrow}>
-              {idea.id} · {idea.status.replace("_", " ")}
+              {idea.id} · {ideaStatusLabel(idea.status)}
             </p>
             <h2>{idea.title}</h2>
             <p>{idea.summary}</p>
+            {idea.status === "rejected" && idea.decisionReason && (
+              <p role="note">
+                <strong>
+                  {language === "th" ? "เหตุผลที่ปฏิเสธ" : "Rejection reason"}:
+                </strong>{" "}
+                {idea.decisionReason}
+              </p>
+            )}
             {[
               idea.audience,
               idea.pillar,
@@ -4063,10 +4119,10 @@ function Ideas({
                     await onRefresh();
                   }}
                 >
-                  <option value="">{idea.status.replace("_", " ")}</option>
+                  <option value="">{ideaStatusLabel(idea.status)}</option>
                   {IDEA_TRANSITIONS[idea.status].map((value) => (
                     <option key={value} value={value}>
-                      {value.replace("_", " ")}
+                      {ideaStatusLabel(value as IdeaStatus)}
                     </option>
                   ))}
                 </select>

@@ -171,14 +171,14 @@ export function buildPrCenterApi(
     const input = await body(request);
     if (
       typeof input.to !== "string" ||
-      !["UNDER_REVIEW", "ACCEPTED", "ARCHIVED"].includes(input.to)
+      !["UNDER_REVIEW", "ACCEPTED", "REJECTED", "ARCHIVED"].includes(input.to)
     )
       throw new PrCenterError("Unknown idea status", 422, "INVALID_STATUS");
     return transitionIdea(
       request.prCenterActor!,
       taskId((request.params as { ideaId: string }).ideaId),
       expectedVersion(request),
-      input.to as "UNDER_REVIEW" | "ACCEPTED" | "ARCHIVED",
+      input.to as "UNDER_REVIEW" | "ACCEPTED" | "REJECTED" | "ARCHIVED",
       typeof input.reason === "string" ? input.reason : undefined,
       correlationId(request),
     );

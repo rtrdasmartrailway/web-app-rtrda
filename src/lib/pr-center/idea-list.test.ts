@@ -26,6 +26,7 @@ const idea = (id: string) => ({
   campaign: null,
   evidenceUrls: [],
   status: "PROPOSED",
+  decisionReason: null,
   createdAt: new Date("2026-10-01T00:00:00.000Z"),
   convertedRequestId: null,
   version: 1,
@@ -79,11 +80,36 @@ describe("listIdeas pagination and scope", () => {
         campaign: true,
         evidenceUrls: true,
         status: true,
+        decisionReason: true,
         createdAt: true,
         convertedRequestId: true,
         version: true,
       },
     });
+  });
+
+  it("supports rejected ideas and exposes their decision reason within the existing scope", async () => {
+    const rejectedIdea = {
+      ...idea("idea-rejected"),
+      status: "REJECTED",
+      decisionReason: "Needs a clearer public benefit.",
+    };
+    mocks.findMany.mockResolvedValue([rejectedIdea]);
+
+    await expect(listIdeas(actor, { status: "REJECTED" })).resolves.toMatchObject({
+      items: [rejectedIdea],
+      nextOffset: null,
+    });
+    expect(mocks.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          organizationId: "org-1",
+          departmentId: "dept-1",
+          status: "REJECTED",
+        }),
+        select: expect.objectContaining({ decisionReason: true }),
+      }),
+    );
   });
 
   it("limits requester results to their own records", async () => {
@@ -92,6 +118,45 @@ describe("listIdeas pagination and scope", () => {
     expect(mocks.findMany.mock.calls[0][0].where).toEqual({
       organizationId: "org-1",
       proposerId: "user-1",
+    });
+  });
+
+  it("returns a rejection reason to its creator while scoping the list to that creator", async () => {
+    const rejectedIdea = {
+      ...idea("idea-rejected"),
+      status: "REJECTED",
+      decisionReason: "Needs a clearer public benefit.",
+    };
+    mocks.findMany.mockResolvedValue([rejectedIdea]);
+
+    const result = await listIdeas(
+      { ...actor, role: "REQUESTER" },
+      { take: 50, offset: 0 },
+    );
+
+    expect(result.items[0]).toMatchObject({
+      proposerId: "user-1",
+      status: "REJECTED",
+      decisionReason: "Needs a clearer public benefit.",
+    });
+    expect(mocks.findMany.mock.calls[0][0].where).toEqual({
+      organizationId: "org-1",
+      proposerId: "user-1",
+    });
+  });
+
+  it("gives an authorized administrator the idea-review queue within the selected grant scope", async () => {
+    const administrator = {
+      ...actor,
+      id: "admin-1",
+      role: "SCOPED_ADMINISTRATOR" as const,
+      scopeDepartmentId: "dept-review",
+    };
+    await listIdeas(administrator, { take: 50, offset: 0 });
+
+    expect(mocks.findMany.mock.calls[0][0].where).toEqual({
+      organizationId: "org-1",
+      departmentId: "dept-review",
     });
   });
 

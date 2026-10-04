@@ -81,6 +81,55 @@ describe("idea reviewer scope", () => {
     );
   });
 
+  it("requires a non-empty reason when an idea is rejected", async () => {
+    mocks.findFirst.mockResolvedValue({
+      id: "idea-1",
+      organizationId: "org-1",
+      departmentId: "dept-1",
+      status: "UNDER_REVIEW",
+      version: 3,
+    });
+
+    await expect(
+      transitionIdea(actor, "idea-1", 3, "REJECTED", "  ", "corr-reject"),
+    ).rejects.toMatchObject({ statusCode: 422, code: "REASON_REQUIRED" });
+    expect(mocks.transactionClient.prContentIdea.updateMany).not.toHaveBeenCalled();
+  });
+
+  it("persists a trimmed rejection reason with the rejected status", async () => {
+    mocks.findFirst.mockResolvedValue({
+      id: "idea-1",
+      organizationId: "org-1",
+      departmentId: "dept-1",
+      status: "UNDER_REVIEW",
+      version: 3,
+    });
+
+    await transitionIdea(
+      actor,
+      "idea-1",
+      3,
+      "REJECTED",
+      "  Needs a clearer public benefit.  ",
+      "corr-reject",
+    );
+
+    expect(mocks.transactionClient.prContentIdea.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          id: "idea-1",
+          organizationId: "org-1",
+          departmentId: "dept-1",
+          version: 3,
+        },
+        data: expect.objectContaining({
+          status: "REJECTED",
+          decisionReason: "Needs a clearer public benefit.",
+        }),
+      }),
+    );
+  });
+
   it("scopes accepted-idea conversion and its conditional update to the grant department", async () => {
     mocks.findFirst.mockResolvedValue({
       id: "idea-1",

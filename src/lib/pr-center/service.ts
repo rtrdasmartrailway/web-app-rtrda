@@ -145,12 +145,19 @@ type CreateRequestInput = {
   priority?: string;
   priorityReason?: string;
 };
-type IdeaStatus = "PROPOSED" | "UNDER_REVIEW" | "ACCEPTED" | "CONVERTED" | "ARCHIVED";
+type IdeaStatus =
+  | "PROPOSED"
+  | "UNDER_REVIEW"
+  | "ACCEPTED"
+  | "REJECTED"
+  | "CONVERTED"
+  | "ARCHIVED";
 
 const IDEA_TRANSITIONS: Record<IdeaStatus, IdeaStatus[]> = {
-  PROPOSED: ["UNDER_REVIEW", "ARCHIVED"],
-  UNDER_REVIEW: ["ACCEPTED", "ARCHIVED"],
+  PROPOSED: ["UNDER_REVIEW", "REJECTED", "ARCHIVED"],
+  UNDER_REVIEW: ["ACCEPTED", "REJECTED", "ARCHIVED"],
   ACCEPTED: ["ARCHIVED"],
+  REJECTED: [],
   CONVERTED: ["ARCHIVED"],
   ARCHIVED: [],
 };
@@ -513,6 +520,7 @@ export async function listIdeas(
     "PROPOSED",
     "UNDER_REVIEW",
     "ACCEPTED",
+    "REJECTED",
     "CONVERTED",
     "ARCHIVED",
   ] as const;
@@ -536,7 +544,7 @@ export async function listIdeas(
   }
   const departmentId = actorScopeDepartmentId(actor);
   const where: Prisma.PrContentIdeaWhereInput = {
-    ...(canReadAllRequests(actor.role)
+    ...(canReviewIdeas(actor.role)
       ? {
           organizationId: actor.organizationId,
           ...(departmentId ? { departmentId } : {}),
@@ -574,6 +582,7 @@ export async function listIdeas(
       campaign: true,
       evidenceUrls: true,
       status: true,
+      decisionReason: true,
       createdAt: true,
       convertedRequestId: true,
       version: true,
@@ -661,13 +670,22 @@ export async function transitionIdea(
       422,
       "INVALID_TRANSITION",
     );
+  const decisionReason = reason?.trim() || "";
+  if (to === "REJECTED" && !decisionReason)
+    throw new PrCenterError(
+      "A reason is required when rejecting an idea",
+      422,
+      "REASON_REQUIRED",
+    );
+  if (decisionReason.length > 5000)
+    throw new PrCenterError("Decision reason is too long", 422, "INVALID_REASON");
   return prisma.$transaction(async (tx) => {
     const updated = await tx.prContentIdea.updateMany({
       where: { ...ideaScope, version: fromVersion },
       data: {
         status: to as PrContentIdeaStatus,
         reviewerId: actor.id,
-        decisionReason: reason?.trim() || null,
+        decisionReason: decisionReason || null,
         version: { increment: 1 },
       },
     });

@@ -1,0 +1,1 @@
+ALTER TYPE "PrContentIdeaStatus" ADD VALUE 'REJECTED';

@@ -9,7 +9,14 @@ export type IdeaListRecord = {
   priority: string | null;
   campaign: string | null;
   evidenceUrls: string[];
-  status: "PROPOSED" | "UNDER_REVIEW" | "ACCEPTED" | "CONVERTED" | "ARCHIVED";
+  status:
+    | "PROPOSED"
+    | "UNDER_REVIEW"
+    | "ACCEPTED"
+    | "REJECTED"
+    | "CONVERTED"
+    | "ARCHIVED";
+  decisionReason: string | null;
   createdAt: string;
   convertedRequestId: string | null;
   version: number;
@@ -24,7 +31,14 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-const statuses = ["PROPOSED", "UNDER_REVIEW", "ACCEPTED", "CONVERTED", "ARCHIVED"];
+const statuses = [
+  "PROPOSED",
+  "UNDER_REVIEW",
+  "ACCEPTED",
+  "REJECTED",
+  "CONVERTED",
+  "ARCHIVED",
+];
 
 function nullableString(value: unknown): value is string | null {
   return value === null || typeof value === "string";
@@ -45,6 +59,7 @@ function parseIdea(value: unknown): IdeaListRecord {
     !Array.isArray(value.evidenceUrls) ||
     !value.evidenceUrls.every((url) => typeof url === "string") ||
     !statuses.includes(String(value.status)) ||
+    !nullableString(value.decisionReason) ||
     typeof value.createdAt !== "string" ||
     !Number.isFinite(Date.parse(value.createdAt)) ||
     !nullableString(value.convertedRequestId) ||
@@ -67,6 +82,7 @@ function parseIdea(value: unknown): IdeaListRecord {
     campaign: value.campaign,
     evidenceUrls: value.evidenceUrls,
     status: value.status as IdeaListRecord["status"],
+    decisionReason: value.decisionReason,
     createdAt: value.createdAt,
     convertedRequestId: value.convertedRequestId,
     version: value.version,

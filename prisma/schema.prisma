@@ -140,6 +140,7 @@ enum PrContentIdeaStatus {
   ACCEPTED
   CONVERTED
   ARCHIVED
+  REJECTED
 }
 
 enum PrMessageHouseStatus {
