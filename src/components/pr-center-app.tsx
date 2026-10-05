@@ -3,6 +3,7 @@
 import { startTransition, useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import type { CreateContentIdeaInput } from "@/lib/pr-center/idea-input";
+import { submitIdeaForm } from "@/lib/pr-center/idea-form";
 import { parseIdeaListPage, type IdeaListRecord } from "@/lib/pr-center/idea-view";
 import { parseCalendarEntries, type CalendarEntry } from "@/lib/pr-center/calendar-view";
 import {
@@ -4057,29 +4058,34 @@ function Ideas({
             event.preventDefault();
             setSaving(true);
             try {
-              const saved = await onCreate({
-                title: title.trim(),
-                rationale: summary.trim(),
-                audience,
-                pillar,
-                channel,
-                priority,
-                campaign,
-                evidenceUrls: evidenceText
-                  .split(/\r?\n/)
-                  .map((url) => url.trim())
-                  .filter(Boolean),
-              });
+              const saved = await submitIdeaForm(
+                () =>
+                  onCreate({
+                    title: title.trim(),
+                    rationale: summary.trim(),
+                    audience,
+                    pillar,
+                    channel,
+                    priority,
+                    campaign,
+                    evidenceUrls: evidenceText
+                      .split(/\r?\n/)
+                      .map((url) => url.trim())
+                      .filter(Boolean),
+                  }),
+                () => {
+                  setTitle("");
+                  setSummary("");
+                  setAudience("");
+                  setPillar("");
+                  setChannel("");
+                  setPriority("");
+                  setCampaign("");
+                  setEvidenceText("");
+                  setOpen(false);
+                },
+              );
               if (!saved) return;
-              setTitle("");
-              setSummary("");
-              setAudience("");
-              setPillar("");
-              setChannel("");
-              setPriority("");
-              setCampaign("");
-              setEvidenceText("");
-              setOpen(false);
               await onRefresh();
             } finally {
               setSaving(false);
