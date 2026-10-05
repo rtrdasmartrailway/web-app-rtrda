@@ -6,6 +6,7 @@ import type { CreateContentIdeaInput } from "@/lib/pr-center/idea-input";
 import { submitIdeaForm } from "@/lib/pr-center/idea-form";
 import { parseIdeaListPage, type IdeaListRecord } from "@/lib/pr-center/idea-view";
 import { parseCalendarEntries, type CalendarEntry } from "@/lib/pr-center/calendar-view";
+import { canEditOwnRequest } from "@/lib/pr-center/request-edit";
 import {
   parseCurrentMessageHouse,
   parseMessageHouseHistory,
@@ -2200,6 +2201,7 @@ export function PrCenterApp({
       {requestOpen && (
         <RequestModal
           language={state.language}
+          isEditing={requestEditId !== null}
           draft={requestDraft}
           onChange={setRequestDraft}
           onClose={() => {
@@ -2708,6 +2710,9 @@ function Requests({
                   <td>{request.requestedDate}</td>
                   <td>
                     <button onClick={() => setSelectedId(request.id)}>Details</button>
+                    {canEditOwnRequest(request, currentUserId) && (
+                      <button onClick={() => onEditRequest(request)}>Edit</button>
+                    )}
                   </td>
                 </tr>
               ))}
@@ -2750,21 +2755,19 @@ function Requests({
                 .map((task) => task.title)
                 .join(", ") || "None"}
             </p>
-            {mode === "mine" &&
-              selected.requesterId === currentUserId &&
-              (selected.status === "DRAFT" || selected.status === "SUBMITTED") && (
-                <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                  <button onClick={() => onEditRequest(selected)}>Edit request</button>
-                  {selected.status === "DRAFT" && (
-                    <button
-                      className={styles.primary}
-                      onClick={() => onSubmitRequest(selected)}
-                    >
-                      Submit request
-                    </button>
-                  )}
-                </div>
-              )}
+            {canEditOwnRequest(selected, currentUserId) && (
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                <button onClick={() => onEditRequest(selected)}>Edit request</button>
+                {selected.status === "DRAFT" && (
+                  <button
+                    className={styles.primary}
+                    onClick={() => onSubmitRequest(selected)}
+                  >
+                    Submit request
+                  </button>
+                )}
+              </div>
+            )}
           </section>
         )}
       </article>
@@ -5309,12 +5312,14 @@ function Help({
 }
 function RequestModal({
   language,
+  isEditing,
   draft,
   onChange,
   onClose,
   onSubmit,
 }: {
   language: Language;
+  isEditing: boolean;
   draft: RequestDraft;
   onChange: (draft: RequestDraft) => void;
   onClose: () => void;
@@ -5332,8 +5337,18 @@ function RequestModal({
       >
         <header>
           <div>
-            <p className={styles.eyebrow}>NEW WORK REQUEST</p>
-            <h2 id="request-title">{thai ? "ส่งคำของาน" : "Submit work request"}</h2>
+            <p className={styles.eyebrow}>
+              {isEditing ? "EDIT WORK REQUEST" : "NEW WORK REQUEST"}
+            </p>
+            <h2 id="request-title">
+              {isEditing
+                ? thai
+                  ? "แก้ไขคำขอ"
+                  : "Edit work request"
+                : thai
+                  ? "ส่งคำของาน"
+                  : "Submit work request"}
+            </h2>
           </div>
           <button type="button" onClick={onClose}>
             Close
@@ -5472,7 +5487,13 @@ function RequestModal({
             Cancel
           </button>
           <button className={styles.primary} type="submit">
-            {thai ? "บันทึกคำขอ" : "Save request"}
+            {isEditing
+              ? thai
+                ? "บันทึกการแก้ไข"
+                : "Save changes"
+              : thai
+                ? "บันทึกคำขอ"
+                : "Save request"}
           </button>
         </footer>
       </form>

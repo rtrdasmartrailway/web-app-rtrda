@@ -8,6 +8,8 @@ const { mockPrisma } = vi.hoisted(() => {
       updateMany: vi.fn(),
       findUniqueOrThrow: vi.fn(),
     },
+    prRequestRevision: { create: vi.fn() },
+    prRequestSource: { deleteMany: vi.fn(), createMany: vi.fn() },
     prUserRole: { findMany: vi.fn() },
     prTask: { findFirst: vi.fn(), updateMany: vi.fn() },
     prCenterUser: { findFirst: vi.fn() },
@@ -29,6 +31,7 @@ import {
   requestDetail,
   recordRequestDecision,
   transitionRequest,
+  updateRequestDraft,
   transitionTask,
   updateTaskAssignment,
   type PrCenterActor,
@@ -180,6 +183,62 @@ describe("request intake approval", () => {
       }),
     );
   });
+
+  it.each(["DRAFT", "SUBMITTED"] as const)(
+    "lets the request owner update an editable %s request with version/audit protection",
+    async (status) => {
+      mockPrisma.prRequest.findFirst.mockResolvedValueOnce({
+        ...requestRecord,
+        status,
+        revisions: [{ revisionNumber: 1 }],
+      });
+      mockPrisma.prRequest.findUniqueOrThrow.mockResolvedValueOnce({
+        ...requestRecord,
+        status,
+        version: 3,
+      });
+
+      await updateRequestDraft(
+        requesterActor,
+        requestRecord.id,
+        2,
+        {
+          type: "PR",
+          title: "Updated title",
+          objective: "Updated objective",
+          audience: "Updated audience",
+          sourceUrls: ["https://example.test/source"],
+        },
+        "edit-correlation",
+      );
+
+      expect(mockPrisma.prRequest.updateMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: requestRecord.id, version: 2 },
+          data: expect.objectContaining({ version: { increment: 1 } }),
+        }),
+      );
+      expect(mockPrisma.prRequestRevision.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            requestId: requestRecord.id,
+            revisionNumber: 2,
+            title: "Updated title",
+            objective: "Updated objective",
+            audience: "Updated audience",
+          }),
+        }),
+      );
+      expect(mockPrisma.prAuditEvent.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            action: "request.amended",
+            entityId: requestRecord.id,
+          }),
+        }),
+      );
+    },
+  );
 
   it("only lists pending requests for PR Operations; requesters and administrators are denied", async () => {
     await expect(listRequestApprovalQueue(requesterActor)).rejects.toMatchObject({
