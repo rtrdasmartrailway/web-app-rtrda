@@ -4,6 +4,13 @@ import { join } from "node:path";
 
 const source = readFileSync(join(__dirname, "survey-dashboard.tsx"), "utf8");
 describe("private response explorer wiring", () => {
+  it("opens full answers through five labeled, collapsed domain dropdowns", () => {
+    expect(source).toContain("buildSurveyDetailGroups(data.headers)");
+    expect(source).toContain("<details");
+    expect(source).toContain("<summary>");
+    expect(source).toContain("group.indices.map((index)");
+    expect(source).not.toContain("data.headers.map((header, index)");
+  });
   it("renders a private live agency heat map with full-response drilldown", () => {
     expect(source).toContain("<SurveyHeatmap");
     expect(source).toContain("headers={data.headers}");
@@ -16,8 +23,8 @@ describe("private response explorer wiring", () => {
     expect(source).toContain("รายการคำตอบและผู้ประสานงาน");
     expect(source).toContain("cells[4]?.trim()");
     expect(source).toContain("รายละเอียดคำตอบทั้งหมด");
-    expect(source).toContain("data.headers.map(");
-    expect(source).toContain("selected.cells[index]");
+    expect(source).toContain("detailGroups.overview.map(");
+    expect(source).toContain("value={selected.cells[index]}");
     expect(source).toContain("index < 14");
   });
   it("keeps a 30-second refresh and does not embed respondent data in SSR", () => {

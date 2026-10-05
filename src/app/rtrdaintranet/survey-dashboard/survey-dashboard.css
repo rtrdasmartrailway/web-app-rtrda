@@ -418,6 +418,7 @@
 }
 .survey-explorer-controls :is(input, select):focus-visible,
 .survey-response-item:focus-visible,
+.survey-detail-group summary:focus-visible,
 .survey-drawer-header button:focus-visible {
   outline: 3px solid #1685c9;
   outline-offset: 2px;
@@ -525,7 +526,51 @@
   cursor: pointer;
 }
 .survey-drawer-fields {
-  padding: 14px clamp(20px, 4vw, 40px) 40px;
+  display: grid;
+  gap: 12px;
+  padding: 18px clamp(20px, 4vw, 40px) 40px;
+}
+.survey-detail-group {
+  min-width: 0;
+  border: 1px solid #dbe5ed;
+  border-radius: 12px;
+  background: white;
+  overflow: hidden;
+}
+.survey-detail-group summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 18px 20px;
+  cursor: pointer;
+  font-weight: 700;
+  color: #102e50;
+  list-style: none;
+}
+.survey-detail-group summary::-webkit-details-marker {
+  display: none;
+}
+.survey-detail-group summary::after {
+  content: "⌄";
+  font-size: 20px;
+  line-height: 1;
+  color: #2485b7;
+  transition: transform 0.15s ease;
+}
+.survey-detail-group[open] summary::after {
+  transform: rotate(180deg);
+}
+.survey-detail-group summary small {
+  margin-left: auto;
+  white-space: nowrap;
+  color: #627d92;
+  font-size: 12px;
+  font-weight: 400;
+}
+.survey-detail-content {
+  padding: 0 20px 8px;
+  border-top: 1px solid #dbe5ed;
 }
 .survey-drawer-field {
   border-bottom: 1px solid #dbe5ed;

@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { SurveyData } from "@/lib/survey/google-sheets";
+import { buildSurveyDetailGroups } from "@/lib/survey/survey-detail-groups";
 import SurveyHeatmap from "./survey-heatmap";
 
 const format = new Intl.NumberFormat("th-TH");
@@ -57,6 +58,7 @@ export default function SurveyDashboard() {
           )),
     ) ?? [];
   const selected = data?.responses.find((response) => response.sheetRow === selectedRow);
+  const detailGroups = data ? buildSurveyDetailGroups(data.headers) : null;
   const [state, setState] = useState<"loading" | "live" | "stale">("loading");
   const [refreshing, setRefreshing] = useState(false);
 
@@ -337,7 +339,7 @@ export default function SurveyDashboard() {
             <div className="survey-footnote">
               อัปเดตอัตโนมัติทุก 30 วินาที · ข้อมูลรายบุคคลสำหรับผู้ได้รับอนุญาตเท่านั้น
             </div>
-            {selected && data && (
+            {selected && data && detailGroups && (
               <div
                 className="survey-drawer-backdrop"
                 onClick={() => setSelectedRow(null)}
@@ -369,18 +371,41 @@ export default function SurveyDashboard() {
                     </button>
                   </div>
                   <div className="survey-drawer-fields">
-                    {data.headers.map((header, index) => (
-                      <div className="survey-drawer-field" key={index}>
-                        <div className="survey-field-label">
-                          <span>{format.format(index + 1).padStart(2, "0")}</span>
-                          {header || `หัวข้อ ${index + 1}`}
-                        </div>
-                        <p>
-                          {selected.cells[index] || (
-                            <span className="survey-no-answer">ไม่ระบุ</span>
-                          )}
-                        </p>
+                    <details className="survey-detail-group">
+                      <summary>
+                        <span>ข้อมูลหน่วยงานและโครงการภาพรวม</span>
+                        <small>
+                          {format.format(detailGroups.overview.length)} หัวข้อ
+                        </small>
+                      </summary>
+                      <div className="survey-detail-content">
+                        {detailGroups.overview.map((index) => (
+                          <SurveyDetailField
+                            key={index}
+                            index={index}
+                            header={data.headers[index]}
+                            value={selected.cells[index]}
+                          />
+                        ))}
                       </div>
+                    </details>
+                    {detailGroups.groups.map((group) => (
+                      <details className="survey-detail-group" key={group.number}>
+                        <summary>
+                          <span>{group.label}</span>
+                          <small>{format.format(group.indices.length)} หัวข้อ</small>
+                        </summary>
+                        <div className="survey-detail-content">
+                          {group.indices.map((index) => (
+                            <SurveyDetailField
+                              key={index}
+                              index={index}
+                              header={data.headers[index]}
+                              value={selected.cells[index]}
+                            />
+                          ))}
+                        </div>
+                      </details>
                     ))}
                   </div>
                 </aside>
@@ -389,6 +414,26 @@ export default function SurveyDashboard() {
           </>
         )}
       </div>
+    </div>
+  );
+}
+
+function SurveyDetailField({
+  index,
+  header,
+  value,
+}: {
+  index: number;
+  header: string;
+  value: string | undefined;
+}) {
+  return (
+    <div className="survey-drawer-field">
+      <div className="survey-field-label">
+        <span>{format.format(index + 1).padStart(2, "0")}</span>
+        {header || `หัวข้อ ${index + 1}`}
+      </div>
+      <p>{value || <span className="survey-no-answer">ไม่ระบุ</span>}</p>
     </div>
   );
 }
