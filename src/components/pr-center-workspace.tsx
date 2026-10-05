@@ -1,37 +1,14 @@
 "use client";
 
 import { useEffect, useState, type FormEvent } from "react";
+import {
+  fetchCurrentPrCenterSession,
+  type PrCenterSession,
+} from "@/lib/pr-center/session-client";
 import { PrCenterApp } from "./pr-center-app";
 import styles from "./pr-center-workspace.module.css";
 
 type SessionState = "loading" | "sign-in-required" | "authenticated" | "unavailable";
-type PrCenterSession = {
-  userId: string;
-  displayName: string;
-  departmentName: string;
-  role:
-    | "REQUESTER"
-    | "PR_OPERATIONS"
-    | "APPROVER"
-    | "EXECUTIVE_READ_ONLY"
-    | "SCOPED_ADMINISTRATOR";
-  roles: Array<
-    | "REQUESTER"
-    | "PR_OPERATIONS"
-    | "APPROVER"
-    | "EXECUTIVE_READ_ONLY"
-    | "SCOPED_ADMINISTRATOR"
-  >;
-  roleGrants: Array<{
-    role:
-      | "REQUESTER"
-      | "PR_OPERATIONS"
-      | "APPROVER"
-      | "EXECUTIVE_READ_ONLY"
-      | "SCOPED_ADMINISTRATOR";
-    departmentId: string | null;
-  }>;
-};
 type Page =
   | "Home"
   | "Submit Request"
@@ -83,15 +60,31 @@ export function PrCenterWorkspace() {
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
-    fetch("/api/pr-center/session", { credentials: "same-origin" })
-      .then(async (response) => {
-        if (response.ok) {
-          setSession((await response.json()) as PrCenterSession);
-          setSessionState("authenticated");
-        } else
-          setSessionState(response.status === 401 ? "sign-in-required" : "unavailable");
-      })
-      .catch(() => setSessionState("unavailable"));
+    let disposed = false;
+    let checking = false;
+    const refreshSession = async () => {
+      if (checking) return;
+      checking = true;
+      const result = await fetchCurrentPrCenterSession();
+      checking = false;
+      if (disposed) return;
+      setSession(result.session);
+      setSessionState(result.state);
+    };
+    const refreshWhenVisible = () => {
+      if (document.visibilityState === "visible") void refreshSession();
+    };
+
+    void refreshSession();
+    window.addEventListener("focus", refreshSession);
+    document.addEventListener("visibilitychange", refreshWhenVisible);
+    const refreshInterval = window.setInterval(() => void refreshSession(), 60_000);
+    return () => {
+      disposed = true;
+      window.removeEventListener("focus", refreshSession);
+      document.removeEventListener("visibilitychange", refreshWhenVisible);
+      window.clearInterval(refreshInterval);
+    };
   }, []);
 
   useEffect(() => {
