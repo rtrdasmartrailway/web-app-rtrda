@@ -499,7 +499,8 @@ export async function updateRequestDraft(
   const request = await requestInScope(actor, requestId);
   if (request.requesterId !== actor.id && !actorHasRole(actor, "SCOPED_ADMINISTRATOR"))
     throw new PrCenterError("You cannot amend this request", 403, "FORBIDDEN");
-  if (request.status !== "DRAFT" && request.status !== "SUBMITTED")
+  const editableStatuses: PrRequestStatus[] = ["DRAFT", "SUBMITTED", "REJECTED"];
+  if (!editableStatuses.includes(request.status))
     throw new PrCenterError(
       "This request can no longer be amended",
       422,
@@ -519,6 +520,8 @@ export async function updateRequestDraft(
       "INVALID_TITLE",
     );
   const sourceUrls = [...new Set(input.sourceUrls.map(assertUrl))];
+  const resubmissionRequired =
+    request.status === "SUBMITTED" || request.status === "REJECTED";
   return prisma.$transaction(async (tx) => {
     const revisionNumber = (request.revisions[0]?.revisionNumber || 0) + 1;
     const updated = await tx.prRequest.updateMany({
@@ -528,6 +531,7 @@ export async function updateRequestDraft(
         priority: input.priority || request.priority,
         priorityReason: input.priorityReason?.trim() || null,
         requestedFor: input.requestedFor,
+        ...(resubmissionRequired ? { status: "DRAFT" } : {}),
         version: { increment: 1 },
       },
     });
@@ -552,12 +556,27 @@ export async function updateRequestDraft(
       await tx.prRequestSource.createMany({
         data: sourceUrls.map((url) => ({ requestId: request.id, url })),
       });
+    if (resubmissionRequired)
+      await tx.prStatusHistory.create({
+        data: {
+          requestId: request.id,
+          fromState: request.status,
+          toState: "DRAFT",
+          reason: "Requester amendment requires resubmission",
+          actorId: actor.id,
+        },
+      });
     await auditAndOutbox(tx, {
       actor,
       action: "request.amended",
       entityType: "request",
       entityId: request.id,
-      after: { revisionNumber, version: fromVersion + 1 },
+      after: {
+        revisionNumber,
+        version: fromVersion + 1,
+        status: resubmissionRequired ? "DRAFT" : request.status,
+        resubmissionRequired,
+      },
       eventType: "pr.request.amended",
       correlationId,
     });

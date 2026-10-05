@@ -394,6 +394,7 @@ const copy = {
     role: "บทบาทตัวอย่าง",
     refresh: "รีเฟรชสถานะ",
     rejectionReason: "เหตุผล/ความคิดเห็นที่ปฏิเสธ",
+    submitForApproval: "ส่งคำขอเพื่อขออนุมัติ",
   },
   en: {
     greeting: "Welcome, Communications Team",
@@ -412,6 +413,7 @@ const copy = {
     role: "Demo role",
     refresh: "Refresh status",
     rejectionReason: "Rejection reason / comment",
+    submitForApproval: "Submit for approval",
   },
 };
 
@@ -1287,6 +1289,11 @@ export function PrCenterApp({
     }));
   };
   const createRequest = async (draft: RequestDraft, editId = requestEditId) => {
+    const originalStatus = editId
+      ? state.requests.find((request) => request.id === editId)?.status
+      : undefined;
+    const resubmissionRequired =
+      originalStatus === "SUBMITTED" || originalStatus === "REJECTED";
     try {
       const response = await fetch(
         editId ? `/api/pr-center/requests/${editId}` : "/api/pr-center/requests",
@@ -1387,10 +1394,14 @@ export function PrCenterApp({
       announce(
         state.language === "th"
           ? editId
-            ? "บันทึกการแก้ไขคำขอแล้ว"
+            ? resubmissionRequired
+              ? "บันทึกการแก้ไขแล้ว คำขอกลับเป็นฉบับร่าง กรุณาส่งอีกครั้งเพื่อขออนุมัติ"
+              : "บันทึกการแก้ไขคำขอแล้ว"
             : "บันทึกคำขอเป็นฉบับร่างแล้ว"
           : editId
-            ? "Request changes saved"
+            ? resubmissionRequired
+              ? "Changes saved. The request is a draft again; submit it to request approval."
+              : "Request changes saved"
             : "Request saved as draft",
       );
       setPage("my-requests");
@@ -2713,6 +2724,16 @@ function Requests({
                     {canEditOwnRequest(request, currentUserId) && (
                       <button onClick={() => onEditRequest(request)}>Edit</button>
                     )}
+                    {mode === "mine" &&
+                      request.requesterId === currentUserId &&
+                      request.status === "DRAFT" && (
+                        <button
+                          className={styles.primary}
+                          onClick={() => onSubmitRequest(request)}
+                        >
+                          {t.submitForApproval}
+                        </button>
+                      )}
                   </td>
                 </tr>
               ))}
@@ -2763,7 +2784,7 @@ function Requests({
                     className={styles.primary}
                     onClick={() => onSubmitRequest(selected)}
                   >
-                    Submit request
+                    {t.submitForApproval}
                   </button>
                 )}
               </div>

@@ -184,7 +184,7 @@ describe("request intake approval", () => {
     );
   });
 
-  it.each(["DRAFT", "SUBMITTED"] as const)(
+  it.each(["DRAFT", "SUBMITTED", "REJECTED"] as const)(
     "lets the request owner update an editable %s request with version/audit protection",
     async (status) => {
       mockPrisma.prRequest.findFirst.mockResolvedValueOnce({
@@ -194,7 +194,7 @@ describe("request intake approval", () => {
       });
       mockPrisma.prRequest.findUniqueOrThrow.mockResolvedValueOnce({
         ...requestRecord,
-        status,
+        status: "DRAFT",
         version: 3,
       });
 
@@ -215,7 +215,10 @@ describe("request intake approval", () => {
       expect(mockPrisma.prRequest.updateMany).toHaveBeenCalledWith(
         expect.objectContaining({
           where: { id: requestRecord.id, version: 2 },
-          data: expect.objectContaining({ version: { increment: 1 } }),
+          data: expect.objectContaining({
+            ...(status === "DRAFT" ? {} : { status: "DRAFT" }),
+            version: { increment: 1 },
+          }),
         }),
       );
       expect(mockPrisma.prRequestRevision.create).toHaveBeenCalledWith(
@@ -229,16 +232,106 @@ describe("request intake approval", () => {
           }),
         }),
       );
+      if (status === "DRAFT") {
+        expect(mockPrisma.prStatusHistory.create).not.toHaveBeenCalled();
+      } else {
+        expect(mockPrisma.prStatusHistory.create).toHaveBeenCalledWith({
+          data: {
+            requestId: requestRecord.id,
+            fromState: status,
+            toState: "DRAFT",
+            reason: "Requester amendment requires resubmission",
+            actorId: requesterActor.id,
+          },
+        });
+      }
       expect(mockPrisma.prAuditEvent.create).toHaveBeenCalledWith(
         expect.objectContaining({
           data: expect.objectContaining({
             action: "request.amended",
             entityId: requestRecord.id,
+            after: expect.objectContaining({
+              status: "DRAFT",
+              resubmissionRequired: status !== "DRAFT",
+            }),
           }),
         }),
       );
     },
   );
+
+  it("returns an amended rejected request to Draft and lets its owner resubmit it for approval", async () => {
+    mockPrisma.prRequest.findFirst.mockResolvedValueOnce({
+      ...requestRecord,
+      status: "REJECTED",
+      version: 2,
+      revisions: [{ revisionNumber: 1 }],
+    });
+    mockPrisma.prRequest.findUniqueOrThrow.mockResolvedValueOnce({
+      ...requestRecord,
+      status: "DRAFT",
+      version: 3,
+    });
+
+    const amended = await updateRequestDraft(requesterActor, requestRecord.id, 2, {
+      type: "PR",
+      title: "Corrected request",
+      objective: "Updated objective",
+      audience: "Updated audience",
+      sourceUrls: ["https://example.test/source"],
+    });
+
+    mockPrisma.prRequest.findFirst.mockResolvedValueOnce({
+      ...requestRecord,
+      status: "DRAFT",
+      version: amended.version,
+    });
+    mockPrisma.prRequest.findUniqueOrThrow.mockResolvedValueOnce({
+      ...requestRecord,
+      status: "SUBMITTED",
+      version: amended.version + 1,
+    });
+
+    await transitionRequest(requesterActor, amended.id, amended.version, "SUBMITTED");
+
+    expect(mockPrisma.prRequest.updateMany).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({
+        data: expect.objectContaining({ status: "DRAFT" }),
+      }),
+    );
+    expect(mockPrisma.prRequest.updateMany).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({
+        where: expect.objectContaining({ version: amended.version }),
+        data: expect.objectContaining({ status: "SUBMITTED" }),
+      }),
+    );
+    expect(mockPrisma.prNotification.createMany).toHaveBeenCalledWith({
+      data: expect.arrayContaining([
+        expect.objectContaining({ userId: requesterActor.id, target: "my-requests" }),
+        expect.objectContaining({ userId: "pr-recipient", target: "approvals" }),
+      ]),
+    });
+  });
+
+  it("keeps approved requests uneditable", async () => {
+    mockPrisma.prRequest.findFirst.mockResolvedValueOnce({
+      ...requestRecord,
+      status: "APPROVED",
+    });
+
+    await expect(
+      updateRequestDraft(requesterActor, requestRecord.id, 2, {
+        type: "PR",
+        title: "Updated title",
+        objective: "Updated objective",
+        audience: "Updated audience",
+        sourceUrls: [],
+      }),
+    ).rejects.toMatchObject({ statusCode: 422, code: "INVALID_TRANSITION" });
+    expect(mockPrisma.prRequest.updateMany).not.toHaveBeenCalled();
+  });
 
   it("only lists pending requests for PR Operations; requesters and administrators are denied", async () => {
     await expect(listRequestApprovalQueue(requesterActor)).rejects.toMatchObject({
