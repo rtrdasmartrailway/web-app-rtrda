@@ -3,7 +3,7 @@
   background-image: url("/intro-background.svg");
   background-position: center;
   background-repeat: no-repeat;
-  background-size: contain;
+  background-size: cover;
   min-height: 100vh;
   min-height: 100svh;
   width: 100%;
