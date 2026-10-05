@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { SurveyData } from "@/lib/survey/google-sheets";
+import { buildSurveyOverlap } from "@/lib/survey/survey-overlap";
 
 const format = new Intl.NumberFormat("th-TH");
 const clock = new Intl.DateTimeFormat("th-TH", {
@@ -16,6 +17,13 @@ export default function SurveyDashboard() {
   const [query, setQuery] = useState("");
   const [organization, setOrganization] = useState("");
   const [selectedRow, setSelectedRow] = useState<number | null>(null);
+  const [moheOnly, setMoheOnly] = useState(true);
+  const [areaFilter, setAreaFilter] = useState("ทั้งหมด");
+  const [expandedActivity, setExpandedActivity] = useState<number | null>(null);
+  const overlap = useMemo(
+    () => (data ? buildSurveyOverlap(data.headers, data.responses, moheOnly) : null),
+    [data, moheOnly],
+  );
   const nameColumns = useMemo(
     () =>
       data?.headers.flatMap((header, index) =>
@@ -104,10 +112,11 @@ export default function SurveyDashboard() {
               ข้อมูลภาพรวม · สถาบันวิจัยและพัฒนาเทคโนโลยีระบบราง
             </p>
             <h1>
-              ภาพรวม<span>ผลสำรวจ</span>
+              แผนที่<span>กิจกรรมร่วม</span>
             </h1>
             <p className="survey-lede">
-              มุมมองภาพรวมความคิดเห็นของผู้ตอบแบบสำรวจ เพื่อขับเคลื่อนอนาคตระบบรางไทย
+              30 กิจกรรมที่ สทร. ดำเนินงาน
+              เทียบกับระดับบทบาทที่หน่วยงานอื่นรายงานด้วยตนเอง
             </p>
           </div>
           <div className="survey-status-wrap">
@@ -170,25 +179,173 @@ export default function SurveyDashboard() {
                   <span>◉</span>
                 </div>
                 <h2>
-                  จากความคิดเห็น
+                  จากกิจกรรมที่ทำร่วมกัน
                   <br />
-                  สู่ทิศทางที่ชัดเจน
+                  สู่การแบ่งบทบาทที่ชัดเจน
                 </h2>
                 <p>
-                  สำรวจความต้องการด้านการวิจัย มาตรฐาน บุคลากร
-                  และการถ่ายทอดเทคโนโลยีในภาคระบบราง
+                  หน่วยงานที่ให้คะแนนบทบาทตนเอง 3–4 ทำกิจกรรมประเภทเดียวกับ สทร.
+                  ต้องตรวจโครงการและผลผลิตก่อนสรุปว่างานซ้ำซ้อนจริง
                 </p>
               </article>
             </div>
 
+            {overlap && (
+              <section
+                className="survey-section survey-overlap"
+                aria-labelledby="survey-overlap-title"
+              >
+                <div className="survey-section-title">
+                  <div>
+                    <span className="survey-section-index">02 / FUNCTIONAL ROLE MAP</span>
+                    <h2 id="survey-overlap-title">
+                      กิจกรรมของ สทร. ที่หน่วยงานอื่นทำเช่นกัน
+                    </h2>
+                  </div>
+                  <span className="survey-section-note">
+                    อัปเดตตามคำตอบในชีต · คะแนน 3–4 = ดำเนินการโดยตรง/บทบาทนำ
+                  </span>
+                </div>
+                <div className="survey-overlap-controls">
+                  <label>
+                    ขอบเขตหน่วยงาน
+                    <select
+                      aria-label="ขอบเขตหน่วยงาน"
+                      value={moheOnly ? "mohe" : "all"}
+                      onChange={(event) => {
+                        setMoheOnly(event.target.value === "mohe");
+                        setExpandedActivity(null);
+                      }}
+                    >
+                      <option value="mohe">สังกัด อว. ที่ระบุชัดเจน</option>
+                      <option value="all">หน่วยงานผู้ตอบทั้งหมด</option>
+                    </select>
+                  </label>
+                  <label>
+                    กลุ่มกิจกรรม
+                    <select
+                      aria-label="กลุ่มกิจกรรม"
+                      value={areaFilter}
+                      onChange={(event) => {
+                        setAreaFilter(event.target.value);
+                        setExpandedActivity(null);
+                      }}
+                    >
+                      <option value="ทั้งหมด">ทั้งหมด 5 ด้าน</option>
+                      {overlap.areas.map((area) => (
+                        <option key={area.label} value={area.label}>
+                          {area.label}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                </div>
+                <div className="survey-overlap-kpis">
+                  <div>
+                    <strong>{format.format(overlap.similarActivityCount)} / 30</strong>
+                    <span>กิจกรรมที่มีอย่างน้อยหนึ่งหน่วยงานรายงานว่าทำโดยตรง</span>
+                  </div>
+                  <div>
+                    <strong>{format.format(overlap.agencyCount)}</strong>
+                    <span>ชื่อหน่วยงานในขอบเขตที่เลือก (ใช้คำตอบล่าสุดต่อชื่อ)</span>
+                  </div>
+                  <div>
+                    <strong>{format.format(overlap.responseCount)}</strong>
+                    <span>คำตอบทั้งหมดในชีต ก่อนจัดกลุ่มชื่อหน่วยงาน</span>
+                  </div>
+                </div>
+                <p className="survey-overlap-caveat">
+                  “ทำกิจกรรมประเภทเดียวกัน” ไม่ใช่ข้อสรุปว่าโครงการ งบประมาณ
+                  หรือผลผลิตซ้ำกันจริง · มุมมอง อว. นับเฉพาะช่องสังกัดที่ระบุ อว.
+                  หรืออุดมศึกษาชัดเจน
+                </p>
+                {overlap.areas
+                  .filter((area) => areaFilter === "ทั้งหมด" || area.label === areaFilter)
+                  .map((area) => (
+                    <div className="survey-overlap-area" key={area.label}>
+                      <h3>
+                        {area.label}{" "}
+                        <small>
+                          {format.format(
+                            area.activities.filter((activity) => activity.direct.length)
+                              .length,
+                          )}{" "}
+                          / 6 กิจกรรมมีผู้ดำเนินการร่วม
+                        </small>
+                      </h3>
+                      <div className="survey-overlap-activities">
+                        {area.activities.map((activity) => (
+                          <div className="survey-overlap-item" key={activity.column}>
+                            <button
+                              type="button"
+                              className="survey-overlap-activity"
+                              aria-expanded={expandedActivity === activity.column}
+                              onClick={() =>
+                                setExpandedActivity(
+                                  expandedActivity === activity.column
+                                    ? null
+                                    : activity.column,
+                                )
+                              }
+                            >
+                              <span className="survey-overlap-index">
+                                {format
+                                  .format(activity.column - area.activities[0].column + 1)
+                                  .padStart(2, "0")}
+                              </span>
+                              <span className="survey-overlap-name">
+                                {activity.title}
+                              </span>
+                              <span className="survey-overlap-count">
+                                <strong>{format.format(activity.direct.length)}</strong>{" "}
+                                หน่วยงานทำโดยตรง
+                              </span>
+                              <span className="survey-overlap-toggle">
+                                {expandedActivity === activity.column ? "−" : "+"}
+                              </span>
+                            </button>
+                            {expandedActivity === activity.column && (
+                              <div className="survey-overlap-detail">
+                                <p>
+                                  ผู้สนับสนุน/ร่วมดำเนินการ (คะแนน 2):{" "}
+                                  {format.format(activity.supporting)} · ตอบข้อนี้:{" "}
+                                  {format.format(activity.answered)} จาก{" "}
+                                  {format.format(overlap.agencyCount)} หน่วยงาน
+                                </p>
+                                {activity.direct.length ? (
+                                  activity.direct.map((agency) => (
+                                    <button
+                                      type="button"
+                                      key={agency.sheetRow}
+                                      onClick={() => setSelectedRow(agency.sheetRow)}
+                                    >
+                                      <span>{agency.name}</span>
+                                      <strong>ระดับ {agency.score} · ดูคำตอบ ↗</strong>
+                                    </button>
+                                  ))
+                                ) : (
+                                  <p>
+                                    ยังไม่มีหน่วยงานในขอบเขตที่เลือกรายงานว่าดำเนินการเอง
+                                  </p>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+              </section>
+            )}
+
             <section className="survey-section" aria-labelledby="survey-areas">
               <div className="survey-section-title">
                 <div>
-                  <span className="survey-section-index">02 / AREAS OF FOCUS</span>
-                  <h2 id="survey-areas">ภาพรวมรายด้าน</h2>
+                  <span className="survey-section-index">03 / SUPPORTING CONTEXT</span>
+                  <h2 id="survey-areas">คะแนนบทบาทรายด้าน</h2>
                 </div>
                 <span className="survey-section-note">
-                  คะแนนเฉลี่ยจากคำตอบที่มีคะแนน · เต็ม 5
+                  คะแนนเฉลี่ยจากคำตอบทั้งหมดที่มีคะแนน · เต็ม 4 · ไม่ใช่ดัชนีความซ้ำซ้อน
                 </span>
               </div>
               <div className="survey-areas">
@@ -198,7 +355,7 @@ export default function SurveyDashboard() {
                       <span className="survey-area-index">0{index + 1}</span>
                       <span className="survey-area-score">
                         {section.mean === null ? "—" : section.mean.toFixed(1)}{" "}
-                        <small>/ 5</small>
+                        <small>/ 4</small>
                       </span>
                     </div>
                     <h3>{section.label}</h3>
@@ -207,10 +364,10 @@ export default function SurveyDashboard() {
                       role="meter"
                       aria-label={`คะแนนเฉลี่ย ${section.label}`}
                       aria-valuemin={0}
-                      aria-valuemax={5}
+                      aria-valuemax={4}
                       aria-valuenow={section.mean ?? 0}
                     >
-                      <span style={{ width: `${((section.mean ?? 0) / 5) * 100}%` }} />
+                      <span style={{ width: `${((section.mean ?? 0) / 4) * 100}%` }} />
                     </div>
                     <div className="survey-area-foot">
                       <span>ผู้ตอบในด้านนี้</span>

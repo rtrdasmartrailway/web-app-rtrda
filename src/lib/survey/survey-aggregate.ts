@@ -4,7 +4,7 @@ const SECTIONS = [
   { label: "มาตรฐานและการรับรอง", start: 24 },
   { label: "พัฒนาบุคลากร", start: 36 },
   { label: "ถ่ายทอดเทคโนโลยี", start: 46 },
-  { label: "ด้านอื่น ๆ", start: 56 },
+  { label: "พัฒนาอุตสาหกรรมและระบบนิเวศ", start: 56 },
 ] as const;
 
 const ORGANIZATION_CHOICES = [
@@ -19,7 +19,7 @@ const ORGANIZATION_CHOICES = [
 ] as const;
 
 function score(value: string | undefined): number | null {
-  const match = value?.trim().match(/^([0-5])(?:\s|$|[.:\-–])/);
+  const match = value?.trim().match(/^([0-4])(?:\s|$|[.:\-–])/);
   return match ? Number(match[1]) : null;
 }
 
