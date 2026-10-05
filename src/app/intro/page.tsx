@@ -8,16 +8,16 @@ export const metadata = {
 
 const portraits = [
   {
-    src: "/intro/king.webp",
-    alt: "พระบรมฉายาลักษณ์พระบาทสมเด็จพระบรมชนกาธิเบศร ในกรอบลายไทยสีทอง",
-    dedication: "น้อมสำนึกในพระมหากรุณาธิคุณเป็นล้นพ้นอันหาที่สุดมิได้",
-    nameLines: ["พระบาทสมเด็จพระบรมชนกาธิเบศร", "มหาภูมิพลอดุลยเดชมหาราช บรมนาถบพิตร"],
-  },
-  {
     src: "/intro/queen.webp",
     alt: "พระฉายาลักษณ์สมเด็จพระนางเจ้าสิริกิติ์ พระบรมราชินีนาถ ในกรอบลายไทยสีทอง",
     dedication: "น้อมสำนึกในพระมหากรุณาธิคุณเป็นล้นพ้นอันหาที่สุดมิได้",
     nameLines: ["สมเด็จพระนางเจ้าสิริกิติ์ พระบรมราชินีนาถ", "พระบรมราชชนนีพันปีหลวง"],
+  },
+  {
+    src: "/intro/king.webp",
+    alt: "พระบรมฉายาลักษณ์พระบาทสมเด็จพระบรมชนกาธิเบศร ในกรอบลายไทยสีทอง",
+    dedication: "น้อมสำนึกในพระมหากรุณาธิคุณเป็นล้นพ้นอันหาที่สุดมิได้",
+    nameLines: ["พระบาทสมเด็จพระบรมชนกาธิเบศร", "มหาภูมิพลอดุลยเดชมหาราช บรมนาถบพิตร"],
   },
   {
     src: "/intro/princess.webp",
@@ -49,12 +49,12 @@ export default function IntroPage() {
                 alt={portrait.alt}
                 className={styles.portrait}
                 fetchPriority={index === 0 ? "high" : "auto"}
-                height={428}
+                height={1255}
                 loading={index === 0 ? "eager" : "lazy"}
                 sizes="(max-width: 820px) 70vw, 260px"
                 src={portrait.src}
                 unoptimized
-                width={389}
+                width={1120}
               />
               <figcaption className={styles.caption}>
                 <p className={styles.dedication}>{portrait.dedication}</p>
