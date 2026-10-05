@@ -6,9 +6,9 @@ import { useEffect, useState } from "react";
 
 const SLIDES = [
   {
-    src: "/stitch-assets/home-hero-slides/slide-1.png",
+    src: "/stitch-assets/home-hero-slides/home-portrait.jpg",
     href: "/ติดต่อเรา/ช่องทางการติดต่อ",
-    label: "แจ้งรับ-ส่งหนังสือราชการและติดต่อสอบถามข้อมูล",
+    label: "ภาพบุคคลบนหน้าแรก",
   },
   {
     src: "/stitch-assets/home-hero-slides/slide-2.png",
