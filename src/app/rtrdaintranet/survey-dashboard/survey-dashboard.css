@@ -747,8 +747,7 @@
   border-radius: 4px;
 }
 .survey-heatmap-scroll {
-  max-height: 630px;
-  overflow: auto;
+  overflow-x: auto;
   margin: 0 24px;
   border: 1px solid #c7d9de;
   border-radius: 10px;
