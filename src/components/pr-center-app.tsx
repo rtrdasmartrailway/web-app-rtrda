@@ -4638,6 +4638,16 @@ function Directory({
   const [grantReason, setGrantReason] = useState("");
   const [grantConfirmation, setGrantConfirmation] = useState("");
   const [grantSubmitting, setGrantSubmitting] = useState(false);
+  const [revokeTarget, setRevokeTarget] = useState<{
+    userId: string;
+    displayName: string;
+    roleId: string;
+    role: string;
+    departmentId: string | null;
+  } | null>(null);
+  const [revokeReason, setRevokeReason] = useState("");
+  const [revokeConfirmation, setRevokeConfirmation] = useState("");
+  const [revokeSubmitting, setRevokeSubmitting] = useState(false);
   const [accessReason, setAccessReason] = useState("");
   const isOrganizationAdmin =
     actor.roleGrants?.some(
@@ -4730,26 +4740,47 @@ function Directory({
     }
   };
 
-  const handleRevoke = async (roleId: string) => {
+  const handleRevoke = async () => {
+    if (!revokeTarget) return;
     setNotice(null);
     setError(null);
-    const reason = accessReason.trim();
+    const reason = revokeReason.trim();
     if (!reason)
       return setError(language === "th" ? "กรุณาระบุเหตุผล" : "A reason is required");
-    const res = await fetch(`/api/pr-center/admin/roles/${roleId}`, {
-      method: "DELETE",
-      credentials: "same-origin",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ reason }),
-    });
-    if (!res.ok) {
-      const err = await res.json().catch(() => null);
-      setError(err?.message || "Revoke failed");
-      return;
+    if (revokeConfirmation.trim() !== "ตกลง")
+      return setError(
+        language === "th" ? 'กรุณาพิมพ์ "ตกลง" เพื่อยืนยัน' : 'Type "ตกลง" to confirm',
+      );
+
+    setRevokeSubmitting(true);
+    try {
+      const res = await fetch(`/api/pr-center/admin/roles/${revokeTarget.roleId}`, {
+        method: "DELETE",
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ reason }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => null);
+        setError(
+          err?.message || (language === "th" ? "ถอน role ไม่สำเร็จ" : "Revoke failed"),
+        );
+        return;
+      }
+      setNotice(language === "th" ? "ถอน role สำเร็จ" : "Role revoked");
+      setRevokeTarget(null);
+      setRevokeReason("");
+      setRevokeConfirmation("");
+      reload();
+    } catch {
+      setError(
+        language === "th"
+          ? "เชื่อมต่อระบบไม่ได้ กรุณาลองอีกครั้ง"
+          : "Could not connect. Please try again.",
+      );
+    } finally {
+      setRevokeSubmitting(false);
     }
-    setNotice("Role revoked");
-    setAccessReason("");
-    reload();
   };
 
   const handleToggleActive = async (userId: string) => {
@@ -4881,13 +4912,26 @@ function Directory({
                   >
                     {r.role} · {r.departmentId ? `dept ${r.departmentId}` : "org-wide"}
                     <button
-                      onClick={() => handleRevoke(r.id)}
+                      type="button"
+                      aria-label={`${language === "th" ? "ถอน role" : "Revoke role"}: ${r.role}`}
+                      onClick={() => {
+                        setError(null);
+                        setGrantTarget(null);
+                        setRevokeReason("");
+                        setRevokeConfirmation("");
+                        setRevokeTarget({
+                          userId: user.id,
+                          displayName: user.displayName,
+                          roleId: r.id,
+                          role: r.role,
+                          departmentId: r.departmentId,
+                        });
+                      }}
                       disabled={
-                        !accessReason.trim() ||
-                        (user.active &&
-                          r.role === "SCOPED_ADMINISTRATOR" &&
-                          r.departmentId === null &&
-                          activeOrganizationAdmins <= 1)
+                        user.active &&
+                        r.role === "SCOPED_ADMINISTRATOR" &&
+                        r.departmentId === null &&
+                        activeOrganizationAdmins <= 1
                       }
                       title={
                         user.active &&
@@ -4895,7 +4939,9 @@ function Directory({
                         r.departmentId === null &&
                         activeOrganizationAdmins <= 1
                           ? "At least one active organization-wide administrator must remain"
-                          : undefined
+                          : language === "th"
+                            ? "ถอน role"
+                            : "Revoke role"
                       }
                       style={{
                         fontSize: 11,
@@ -5035,6 +5081,109 @@ function Directory({
                         : language === "th"
                           ? "ยืนยันเพิ่ม role"
                           : "Confirm grant"}
+                    </button>
+                  </div>
+                </section>
+              </div>
+            )}
+            {revokeTarget?.userId === user.id && (
+              <div
+                role="presentation"
+                onClick={() => {
+                  if (!revokeSubmitting) setRevokeTarget(null);
+                }}
+                style={{
+                  position: "fixed",
+                  inset: 0,
+                  zIndex: 1000,
+                  display: "grid",
+                  placeItems: "center",
+                  padding: 16,
+                  background: "rgba(15, 23, 42, 0.55)",
+                }}
+              >
+                <section
+                  role="dialog"
+                  aria-modal="true"
+                  aria-labelledby="revoke-role-title"
+                  onClick={(event) => event.stopPropagation()}
+                  onKeyDown={(event) => {
+                    if (event.key === "Escape" && !revokeSubmitting)
+                      setRevokeTarget(null);
+                  }}
+                  style={{
+                    width: "min(100%, 480px)",
+                    display: "grid",
+                    gap: 12,
+                    padding: 20,
+                    borderRadius: 12,
+                    background: "white",
+                    boxShadow: "0 20px 45px rgba(15, 23, 42, 0.25)",
+                  }}
+                >
+                  <h2 id="revoke-role-title" style={{ margin: 0 }}>
+                    {language === "th" ? "ยืนยันการถอน role" : "Confirm role revocation"}
+                  </h2>
+                  <p style={{ margin: 0, color: "#4b5563" }}>
+                    {revokeTarget.displayName} · {revokeTarget.role} ·{" "}
+                    {revokeTarget.departmentId
+                      ? `dept ${revokeTarget.departmentId}`
+                      : "org-wide"}
+                  </p>
+                  {error && (
+                    <p role="alert" style={{ color: "#b91c1c", margin: 0 }}>
+                      {error}
+                    </p>
+                  )}
+                  <label style={{ display: "grid", gap: 4 }}>
+                    <span>
+                      {language === "th" ? "เหตุผล (จำเป็น)" : "Reason (required)"}
+                    </span>
+                    <textarea
+                      value={revokeReason}
+                      maxLength={1000}
+                      rows={3}
+                      onChange={(event) => setRevokeReason(event.target.value)}
+                      aria-required="true"
+                    />
+                  </label>
+                  <label style={{ display: "grid", gap: 4 }}>
+                    <span>
+                      {language === "th"
+                        ? 'พิมพ์ "ตกลง" เพื่อยืนยันการถอนสิทธิ์'
+                        : 'Type "ตกลง" to confirm this role revocation'}
+                    </span>
+                    <input
+                      value={revokeConfirmation}
+                      onChange={(event) => setRevokeConfirmation(event.target.value)}
+                      autoComplete="off"
+                    />
+                  </label>
+                  <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
+                    <button
+                      type="button"
+                      onClick={() => setRevokeTarget(null)}
+                      disabled={revokeSubmitting}
+                    >
+                      {language === "th" ? "ยกเลิก" : "Cancel"}
+                    </button>
+                    <button
+                      type="button"
+                      className={styles.primary}
+                      onClick={() => void handleRevoke()}
+                      disabled={
+                        revokeSubmitting ||
+                        !revokeReason.trim() ||
+                        revokeConfirmation.trim() !== "ตกลง"
+                      }
+                    >
+                      {revokeSubmitting
+                        ? language === "th"
+                          ? "กำลังบันทึก…"
+                          : "Saving…"
+                        : language === "th"
+                          ? "ยืนยันถอน role"
+                          : "Confirm revoke"}
                     </button>
                   </div>
                 </section>
