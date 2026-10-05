@@ -4,14 +4,11 @@ import { join } from "node:path";
 
 const source = readFileSync(join(__dirname, "survey-dashboard.tsx"), "utf8");
 describe("private response explorer wiring", () => {
-  it("renders a live 5-by-6 infographic linked to activity evidence", () => {
-    expect(source).toContain("แผนที่ความหนาแน่นกิจกรรมร่วม");
-    expect(source).toContain("overlap.areas.map((area, index)");
-    expect(source).toContain("area.activities.map((activity, position)");
-    expect(source).toContain("focusActivity(area.label, activity.column)");
-    expect(source).toContain("survey-activity-${column}");
-    expect(source).toContain("topActivities.map((activity, index)");
-    expect(source).toContain("overlap.agencyCount");
+  it("renders a private live agency heat map with full-response drilldown", () => {
+    expect(source).toContain("<SurveyHeatmap");
+    expect(source).toContain("headers={data.headers}");
+    expect(source).toContain("responses={data.responses}");
+    expect(source).toContain("onOpenResponse={setSelectedRow}");
   });
   it("has search, organization filter, respondent list, and all-field detail view", () => {
     expect(source).toContain("ค้นหาผู้ตอบหรือคำตอบ");
