@@ -24,6 +24,23 @@ export default function SurveyDashboard() {
     () => (data ? buildSurveyOverlap(data.headers, data.responses, moheOnly) : null),
     [data, moheOnly],
   );
+  const topActivities =
+    overlap?.areas
+      .flatMap((area) =>
+        area.activities.map((activity) => ({ ...activity, area: area.label })),
+      )
+      .sort((a, b) => b.direct.length - a.direct.length || a.column - b.column)
+      .slice(0, 5) ?? [];
+  const focusActivity = (area: string, column: number) => {
+    setAreaFilter(area);
+    setExpandedActivity(column);
+    window.requestAnimationFrame(() => {
+      document.getElementById(`survey-activity-${column}`)?.scrollIntoView({
+        behavior: "smooth",
+        block: "center",
+      });
+    });
+  };
   const nameColumns = useMemo(
     () =>
       data?.headers.flatMap((header, index) =>
@@ -259,6 +276,129 @@ export default function SurveyDashboard() {
                   หรือผลผลิตซ้ำกันจริง · มุมมอง อว. นับเฉพาะช่องสังกัดที่ระบุ อว.
                   หรืออุดมศึกษาชัดเจน
                 </p>
+                <div
+                  className="survey-infographic"
+                  aria-label="อินโฟกราฟิกกิจกรรมร่วม 30 กิจกรรม"
+                >
+                  <div className="survey-infographic-head">
+                    <div>
+                      <span className="survey-infographic-eyebrow">
+                        30-ACTIVITY / ROLE SIGNAL MAP
+                      </span>
+                      <h3>แผนที่ความหนาแน่นกิจกรรมร่วม</h3>
+                      <p>
+                        แต่ละช่องคือ 1 กิจกรรมของ สทร. ·
+                        ตัวเลขคือจำนวนหน่วยงานที่ระบุว่าดำเนินการเองหรือเป็นบทบาทนำ
+                      </p>
+                    </div>
+                    <div className="survey-infographic-total">
+                      <strong>{format.format(overlap.similarActivityCount)}</strong>
+                      <span>
+                        จาก 30 กิจกรรม
+                        <br />
+                        มีผู้ดำเนินการร่วม
+                      </span>
+                    </div>
+                  </div>
+                  <div className="survey-infographic-legend" aria-label="คำอธิบายระดับสี">
+                    <span>
+                      <i className="survey-density survey-density-0" /> 0 หน่วยงาน
+                    </span>
+                    <span>
+                      <i className="survey-density survey-density-1" /> 1–2 หน่วยงาน
+                    </span>
+                    <span>
+                      <i className="survey-density survey-density-2" /> 3–4 หน่วยงาน
+                    </span>
+                    <span>
+                      <i className="survey-density survey-density-3" /> 5 หน่วยงานขึ้นไป
+                    </span>
+                  </div>
+                  <div className="survey-infographic-lanes">
+                    {overlap.areas.map((area, index) => (
+                      <div
+                        className={`survey-infographic-lane${areaFilter !== "ทั้งหมด" && areaFilter !== area.label ? " survey-infographic-lane-muted" : ""}`}
+                        key={area.label}
+                      >
+                        <div className="survey-infographic-lane-label">
+                          <span>0{index + 1} / 05</span>
+                          <strong>{area.label}</strong>
+                        </div>
+                        <div className="survey-infographic-cells">
+                          {area.activities.map((activity, position) => {
+                            const count = activity.direct.length;
+                            const density =
+                              count === 0 ? 0 : count <= 2 ? 1 : count <= 4 ? 2 : 3;
+                            return (
+                              <button
+                                type="button"
+                                key={activity.column}
+                                className={`survey-infographic-cell survey-density-${density}${expandedActivity === activity.column ? " survey-infographic-cell-active" : ""}`}
+                                aria-label={`${area.label} กิจกรรม ${position + 1}: ${activity.title} — ${count} หน่วยงานดำเนินการโดยตรง`}
+                                title={`${activity.title} · ${count} หน่วยงาน`}
+                                onClick={() => focusActivity(area.label, activity.column)}
+                              >
+                                <span className="survey-infographic-cell-index">
+                                  {String(position + 1).padStart(2, "0")}
+                                </span>
+                                <strong>{format.format(count)}</strong>
+                                <span className="survey-infographic-cell-text">
+                                  หน่วยงาน
+                                </span>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="survey-infographic-rank">
+                    <div>
+                      <span className="survey-infographic-eyebrow">PRIORITY VIEW</span>
+                      <h4>กิจกรรมที่มีผู้ทำร่วมมากที่สุด</h4>
+                      <p>
+                        เรียงตามจำนวนหน่วยงานในขอบเขตที่เลือก
+                        ไม่ใช่อันดับความซ้ำซ้อนของงบประมาณ
+                      </p>
+                    </div>
+                    <ol>
+                      {topActivities.map((activity, index) => (
+                        <li key={activity.column}>
+                          <button
+                            type="button"
+                            onClick={() => focusActivity(activity.area, activity.column)}
+                          >
+                            <span className="survey-infographic-rank-no">
+                              {String(index + 1).padStart(2, "0")}
+                            </span>
+                            <span className="survey-infographic-rank-title">
+                              <small>{activity.area}</small>
+                              <strong>{activity.title}</strong>
+                            </span>
+                            <span
+                              className="survey-infographic-rank-bar"
+                              aria-hidden="true"
+                            >
+                              <i
+                                style={{
+                                  width: `${overlap.agencyCount ? (activity.direct.length / overlap.agencyCount) * 100 : 0}%`,
+                                }}
+                              />
+                            </span>
+                            <span className="survey-infographic-rank-value">
+                              {format.format(activity.direct.length)} /{" "}
+                              {format.format(overlap.agencyCount)}
+                            </span>
+                          </button>
+                        </li>
+                      ))}
+                    </ol>
+                  </div>
+                  <p className="survey-infographic-footer">
+                    แตะช่องสีหรืออันดับเพื่อดูชื่อหน่วยงานและคำตอบประกอบ ·
+                    ข้อมูลอัปเดตอัตโนมัติทุก 30 วินาที
+                  </p>
+                </div>
                 {overlap.areas
                   .filter((area) => areaFilter === "ทั้งหมด" || area.label === areaFilter)
                   .map((area) => (
@@ -275,7 +415,11 @@ export default function SurveyDashboard() {
                       </h3>
                       <div className="survey-overlap-activities">
                         {area.activities.map((activity) => (
-                          <div className="survey-overlap-item" key={activity.column}>
+                          <div
+                            className="survey-overlap-item"
+                            id={`survey-activity-${activity.column}`}
+                            key={activity.column}
+                          >
                             <button
                               type="button"
                               className="survey-overlap-activity"
