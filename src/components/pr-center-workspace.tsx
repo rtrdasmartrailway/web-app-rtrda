@@ -78,12 +78,10 @@ export function PrCenterWorkspace() {
     void refreshSession();
     window.addEventListener("focus", refreshSession);
     document.addEventListener("visibilitychange", refreshWhenVisible);
-    const refreshInterval = window.setInterval(() => void refreshSession(), 60_000);
     return () => {
       disposed = true;
       window.removeEventListener("focus", refreshSession);
       document.removeEventListener("visibilitychange", refreshWhenVisible);
-      window.clearInterval(refreshInterval);
     };
   }, []);
 

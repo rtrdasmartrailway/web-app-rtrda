@@ -172,8 +172,14 @@ function requestScopeWhere(actor: PrCenterActor): Prisma.PrRequestWhereInput {
 }
 
 function requestReadWhere(actor: PrCenterActor): Prisma.PrRequestWhereInput {
+  const roleScopes = roleDepartmentClauses(actor, [
+    "PR_OPERATIONS",
+    "SCOPED_ADMINISTRATOR",
+  ]);
+  if (roleScopes.some((scope) => Object.keys(scope).length === 0))
+    return { organizationId: actor.organizationId };
   const clauses: Prisma.PrRequestWhereInput[] = [{ requesterId: actor.id }];
-  clauses.push(...roleDepartmentClauses(actor, ["PR_OPERATIONS"]));
+  clauses.push(...roleScopes);
   return { organizationId: actor.organizationId, OR: clauses };
 }
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { startTransition, useEffect, useRef, useState } from "react";
+import { Fragment, startTransition, useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import type { CreateContentIdeaInput } from "@/lib/pr-center/idea-input";
 import { submitIdeaForm } from "@/lib/pr-center/idea-form";
@@ -506,7 +506,7 @@ const STATUS_TRANSITIONS: Record<StatusId, StatusId[]> = {
 };
 
 const ROLE_PAGES: Record<Role, Page[]> = {
-  admin: pages.filter(({ id }) => id !== "requests").map(({ id }) => id),
+  admin: pages.map(({ id }) => id),
   pr: pages.filter(({ id }) => id !== "new-request").map(({ id }) => id),
   executive: ["home", "calendar", "notifications"],
   project_owner: [
@@ -4632,6 +4632,9 @@ function Directory({
   const [grantTarget, setGrantTarget] = useState<string | null>(null);
   const [grantRole, setGrantRole] = useState<string>("REQUESTER");
   const [grantDepartmentId, setGrantDepartmentId] = useState("");
+  const [grantReason, setGrantReason] = useState("");
+  const [grantConfirmation, setGrantConfirmation] = useState("");
+  const [grantSubmitting, setGrantSubmitting] = useState(false);
   const [accessReason, setAccessReason] = useState("");
   const isOrganizationAdmin =
     actor.roleGrants?.some(
@@ -4684,28 +4687,44 @@ function Directory({
   const handleGrant = async (userId: string) => {
     setNotice(null);
     setError(null);
-    const reason = accessReason.trim();
+    const reason = grantReason.trim();
     if (!reason)
       return setError(language === "th" ? "กรุณาระบุเหตุผล" : "A reason is required");
-    const res = await fetch(`/api/pr-center/admin/users/${userId}/roles`, {
-      method: "POST",
-      credentials: "same-origin",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        role: grantRole,
-        departmentId: grantDepartmentId || null,
-        reason,
-      }),
-    });
-    if (!res.ok) {
-      const err = await res.json().catch(() => null);
-      setError(err?.message || "Grant failed");
-      return;
+    if (grantConfirmation.trim() !== "ตกลง")
+      return setError(
+        language === "th" ? 'กรุณาพิมพ์ "ตกลง" เพื่อยืนยัน' : 'Type "ตกลง" to confirm',
+      );
+    setGrantSubmitting(true);
+    try {
+      const res = await fetch(`/api/pr-center/admin/users/${userId}/roles`, {
+        method: "POST",
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          role: grantRole,
+          departmentId: grantDepartmentId || null,
+          reason,
+        }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => null);
+        setError(err?.message || "Grant failed");
+        return;
+      }
+      setNotice(language === "th" ? "เพิ่ม role สำเร็จ" : "Role granted");
+      setGrantTarget(null);
+      setGrantReason("");
+      setGrantConfirmation("");
+      reload();
+    } catch {
+      setError(
+        language === "th"
+          ? "เชื่อมต่อระบบไม่ได้ กรุณาลองอีกครั้ง"
+          : "Could not connect. Please try again.",
+      );
+    } finally {
+      setGrantSubmitting(false);
     }
-    setNotice("Role granted");
-    setGrantTarget(null);
-    setAccessReason("");
-    reload();
   };
 
   const handleRevoke = async (roleId: string) => {
@@ -4783,156 +4802,242 @@ function Directory({
       {loading && <p>Loading user directory…</p>}
       {!loading &&
         users.map((user) => (
-          <article key={user.id} className={styles.card} style={{ marginBottom: 12 }}>
-            <header>
-              <div>
-                <h2>{user.displayName}</h2>
-                <p style={{ fontSize: 13, color: "#6b7280" }}>{user.email}</p>
-                <p style={{ fontSize: 13 }}>
-                  {user.department?.name || "No department"} ·{" "}
-                  {user.active ? "Active" : "Inactive"}
-                </p>
-              </div>
-              <div style={{ display: "flex", gap: 8 }}>
-                <button
-                  onClick={() => handleToggleActive(user.id)}
-                  disabled={
-                    user.id === actor.userId ||
-                    isLastOrganizationAdmin(user) ||
-                    !accessReason.trim()
-                  }
-                  title={
-                    isLastOrganizationAdmin(user)
-                      ? "At least one active organization-wide administrator must remain"
-                      : undefined
-                  }
-                  style={{ fontSize: 12, color: user.active ? "#dc2626" : "#16a34a" }}
-                >
-                  {user.active ? "Deactivate" : "Activate"}
-                </button>
-                <button
-                  onClick={() => {
-                    const nextTarget = grantTarget === user.id ? null : user.id;
-                    setGrantTarget(nextTarget);
-                    if (nextTarget)
-                      setGrantDepartmentId(
-                        isOrganizationAdmin ? "" : (user.department?.id ?? ""),
-                      );
-                  }}
-                  disabled={user.id === actor.userId}
-                  title={
-                    user.id === actor.userId
-                      ? "You cannot grant roles to your own account"
-                      : undefined
-                  }
-                  style={{ fontSize: 12 }}
-                >
-                  + Grant role
-                </button>
-              </div>
-            </header>
-            <div style={{ marginTop: 8 }}>
-              <p style={{ fontSize: 12, fontWeight: 600, marginBottom: 4 }}>
-                Assigned roles:
-              </p>
-              {user.roles.length === 0 && (
-                <p style={{ fontSize: 12, color: "#6b7280" }}>No roles assigned</p>
-              )}
-              {user.roles.map((r) => (
-                <span
-                  key={r.id}
-                  style={{
-                    display: "inline-flex",
-                    alignItems: "center",
-                    gap: 4,
-                    marginRight: 8,
-                    marginBottom: 4,
-                    padding: "2px 8px",
-                    background: "#f3f4f6",
-                    borderRadius: 4,
-                    fontSize: 12,
-                  }}
-                >
-                  {r.role} · {r.departmentId ? `dept ${r.departmentId}` : "org-wide"}
+          <Fragment key={user.id}>
+            <article className={styles.card} style={{ marginBottom: 12 }}>
+              <header>
+                <div>
+                  <h2>{user.displayName}</h2>
+                  <p style={{ fontSize: 13, color: "#6b7280" }}>{user.email}</p>
+                  <p style={{ fontSize: 13 }}>
+                    {user.department?.name || "No department"} ·{" "}
+                    {user.active ? "Active" : "Inactive"}
+                  </p>
+                </div>
+                <div style={{ display: "flex", gap: 8 }}>
                   <button
-                    onClick={() => handleRevoke(r.id)}
+                    onClick={() => handleToggleActive(user.id)}
                     disabled={
-                      !accessReason.trim() ||
-                      (user.active &&
-                        r.role === "SCOPED_ADMINISTRATOR" &&
-                        r.departmentId === null &&
-                        activeOrganizationAdmins <= 1)
+                      user.id === actor.userId ||
+                      isLastOrganizationAdmin(user) ||
+                      !accessReason.trim()
                     }
                     title={
-                      user.active &&
-                      r.role === "SCOPED_ADMINISTRATOR" &&
-                      r.departmentId === null &&
-                      activeOrganizationAdmins <= 1
+                      isLastOrganizationAdmin(user)
                         ? "At least one active organization-wide administrator must remain"
                         : undefined
                     }
-                    style={{
-                      fontSize: 11,
-                      color: "#dc2626",
-                      background: "none",
-                      border: "none",
-                      cursor: "pointer",
-                      padding: 0,
-                    }}
+                    style={{ fontSize: 12, color: user.active ? "#dc2626" : "#16a34a" }}
                   >
-                    ✕
+                    {user.active ? "Deactivate" : "Activate"}
                   </button>
-                </span>
-              ))}
-            </div>
-            {grantTarget === user.id && (
-              <div
-                style={{ marginTop: 8, display: "flex", gap: 8, alignItems: "center" }}
-              >
-                {isOrganizationAdmin ? (
-                  <select
-                    aria-label="Role scope"
-                    value={grantDepartmentId}
-                    onChange={(event) => setGrantDepartmentId(event.target.value)}
+                  <button
+                    onClick={() => {
+                      const nextTarget = grantTarget === user.id ? null : user.id;
+                      setGrantTarget(nextTarget);
+                      setError(null);
+                      setGrantReason("");
+                      setGrantConfirmation("");
+                      if (nextTarget)
+                        setGrantDepartmentId(
+                          isOrganizationAdmin ? "" : (user.department?.id ?? ""),
+                        );
+                    }}
+                    disabled={user.id === actor.userId}
+                    title={
+                      user.id === actor.userId
+                        ? "You cannot grant roles to your own account"
+                        : undefined
+                    }
                     style={{ fontSize: 12 }}
                   >
-                    <option value="">Organization-wide</option>
-                    {user.department && (
-                      <option value={user.department.id}>
-                        Department: {user.department.name}
-                      </option>
-                    )}
-                  </select>
-                ) : (
-                  <span style={{ fontSize: 12 }}>
-                    Scope: {user.department?.name || "No department"}
-                  </span>
+                    + Grant role
+                  </button>
+                </div>
+              </header>
+              <div style={{ marginTop: 8 }}>
+                <p style={{ fontSize: 12, fontWeight: 600, marginBottom: 4 }}>
+                  Assigned roles:
+                </p>
+                {user.roles.length === 0 && (
+                  <p style={{ fontSize: 12, color: "#6b7280" }}>No roles assigned</p>
                 )}
-                <select
-                  value={grantRole}
-                  onChange={(e) => setGrantRole(e.target.value)}
-                  style={{ fontSize: 12 }}
+                {user.roles.map((r) => (
+                  <span
+                    key={r.id}
+                    style={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: 4,
+                      marginRight: 8,
+                      marginBottom: 4,
+                      padding: "2px 8px",
+                      background: "#f3f4f6",
+                      borderRadius: 4,
+                      fontSize: 12,
+                    }}
+                  >
+                    {r.role} · {r.departmentId ? `dept ${r.departmentId}` : "org-wide"}
+                    <button
+                      onClick={() => handleRevoke(r.id)}
+                      disabled={
+                        !accessReason.trim() ||
+                        (user.active &&
+                          r.role === "SCOPED_ADMINISTRATOR" &&
+                          r.departmentId === null &&
+                          activeOrganizationAdmins <= 1)
+                      }
+                      title={
+                        user.active &&
+                        r.role === "SCOPED_ADMINISTRATOR" &&
+                        r.departmentId === null &&
+                        activeOrganizationAdmins <= 1
+                          ? "At least one active organization-wide administrator must remain"
+                          : undefined
+                      }
+                      style={{
+                        fontSize: 11,
+                        color: "#dc2626",
+                        background: "none",
+                        border: "none",
+                        cursor: "pointer",
+                        padding: 0,
+                      }}
+                    >
+                      ✕
+                    </button>
+                  </span>
+                ))}
+              </div>
+            </article>
+            {grantTarget === user.id && (
+              <div
+                role="presentation"
+                onClick={() => setGrantTarget(null)}
+                style={{
+                  position: "fixed",
+                  inset: 0,
+                  zIndex: 1000,
+                  display: "grid",
+                  placeItems: "center",
+                  padding: 16,
+                  background: "rgba(15, 23, 42, 0.55)",
+                }}
+              >
+                <section
+                  role="dialog"
+                  aria-modal="true"
+                  aria-labelledby="grant-role-title"
+                  onClick={(event) => event.stopPropagation()}
+                  onKeyDown={(event) => {
+                    if (event.key === "Escape" && !grantSubmitting) setGrantTarget(null);
+                  }}
+                  style={{
+                    width: "min(100%, 480px)",
+                    display: "grid",
+                    gap: 12,
+                    padding: 20,
+                    borderRadius: 12,
+                    background: "white",
+                    boxShadow: "0 20px 45px rgba(15, 23, 42, 0.25)",
+                  }}
                 >
-                  <option value="REQUESTER">REQUESTER</option>
-                  <option value="PR_OPERATIONS">PR_OPERATIONS</option>
-                  <option value="APPROVER">APPROVER</option>
-                  <option value="EXECUTIVE_READ_ONLY">EXECUTIVE_READ_ONLY</option>
-                  <option value="SCOPED_ADMINISTRATOR">SCOPED_ADMINISTRATOR</option>
-                </select>
-                <button
-                  onClick={() => handleGrant(user.id)}
-                  className={styles.primary}
-                  disabled={!accessReason.trim()}
-                  style={{ fontSize: 12 }}
-                >
-                  Confirm grant
-                </button>
-                <button onClick={() => setGrantTarget(null)} style={{ fontSize: 12 }}>
-                  Cancel
-                </button>
+                  <h2 id="grant-role-title" style={{ margin: 0 }}>
+                    {language === "th" ? "เพิ่ม role ให้ผู้ใช้" : "Grant a role"}
+                  </h2>
+                  <p style={{ margin: 0, color: "#4b5563" }}>{user.displayName}</p>
+                  <label style={{ display: "grid", gap: 4 }}>
+                    <span>{language === "th" ? "Role" : "Role"}</span>
+                    <select
+                      aria-label="Role"
+                      value={grantRole}
+                      onChange={(event) => setGrantRole(event.target.value)}
+                    >
+                      <option value="REQUESTER">REQUESTER</option>
+                      <option value="PR_OPERATIONS">PR_OPERATIONS</option>
+                      <option value="APPROVER">APPROVER</option>
+                      <option value="EXECUTIVE_READ_ONLY">EXECUTIVE_READ_ONLY</option>
+                      <option value="SCOPED_ADMINISTRATOR">SCOPED_ADMINISTRATOR</option>
+                    </select>
+                  </label>
+                  <label style={{ display: "grid", gap: 4 }}>
+                    <span>{language === "th" ? "ขอบเขตสิทธิ์" : "Role scope"}</span>
+                    {isOrganizationAdmin ? (
+                      <select
+                        aria-label="Role scope"
+                        value={grantDepartmentId}
+                        onChange={(event) => setGrantDepartmentId(event.target.value)}
+                      >
+                        <option value="">Organization-wide</option>
+                        {user.department && (
+                          <option value={user.department.id}>
+                            Department: {user.department.name}
+                          </option>
+                        )}
+                      </select>
+                    ) : (
+                      <span>{user.department?.name || "No department"}</span>
+                    )}
+                  </label>
+                  {error && (
+                    <p role="alert" style={{ color: "#b91c1c", margin: 0 }}>
+                      {error}
+                    </p>
+                  )}
+                  <label style={{ display: "grid", gap: 4 }}>
+                    <span>
+                      {language === "th" ? "เหตุผล (จำเป็น)" : "Reason (required)"}
+                    </span>
+                    <textarea
+                      value={grantReason}
+                      maxLength={1000}
+                      rows={3}
+                      onChange={(event) => setGrantReason(event.target.value)}
+                      aria-required="true"
+                    />
+                  </label>
+                  <label style={{ display: "grid", gap: 4 }}>
+                    <span>
+                      {language === "th"
+                        ? 'พิมพ์ "ตกลง" เพื่อยืนยันการเพิ่มสิทธิ์'
+                        : 'Type "ตกลง" to confirm this role grant'}
+                    </span>
+                    <input
+                      value={grantConfirmation}
+                      onChange={(event) => setGrantConfirmation(event.target.value)}
+                      autoComplete="off"
+                    />
+                  </label>
+                  <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
+                    <button
+                      type="button"
+                      onClick={() => setGrantTarget(null)}
+                      disabled={grantSubmitting}
+                    >
+                      {language === "th" ? "ยกเลิก" : "Cancel"}
+                    </button>
+                    <button
+                      type="button"
+                      className={styles.primary}
+                      onClick={() => void handleGrant(user.id)}
+                      disabled={
+                        grantSubmitting ||
+                        !grantReason.trim() ||
+                        grantConfirmation.trim() !== "ตกลง"
+                      }
+                    >
+                      {grantSubmitting
+                        ? language === "th"
+                          ? "กำลังบันทึก…"
+                          : "Saving…"
+                        : language === "th"
+                          ? "ยืนยันเพิ่ม role"
+                          : "Confirm grant"}
+                    </button>
+                  </div>
+                </section>
               </div>
             )}
-          </article>
+          </Fragment>
         ))}
     </>
   );

@@ -72,7 +72,7 @@ beforeEach(() => {
 });
 
 describe("request intake approval", () => {
-  it("shows each owner their own requests and PR Operations its assigned scope", async () => {
+  it("shows owners their requests and PR/admin users requests in their granted scope", async () => {
     mockPrisma.prRequest.findMany.mockResolvedValue([]);
 
     await listRequests(requesterActor);
@@ -109,23 +109,40 @@ describe("request intake approval", () => {
     await listRequests(adminActor);
     expect(mockPrisma.prRequest.findMany).toHaveBeenLastCalledWith(
       expect.objectContaining({
+        where: { organizationId: "org-1" },
+        include: expect.objectContaining({
+          statusHistory: expect.objectContaining({
+            where: { toState: "REJECTED" },
+            select: { reason: true },
+          }),
+        }),
+      }),
+    );
+
+    const departmentAdmin: PrCenterActor = {
+      ...adminActor,
+      roleGrants: [{ role: "SCOPED_ADMINISTRATOR", departmentId: "dept-2" }],
+    };
+    await listRequests(departmentAdmin);
+    expect(mockPrisma.prRequest.findMany).toHaveBeenLastCalledWith(
+      expect.objectContaining({
         where: expect.objectContaining({
           organizationId: "org-1",
-          OR: [{ requesterId: adminActor.id }],
+          OR: [{ requesterId: departmentAdmin.id }, { departmentId: "dept-2" }],
         }),
       }),
     );
   });
 
-  it("does not let a non-owner non-PR role open another user's request", async () => {
-    const adminActor: PrCenterActor = {
+  it("does not let an unrelated non-owner role open another user's request", async () => {
+    const unrelatedActor: PrCenterActor = {
       ...prActor,
-      id: "admin-user",
-      role: "SCOPED_ADMINISTRATOR",
+      id: "unrelated-user",
+      role: "APPROVER",
     };
     mockPrisma.prRequest.findFirst.mockResolvedValueOnce(null);
 
-    await expect(requestDetail(adminActor, requestRecord.id)).rejects.toMatchObject({
+    await expect(requestDetail(unrelatedActor, requestRecord.id)).rejects.toMatchObject({
       statusCode: 404,
       code: "NOT_FOUND",
     });
@@ -133,8 +150,8 @@ describe("request intake approval", () => {
       expect.objectContaining({
         where: expect.objectContaining({
           id: requestRecord.id,
-          organizationId: adminActor.organizationId,
-          OR: [{ requesterId: adminActor.id }],
+          organizationId: unrelatedActor.organizationId,
+          OR: [{ requesterId: unrelatedActor.id }],
         }),
       }),
     );
