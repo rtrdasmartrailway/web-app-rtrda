@@ -130,13 +130,16 @@ export function validateIdentityMapping<T extends ExistingIdentity>(
   return existingUser;
 }
 
+const EXPLICITLY_ALLOWED_PR_CENTER_EMAILS = new Set(["admin@apprtrda.onmicrosoft.com"]);
+
 export function isAllowedOrganizationEmail(email: string): boolean {
   const normalized = email.trim().toLowerCase();
   const at = normalized.indexOf("@");
   return (
-    at > 0 &&
-    at === normalized.lastIndexOf("@") &&
-    normalized.slice(at + 1) === "rtrda.or.th"
+    EXPLICITLY_ALLOWED_PR_CENTER_EMAILS.has(normalized) ||
+    (at > 0 &&
+      at === normalized.lastIndexOf("@") &&
+      normalized.slice(at + 1) === "rtrda.or.th")
   );
 }
 

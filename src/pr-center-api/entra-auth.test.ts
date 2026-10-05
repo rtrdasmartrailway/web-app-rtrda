@@ -16,6 +16,23 @@ describe("organization-domain access and administrator role grants", () => {
     expect(isAllowedOrganizationEmail("@rtrda.or.th")).toBe(false);
   });
 
+  it("allows only the specifically approved Entra admin UPN outside the organization domain", () => {
+    expect(isAllowedOrganizationEmail("admin@apprtrda.onmicrosoft.com")).toBe(true);
+    expect(isAllowedOrganizationEmail("other@apprtrda.onmicrosoft.com")).toBe(false);
+    expect(
+      resolvePrCenterLoginRole("admin@apprtrda.onmicrosoft.com", [
+        { role: "SCOPED_ADMINISTRATOR", departmentId: null },
+      ]),
+    ).toEqual({
+      role: "SCOPED_ADMINISTRATOR",
+      roleGrants: [
+        { role: "SCOPED_ADMINISTRATOR", departmentId: null },
+        { role: "REQUESTER", departmentId: null },
+      ],
+      autoProvisionRequester: true,
+    });
+  });
+
   it("gives a domain-approved user without a role the least-privilege requester role", () => {
     expect(resolvePrCenterLoginRole("staff@rtrda.or.th", [])).toEqual({
       role: "REQUESTER",
