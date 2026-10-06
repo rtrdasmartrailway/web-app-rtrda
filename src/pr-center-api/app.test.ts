@@ -113,6 +113,24 @@ describe("File and attachment route guards", () => {
   });
 });
 
+describe("Release evidence route guards", () => {
+  it("rejects release evidence access for non-administrator roles", async () => {
+    const app = buildPrCenterApi(async () => mockActor);
+    const response = await app.inject({
+      method: "POST",
+      url: "/admin/release-evidence",
+      payload: {
+        gateKey: "BACKUP_RESTORE",
+        result: "PASSED",
+        evidenceReference: "RESTORE-UAT-2026-09-01",
+        performedAt: "2026-09-01T00:00:00.000Z",
+      },
+    });
+    expect(response.statusCode).toBe(403);
+    await app.close();
+  });
+});
+
 describe("Access administration route guards", () => {
   const adminActor = {
     ...mockActor,
@@ -477,6 +495,24 @@ describe("Message House current route", () => {
 
     expect(currentResponse.statusCode).toBe(403);
     expect(historyResponse.statusCode).toBe(403);
+    await app.close();
+  });
+});
+
+describe("Content Library route access", () => {
+  it("requires an authenticated actor", async () => {
+    const app = buildPrCenterApi(async () => null);
+    const response = await app.inject({ method: "GET", url: "/content-library" });
+    expect(response.statusCode).toBe(401);
+    await app.close();
+  });
+
+  it("denies users who do not have a PR or administrator role", async () => {
+    const requesterActor = { ...mockActor, role: "REQUESTER" as const };
+    const app = buildPrCenterApi(async () => requesterActor);
+    const response = await app.inject({ method: "GET", url: "/content-library" });
+    expect(response.statusCode).toBe(403);
+    expect(response.json().error).toBe("FORBIDDEN");
     await app.close();
   });
 });

@@ -13,6 +13,8 @@ describe("parseCalendarEntries", () => {
         taskRevision: 2,
         date: "2026-10-10T09:00:00.000Z",
         status: "SCHEDULED",
+        publishedUrl: null,
+        publishedReference: null,
       },
       {
         id: "schedule-2",
@@ -23,6 +25,8 @@ describe("parseCalendarEntries", () => {
         taskRevision: 1,
         date: "2026-10-11T10:00:00.000Z",
         status: "PUBLISHED",
+        publishedUrl: "https://example.org/published",
+        publishedReference: "post-123",
       },
       {
         id: "task-3",
@@ -38,6 +42,24 @@ describe("parseCalendarEntries", () => {
     ];
 
     expect(parseCalendarEntries(entries)).toEqual(entries);
+  });
+
+  it("rejects malformed publication evidence fields", () => {
+    expect(() =>
+      parseCalendarEntries([
+        {
+          id: "schedule-1",
+          taskId: "task-1",
+          title: "Story",
+          requestNumber: "PR-2026-001",
+          channel: "Website",
+          taskRevision: 1,
+          date: "2026-10-10T09:00:00.000Z",
+          status: "PUBLISHED",
+          publishedUrl: 42,
+        },
+      ]),
+    ).toThrow("Invalid calendar response");
   });
 
   it("rejects malformed entries instead of presenting local/demo dates", () => {

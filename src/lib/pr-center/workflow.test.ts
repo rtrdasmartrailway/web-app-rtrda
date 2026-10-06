@@ -36,7 +36,7 @@ describe("PR Center workflow policy", () => {
   it("limits approvals to PR operations and scoped administrators", () => {
     expect(canApprove("PR_OPERATIONS")).toBe(true);
     expect(canApprove("SCOPED_ADMINISTRATOR")).toBe(true);
-    expect(canApprove("APPROVER")).toBe(false);
+    expect(canApprove("APPROVER")).toBe(true);
     expect(canApprove("EXECUTIVE_READ_ONLY")).toBe(false);
     expect(canApprove("REQUESTER")).toBe(false);
   });

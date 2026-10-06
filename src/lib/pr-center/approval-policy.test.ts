@@ -57,14 +57,14 @@ describe("approval policy configuration", () => {
     expect(getNextApprovalStage(policy, "PR_EDITORIAL_REVIEW")).toBeNull();
   });
 
-  it("rejects legacy APPROVER role from stage authority", () => {
-    const legacyRolePolicy = {
+  it("accepts the dedicated APPROVER role in stage policy", () => {
+    const approverRolePolicy = {
       ...source,
       stages: [{ ...source.stages[0], roles: ["APPROVER"] }, ...source.stages.slice(1)],
     };
-    expect(() => parseApprovalPolicy(JSON.stringify(legacyRolePolicy))).toThrow(
-      /valid approver roles/i,
-    );
+    expect(
+      parseApprovalPolicy(JSON.stringify(approverRolePolicy)).stages[0].roles,
+    ).toEqual(["APPROVER"]);
   });
 
   it("does not resolve unconfigured or optional stages as valid current authority", () => {

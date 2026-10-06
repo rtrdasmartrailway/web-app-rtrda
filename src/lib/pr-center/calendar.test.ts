@@ -42,6 +42,8 @@ describe("listCalendarEntries", () => {
         taskRevision: 2,
         scheduledFor,
         publishedAt: null,
+        publishedUrl: null,
+        publishedReference: null,
         task: { title: "Scheduled story", request: { requestNumber: "PR-2026-001" } },
       },
       {
@@ -51,6 +53,8 @@ describe("listCalendarEntries", () => {
         taskRevision: 1,
         scheduledFor,
         publishedAt,
+        publishedUrl: "https://example.org/news",
+        publishedReference: "facebook-123",
         task: { title: "Published story", request: { requestNumber: "PR-2026-002" } },
       },
     ]);
@@ -76,6 +80,13 @@ describe("listCalendarEntries", () => {
       publishedAt,
       draftDueAt,
     ]);
+    expect(result[1]).toMatchObject({
+      taskId: "task-2",
+      channel: "Facebook",
+      status: "PUBLISHED",
+      publishedUrl: "https://example.org/news",
+      publishedReference: "facebook-123",
+    });
     expect(result[2]).toMatchObject({
       taskId: "task-3",
       requestNumber: "PR-2026-003",
@@ -97,6 +108,8 @@ describe("listCalendarEntries", () => {
         taskRevision: true,
         scheduledFor: true,
         publishedAt: true,
+        publishedUrl: true,
+        publishedReference: true,
         task: {
           select: {
             title: true,

@@ -8,6 +8,8 @@ export type CalendarEntry = {
   date: string;
   status: "SCHEDULED" | "PUBLISHED" | "DRAFT";
   contentType?: string;
+  publishedUrl?: string | null;
+  publishedReference?: string | null;
 };
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -32,6 +34,13 @@ export function parseCalendarEntries(value: unknown): CalendarEntry[] {
       typeof entry.date !== "string" ||
       !Number.isFinite(Date.parse(entry.date)) ||
       !["SCHEDULED", "PUBLISHED", "DRAFT"].includes(String(entry.status)) ||
+      ("publishedUrl" in entry &&
+        !(entry.publishedUrl === null || typeof entry.publishedUrl === "string")) ||
+      ("publishedReference" in entry &&
+        !(
+          entry.publishedReference === null ||
+          typeof entry.publishedReference === "string"
+        )) ||
       (entry.status === "DRAFT" && typeof entry.contentType !== "string") ||
       (entry.status !== "DRAFT" && typeof entry.channel !== "string")
     ) {
@@ -49,6 +58,13 @@ export function parseCalendarEntries(value: unknown): CalendarEntry[] {
       status: entry.status as CalendarEntry["status"],
       ...(typeof entry.contentType === "string"
         ? { contentType: entry.contentType }
+        : {}),
+      ...(typeof entry.publishedUrl === "string" || entry.publishedUrl === null
+        ? { publishedUrl: entry.publishedUrl }
+        : {}),
+      ...(typeof entry.publishedReference === "string" ||
+      entry.publishedReference === null
+        ? { publishedReference: entry.publishedReference }
         : {}),
     };
   });

@@ -50,6 +50,12 @@ import {
 } from "./notification-policy";
 import { dispatchNotification } from "./notification-channels";
 import { normalizeCreateIdeaInput } from "./idea-input";
+import {
+  latestReleaseEvidenceByGate,
+  parseReleaseEvidenceInput,
+  RELEASE_EVIDENCE_GATES,
+  type ReleaseEvidenceGate,
+} from "./release-evidence";
 
 export type PrCenterActor = {
   id: string;
@@ -288,7 +294,31 @@ type CreateRequestInput = {
   sourceUrls: string[];
   priority?: string;
   priorityReason?: string;
+  offsiteDetails?: { startTime: string; travel: string };
 };
+
+function validateOffsiteDetails(
+  type: CreateRequestInput["type"],
+  details: CreateRequestInput["offsiteDetails"],
+) {
+  if (type !== "OFFSITE") return undefined;
+  const startTime = details?.startTime?.trim() || "";
+  const travel = details?.travel?.trim() || "";
+  if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(startTime))
+    throw new PrCenterError(
+      "A valid off-site start time is required",
+      422,
+      "INVALID_OFFSITE_DETAILS",
+    );
+  if (!travel || travel.length > 200)
+    throw new PrCenterError(
+      "Travel arrangement is required",
+      422,
+      "INVALID_OFFSITE_DETAILS",
+    );
+  return { startTime, travel };
+}
+
 type IdeaStatus =
   | "PROPOSED"
   | "UNDER_REVIEW"
@@ -378,6 +408,7 @@ export async function createRequest(
       "INVALID_TITLE",
     );
   const sourceUrls = [...new Set(input.sourceUrls.map(assertUrl))];
+  const offsiteDetails = validateOffsiteDetails(input.type, input.offsiteDetails);
 
   return prisma.$transaction(async (tx) => {
     const request = await tx.prRequest.create({
@@ -397,6 +428,7 @@ export async function createRequest(
             title,
             objective: input.objective?.trim() || null,
             audience: input.audience?.trim() || null,
+            offsiteDetails,
           },
         },
         sources: { create: sourceUrls.map((url) => ({ url })) },
@@ -460,8 +492,75 @@ export async function listRequests(actor: PrCenterActor, take = 25, cursor?: str
         take: 1,
         select: { reason: true },
       },
-      tasks: true,
+      tasks: {
+        include: {
+          owner: { select: { displayName: true } },
+          revisions: {
+            orderBy: { revisionNumber: "desc" },
+            take: 1,
+            select: {
+              revisionNumber: true,
+              body: true,
+              keyMessage: true,
+              finalAssetId: true,
+            },
+          },
+        },
+      },
       revisions: { orderBy: { revisionNumber: "desc" }, take: 1 },
+    },
+  });
+}
+
+export async function listContentLibraryRequests(
+  actor: PrCenterActor,
+  take = 25,
+  cursor?: string,
+) {
+  const allowedRoles = ["PR_OPERATIONS", "SCOPED_ADMINISTRATOR"] as const;
+  if (!allowedRoles.some((role) => actorHasRole(actor, role)))
+    throw new PrCenterError("You cannot view the Content Library", 403, "FORBIDDEN");
+  const limit = Math.min(Math.max(take, 1), 100);
+  const scopes = roleDepartmentClauses(actor, allowedRoles);
+  return prisma.prRequest.findMany({
+    where: { organizationId: actor.organizationId, OR: scopes },
+    take: limit + 1,
+    ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
+    orderBy: { createdAt: "desc" },
+    include: {
+      department: { select: { name: true } },
+      revisions: {
+        orderBy: { revisionNumber: "desc" },
+        select: {
+          revisionNumber: true,
+          title: true,
+          objective: true,
+          audience: true,
+          offsiteDetails: true,
+          changeSummary: true,
+          createdAt: true,
+        },
+      },
+      sources: { select: { id: true, label: true, url: true, createdAt: true } },
+      attachments: {
+        where: { taskId: null },
+        orderBy: { createdAt: "desc" },
+        select: {
+          id: true,
+          kind: true,
+          version: true,
+          createdAt: true,
+          file: {
+            select: {
+              fileName: true,
+              mimeType: true,
+              sizeBytes: true,
+              scanStatus: true,
+              deletedAt: true,
+            },
+          },
+        },
+      },
     },
   });
 }
@@ -519,6 +618,7 @@ export async function updateRequestDraft(
       "INVALID_TITLE",
     );
   const sourceUrls = [...new Set(input.sourceUrls.map(assertUrl))];
+  const offsiteDetails = validateOffsiteDetails(input.type, input.offsiteDetails);
   return prisma.$transaction(async (tx) => {
     const revisionNumber = (request.revisions[0]?.revisionNumber || 0) + 1;
     const updated = await tx.prRequest.updateMany({
@@ -544,6 +644,7 @@ export async function updateRequestDraft(
         title,
         objective: input.objective?.trim() || null,
         audience: input.audience?.trim() || null,
+        offsiteDetails,
         changeSummary: "Requester amendment",
       },
     });
@@ -612,6 +713,30 @@ export async function transitionRequest(
         actorId: actor.id,
       },
     });
+    if (status === "WITHDRAWN") {
+      for (const task of request.tasks) {
+        if (task.status !== "DRAFT") continue;
+        const cancelled = await tx.prTask.updateMany({
+          where: { id: task.id, status: "DRAFT", version: task.version },
+          data: { status: "CANCELLED", version: { increment: 1 } },
+        });
+        if (cancelled.count !== 1)
+          throw new PrCenterError(
+            "A task changed while this request was being withdrawn. Refresh and try again.",
+            409,
+            "STALE_UPDATE",
+          );
+        await tx.prStatusHistory.create({
+          data: {
+            taskId: task.id,
+            fromState: task.status,
+            toState: "CANCELLED",
+            reason: "Parent request withdrawn",
+            actorId: actor.id,
+          },
+        });
+      }
+    }
     if (status === "SUBMITTED") {
       const approverRoles = await tx.prUserRole.findMany({
         where: {
@@ -1151,7 +1276,10 @@ export async function updateTaskAssignment(
       eventType: "pr.task.assigned",
       correlationId,
     });
-    return tx.prTask.findUniqueOrThrow({ where: { id: task.id } });
+    return tx.prTask.findUniqueOrThrow({
+      where: { id: task.id },
+      include: { owner: { select: { displayName: true } } },
+    });
   });
 }
 
@@ -1413,23 +1541,56 @@ export async function createTaskRevision(
     throw new PrCenterError("You cannot revise this task", 403, "FORBIDDEN");
   const task = await prisma.prTask.findFirst({
     where: taskScopeWhere(actor, taskId),
-    include: { revisions: { orderBy: { revisionNumber: "desc" } } },
+    include: {
+      request: { select: { status: true } },
+      revisions: { orderBy: { revisionNumber: "desc" } },
+    },
   });
   if (!task) throw new PrCenterError("Task not found", 404, "NOT_FOUND");
+  if (task.request.status !== "APPROVED")
+    throw new PrCenterError(
+      "The request must be approved before a task revision can be created",
+      409,
+      "REQUEST_NOT_APPROVED",
+    );
+  if (task.status !== "IN_PRODUCTION" && task.status !== "REVISION_REQUIRED")
+    throw new PrCenterError(
+      "A task revision can only be created during production or after a revision request",
+      409,
+      "INVALID_REVISION_STATE",
+    );
   if (task.version !== fromVersion)
     throw new PrCenterError(
       "This task has changed. Refresh and try again.",
       409,
       "STALE_UPDATE",
     );
-  if (["PUBLISHED", "CLOSED", "CANCELLED"].includes(task.status))
-    throw new PrCenterError(
-      "This task can no longer be revised",
-      422,
-      "INVALID_TRANSITION",
-    );
   const body = input.body?.trim() || null;
   const keyMessage = input.keyMessage?.trim() || null;
+  const changeSummary = input.changeSummary?.trim() || "";
+  if (!body || body.length > 20_000)
+    throw new PrCenterError(
+      "Content body must contain 1 to 20,000 characters",
+      422,
+      "INVALID_TASK_REVISION",
+    );
+  if (!keyMessage || keyMessage.length > 2_000)
+    throw new PrCenterError(
+      "Key message must contain 1 to 2,000 characters",
+      422,
+      "INVALID_TASK_REVISION",
+    );
+  if (changeSummary.length > 1_000)
+    throw new PrCenterError("Change summary is too long", 422, "INVALID_TASK_REVISION");
+  const pendingSchedules = await prisma.prSchedule.findMany({
+    where: { taskId: task.id, publishedAt: null },
+    select: {
+      id: true,
+      channel: true,
+      taskRevision: true,
+      scheduledFor: true,
+    },
+  });
   return prisma.$transaction(async (tx) => {
     const updated = await tx.prTask.updateMany({
       where: { id: task.id, version: fromVersion },
@@ -1441,6 +1602,36 @@ export async function createTaskRevision(
         409,
         "STALE_UPDATE",
       );
+    if (pendingSchedules.length > 0) {
+      const invalidated = await tx.prSchedule.deleteMany({
+        where: {
+          id: { in: pendingSchedules.map((schedule) => schedule.id) },
+          publishedAt: null,
+        },
+      });
+      if (invalidated.count !== pendingSchedules.length)
+        throw new PrCenterError(
+          "A schedule changed while the content revision was being saved. Refresh and try again.",
+          409,
+          "STALE_UPDATE",
+        );
+      for (const schedule of pendingSchedules)
+        await auditAndOutbox(tx, {
+          actor,
+          action: "task.schedule_invalidated_for_revision",
+          entityType: "schedule",
+          entityId: schedule.id,
+          after: {
+            taskId: task.id,
+            channel: schedule.channel,
+            taskRevision: schedule.taskRevision,
+            scheduledFor: schedule.scheduledFor.toISOString(),
+            invalidatedByRevision: (task.revisions[0]?.revisionNumber || 0) + 1,
+          },
+          eventType: "pr.task.schedule_invalidated",
+          correlationId: `${correlationId}:${schedule.id}`,
+        });
+    }
     const revision = await tx.prTaskRevision.create({
       data: {
         taskId: task.id,
@@ -1455,7 +1646,7 @@ export async function createTaskRevision(
         taskId: task.id,
         fromState: task.status,
         toState: "IN_PRODUCTION",
-        reason: input.changeSummary?.trim() || "Material revision",
+        reason: changeSummary || "Material revision",
         actorId: actor.id,
       },
     });
@@ -1488,8 +1679,25 @@ export async function listApprovalQueue(actor: PrCenterActor) {
       },
     },
     include: {
-      request: { select: { title: true, requesterId: true } },
-      revisions: { orderBy: { revisionNumber: "desc" }, take: 1 },
+      request: {
+        select: {
+          title: true,
+          requesterId: true,
+          status: true,
+          sources: { select: { url: true } },
+        },
+      },
+      owner: { select: { displayName: true } },
+      revisions: {
+        orderBy: { revisionNumber: "desc" },
+        take: 1,
+        select: {
+          revisionNumber: true,
+          body: true,
+          keyMessage: true,
+          finalAssetId: true,
+        },
+      },
     },
     orderBy: { updatedAt: "asc" },
   });
@@ -1513,6 +1721,7 @@ export async function listRequestApprovalQueue(actor: PrCenterActor) {
       department: { select: { name: true } },
       requester: { select: { displayName: true } },
       revisions: { orderBy: { revisionNumber: "desc" }, take: 1 },
+      sources: { select: { url: true } },
     },
     orderBy: [{ createdAt: "asc" }, { id: "asc" }],
   });
@@ -1864,6 +2073,8 @@ export async function listCalendarEntries(actor: PrCenterActor, from: Date, to: 
         taskRevision: true,
         scheduledFor: true,
         publishedAt: true,
+        publishedUrl: true,
+        publishedReference: true,
         task: {
           select: {
             title: true,
@@ -1900,6 +2111,8 @@ export async function listCalendarEntries(actor: PrCenterActor, from: Date, to: 
       taskRevision: schedule.taskRevision,
       date: schedule.publishedAt ?? schedule.scheduledFor,
       status: schedule.publishedAt ? ("PUBLISHED" as const) : ("SCHEDULED" as const),
+      publishedUrl: schedule.publishedUrl,
+      publishedReference: schedule.publishedReference,
     })),
     ...drafts.map((task) => ({
       id: task.id,
@@ -1968,7 +2181,7 @@ export async function scheduleTask(
         409,
         "IDEMPOTENCY_CONFLICT",
       );
-    return existing;
+    return { ...existing, taskVersion: task.version };
   }
   if (task.version !== fromVersion)
     throw new PrCenterError(
@@ -2068,7 +2281,7 @@ export async function scheduleTask(
       eventType: firstSchedule ? "pr.task.scheduled" : "pr.task.channel_scheduled",
       correlationId,
     });
-    return schedule;
+    return { ...schedule, taskVersion: fromVersion + 1 };
   });
 }
 
@@ -2168,7 +2381,13 @@ export async function recordPublishingEvidence(
         : "pr.task.publication_evidence_recorded",
       correlationId,
     });
-    return { id: schedule.id, publishedUrl, publishedReference, publishedAt };
+    return {
+      id: schedule.id,
+      publishedUrl,
+      publishedReference,
+      publishedAt,
+      taskVersion: firstPublication ? fromVersion + 1 : fromVersion,
+    };
   });
 }
 
@@ -2532,6 +2751,24 @@ export async function assignFinalAsset(
   });
   if (!fileObject)
     throw new PrCenterError("File not found or not yet clean", 404, "FILE_NOT_FOUND");
+  const attachment = await prisma.prAttachment.findFirst({
+    where: {
+      taskId: task.id,
+      fileId: fileObject.id,
+      file: {
+        organizationId: actor.organizationId,
+        scanStatus: "CLEAN",
+        deletedAt: null,
+      },
+    },
+    select: { id: true },
+  });
+  if (!attachment)
+    throw new PrCenterError(
+      "Final assets must be clean files attached to this task",
+      422,
+      "FINAL_ASSET_NOT_ATTACHED",
+    );
   const revision = task.revisions[0];
   if (!revision)
     throw new PrCenterError(
@@ -3182,11 +3419,116 @@ export async function restoreRequest(
 
 // ── UAT / release readiness check ────────────────────────────────────
 
+function assertCanManageReleaseEvidence(actor: PrCenterActor) {
+  if (!actorHasOrganizationWideRole(actor, ["SCOPED_ADMINISTRATOR"]))
+    throw new PrCenterError("You cannot manage release evidence", 403, "FORBIDDEN");
+}
+
+function releaseEvidencePayload(value: Prisma.JsonValue): {
+  gateKey: ReleaseEvidenceGate;
+  result: "PASSED" | "FAILED";
+  evidenceReference: string;
+  notes: string | null;
+  performedAt: string;
+} | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const payload = value as Record<string, Prisma.JsonValue>;
+  if (
+    typeof payload.gateKey !== "string" ||
+    !RELEASE_EVIDENCE_GATES.includes(payload.gateKey as ReleaseEvidenceGate) ||
+    (payload.result !== "PASSED" && payload.result !== "FAILED") ||
+    typeof payload.evidenceReference !== "string" ||
+    typeof payload.performedAt !== "string"
+  )
+    return null;
+  return {
+    gateKey: payload.gateKey as ReleaseEvidenceGate,
+    result: payload.result,
+    evidenceReference: payload.evidenceReference,
+    notes: typeof payload.notes === "string" ? payload.notes : null,
+    performedAt: payload.performedAt,
+  };
+}
+
+export async function listReleaseEvidence(actor: PrCenterActor) {
+  assertCanManageReleaseEvidence(actor);
+  const events = await prisma.prAuditEvent.findMany({
+    where: {
+      organizationId: actor.organizationId,
+      entityType: "release_evidence",
+      action: "release.evidence.recorded",
+    },
+    orderBy: { createdAt: "desc" },
+    take: 200,
+    select: {
+      id: true,
+      after: true,
+      createdAt: true,
+      actor: { select: { displayName: true, email: true } },
+    },
+  });
+  return events.flatMap((event) => {
+    const evidence = event.after ? releaseEvidencePayload(event.after) : null;
+    return evidence
+      ? [{ id: event.id, ...evidence, signedAt: event.createdAt, signer: event.actor }]
+      : [];
+  });
+}
+
+export async function recordReleaseEvidence(
+  actor: PrCenterActor,
+  raw: Record<string, unknown>,
+  correlationId: string,
+) {
+  assertCanManageReleaseEvidence(actor);
+  let evidence: ReturnType<typeof parseReleaseEvidenceInput>;
+  try {
+    evidence = parseReleaseEvidenceInput(raw);
+  } catch (error) {
+    throw new PrCenterError(
+      error instanceof Error ? error.message : "Release evidence is invalid",
+      422,
+      "INVALID_RELEASE_EVIDENCE",
+    );
+  }
+  const event = await prisma.prAuditEvent.create({
+    data: {
+      organizationId: actor.organizationId,
+      actorId: actor.id,
+      action: "release.evidence.recorded",
+      entityType: "release_evidence",
+      entityId: evidence.gateKey,
+      correlationId,
+      after: {
+        gateKey: evidence.gateKey,
+        result: evidence.result,
+        evidenceReference: evidence.evidenceReference,
+        notes: evidence.notes,
+        performedAt: evidence.performedAt.toISOString(),
+      },
+    },
+    select: { id: true, createdAt: true },
+  });
+  return { id: event.id, ...evidence, signedAt: event.createdAt, signedBy: actor.id };
+}
+
 export async function releaseReadinessCheck(actor: PrCenterActor) {
   if (!actorHasOrganizationWideRole(actor, ["SCOPED_ADMINISTRATOR"]))
     throw new PrCenterError("You cannot view release readiness", 403, "FORBIDDEN");
   const org = { organizationId: actor.organizationId };
   const checks: { name: string; passed: boolean; detail: string }[] = [];
+  const releaseEvidence = await listReleaseEvidence(actor);
+  const latestEvidence = latestReleaseEvidenceByGate(releaseEvidence);
+  const addEvidenceCheck = (name: string, gate: ReleaseEvidenceGate) => {
+    const evidence = latestEvidence[gate];
+    checks.push({
+      name,
+      passed: evidence?.result === "PASSED",
+      detail: evidence
+        ? `${evidence.result}; signed by ${evidence.signer?.displayName || "unknown"} at ${evidence.signedAt.toISOString()}; evidence=${evidence.evidenceReference}`
+        : "No signed evidence record is available.",
+    });
+  };
 
   // 1. Audit trail exists
   const auditCount = await prisma.prAuditEvent.count({ where: org });
@@ -3345,17 +3687,10 @@ export async function releaseReadinessCheck(actor: PrCenterActor) {
     passed: approvalPolicyConfigured,
     detail: approvalPolicyDetail,
   });
-  checks.push({
-    name: "Backup and restore UAT",
-    passed: false,
-    detail: "A successful backup restore evidence record is not available to this check.",
-  });
-  checks.push({
-    name: "Role/scope and security UAT",
-    passed: false,
-    detail:
-      "Role-by-action scope, IDOR, CSRF/session, and disabled-account UAT evidence is not recorded.",
-  });
+  addEvidenceCheck("Authenticated role/scope UAT", "AUTHENTICATED_UAT");
+  addEvidenceCheck("Backup and restore UAT", "BACKUP_RESTORE");
+  addEvidenceCheck("Role/scope and security UAT", "SECURITY_UAT");
+  addEvidenceCheck("Authorized go-live sign-off", "GO_LIVE_SIGNOFF");
 
   const allPassed = checks.every((c) => c.passed);
   return {

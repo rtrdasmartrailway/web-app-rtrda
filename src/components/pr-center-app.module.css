@@ -178,6 +178,19 @@
   height: 34px;
   width: 34px;
 }
+.signOut {
+  background: #fff;
+  border: 1px solid var(--pc-line);
+  border-radius: 6px;
+  color: #43536b;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 8px 10px;
+  white-space: nowrap;
+}
+.signOut:hover {
+  background: #f5f8fe;
+}
 .main {
   margin: 0 auto;
   max-width: 1500px;
@@ -290,6 +303,225 @@
   gap: 18px;
   grid-template-columns: 1.6fr 1fr;
 }
+.readiness {
+  background: #fff;
+  border: 1px solid var(--pc-line);
+  border-radius: 10px;
+  margin: 20px 0;
+  padding: 22px;
+}
+.readinessHeader {
+  align-items: flex-start;
+  display: flex;
+  gap: 20px;
+  justify-content: space-between;
+}
+.readinessHeader h2 {
+  font-size: 19px;
+  margin: 5px 0;
+}
+.readinessHeader p:not(.eyebrow) {
+  color: var(--pc-muted);
+  font-size: 12px;
+  line-height: 1.6;
+  margin: 0;
+}
+.readinessStatus {
+  background: #fff5df;
+  border: 1px solid #f1d89e;
+  border-radius: 20px;
+  color: #80550b;
+  flex: 0 0 auto;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 7px 11px;
+}
+.readinessColumns {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin-top: 18px;
+}
+.readinessPanel {
+  background: #f8faff;
+  border: 1px solid #e6ecf5;
+  border-radius: 8px;
+  min-width: 0;
+  padding: 16px;
+}
+.readinessPanel h3 {
+  font-size: 14px;
+  margin: 0 0 12px;
+}
+.readinessList {
+  display: grid;
+  gap: 13px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.readinessList li {
+  border-top: 1px solid #e5ebf3;
+  padding-top: 11px;
+}
+.readinessList li:first-child {
+  border-top: 0;
+  padding-top: 0;
+}
+.readinessList b {
+  color: #243957;
+  display: block;
+  font-size: 12px;
+  line-height: 1.5;
+}
+.readinessList p {
+  color: #64748b;
+  font-size: 11px;
+  line-height: 1.65;
+  margin: 4px 0 0;
+}
+.releaseEvidence {
+  border-top: 1px solid var(--pc-line);
+  margin-top: 20px;
+  padding-top: 20px;
+}
+.releaseEvidence > header {
+  align-items: center;
+  display: flex;
+  justify-content: space-between;
+}
+.releaseEvidence > header h3 {
+  font-size: 16px;
+  margin: 4px 0 0;
+}
+.releasePassed,
+.releaseBlocked {
+  border-radius: 12px;
+  display: inline-block;
+  font-size: 10px;
+  font-weight: 800;
+  padding: 4px 8px;
+}
+.releasePassed {
+  background: #e8f7ef;
+  color: #17633e;
+}
+.releaseBlocked {
+  background: #fff2df;
+  color: #80550b;
+}
+.releaseCheckList,
+.releaseGateList {
+  display: grid;
+  gap: 8px;
+  margin-top: 14px;
+}
+.releaseCheckList {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.releaseCheckList article,
+.releaseGateList > p {
+  background: #f8faff;
+  border: 1px solid #e6ecf5;
+  border-radius: 7px;
+  margin: 0;
+  padding: 10px 12px;
+}
+.releaseCheckList b,
+.releaseGateList b {
+  color: #243957;
+  font-size: 11px;
+}
+.releaseCheckList p {
+  color: #64748b;
+  font-size: 10px;
+  line-height: 1.6;
+  margin: 4px 0 0;
+  overflow-wrap: anywhere;
+}
+.releaseGateList > p {
+  align-items: center;
+  display: grid;
+  gap: 4px 10px;
+  grid-template-columns: 1fr auto;
+}
+.releaseGateList small {
+  color: #64748b;
+  font-size: 10px;
+  grid-column: 1 / -1;
+  overflow-wrap: anywhere;
+}
+.releaseEvidenceForm {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin-top: 16px;
+}
+.releaseEvidenceForm label {
+  color: #43536b;
+  display: grid;
+  font-size: 11px;
+  font-weight: 700;
+  gap: 5px;
+}
+.releaseEvidenceForm input,
+.releaseEvidenceForm select,
+.releaseEvidenceForm textarea {
+  background: #fff;
+  border: 1px solid var(--pc-line);
+  border-radius: 6px;
+  color: #14213a;
+  font: inherit;
+  min-width: 0;
+  padding: 8px;
+}
+.releaseEvidenceFull {
+  grid-column: 1 / -1;
+}
+.releaseEvidenceForm > button {
+  justify-self: start;
+}
+.releaseError {
+  color: #b42318;
+  font-size: 12px;
+}
+.taskRevisionForm {
+  background: #f8faff;
+  border: 1px solid #e6ecf5;
+  border-radius: 8px;
+  display: grid;
+  gap: 10px;
+  margin: 14px 0;
+  padding: 14px;
+}
+.taskRevisionForm h3 {
+  font-size: 14px;
+  margin: 0;
+}
+.taskRevisionForm label {
+  color: #43536b;
+  display: grid;
+  font-size: 11px;
+  font-weight: 700;
+  gap: 5px;
+}
+.taskRevisionForm input,
+.taskRevisionForm textarea {
+  background: #fff;
+  border: 1px solid var(--pc-line);
+  border-radius: 6px;
+  color: #14213a;
+  font: inherit;
+  padding: 8px;
+}
+.taskRevisionForm button {
+  justify-self: start;
+}
+.approvalContent {
+  max-height: 220px;
+  overflow: auto;
+  white-space: pre-wrap;
+}
 .card {
   background: #fff;
   border: 1px solid var(--pc-line);
@@ -316,6 +548,12 @@
 .helpGrid h2 {
   font-size: 16px;
   margin: 3px 0 0;
+}
+.dashboardNote {
+  color: #64748b;
+  font-size: 12px;
+  line-height: 1.7;
+  margin: 18px 0 0;
 }
 .card header button,
 .ideaGrid button,
@@ -658,6 +896,39 @@
   align-items: center;
   display: flex;
   gap: 12px;
+}
+.libraryRecord {
+  display: grid;
+  align-content: start;
+  gap: 9px;
+  padding: 16px;
+}
+.libraryRecord dl {
+  display: grid;
+  gap: 5px;
+  margin: 0 15px;
+}
+.libraryRecord dt {
+  color: #41556d;
+  font-size: 12px;
+  font-weight: 700;
+}
+.libraryRecord dd {
+  margin: 0 0 7px;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+.libraryRecord pre {
+  margin: 0;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+.libraryRecord a {
+  overflow-wrap: anywhere;
+}
+.libraryNotice {
+  color: #53677e;
+  margin: 0 0 16px;
 }
 .library,
 .ideaGrid,
@@ -1016,6 +1287,13 @@
   .dashboardGrid {
     grid-template-columns: 1fr;
   }
+  .readinessColumns {
+    grid-template-columns: 1fr;
+  }
+  .releaseCheckList,
+  .releaseEvidenceForm {
+    grid-template-columns: 1fr;
+  }
   .library {
     grid-template-columns: repeat(2, 1fr);
   }
@@ -1046,6 +1324,12 @@
   }
   .main {
     padding: 18px 15px 35px;
+  }
+  .readiness {
+    padding: 17px;
+  }
+  .readinessHeader {
+    flex-direction: column;
   }
   .hero {
     align-items: flex-start;

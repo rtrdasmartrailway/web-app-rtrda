@@ -15,6 +15,7 @@ import {
   listAuditEvents,
   markNotificationsRead,
   listRequests,
+  listContentLibraryRequests,
   listApprovalQueue,
   listRequestApprovalQueue,
   listAssignableUsers,
@@ -49,6 +50,8 @@ import {
   exportAuditEvents,
   restoreRequest,
   releaseReadinessCheck,
+  listReleaseEvidence,
+  recordReleaseEvidence,
   PrCenterError,
   type PrCenterActor,
 } from "@/lib/pr-center/service";
@@ -135,6 +138,14 @@ export function buildPrCenterApi(
   app.get("/requests", async (request) => {
     const query = request.query as { take?: string; cursor?: string };
     return listRequests(request.prCenterActor!, Number(query.take || 25), query.cursor);
+  });
+  app.get("/content-library", async (request) => {
+    const query = request.query as { take?: string; cursor?: string };
+    return listContentLibraryRequests(
+      request.prCenterActor!,
+      Number(query.take || 25),
+      query.cursor,
+    );
   });
   app.get("/approvals", async (request) => listApprovalQueue(request.prCenterActor!));
   app.get("/request-approvals", async (request) =>
@@ -303,6 +314,25 @@ export function buildPrCenterApi(
         priority: typeof input.priority === "string" ? input.priority : undefined,
         priorityReason:
           typeof input.priorityReason === "string" ? input.priorityReason : undefined,
+        offsiteDetails:
+          input.type === "OFFSITE" &&
+          typeof input.offsiteDetails === "object" &&
+          input.offsiteDetails !== null &&
+          !Array.isArray(input.offsiteDetails)
+            ? {
+                startTime:
+                  typeof (input.offsiteDetails as Record<string, unknown>).startTime ===
+                  "string"
+                    ? ((input.offsiteDetails as Record<string, unknown>)
+                        .startTime as string)
+                    : "",
+                travel:
+                  typeof (input.offsiteDetails as Record<string, unknown>).travel ===
+                  "string"
+                    ? ((input.offsiteDetails as Record<string, unknown>).travel as string)
+                    : "",
+              }
+            : undefined,
       },
       correlationId(request),
     );
@@ -329,6 +359,25 @@ export function buildPrCenterApi(
         priority: typeof input.priority === "string" ? input.priority : undefined,
         priorityReason:
           typeof input.priorityReason === "string" ? input.priorityReason : undefined,
+        offsiteDetails:
+          input.type === "OFFSITE" &&
+          typeof input.offsiteDetails === "object" &&
+          input.offsiteDetails !== null &&
+          !Array.isArray(input.offsiteDetails)
+            ? {
+                startTime:
+                  typeof (input.offsiteDetails as Record<string, unknown>).startTime ===
+                  "string"
+                    ? ((input.offsiteDetails as Record<string, unknown>)
+                        .startTime as string)
+                    : "",
+                travel:
+                  typeof (input.offsiteDetails as Record<string, unknown>).travel ===
+                  "string"
+                    ? ((input.offsiteDetails as Record<string, unknown>).travel as string)
+                    : "",
+              }
+            : undefined,
       },
       correlationId(request),
     );
@@ -651,6 +700,16 @@ export function buildPrCenterApi(
   // ── Release readiness (SCOPED_ADMINISTRATOR) ─────────────────────────
   app.get("/admin/release-readiness", async (request) =>
     releaseReadinessCheck(request.prCenterActor!),
+  );
+  app.get("/admin/release-evidence", async (request) =>
+    listReleaseEvidence(request.prCenterActor!),
+  );
+  app.post("/admin/release-evidence", async (request) =>
+    recordReleaseEvidence(
+      request.prCenterActor!,
+      await body(request),
+      correlationId(request),
+    ),
   );
   return app;
 }

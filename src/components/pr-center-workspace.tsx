@@ -140,6 +140,24 @@ export function PrCenterWorkspace() {
     }
   }
 
+  async function signOut() {
+    try {
+      const response = await fetch("/api/pr-center/auth/logout", {
+        method: "POST",
+        credentials: "same-origin",
+        cache: "no-store",
+      });
+      if (!response.ok) throw new Error("Sign-out request failed");
+    } catch {
+      setRequestsError("ออกจากระบบไม่สำเร็จ กรุณาลองอีกครั้ง");
+      return;
+    }
+    setSession(null);
+    setSessionState("sign-in-required");
+    setPage("Home");
+    setRequests([]);
+  }
+
   const signedIn = sessionState === "authenticated";
   const isRequestList = ["Home", "My Requests", "All Requests"].includes(page);
   const signInFailed =
@@ -155,6 +173,7 @@ export function PrCenterWorkspace() {
           .sort()
           .join(",")}`}
         actor={session}
+        onSignOut={() => void signOut()}
       />
     );
 

@@ -1,12 +1,24 @@
 "use client";
 
-import { Fragment, startTransition, useEffect, useRef, useState } from "react";
+import {
+  Fragment,
+  startTransition,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 import Image from "next/image";
 import type { CreateContentIdeaInput } from "@/lib/pr-center/idea-input";
 import { submitIdeaForm } from "@/lib/pr-center/idea-form";
 import { parseIdeaListPage, type IdeaListRecord } from "@/lib/pr-center/idea-view";
 import { parseCalendarEntries, type CalendarEntry } from "@/lib/pr-center/calendar-view";
 import { canEditOwnRequest } from "@/lib/pr-center/request-edit";
+import { unavailableMetricDisplay } from "@/lib/pr-center/metric-display";
+import {
+  RELEASE_EVIDENCE_GATES,
+  type ReleaseEvidenceGate,
+} from "@/lib/pr-center/release-evidence";
 import {
   parseCurrentMessageHouse,
   parseMessageHouseHistory,
@@ -120,8 +132,15 @@ type Task = {
   title: string;
   status: StatusId;
   ownerId: string;
+  ownerName?: string;
   dueDate: string;
   version?: number;
+  revisionNumber?: number;
+  keyMessage?: string;
+  contentBody?: string;
+  finalAssetId?: string | null;
+  requestStatus?: Request["status"];
+  sourceUrls?: string[];
 };
 type Notification = {
   id: string;
@@ -256,6 +275,7 @@ type ApiRequestRecord = {
     revisionNumber: number;
     objective: string | null;
     audience: string | null;
+    offsiteDetails: unknown;
   }>;
   sources: { url: string }[];
   statusHistory: { reason: string | null }[];
@@ -265,21 +285,113 @@ type ApiRequestRecord = {
     contentType: string;
     status: string;
     ownerId: string | null;
+    owner: { displayName: string } | null;
     dueAt: string | null;
     version: number;
+    revisions: Array<{
+      revisionNumber: number;
+      body: string | null;
+      keyMessage: string | null;
+      finalAssetId: string | null;
+    }>;
+  }>;
+};
+type ContentLibraryRecord = {
+  id: string;
+  requestNumber: string;
+  title: string;
+  type: "PR" | "OFFSITE";
+  status: string;
+  requestedFor: string | null;
+  createdAt: string;
+  updatedAt: string;
+  department: { name: string };
+  revisions: Array<{
+    revisionNumber: number;
+    title: string;
+    objective: string | null;
+    audience: string | null;
+    offsiteDetails: unknown;
+    changeSummary: string | null;
+    createdAt: string;
+  }>;
+  sources: Array<{ id: string; label: string | null; url: string; createdAt: string }>;
+  attachments: Array<{
+    id: string;
+    kind: string;
+    version: number;
+    createdAt: string;
+    file: {
+      fileName: string;
+      mimeType: string;
+      sizeBytes: number;
+      scanStatus: string;
+      deletedAt: string | null;
+    };
   }>;
 };
 type RequestApprovalItem = {
   id: string;
   requestNumber: string;
   title: string;
+  type: "PR" | "OFFSITE";
   status: "SUBMITTED";
   version: number;
   department: { name: string };
   requester: { displayName: string };
+  requestedFor: string | null;
+  revisions: Array<{
+    objective: string | null;
+    audience: string | null;
+    offsiteDetails: unknown;
+  }>;
+  sources: Array<{ url: string }>;
+};
+type TaskApprovalRecord = {
+  id: string;
+  requestId: string;
+  title: string;
+  contentType: string;
+  status: string;
+  ownerId: string | null;
+  owner?: { displayName: string } | null;
+  dueAt: string | null;
+  version: number;
+  revisions?: Array<{
+    revisionNumber: number;
+    body: string | null;
+    keyMessage: string | null;
+    finalAssetId: string | null;
+  }>;
+  request: { status?: Request["status"]; sources: Array<{ url: string }> };
 };
 
+function mapTaskApprovalRecord(task: TaskApprovalRecord): Task {
+  return {
+    id: task.id,
+    requestId: task.requestId,
+    title: task.title,
+    type: task.contentType,
+    status: task.status.toLowerCase() as StatusId,
+    ownerId: task.ownerId || "",
+    ownerName: task.owner?.displayName,
+    dueDate: task.dueAt?.slice(0, 10) || "",
+    version: task.version,
+    revisionNumber: task.revisions?.[0]?.revisionNumber,
+    contentBody: task.revisions?.[0]?.body || undefined,
+    keyMessage: task.revisions?.[0]?.keyMessage || undefined,
+    finalAssetId: task.revisions?.[0]?.finalAssetId,
+    requestStatus: task.request.status,
+    sourceUrls: task.request.sources.map((source) => source.url),
+  };
+}
+
 function mapRequestRecord(request: ApiRequestRecord): Request {
+  const offsiteDetails = request.revisions[0]?.offsiteDetails;
+  const detailRecord =
+    offsiteDetails && typeof offsiteDetails === "object" && !Array.isArray(offsiteDetails)
+      ? (offsiteDetails as Record<string, unknown>)
+      : null;
   return {
     id: request.id,
     title: request.title,
@@ -294,6 +406,9 @@ function mapRequestRecord(request: ApiRequestRecord): Request {
     revisionNumber: request.revisions[0]?.revisionNumber,
     objective: request.revisions[0]?.objective || undefined,
     audience: request.revisions[0]?.audience || undefined,
+    startTime:
+      typeof detailRecord?.startTime === "string" ? detailRecord.startTime : undefined,
+    travel: typeof detailRecord?.travel === "string" ? detailRecord.travel : undefined,
     source: request.sources[0]?.url,
   };
 }
@@ -303,12 +418,19 @@ function mapRequestTasks(records: ApiRequestRecord[]): Task[] {
     request.tasks.map((task) => ({
       id: task.id,
       requestId: request.id,
+      requestStatus: request.status,
       type: task.contentType,
       title: task.title,
       status: task.status.toLowerCase() as StatusId,
       ownerId: task.ownerId || "",
+      ownerName: task.owner?.displayName,
       dueDate: task.dueAt?.slice(0, 10) || "",
       version: task.version,
+      revisionNumber: task.revisions[0]?.revisionNumber,
+      contentBody: task.revisions[0]?.body || undefined,
+      keyMessage: task.revisions[0]?.keyMessage || undefined,
+      finalAssetId: task.revisions[0]?.finalAssetId,
+      sourceUrls: request.sources.map((source) => source.url),
     })),
   );
 }
@@ -359,13 +481,7 @@ const PHASE_1_PAGES = new Set<Page>([
   "directory",
   "settings",
 ]);
-const PHASE_2_PAGE_IDS = new Set<Page>([
-  "library",
-  "ideas",
-  "message-house",
-  "help",
-  "system-data",
-]);
+const PHASE_2_PAGE_IDS = new Set<Page>(["library", "ideas", "message-house"]);
 const PHASE_2_PAGES = new Set<Page>(
   (process.env.NEXT_PUBLIC_PR_CENTER_PHASE2_PAGES || "")
     .split(",")
@@ -432,40 +548,6 @@ const STATUS_LABELS: Record<StatusId, string> = {
   rejected: "Rejected",
   cancelled: "Cancelled",
 };
-const STATUS_LABELS_TH: Record<StatusId, string> = {
-  draft: "ฉบับร่าง",
-  waiting_for_information: "รอข้อมูลเพิ่มเติม",
-  communication_planning: "วางแผนการสื่อสาร",
-  in_production: "กำลังผลิต",
-  source_fact_check: "ตรวจสอบข้อมูลต้นทาง",
-  technical_review: "ตรวจสอบด้านเทคนิค",
-  pr_editorial_review: "ตรวจทานโดย PR",
-  management_approval: "รออนุมัติ",
-  revision_required: "ขอแก้ไข",
-  approved: "อนุมัติแล้ว",
-  scheduled: "กำหนดเผยแพร่แล้ว",
-  published: "เผยแพร่แล้ว",
-  closed: "ปิดงาน",
-  rejected: "ไม่อนุมัติ",
-  cancelled: "ยกเลิก",
-};
-function statusLabel(status: StatusId, language: Language) {
-  return language === "th" ? STATUS_LABELS_TH[status] : STATUS_LABELS[status];
-}
-function formatDate(
-  value: string,
-  language: Language,
-  options?: Intl.DateTimeFormatOptions,
-) {
-  const date = new Date(`${value}T00:00:00`);
-  return date.toLocaleDateString(language === "th" ? "th-TH-u-ca-buddhist" : "en-GB", {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-    ...options,
-  });
-}
-
 const STATUS_TRANSITIONS: Record<StatusId, StatusId[]> = {
   draft: ["waiting_for_information", "communication_planning", "cancelled"],
   waiting_for_information: ["communication_planning", "cancelled"],
@@ -515,47 +597,28 @@ const ROLE_PAGES: Record<Role, Page[]> = {
     "new-request",
     "my-requests",
     "calendar",
-    "library",
     "ideas",
     "notifications",
     "help",
   ],
-  approver: ["home", "calendar", "notifications"],
+  approver: ["home", "calendar", "approvals", "notifications"],
   writer: [
     "home",
     "new-request",
     "my-requests",
     "operations",
     "calendar",
-    "library",
     "ideas",
     "notifications",
     "help",
   ],
-  designer: [
-    "home",
-    "my-requests",
-    "operations",
-    "calendar",
-    "library",
-    "notifications",
-    "help",
-  ],
-  video: [
-    "home",
-    "my-requests",
-    "operations",
-    "calendar",
-    "library",
-    "notifications",
-    "help",
-  ],
+  designer: ["home", "my-requests", "operations", "calendar", "notifications", "help"],
+  video: ["home", "my-requests", "operations", "calendar", "notifications", "help"],
   requester: [
     "home",
     "new-request",
     "my-requests",
     "calendar",
-    "library",
     "ideas",
     "notifications",
     "help",
@@ -799,6 +862,17 @@ const users: User[] = [
 function cloneDefaultState(): PrCenterState {
   return structuredClone(defaultState);
 }
+function createAuthenticatedState(): PrCenterState {
+  const state = cloneDefaultState();
+  state.requests = [];
+  state.tasks = [];
+  state.notifications = [];
+  state.audit = [];
+  state.ideas = [];
+  state.messageHouse = emptyMessageHouse();
+  state.snapshots = [];
+  return state;
+}
 function getUser(userId: string) {
   return users.find((user) => user.id === userId);
 }
@@ -807,7 +881,7 @@ function taskRows(items: Task[]) {
     task.type,
     task.title,
     STATUS_LABELS[task.status],
-    getUser(task.ownerId)?.name ?? "Unassigned",
+    getUser(task.ownerId)?.name ?? task.ownerName ?? "Unassigned",
   ]);
 }
 function requestStatus(request: Request, allTasks: Task[]): StatusId {
@@ -827,20 +901,6 @@ function emptyRequestDraft(user: User): RequestDraft {
     travel: "RTRDA transport confirmed",
   };
 }
-function isPrCenterState(value: unknown): value is PrCenterState {
-  if (!value || typeof value !== "object") return false;
-  const state = value as Partial<PrCenterState>;
-  return (
-    state.version === 1 &&
-    (state.language === "th" || state.language === "en") &&
-    typeof state.currentUserId === "string" &&
-    Array.isArray(state.requests) &&
-    Array.isArray(state.tasks) &&
-    Array.isArray(state.notifications) &&
-    Array.isArray(state.audit)
-  );
-}
-
 function label(page: (typeof pages)[number], language: Language) {
   return language === "th" ? page.th : page.en;
 }
@@ -879,6 +939,7 @@ function Metric({
 
 export function PrCenterApp({
   actor,
+  onSignOut,
 }: {
   actor?: {
     userId: string;
@@ -888,10 +949,13 @@ export function PrCenterApp({
     roles?: PrCenterRoleCode[];
     roleGrants?: Array<{ role: PrCenterRoleCode; departmentId: string | null }>;
   };
+  onSignOut?: () => void;
 }) {
   const latestActorId = useRef(actor?.userId);
   const [page, setPage] = useState<Page>("home");
-  const [state, setState] = useState<PrCenterState>(cloneDefaultState);
+  const [state, setState] = useState<PrCenterState>(() =>
+    actor ? createAuthenticatedState() : cloneDefaultState(),
+  );
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [requestOpen, setRequestOpen] = useState(false);
   const [requestEditId, setRequestEditId] = useState<string | null>(null);
@@ -905,6 +969,7 @@ export function PrCenterApp({
   const [hasMoreRequests, setHasMoreRequests] = useState(false);
   const [loadingMoreRequests, setLoadingMoreRequests] = useState(false);
   const [loadingRequests, setLoadingRequests] = useState(true);
+  const [requestsUnavailable, setRequestsUnavailable] = useState(false);
   const [ideaNextOffset, setIdeaNextOffset] = useState<number | null>(null);
   const [ideasOwnerId, setIdeasOwnerId] = useState<string | null>(null);
   const [loadingMoreIdeas, setLoadingMoreIdeas] = useState(false);
@@ -936,6 +1001,7 @@ export function PrCenterApp({
       .then(async (response) => {
         if (!response.ok) throw new Error("Request list unavailable");
         const records = (await response.json()) as ApiRequestRecord[];
+        setRequestsUnavailable(false);
         const pageRecords = records.slice(0, 100);
         setHasMoreRequests(records.length > pageRecords.length);
         setRequestCursor(pageRecords.at(-1)?.id || null);
@@ -947,45 +1013,32 @@ export function PrCenterApp({
           })),
         );
       })
-      .catch(() => setNotice("Unable to load server requests"))
+      .catch(() => {
+        setRequestsUnavailable(true);
+        setNotice("Unable to load server requests");
+      })
       .finally(() => setLoadingRequests(false));
   }, []);
   useEffect(() => {
+    const roleGrants = actor?.roles?.length ? actor.roles : actor ? [actor.role] : [];
     if (
-      (actor?.role !== "PR_OPERATIONS" && actor?.role !== "SCOPED_ADMINISTRATOR") ||
+      !roleGrants.some((role) =>
+        ["APPROVER", "PR_OPERATIONS", "SCOPED_ADMINISTRATOR"].includes(role),
+      ) ||
       page !== "approvals"
     )
       return;
     fetch("/api/pr-center/approvals", { credentials: "same-origin" })
       .then(async (response) => {
         if (!response.ok) throw new Error("Approval queue unavailable");
-        const items = (await response.json()) as Array<{
-          id: string;
-          requestId: string;
-          title: string;
-          contentType: string;
-          status: string;
-          ownerId: string | null;
-          dueAt: string | null;
-          version: number;
-        }>;
-        setApprovalTasks(
-          items.map((task) => ({
-            id: task.id,
-            requestId: task.requestId,
-            title: task.title,
-            type: task.contentType,
-            status: task.status.toLowerCase() as StatusId,
-            ownerId: task.ownerId || "",
-            dueDate: task.dueAt?.slice(0, 10) || "",
-            version: task.version,
-          })),
-        );
+        const items = (await response.json()) as TaskApprovalRecord[];
+        setApprovalTasks(items.map(mapTaskApprovalRecord));
       })
       .catch(() => setNotice("Unable to load approval queue"));
-  }, [actor?.role, page]);
+  }, [actor, page]);
   useEffect(() => {
-    if (actor?.role !== "PR_OPERATIONS" || page !== "approvals") return;
+    const roleGrants = actor?.roles?.length ? actor.roles : actor ? [actor.role] : [];
+    if (!roleGrants.includes("PR_OPERATIONS") || page !== "approvals") return;
     fetch("/api/pr-center/request-approvals", { credentials: "same-origin" })
       .then(async (response) => {
         if (!response.ok) throw new Error("Request approval queue unavailable");
@@ -993,7 +1046,7 @@ export function PrCenterApp({
         setApprovalRequests(requests);
       })
       .catch(() => setNotice("Unable to load submitted request approvals"));
-  }, [actor?.role, page]);
+  }, [actor, page]);
   useEffect(() => {
     latestActorId.current = actor?.userId;
   }, [actor?.userId]);
@@ -1148,6 +1201,7 @@ export function PrCenterApp({
       });
       if (!response.ok) throw new Error("Unable to refresh requests");
       const records = (await response.json()) as ApiRequestRecord[];
+      setRequestsUnavailable(false);
       const pageRecords = records.slice(0, 100);
       setRequestCursor(pageRecords.at(-1)?.id || null);
       setHasMoreRequests(records.length > pageRecords.length);
@@ -1157,6 +1211,7 @@ export function PrCenterApp({
         tasks: mapRequestTasks(pageRecords),
       }));
     } catch {
+      setRequestsUnavailable(true);
       setNotice(
         state.language === "th"
           ? "รีเฟรชสถานะคำขอไม่สำเร็จ"
@@ -1227,6 +1282,8 @@ export function PrCenterApp({
       source: request.source || "",
       objective: request.objective || "",
       audience: request.audience || "",
+      startTime: request.startTime || "",
+      travel: request.travel || "RTRDA transport confirmed",
     });
     setRequestOpen(true);
   };
@@ -1308,6 +1365,10 @@ export function PrCenterApp({
             title: draft.title,
             objective: draft.objective,
             audience: draft.audience,
+            offsiteDetails:
+              draft.type === "offsite"
+                ? { startTime: draft.startTime, travel: draft.travel }
+                : undefined,
             requestedFor: draft.requestedDate || undefined,
             sourceUrls: draft.source ? [draft.source] : [],
           }),
@@ -1332,6 +1393,7 @@ export function PrCenterApp({
           revisionNumber: number;
           objective: string | null;
           audience: string | null;
+          offsiteDetails: unknown;
         }>;
         sources: { url: string }[];
         tasks: Array<{
@@ -1358,6 +1420,17 @@ export function PrCenterApp({
         revisionNumber: updated.revisions[0]?.revisionNumber,
         objective: updated.revisions[0]?.objective || undefined,
         audience: updated.revisions[0]?.audience || undefined,
+        ...(() => {
+          const details = updated.revisions[0]?.offsiteDetails;
+          if (!details || typeof details !== "object" || Array.isArray(details))
+            return {};
+          const fields = details as Record<string, unknown>;
+          return {
+            startTime:
+              typeof fields.startTime === "string" ? fields.startTime : undefined,
+            travel: typeof fields.travel === "string" ? fields.travel : undefined,
+          };
+        })(),
       };
       setState((previous) => ({
         ...previous,
@@ -1369,12 +1442,15 @@ export function PrCenterApp({
           ...updated.tasks.map((task) => ({
             id: task.id,
             requestId: updated.id,
+            requestStatus: updated.status,
             type: task.contentType,
             title: task.title,
             status: task.status.toLowerCase() as StatusId,
             ownerId: task.ownerId || currentUser.id,
+            ownerName: currentUser.name,
             dueDate: task.dueAt?.slice(0, 10) || "",
             version: task.version,
+            revisionNumber: undefined,
           })),
           ...previous.tasks.filter(
             (task) => !updated.tasks.some((nextTask) => nextTask.id === task.id),
@@ -1396,6 +1472,61 @@ export function PrCenterApp({
       setPage("my-requests");
     } catch (error) {
       announce(error instanceof Error ? error.message : "Request could not be saved");
+    }
+  };
+
+  const createTaskRevision = async (
+    taskId: string,
+    body: string,
+    keyMessage: string,
+    changeSummary: string,
+  ): Promise<boolean> => {
+    const task = state.tasks.find((item) => item.id === taskId);
+    if (!task?.version) return false;
+    try {
+      const response = await fetch(`/api/pr-center/tasks/${taskId}/revisions`, {
+        method: "POST",
+        credentials: "same-origin",
+        headers: {
+          "Content-Type": "application/json",
+          "If-Match": String(task.version),
+        },
+        body: JSON.stringify({ body, keyMessage, changeSummary }),
+      });
+      if (!response.ok) {
+        const result = (await response.json().catch(() => null)) as {
+          message?: string;
+        } | null;
+        throw new Error(result?.message || "Task revision could not be saved");
+      }
+      const revision = (await response.json()) as {
+        revisionNumber: number;
+        body: string | null;
+        keyMessage: string | null;
+      };
+      setState((previous) => ({
+        ...previous,
+        tasks: previous.tasks.map((item) =>
+          item.id === taskId
+            ? {
+                ...item,
+                status: "in_production",
+                version: task.version! + 1,
+                revisionNumber: revision.revisionNumber,
+                contentBody: revision.body || undefined,
+                keyMessage: revision.keyMessage || undefined,
+                finalAssetId: null,
+              }
+            : item,
+        ),
+      }));
+      announce(state.language === "th" ? "บันทึกฉบับเนื้อหาแล้ว" : "Task revision saved");
+      return true;
+    } catch (error) {
+      announce(
+        error instanceof Error ? error.message : "Task revision could not be saved",
+      );
+      return false;
     }
   };
   const submitRequest = async (request: Request) => {
@@ -1436,6 +1567,38 @@ export function PrCenterApp({
       );
     } catch (error) {
       announce(error instanceof Error ? error.message : "Request could not be submitted");
+    }
+  };
+  const withdrawRequest = async (request: Request) => {
+    if (!request.version) return announce("Refresh this request before withdrawing.");
+    if (
+      !window.confirm(
+        state.language === "th"
+          ? "ยืนยันถอนคำขอนี้หรือไม่ งานร่างที่เกี่ยวข้องจะถูกยกเลิก"
+          : "Withdraw this request? Its draft tasks will be cancelled.",
+      )
+    )
+      return;
+    try {
+      const response = await fetch(`/api/pr-center/requests/${request.id}/transitions`, {
+        method: "POST",
+        credentials: "same-origin",
+        headers: {
+          "Content-Type": "application/json",
+          "If-Match": String(request.version),
+        },
+        body: JSON.stringify({ to: "WITHDRAWN" }),
+      });
+      if (!response.ok) {
+        const result = (await response.json().catch(() => null)) as {
+          message?: string;
+        } | null;
+        throw new Error(result?.message || "Request could not be withdrawn");
+      }
+      await refreshRequests();
+      announce(state.language === "th" ? "ถอนคำขอแล้ว" : "Request withdrawn");
+    } catch (error) {
+      announce(error instanceof Error ? error.message : "Request could not be withdrawn");
     }
   };
   const transitionTask = async (taskId: string, nextStatus: StatusId) => {
@@ -1490,24 +1653,43 @@ export function PrCenterApp({
             )
             ?.trim() || "";
     if (decision !== "APPROVED" && !comment) return;
-    const response = await fetch(`/api/pr-center/tasks/${taskId}/approvals`, {
-      method: "POST",
-      credentials: "same-origin",
-      headers: { "Content-Type": "application/json", "If-Match": String(task.version) },
-      body: JSON.stringify({ decision, ...(comment ? { comment } : {}) }),
-    });
-    if (!response.ok) {
-      const result = await response.json().catch(() => null);
-      return announce(
-        typeof result?.message === "string"
-          ? result.message
-          : state.language === "th"
-            ? "บันทึกผลอนุมัติไม่สำเร็จ"
-            : "Approval decision failed",
+    try {
+      const response = await fetch(`/api/pr-center/tasks/${taskId}/approvals`, {
+        method: "POST",
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/json", "If-Match": String(task.version) },
+        body: JSON.stringify({ decision, ...(comment ? { comment } : {}) }),
+      });
+      if (!response.ok) {
+        const result = (await response.json().catch(() => null)) as {
+          message?: string;
+        } | null;
+        throw new Error(result?.message || "Approval decision failed");
+      }
+      setApprovalTasks((previous) => previous.filter((item) => item.id !== taskId));
+      announce(
+        state.language === "th" ? "บันทึกผลอนุมัติแล้ว" : "Approval decision saved",
       );
+      await refreshRequests();
+      try {
+        const queueResponse = await fetch("/api/pr-center/approvals", {
+          credentials: "same-origin",
+          cache: "no-store",
+        });
+        if (queueResponse.ok) {
+          const nextTasks = (await queueResponse.json()) as TaskApprovalRecord[];
+          setApprovalTasks(nextTasks.map(mapTaskApprovalRecord));
+        }
+      } catch {
+        announce(
+          state.language === "th"
+            ? "บันทึกผลแล้ว แต่รีเฟรชคิวไม่สำเร็จ กรุณาเปิดคิวอีกครั้ง"
+            : "Decision saved, but the queue could not refresh. Reopen the queue.",
+        );
+      }
+    } catch (error) {
+      announce(error instanceof Error ? error.message : "Approval decision failed");
     }
-    setApprovalTasks((previous) => previous.filter((item) => item.id !== taskId));
-    announce("Approval decision saved");
   };
   const recordRequestDecision = async (
     requestId: string,
@@ -1554,8 +1736,14 @@ export function PrCenterApp({
             ? { ...item, status: updated.status, version: updated.version }
             : item,
         ),
+        tasks: previous.tasks.map((task) =>
+          task.requestId === requestId
+            ? { ...task, requestStatus: updated.status }
+            : task,
+        ),
       }));
-      await refreshNotifications();
+      if (decision === "APPROVED") await refreshRequests();
+      await refreshNotifications().catch(() => undefined);
       announce(
         decision === "APPROVED"
           ? state.language === "th"
@@ -1569,97 +1757,139 @@ export function PrCenterApp({
       announce(error instanceof Error ? error.message : "Request decision failed");
     }
   };
-  const scheduleTask = async (taskId: string, channel: string, scheduledFor: string) => {
+  const scheduleTask = async (
+    taskId: string,
+    channel: string,
+    scheduledFor: string,
+  ): Promise<boolean> => {
     const task = state.tasks.find((item) => item.id === taskId);
-    if (!task) return;
-    const response = await fetch(`/api/pr-center/tasks/${taskId}/schedule`, {
-      method: "POST",
-      credentials: "same-origin",
-      headers: {
-        "Content-Type": "application/json",
-        "If-Match": String(task.version ?? 0),
-      },
-      body: JSON.stringify({
-        channel,
-        scheduledFor,
-        idempotencyKey: `schedule:${taskId}:${channel}:${scheduledFor}`,
-      }),
-    });
-    if (!response.ok)
-      return announce("Scheduling failed. Complete the publication gate first.");
-    setState((previous) => ({
-      ...previous,
-      tasks: previous.tasks.map((item) =>
-        item.id === taskId
-          ? { ...item, status: "scheduled", version: (item.version || 0) + 1 }
-          : item,
-      ),
-    }));
-    announce("Task scheduled");
+    if (!task) return false;
+    try {
+      const response = await fetch(`/api/pr-center/tasks/${taskId}/schedule`, {
+        method: "POST",
+        credentials: "same-origin",
+        headers: {
+          "Content-Type": "application/json",
+          "If-Match": String(task.version ?? 0),
+        },
+        body: JSON.stringify({
+          channel,
+          scheduledFor,
+          idempotencyKey: `schedule:${taskId}:${channel}:${scheduledFor}`,
+        }),
+      });
+      if (!response.ok) {
+        const result = (await response.json().catch(() => null)) as {
+          message?: string;
+        } | null;
+        throw new Error(
+          result?.message || "Scheduling failed. Complete the publication gate first.",
+        );
+      }
+      const scheduled = (await response.json()) as { taskVersion: number };
+      setState((previous) => ({
+        ...previous,
+        tasks: previous.tasks.map((item) =>
+          item.id === taskId
+            ? { ...item, status: "scheduled", version: scheduled.taskVersion }
+            : item,
+        ),
+      }));
+      announce(state.language === "th" ? "จัดตารางเผยแพร่แล้ว" : "Task scheduled");
+      return true;
+    } catch (error) {
+      announce(error instanceof Error ? error.message : "Scheduling failed");
+      return false;
+    }
   };
   const publishTask = async (
     taskId: string,
     channel: string,
     publishedUrl: string,
     publishedReference: string,
-  ) => {
+  ): Promise<boolean> => {
     const task = state.tasks.find((item) => item.id === taskId);
-    if (!task) return;
-    const response = await fetch(`/api/pr-center/tasks/${taskId}/publishing-evidence`, {
-      method: "POST",
-      credentials: "same-origin",
-      headers: {
-        "Content-Type": "application/json",
-        "If-Match": String(task.version ?? 0),
-      },
-      body: JSON.stringify({ publishedUrl, publishedReference, channel }),
-    });
-    if (!response.ok) return announce("Publishing evidence could not be saved");
-    setState((previous) => ({
-      ...previous,
-      tasks: previous.tasks.map((item) =>
-        item.id === taskId
-          ? {
-              ...item,
-              status: "published",
-              version: (item.version || 0) + (item.status === "scheduled" ? 1 : 0),
-            }
-          : item,
-      ),
-    }));
-    announce("Publishing evidence saved");
+    if (!task) return false;
+    try {
+      const response = await fetch(`/api/pr-center/tasks/${taskId}/publishing-evidence`, {
+        method: "POST",
+        credentials: "same-origin",
+        headers: {
+          "Content-Type": "application/json",
+          "If-Match": String(task.version ?? 0),
+        },
+        body: JSON.stringify({ publishedUrl, publishedReference, channel }),
+      });
+      if (!response.ok) {
+        const result = (await response.json().catch(() => null)) as {
+          message?: string;
+        } | null;
+        throw new Error(result?.message || "Publishing evidence could not be saved");
+      }
+      const published = (await response.json()) as { taskVersion: number };
+      setState((previous) => ({
+        ...previous,
+        tasks: previous.tasks.map((item) =>
+          item.id === taskId
+            ? { ...item, status: "published", version: published.taskVersion }
+            : item,
+        ),
+      }));
+      announce(
+        state.language === "th"
+          ? "บันทึกหลักฐานเผยแพร่แล้ว"
+          : "Publishing evidence saved",
+      );
+      return true;
+    } catch (error) {
+      announce(
+        error instanceof Error ? error.message : "Publishing evidence could not be saved",
+      );
+      return false;
+    }
   };
   const assignTask = async (taskId: string, ownerId: string, dueDate: string) => {
     const task = state.tasks.find((item) => item.id === taskId);
     if (!task) return;
-    const response = await fetch(`/api/pr-center/tasks/${taskId}`, {
-      method: "PATCH",
-      credentials: "same-origin",
-      headers: {
-        "Content-Type": "application/json",
-        "If-Match": String(task.version ?? 0),
-      },
-      body: JSON.stringify({ ownerId: ownerId || null, dueAt: dueDate || null }),
-    });
-    if (!response.ok) return announce("Task assignment failed");
-    const updated = (await response.json()) as {
-      ownerId: string | null;
-      dueAt: string | null;
-      version: number;
-    };
-    setState((previous) => ({
-      ...previous,
-      tasks: previous.tasks.map((item) =>
-        item.id === taskId
-          ? {
-              ...item,
-              ownerId: updated.ownerId || "",
-              dueDate: updated.dueAt?.slice(0, 10) || "",
-              version: updated.version,
-            }
-          : item,
-      ),
-    }));
+    try {
+      const response = await fetch(`/api/pr-center/tasks/${taskId}`, {
+        method: "PATCH",
+        credentials: "same-origin",
+        headers: {
+          "Content-Type": "application/json",
+          "If-Match": String(task.version ?? 0),
+        },
+        body: JSON.stringify({ ownerId: ownerId || null, dueAt: dueDate || null }),
+      });
+      if (!response.ok) {
+        const result = (await response.json().catch(() => null)) as {
+          message?: string;
+        } | null;
+        throw new Error(result?.message || "Task assignment failed");
+      }
+      const updated = (await response.json()) as {
+        ownerId: string | null;
+        owner: { displayName: string } | null;
+        dueAt: string | null;
+        version: number;
+      };
+      setState((previous) => ({
+        ...previous,
+        tasks: previous.tasks.map((item) =>
+          item.id === taskId
+            ? {
+                ...item,
+                ownerId: updated.ownerId || "",
+                ownerName: updated.owner?.displayName,
+                dueDate: updated.dueAt?.slice(0, 10) || "",
+                version: updated.version,
+              }
+            : item,
+        ),
+      }));
+    } catch (error) {
+      announce(error instanceof Error ? error.message : "Task assignment failed");
+    }
   };
   const createIdea = async (input: CreateContentIdeaInput): Promise<boolean> => {
     try {
@@ -1915,42 +2145,6 @@ export function PrCenterApp({
     }));
   };
 
-  const resetData = () => {
-    if (!window.confirm("Reset all PR Center demo data?")) return;
-    setState(cloneDefaultState());
-    setPage("home");
-    announce("System data reset");
-  };
-  const importData = (file: File) => {
-    const reader = new FileReader();
-    reader.onload = () => {
-      try {
-        const parsed: unknown = JSON.parse(String(reader.result));
-        if (!isPrCenterState(parsed)) throw new Error("invalid");
-        setState({
-          ...cloneDefaultState(),
-          ...parsed,
-          ideas: (parsed as PrCenterState).ideas ?? cloneDefaultState().ideas,
-          messageHouse: {
-            ...cloneDefaultState().messageHouse,
-            ...(parsed as Partial<PrCenterState>).messageHouse,
-            pillarByTask: {
-              ...cloneDefaultState().messageHouse.pillarByTask,
-              ...(parsed as Partial<PrCenterState>).messageHouse?.pillarByTask,
-            },
-          },
-          masterData:
-            (parsed as PrCenterState).masterData ?? cloneDefaultState().masterData,
-          snapshots: (parsed as PrCenterState).snapshots ?? [],
-        });
-        announce("System data imported");
-      } catch {
-        announce("Import file is not valid PR Center data");
-      }
-    };
-    reader.readAsText(file);
-  };
-
   return (
     <div className={styles.app}>
       <aside
@@ -1988,9 +2182,13 @@ export function PrCenterApp({
           ))}
         </nav>
         <div className={styles.sidebarFooter}>
-          <b>Prototype workspace</b>
-          <br />
-          V25.1 UI only
+          <b>{actor ? "Authenticated workspace" : "Prototype workspace"}</b>
+          {!actor && (
+            <>
+              <br />
+              V25.1 UI only
+            </>
+          )}
         </div>
       </aside>
 
@@ -2020,7 +2218,7 @@ export function PrCenterApp({
             <input placeholder={t.search} />
           </label>
           <div className={styles.topActions}>
-            {(actor?.role === "REQUESTER" || actor?.role === "SCOPED_ADMINISTRATOR") && (
+            {hasUiRole("requester", "admin") && (
               <button className={styles.topRequest} onClick={openRequest}>
                 + {t.newRequest}
               </button>
@@ -2053,45 +2251,53 @@ export function PrCenterApp({
               <span>{currentUser.name.slice(0, 2)}</span>
               <i>{currentUser.role}</i>
             </button>
+            {onSignOut && (
+              <button className={styles.signOut} type="button" onClick={onSignOut}>
+                {state.language === "th" ? "ออกจากระบบ" : "Sign out"}
+              </button>
+            )}
           </div>
         </header>
 
         <main className={styles.main}>
-          <div className={styles.prototype}>{t.prototype}</div>
+          {!actor && <div className={styles.prototype}>{t.prototype}</div>}
           {page === "home" && (
             <Dashboard
               t={t}
+              language={state.language}
               onNavigate={go}
               onOpenRequest={openRequest}
-              canCreateRequest={
-                actor?.role === "REQUESTER" || actor?.role === "SCOPED_ADMINISTRATOR"
-              }
+              canCreateRequest={hasUiRole("requester", "admin")}
+              currentUserName={currentUser.name}
+              currentUserRole={currentUser.role}
+              canManageReleaseEvidence={hasUiRole("admin")}
+              requestsUnavailable={requestsUnavailable}
               requests={state.requests}
               tasks={state.tasks}
+              loading={loadingRequests}
             />
           )}
           {page === "executive" && (
             <ExecutiveDashboard
               t={t}
+              language={state.language}
               onNavigate={go}
               tasks={state.tasks}
               requests={state.requests}
             />
           )}
-          {page === "new-request" &&
-            (actor?.role === "REQUESTER" || actor?.role === "SCOPED_ADMINISTRATOR") && (
-              <NewRequest t={t} onOpenRequest={openRequest} />
-            )}
+          {page === "new-request" && hasUiRole("requester", "admin") && (
+            <NewRequest t={t} onOpenRequest={openRequest} />
+          )}
           {page === "my-requests" && (
             <Requests
               t={t}
               onOpenRequest={openRequest}
               onEditRequest={editRequest}
               onSubmitRequest={submitRequest}
+              onWithdrawRequest={withdrawRequest}
               mode="mine"
-              canCreate={
-                actor?.role === "REQUESTER" || actor?.role === "SCOPED_ADMINISTRATOR"
-              }
+              canCreate={hasUiRole("requester", "admin")}
               requests={state.requests}
               tasks={state.tasks}
               currentUserId={currentUser.id}
@@ -2108,6 +2314,7 @@ export function PrCenterApp({
               onOpenRequest={openRequest}
               onEditRequest={editRequest}
               onSubmitRequest={submitRequest}
+              onWithdrawRequest={withdrawRequest}
               mode="all"
               canCreate={false}
               requests={state.requests}
@@ -2123,10 +2330,22 @@ export function PrCenterApp({
           {page === "operations" && (
             <Operations
               tasks={state.tasks}
+              language={state.language}
               onTransition={transitionTask}
               onAssign={assignTask}
               onSchedule={scheduleTask}
               onPublish={publishTask}
+              onCreateRevision={createTaskRevision}
+              canManageTasks={hasUiRole("pr", "admin")}
+              onFinalAssetAssigned={(taskId, fileId) =>
+                setState((previous) => ({
+                  ...previous,
+                  tasks: previous.tasks.map((task) =>
+                    task.id === taskId ? { ...task, finalAssetId: fileId } : task,
+                  ),
+                }))
+              }
+              canViewPublishing={hasUiRole("pr", "admin")}
             />
           )}
           {page === "calendar" && <Calendar language={state.language} />}
@@ -2134,14 +2353,13 @@ export function PrCenterApp({
             <Approvals
               tasks={approvalTasks}
               requests={approvalRequests}
-              role={currentUser.role}
+              canDecideRequests={hasUiRole("pr")}
+              canDecideTasks={hasUiRole("approver", "pr", "admin")}
               onDecision={recordApproval}
               onRequestDecision={recordRequestDecision}
             />
           )}
-          {page === "library" && (
-            <Library tasks={state.tasks} language={state.language} onNavigate={go} />
-          )}
+          {page === "library" && <Library language={state.language} />}
           {page === "ideas" && (
             <Ideas
               ideas={ideasOwnerId === actor?.userId ? state.ideas : []}
@@ -2225,19 +2443,32 @@ export function PrCenterApp({
 
 function Dashboard({
   t,
+  language,
   onNavigate,
   onOpenRequest,
   canCreateRequest,
+  currentUserName,
+  currentUserRole,
+  canManageReleaseEvidence,
+  requestsUnavailable,
+  loading,
   requests: requestItems,
   tasks: taskItems,
 }: {
   t: (typeof copy)[Language];
+  language: Language;
   onNavigate: (page: Page) => void;
   onOpenRequest: () => void;
   canCreateRequest: boolean;
+  currentUserName: string;
+  currentUserRole: Role;
+  canManageReleaseEvidence: boolean;
+  requestsUnavailable: boolean;
+  loading: boolean;
   requests: Request[];
   tasks: Task[];
 }) {
+  const thai = language === "th";
   const published = taskItems.filter((task) =>
     ["published", "closed"].includes(task.status),
   ).length;
@@ -2262,8 +2493,11 @@ function Dashboard({
     ).length,
     approval: pending,
   };
-  const reach = published * 6700;
-  const engagement = Math.round(reach * 0.076);
+  const metricsUnavailable = unavailableMetricDisplay(language);
+  const currentMonth = new Intl.DateTimeFormat(
+    language === "th" ? "th-TH-u-ca-buddhist" : "en-GB",
+    { month: "long", year: "numeric" },
+  ).format(new Date());
   const requestRows = requestItems.map((request) => [
     request.id,
     request.title,
@@ -2274,11 +2508,13 @@ function Dashboard({
     <>
       <section className={styles.hero}>
         <div className={styles.heroCopy}>
-          <p>{t.role}: PR Lead</p>
+          <p>
+            {currentUserName} · {currentUserRole}
+          </p>
           <h1>{t.greeting}</h1>
           <span>{t.subheading}</span>
           <div className={styles.heroChips}>
-            <b>September 2569</b>
+            <b>{currentMonth}</b>
             <b>{published} published items</b>
             <b>{pending} approvals pending</b>
           </div>
@@ -2302,15 +2538,15 @@ function Dashboard({
           tone="blue"
         />
         <Metric
-          value={`${(reach / 1000).toFixed(1)}K`}
+          value={metricsUnavailable.value}
           label={t.reach}
-          trend="Estimated from published items"
+          trend={metricsUnavailable.trend}
           tone="green"
         />
         <Metric
-          value={`${(engagement / 1000).toFixed(1)}K`}
+          value={metricsUnavailable.value}
           label={t.engagement}
-          trend="7.6% engagement rate"
+          trend={metricsUnavailable.trend}
           tone="purple"
         />
         <Metric
@@ -2337,6 +2573,10 @@ function Dashboard({
           </button>
         ))}
       </section>
+      <ProductionReadiness
+        language={language}
+        canManageEvidence={canManageReleaseEvidence}
+      />
       <section className={styles.dashboardGrid}>
         <article className={`${styles.card} ${styles.wideCard}`}>
           <header>
@@ -2369,26 +2609,17 @@ function Dashboard({
           <header>
             <div>
               <p className={styles.eyebrow}>{t.upcoming}</p>
-              <h2>September 2569</h2>
+              <h2>{currentMonth}</h2>
             </div>
+            <button type="button" onClick={() => onNavigate("calendar")}>
+              {thai ? "เปิดปฏิทิน" : "Open calendar"}
+            </button>
           </header>
-          <ol className={styles.timeline}>
-            <li>
-              <b>08 Sep</b>
-              <span>Rail standard announcement</span>
-              <Status>Scheduled</Status>
-            </li>
-            <li>
-              <b>11 Sep</b>
-              <span>AI Camera project update</span>
-              <Status>In review</Status>
-            </li>
-            <li>
-              <b>16 Sep</b>
-              <span>Safety journey video</span>
-              <Status>In production</Status>
-            </li>
-          </ol>
+          <p className={styles.dashboardNote}>
+            {thai
+              ? "เปิดปฏิทินเพื่อดูรายการกำหนดการและสถานะที่โหลดจากระบบ ไม่มีการแสดงรายการตัวอย่าง"
+              : "Open the calendar to view schedules and statuses loaded from the system. No sample entries are shown."}
+          </p>
         </article>
         <article className={`${styles.card} ${styles.wideCard}`}>
           <header>
@@ -2398,39 +2629,509 @@ function Dashboard({
             </div>
             <button onClick={() => onNavigate("requests")}>{t.viewAll}</button>
           </header>
-          <Table
-            rows={requestRows}
-            headers={["ID", "Project", "Status", "Target date"]}
-          />
+          {loading ? (
+            <p className={styles.dashboardNote} role="status">
+              {thai ? "กำลังโหลดคำขอจากระบบ…" : "Loading requests from the system…"}
+            </p>
+          ) : requestsUnavailable ? (
+            <p className={styles.dashboardNote} role="alert">
+              {thai
+                ? "โหลดคำขอไม่สำเร็จ กรุณาเปิดคำขอของฉันเพื่อลองอีกครั้ง"
+                : "Requests could not be loaded. Open My Requests to retry."}{" "}
+              <button type="button" onClick={() => onNavigate("my-requests")}>
+                {thai ? "เปิดคำขอของฉัน" : "Open My Requests"}
+              </button>
+            </p>
+          ) : requestRows.length ? (
+            <Table
+              rows={requestRows}
+              headers={["ID", "Project", "Status", "Target date"]}
+            />
+          ) : (
+            <p className={styles.dashboardNote}>
+              {thai
+                ? "ยังไม่มีคำขอในขอบเขตที่คุณเข้าถึงได้"
+                : "No requests are available in your access scope."}
+            </p>
+          )}
         </article>
         <article className={styles.card}>
           <header>
             <div>
-              <p className={styles.eyebrow}>CHANNEL MIX</p>
-              <h2>Published content</h2>
+              <p className={styles.eyebrow}>{thai ? "ข้อมูลวิเคราะห์" : "ANALYTICS"}</p>
+              <h2>{thai ? "ผลการเข้าถึงเนื้อหา" : "Content performance"}</h2>
             </div>
           </header>
-          <div className={styles.donut}>
-            <b>{published}</b>
-            <span>items</span>
-          </div>
-          <div className={styles.legend}>
-            <span>
-              <i className={styles.blueDot} />
-              Facebook 39%
-            </span>
-            <span>
-              <i className={styles.tealDot} />
-              Website 27%
-            </span>
-            <span>
-              <i className={styles.amberDot} />
-              Video 18%
-            </span>
-          </div>
+          <p className={styles.dashboardNote}>
+            {thai
+              ? "ยังไม่มีแหล่งข้อมูล analytics จริงที่ยืนยันแล้ว จึงไม่แสดงสัดส่วนช่องทางหรือค่าประมาณ Reach/Engagement"
+              : "No verified analytics source is connected. Channel shares and estimated Reach/Engagement are not shown."}
+          </p>
         </article>
       </section>
     </>
+  );
+}
+
+function ProductionReadiness({
+  language,
+  canManageEvidence,
+}: {
+  language: Language;
+  canManageEvidence: boolean;
+}) {
+  const thai = language === "th";
+  const productionGates = thai
+    ? [
+        [
+          "UAT ด้วยบัญชีจริงและผู้รับผิดชอบลงนาม",
+          "ทดสอบ role/scope ทั้งหน้าเว็บและ API ครอบคลุม submit, อนุมัติ/ปฏิเสธ, schedule, หลักฐานเผยแพร่, ไฟล์/สแกนไวรัส และประวัติ พร้อมเก็บผลทดสอบและผู้รับรอง",
+        ],
+        [
+          "ยืนยันและตั้งค่า Approval Policy",
+          "กำหนด stage, scope และเงื่อนไขอนุมัติระดับ task ให้ชัดเจน ระบบต้อง fail-closed เมื่อ policy ไม่ครบ แยกจาก policy อนุมัติ request intake ที่กำหนดไว้แล้ว",
+        ],
+        [
+          "พิสูจน์การแจ้งเตือนภายนอก",
+          "หากยังต้องการ email ตามแผน ให้ตั้งค่า SMTP/worker และทดสอบการส่งถึงผู้รับจริง สถานะ queued หรือ in-app notification ไม่ใช่หลักฐานการส่ง email",
+        ],
+        [
+          "ทดสอบกู้คืนจาก backup จริง",
+          "กู้คืนทั้งฐานข้อมูลและไฟล์ส่วนตัวในสภาพแวดล้อมทดสอบ และบันทึกผลการกู้คืน ไม่ใช่เพียงตรวจว่าไฟล์ backup อ่านได้",
+        ],
+        [
+          "ปิด Security/Release sign-off",
+          "แนบผลทดสอบสิทธิ์ที่อนุญาต/ปฏิเสธ, session และการเพิกถอนสิทธิ์ พร้อมการลงนามจากผู้มีอำนาจอนุมัติ go-live",
+        ],
+      ]
+    : [
+        [
+          "Authenticated UAT and owner sign-off",
+          "Test roles and scopes in the UI and API: submit, approve/reject, schedule, publication evidence, files/malware scanning, and activity history. Retain test results and named sign-off.",
+        ],
+        [
+          "Confirm and configure Approval Policy",
+          "Define task-level stages, scopes, and conditions. The system must fail closed while policy is incomplete. This is separate from the already-defined request-intake approval policy.",
+        ],
+        [
+          "Prove external notifications",
+          "If email remains in scope, configure SMTP/the worker and verify delivery to real recipients. Queued status or in-app notification does not prove email delivery.",
+        ],
+        [
+          "Test a real backup restore",
+          "Restore both the database and private files in a test environment and retain results; checking that a backup file is readable is insufficient.",
+        ],
+        [
+          "Complete Security/Release sign-off",
+          "Attach allowed/denied authorization, session, and access-revocation test results, plus go-live approval from an authorized owner.",
+        ],
+      ];
+
+  return (
+    <section className={styles.readiness} aria-labelledby="production-readiness-title">
+      <header className={styles.readinessHeader}>
+        <div>
+          <p className={styles.eyebrow}>{thai ? "RELEASE GATES" : "RELEASE GATES"}</p>
+          <h2 id="production-readiness-title">
+            {thai ? "งานที่ยังต้องปิดก่อน Production" : "Open items before Production"}
+          </h2>
+          <p>
+            {thai
+              ? "รายการติดตามแบบอ่านอย่างเดียว ยังไม่มีการยืนยันว่าผ่านจนกว่าจะมีหลักฐานและผู้รับรอง"
+              : "Read-only tracking. Items are not considered complete until evidence and owner sign-off are recorded."}
+          </p>
+        </div>
+        <span className={styles.readinessStatus}>
+          {thai ? "รอหลักฐาน / การยืนยัน" : "Evidence / confirmation pending"}
+        </span>
+      </header>
+
+      <div className={styles.readinessColumns}>
+        <article className={styles.readinessPanel}>
+          <h3>{thai ? "ก่อน Production" : "Before Production"}</h3>
+          <ol className={styles.readinessList}>
+            {productionGates.map(([title, detail]) => (
+              <li key={title}>
+                <b>{title}</b>
+                <p>{detail}</p>
+              </li>
+            ))}
+          </ol>
+        </article>
+
+        <article className={styles.readinessPanel}>
+          <h3>{thai ? "Phase 2" : "Phase 2"}</h3>
+          <ul className={styles.readinessList}>
+            <li>
+              <b>{thai ? "สิ่งที่อยู่ใน scope ปัจจุบัน" : "In current scope"}</b>
+              <p>
+                {thai
+                  ? "ฟังก์ชันที่เปิดใช้ต้องผ่าน authenticated role/scope UAT และมีหลักฐานรับรองก่อนใช้งานจริง"
+                  : "Enabled functions require authenticated role/scope UAT and signed evidence before release."}
+              </p>
+            </li>
+            <li>
+              <b>
+                {thai
+                  ? "รายการขั้นสูง — blocker เมื่อรวมใน scope เท่านั้น"
+                  : "Advanced items — blockers only if brought into scope"}
+              </b>
+              <p>
+                {thai
+                  ? "workflow เขียน/อนุมัติ Message House, policy แก้ไข/จัดการรายการซ้ำ/export ของ Content Ideas และคลัง final asset แบบเต็ม"
+                  : "Message House authoring/approval workflow; Content Ideas edit, duplicate-management and export policy; and a full final-asset library."}
+              </p>
+            </li>
+            <li>
+              <b>
+                {thai ? "พักไว้ตาม scope ที่บันทึก" : "Deferred in the recorded scope"}
+              </b>
+              <p>
+                {thai
+                  ? "How to Use, กฎวันหยุดใน Calendar และการขยาย Directory/Access/System Data ยังไม่จำเป็นต้องทำในรอบนี้"
+                  : "How to Use, Calendar holiday rules, and expanded Directory/Access/System Data are not required in this scope."}
+              </p>
+            </li>
+          </ul>
+        </article>
+
+        <article className={styles.readinessPanel}>
+          <h3>{thai ? "Phase 3" : "Phase 3"}</h3>
+          <ul className={styles.readinessList}>
+            <li>
+              <b>{thai ? "Content Operations" : "Content Operations"}</b>
+              <p>
+                {thai
+                  ? "มุมมองอ่านอย่างเดียวต้องอยู่บนเว็บทดสอบและผ่าน UAT บนเว็บก่อนนับว่าส่งมอบ Phase 3"
+                  : "The read-only view must be available on the test website and pass web UAT before Phase 3 is considered delivered."}
+              </p>
+            </li>
+            <li>
+              <b>
+                {thai
+                  ? "ช่องทางเผยแพร่และ analytics"
+                  : "Publishing channels and analytics"}
+              </b>
+              <p>
+                {thai
+                  ? "ต้องเลือกช่องทางและเจ้าของช่องทาง อนุมัติวิธีจัดการ credentials, runbook และ UAT; analytics ต้องใช้แหล่งข้อมูลจริงที่อนุมัติ พร้อมทดสอบความถูกต้องและความสด"
+                  : "Select channels and owners; approve credential handling, runbook, and UAT. Analytics requires an approved real data source plus accuracy and freshness checks."}
+              </p>
+            </li>
+            <li>
+              <b>{thai ? "Reach / Engagement" : "Reach / Engagement"}</b>
+              <p>
+                {thai
+                  ? "หากยังไม่มีแหล่งข้อมูลจริงที่อนุมัติ ให้แสดงว่าไม่มีข้อมูลยืนยัน"
+                  : "Show no verified data until an approved real analytics source is connected."}
+              </p>
+            </li>
+          </ul>
+        </article>
+      </div>
+      {canManageEvidence && <ReleaseEvidenceManager language={language} />}
+    </section>
+  );
+}
+
+type ReleaseEvidenceRecord = {
+  id: string;
+  gateKey: ReleaseEvidenceGate;
+  result: "PASSED" | "FAILED";
+  evidenceReference: string;
+  notes: string | null;
+  performedAt: string;
+  signedAt: string;
+  signer: { displayName: string; email: string } | null;
+};
+
+function ReleaseEvidenceManager({ language }: { language: Language }) {
+  const thai = language === "th";
+  const [records, setRecords] = useState<ReleaseEvidenceRecord[]>([]);
+  const [checks, setChecks] = useState<
+    Array<{ name: string; passed: boolean; detail: string }>
+  >([]);
+  const [ready, setReady] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+  const [gateKey, setGateKey] = useState<ReleaseEvidenceGate>("AUTHENTICATED_UAT");
+  const [result, setResult] = useState<"PASSED" | "FAILED">("PASSED");
+  const [reference, setReference] = useState("");
+  const [notes, setNotes] = useState("");
+  const [performedAt, setPerformedAt] = useState(() => {
+    const now = new Date();
+    now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
+    return now.toISOString().slice(0, 16);
+  });
+
+  useEffect(() => {
+    let active = true;
+    Promise.all([
+      fetch("/api/pr-center/admin/release-evidence", {
+        credentials: "same-origin",
+        cache: "no-store",
+      }),
+      fetch("/api/pr-center/admin/release-readiness", {
+        credentials: "same-origin",
+        cache: "no-store",
+      }),
+    ])
+      .then(async ([evidenceResponse, readinessResponse]) => {
+        if (!evidenceResponse.ok || !readinessResponse.ok)
+          throw new Error("Unable to load release checks");
+        return Promise.all([evidenceResponse.json(), readinessResponse.json()]);
+      })
+      .then(([evidence, readiness]) => {
+        if (!active) return;
+        const result = readiness as { ready: boolean; checks: typeof checks };
+        setRecords(evidence as ReleaseEvidenceRecord[]);
+        setChecks(result.checks);
+        setReady(result.ready);
+      })
+      .catch(() => {
+        if (active)
+          setError(
+            thai
+              ? "โหลดผลตรวจและหลักฐาน Release ไม่สำเร็จ"
+              : "Unable to load release checks and evidence.",
+          );
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [thai]);
+
+  const refresh = useCallback(async () => {
+    setLoading(true);
+    setError("");
+    try {
+      const [evidenceResponse, readinessResponse] = await Promise.all([
+        fetch("/api/pr-center/admin/release-evidence", {
+          credentials: "same-origin",
+          cache: "no-store",
+        }),
+        fetch("/api/pr-center/admin/release-readiness", {
+          credentials: "same-origin",
+          cache: "no-store",
+        }),
+      ]);
+      if (!evidenceResponse.ok || !readinessResponse.ok)
+        throw new Error("Unable to load release checks");
+      const [evidence, readiness] = (await Promise.all([
+        evidenceResponse.json(),
+        readinessResponse.json(),
+      ])) as [ReleaseEvidenceRecord[], { ready: boolean; checks: typeof checks }];
+      setRecords(evidence);
+      setChecks(readiness.checks);
+      setReady(readiness.ready);
+    } catch {
+      setError(
+        thai
+          ? "โหลดผลตรวจและหลักฐาน Release ไม่สำเร็จ"
+          : "Unable to load release checks and evidence.",
+      );
+    } finally {
+      setLoading(false);
+    }
+  }, [thai]);
+
+  const latestByGate = new Map<ReleaseEvidenceGate, ReleaseEvidenceRecord>();
+  for (const record of records)
+    if (!latestByGate.has(record.gateKey)) latestByGate.set(record.gateKey, record);
+
+  const gateLabels: Record<ReleaseEvidenceGate, string> = {
+    AUTHENTICATED_UAT: thai
+      ? "UAT role/scope ด้วยบัญชีจริง"
+      : "Authenticated role/scope UAT",
+    BACKUP_RESTORE: thai ? "ทดสอบกู้คืน backup" : "Backup restore test",
+    SECURITY_UAT: thai ? "Security และ session UAT" : "Security and session UAT",
+    GO_LIVE_SIGNOFF: thai ? "ผู้มีอำนาจอนุมัติ go-live" : "Authorized go-live sign-off",
+  };
+
+  const submit = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (saving) return;
+    setSaving(true);
+    setError("");
+    try {
+      const response = await fetch("/api/pr-center/admin/release-evidence", {
+        method: "POST",
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          gateKey,
+          result,
+          evidenceReference: reference,
+          notes,
+          performedAt: new Date(performedAt).toISOString(),
+        }),
+      });
+      if (!response.ok) {
+        const body = (await response.json().catch(() => null)) as {
+          message?: string;
+        } | null;
+        throw new Error(body?.message || "Could not record evidence");
+      }
+      setReference("");
+      setNotes("");
+      await refresh();
+    } catch (caught) {
+      setError(
+        caught instanceof Error
+          ? caught.message
+          : thai
+            ? "บันทึกหลักฐานไม่สำเร็จ"
+            : "Unable to record evidence.",
+      );
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <section className={styles.releaseEvidence} aria-labelledby="release-evidence-title">
+      <header>
+        <div>
+          <p className={styles.eyebrow}>{thai ? "ADMIN SIGN-OFF" : "ADMIN SIGN-OFF"}</p>
+          <h3 id="release-evidence-title">
+            {thai ? "หลักฐานและผล Release Readiness" : "Release readiness evidence"}
+          </h3>
+        </div>
+        <b className={ready ? styles.releasePassed : styles.releaseBlocked}>
+          {loading ? (thai ? "กำลังตรวจ…" : "Checking…") : ready ? "READY" : "BLOCKED"}
+        </b>
+        <button type="button" onClick={() => void refresh()} disabled={loading || saving}>
+          {thai ? "รีเฟรชผลตรวจ" : "Refresh checks"}
+        </button>
+      </header>
+      <p className={styles.dashboardNote}>
+        {thai
+          ? "การบันทึกผูกกับบัญชีผู้ดูแลและเก็บเป็น audit record แบบเพิ่มรายการใหม่ ไม่แนบไฟล์หลักฐานในระบบนี้ ให้ใส่เลขอ้างอิงเอกสาร ห้ามใส่รหัสผ่าน token หรือ signed URL"
+          : "Each entry is signed with the administrator account and stored as an append-only audit record. Evidence files are not uploaded here; use a document reference, never a password, token, or signed URL."}
+      </p>
+      {error && (
+        <p role="alert" className={styles.releaseError}>
+          {error}
+        </p>
+      )}
+      {loading ? (
+        <p role="status">{thai ? "กำลังโหลดหลักฐาน…" : "Loading evidence…"}</p>
+      ) : (
+        <div className={styles.releaseCheckList}>
+          {checks.map((check) => (
+            <article key={check.name}>
+              <b>
+                {check.passed ? "✓" : "•"} {check.name}
+              </b>
+              <p>{check.detail}</p>
+            </article>
+          ))}
+        </div>
+      )}
+      <div className={styles.releaseGateList}>
+        {RELEASE_EVIDENCE_GATES.map((gate) => {
+          const evidence = latestByGate.get(gate);
+          return (
+            <p key={gate}>
+              <b>{gateLabels[gate]}</b>
+              <span
+                className={
+                  evidence?.result === "PASSED"
+                    ? styles.releasePassed
+                    : styles.releaseBlocked
+                }
+              >
+                {evidence?.result === "PASSED"
+                  ? thai
+                    ? "ผ่าน"
+                    : "Passed"
+                  : evidence?.result === "FAILED"
+                    ? thai
+                      ? "ไม่ผ่าน"
+                      : "Failed"
+                    : thai
+                      ? "รอหลักฐาน"
+                      : "Evidence pending"}
+              </span>
+              {evidence && (
+                <small>
+                  {evidence.signer?.displayName || evidence.signer?.email || "—"} ·{" "}
+                  {evidence.evidenceReference}
+                </small>
+              )}
+            </p>
+          );
+        })}
+      </div>
+      <form className={styles.releaseEvidenceForm} onSubmit={submit}>
+        <label>
+          {thai ? "หัวข้อหลักฐาน" : "Evidence gate"}
+          <select
+            value={gateKey}
+            onChange={(event) => setGateKey(event.target.value as ReleaseEvidenceGate)}
+          >
+            {RELEASE_EVIDENCE_GATES.map((gate) => (
+              <option value={gate} key={gate}>
+                {gateLabels[gate]}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label>
+          {thai ? "ผลทดสอบ" : "Result"}
+          <select
+            value={result}
+            onChange={(event) => setResult(event.target.value as "PASSED" | "FAILED")}
+          >
+            <option value="PASSED">{thai ? "ผ่าน" : "Passed"}</option>
+            <option value="FAILED">{thai ? "ไม่ผ่าน" : "Failed"}</option>
+          </select>
+        </label>
+        <label>
+          {thai ? "วันที่ทดสอบ/อนุมัติ" : "Test / approval date"}
+          <input
+            type="datetime-local"
+            value={performedAt}
+            onChange={(event) => setPerformedAt(event.target.value)}
+            required
+          />
+        </label>
+        <label className={styles.releaseEvidenceFull}>
+          {thai ? "เลขอ้างอิงเอกสารหลักฐาน" : "Evidence document reference"}
+          <input
+            value={reference}
+            onChange={(event) => setReference(event.target.value)}
+            minLength={3}
+            maxLength={800}
+            required
+          />
+        </label>
+        <label className={styles.releaseEvidenceFull}>
+          {thai
+            ? "รายละเอียด role/action หรือผลการ restore"
+            : "Role/actions tested or restore details"}
+          <textarea
+            value={notes}
+            onChange={(event) => setNotes(event.target.value)}
+            maxLength={2000}
+            rows={3}
+          />
+        </label>
+        <button className={styles.primary} type="submit" disabled={saving || loading}>
+          {saving
+            ? thai
+              ? "กำลังบันทึก…"
+              : "Saving…"
+            : thai
+              ? "ลงนามและบันทึกหลักฐาน"
+              : "Sign and record evidence"}
+        </button>
+      </form>
+    </section>
   );
 }
 
@@ -2479,11 +3180,13 @@ function Table({ headers, rows }: { headers: string[]; rows: string[][] }) {
 }
 function ExecutiveDashboard({
   t,
+  language,
   onNavigate,
   tasks,
   requests,
 }: {
   t: (typeof copy)[Language];
+  language: Language;
   onNavigate: (page: Page) => void;
   tasks: Task[];
   requests: Request[];
@@ -2498,8 +3201,7 @@ function ExecutiveDashboard({
     ["approved", "scheduled"].includes(task.status),
   ).length;
   const onTime = tasks.filter((task) => task.dueDate >= "2026-09-07").length;
-  const reach = published * 6700;
-  const engagement = Math.round(reach * 0.076);
+  const metricsUnavailable = unavailableMetricDisplay(language);
   return (
     <>
       <SectionHeading eyebrow="EXECUTIVE OVERVIEW" title="Executive Dashboard" />
@@ -2511,15 +3213,15 @@ function ExecutiveDashboard({
           tone="blue"
         />
         <Metric
-          value={`${(reach / 1000).toFixed(1)}K`}
+          value={metricsUnavailable.value}
           label={t.reach}
-          trend="Estimated from published items"
+          trend={metricsUnavailable.trend}
           tone="green"
         />
         <Metric
-          value={`${(engagement / 1000).toFixed(1)}K`}
+          value={metricsUnavailable.value}
           label={t.engagement}
-          trend="7.6% engagement rate"
+          trend={metricsUnavailable.trend}
           tone="purple"
         />
         <Metric
@@ -2586,6 +3288,7 @@ function Requests({
   onOpenRequest,
   onEditRequest,
   onSubmitRequest,
+  onWithdrawRequest,
   mode,
   canCreate,
   requests: requestItems,
@@ -2601,6 +3304,7 @@ function Requests({
   onOpenRequest: () => void;
   onEditRequest: (request: Request) => void;
   onSubmitRequest: (request: Request) => void;
+  onWithdrawRequest: (request: Request) => void;
   mode: "all" | "mine";
   canCreate: boolean;
   requests: Request[];
@@ -2711,7 +3415,12 @@ function Requests({
                   <td>
                     <button onClick={() => setSelectedId(request.id)}>Details</button>
                     {canEditOwnRequest(request, currentUserId) && (
-                      <button onClick={() => onEditRequest(request)}>Edit</button>
+                      <>
+                        <button onClick={() => onEditRequest(request)}>Edit</button>
+                        <button onClick={() => onWithdrawRequest(request)}>
+                          Withdraw
+                        </button>
+                      </>
                     )}
                   </td>
                 </tr>
@@ -2766,6 +3475,11 @@ function Requests({
                     Submit request
                   </button>
                 )}
+                {(selected.status === "DRAFT" || selected.status === "SUBMITTED") && (
+                  <button onClick={() => onWithdrawRequest(selected)}>
+                    Withdraw request
+                  </button>
+                )}
               </div>
             )}
           </section>
@@ -2776,23 +3490,38 @@ function Requests({
 }
 function Operations({
   tasks: taskItems,
+  language,
   onTransition,
   onAssign,
   onSchedule,
   onPublish,
+  onCreateRevision,
+  canManageTasks,
+  onFinalAssetAssigned,
+  canViewPublishing,
 }: {
   tasks: Task[];
+  language: Language;
   onTransition: (taskId: string, status: StatusId) => void;
   onAssign: (taskId: string, ownerId: string, dueDate: string) => Promise<void>;
-  onSchedule: (taskId: string, channel: string, scheduledFor: string) => Promise<void>;
+  onSchedule: (taskId: string, channel: string, scheduledFor: string) => Promise<boolean>;
   onPublish: (
     taskId: string,
     channel: string,
     publishedUrl: string,
     publishedReference: string,
-  ) => Promise<void>;
+  ) => Promise<boolean>;
+  onCreateRevision: (
+    taskId: string,
+    body: string,
+    keyMessage: string,
+    changeSummary: string,
+  ) => Promise<boolean>;
+  canManageTasks: boolean;
+  onFinalAssetAssigned: (taskId: string, fileId: string) => void;
+  canViewPublishing: boolean;
 }) {
-  const [view, setView] = useState<"board" | "table">("board");
+  const [view, setView] = useState<"board" | "table" | "publishing">("board");
   const [status, setStatus] = useState<"all" | StatusId>("all");
   const [ownerId, setOwnerId] = useState("all");
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -2802,6 +3531,10 @@ function Operations({
   const [scheduledFor, setScheduledFor] = useState("");
   const [publishedUrl, setPublishedUrl] = useState("");
   const [publishedReference, setPublishedReference] = useState("");
+  const [revisionBody, setRevisionBody] = useState("");
+  const [revisionKeyMessage, setRevisionKeyMessage] = useState("");
+  const [revisionSummary, setRevisionSummary] = useState("");
+  const [savingRevision, setSavingRevision] = useState(false);
   const [assigneeId, setAssigneeId] = useState("");
   const [assignableUsers, setAssignableUsers] = useState<
     { id: string; displayName: string; department?: { name: string } | null }[]
@@ -2912,37 +3645,58 @@ function Operations({
     <>
       <SectionHeading
         eyebrow="CONTENT OPERATIONS"
-        title="Production board"
+        title={
+          view === "publishing"
+            ? language === "th"
+              ? "สถานะการเผยแพร่"
+              : "Publishing status"
+            : "Production board"
+        }
         action={
           <div className={styles.segmented}>
-            <button onClick={() => setView("board")}>Board</button>
-            <button onClick={() => setView("table")}>Table</button>
+            <button aria-pressed={view === "board"} onClick={() => setView("board")}>
+              Board
+            </button>
+            <button aria-pressed={view === "table"} onClick={() => setView("table")}>
+              Table
+            </button>
+            {canViewPublishing && (
+              <button
+                aria-pressed={view === "publishing"}
+                onClick={() => setView("publishing")}
+              >
+                Publishing status
+              </button>
+            )}
           </div>
         }
       />
-      <section className={styles.filterBar}>
-        <select
-          value={status}
-          onChange={(event) => setStatus(event.target.value as "all" | StatusId)}
-        >
-          <option value="all">All statuses</option>
-          {Object.entries(STATUS_LABELS).map(([id, name]) => (
-            <option key={id} value={id}>
-              {name}
-            </option>
-          ))}
-        </select>
-        <select value={ownerId} onChange={(event) => setOwnerId(event.target.value)}>
-          <option value="all">All owners</option>
-          {users
-            .filter((user) => user.active)
-            .map((user) => (
-              <option key={user.id} value={user.id}>
-                {user.name}
+      {view !== "publishing" && (
+        <section className={styles.filterBar}>
+          <select
+            value={status}
+            onChange={(event) => setStatus(event.target.value as "all" | StatusId)}
+          >
+            <option value="all">All statuses</option>
+            {Object.entries(STATUS_LABELS).map(([id, name]) => (
+              <option key={id} value={id}>
+                {name}
               </option>
             ))}
-        </select>
-      </section>
+          </select>
+          <select value={ownerId} onChange={(event) => setOwnerId(event.target.value)}>
+            <option value="all">All owners</option>
+            {assignableUsers.map((user) => (
+              <option key={user.id} value={user.id}>
+                {user.displayName}
+              </option>
+            ))}
+          </select>
+        </section>
+      )}
+      {view === "publishing" && canViewPublishing && (
+        <PublishingOperations language={language} />
+      )}
       {view === "board" && (
         <div className={styles.board}>
           {columns.map(([column, statuses]) => (
@@ -2961,7 +3715,7 @@ function Operations({
                     <b>{task.title}</b>
                     <Status>{STATUS_LABELS[task.status]}</Status>
                     <footer>
-                      {getUser(task.ownerId)?.name ?? "Unassigned"}
+                      {getUser(task.ownerId)?.name ?? task.ownerName ?? "Unassigned"}
                       <span>{task.dueDate}</span>
                     </footer>
                     <button
@@ -2969,6 +3723,9 @@ function Operations({
                         setSelectedId(task.id);
                         setDueDate(task.dueDate);
                         setAssigneeId(task.ownerId);
+                        setRevisionBody(task.contentBody || "");
+                        setRevisionKeyMessage(task.keyMessage || "");
+                        setRevisionSummary("");
                       }}
                     >
                       Details
@@ -2988,16 +3745,91 @@ function Operations({
           />
         </article>
       )}
-      {selected && (
+      {selected && view !== "publishing" && (
         <article className={styles.card}>
           <p className={styles.eyebrow}>
             {selected.id} · due {selected.dueDate}
           </p>
           <h2>{selected.title}</h2>
+          <p>
+            {language === "th" ? "ฉบับเนื้อหา" : "Content revision"}:{" "}
+            {selected.revisionNumber ?? "—"}
+            {selected.keyMessage ? ` · ${selected.keyMessage}` : ""}
+          </p>
+          {canManageTasks &&
+            selected.requestStatus === "APPROVED" &&
+            ["in_production", "revision_required"].includes(selected.status) && (
+              <form
+                className={styles.taskRevisionForm}
+                onSubmit={async (event) => {
+                  event.preventDefault();
+                  if (savingRevision) return;
+                  setSavingRevision(true);
+                  const saved = await onCreateRevision(
+                    selected.id,
+                    revisionBody,
+                    revisionKeyMessage,
+                    revisionSummary,
+                  );
+                  if (saved) {
+                    setRevisionBody("");
+                    setRevisionSummary("");
+                  }
+                  setSavingRevision(false);
+                }}
+              >
+                <h3>
+                  {language === "th"
+                    ? "บันทึกฉบับเนื้อหาใหม่"
+                    : "Create content revision"}
+                </h3>
+                <label>
+                  {language === "th" ? "เนื้อหาฉบับที่จะส่งตรวจ" : "Content to review"}
+                  <textarea
+                    value={revisionBody}
+                    onChange={(event) => setRevisionBody(event.target.value)}
+                    maxLength={20000}
+                    rows={4}
+                    required
+                  />
+                </label>
+                <label>
+                  {language === "th" ? "Key Message" : "Key message"}
+                  <textarea
+                    value={revisionKeyMessage}
+                    onChange={(event) => setRevisionKeyMessage(event.target.value)}
+                    maxLength={2000}
+                    rows={2}
+                    required
+                  />
+                </label>
+                <label>
+                  {language === "th" ? "สรุปการเปลี่ยนแปลง" : "Change summary"}
+                  <input
+                    value={revisionSummary}
+                    onChange={(event) => setRevisionSummary(event.target.value)}
+                    maxLength={1000}
+                  />
+                </label>
+                <button
+                  className={styles.secondaryButton}
+                  type="submit"
+                  disabled={savingRevision}
+                >
+                  {savingRevision
+                    ? language === "th"
+                      ? "กำลังบันทึก…"
+                      : "Saving…"
+                    : language === "th"
+                      ? "บันทึกและส่งกลับเข้าสู่การผลิต"
+                      : "Save and return to production"}
+                </button>
+              </form>
+            )}
           <label>
             Assign to{" "}
             <select
-              value={assigneeId || selected.ownerId}
+              value={assigneeId}
               onChange={(event) => setAssigneeId(event.target.value)}
             >
               <option value="">Unassigned</option>
@@ -3013,19 +3845,11 @@ function Operations({
             Due date{" "}
             <input
               type="date"
-              value={dueDate || selected.dueDate}
+              value={dueDate}
               onChange={(event) => setDueDate(event.target.value)}
             />
           </label>
-          <button
-            onClick={() =>
-              onAssign(
-                selected.id,
-                assigneeId || selected.ownerId,
-                dueDate || selected.dueDate,
-              )
-            }
-          >
+          <button onClick={() => onAssign(selected.id, assigneeId, dueDate)}>
             Save assignment
           </button>
           {STATUS_TRANSITIONS[selected.status].filter(
@@ -3058,6 +3882,7 @@ function Operations({
                 <input
                   value={channel}
                   onChange={(event) => setChannel(event.target.value)}
+                  required
                 />
               </label>
               <label>
@@ -3066,14 +3891,16 @@ function Operations({
                   type="datetime-local"
                   value={scheduledFor}
                   onChange={(event) => setScheduledFor(event.target.value)}
+                  required
                 />
               </label>
               <button
                 onClick={async () => {
-                  await onSchedule(selected.id, channel, scheduledFor);
-                  await loadTaskSchedules(selected.id).catch(() =>
-                    setScheduleChoices([]),
-                  );
+                  const saved = await onSchedule(selected.id, channel, scheduledFor);
+                  if (saved)
+                    await loadTaskSchedules(selected.id).catch(() =>
+                      setScheduleChoices([]),
+                    );
                 }}
               >
                 Schedule channel
@@ -3103,6 +3930,7 @@ function Operations({
                     type="url"
                     value={publishedUrl}
                     onChange={(event) => setPublishedUrl(event.target.value)}
+                    required
                   />
                 </label>
                 <label>
@@ -3110,19 +3938,21 @@ function Operations({
                   <input
                     value={publishedReference}
                     onChange={(event) => setPublishedReference(event.target.value)}
+                    required
                   />
                 </label>
                 <button
                   onClick={async () => {
-                    await onPublish(
+                    const saved = await onPublish(
                       selected.id,
                       evidenceChannel,
                       publishedUrl,
                       publishedReference,
                     );
-                    await loadTaskSchedules(selected.id).catch(() =>
-                      setScheduleChoices([]),
-                    );
+                    if (saved)
+                      await loadTaskSchedules(selected.id).catch(() =>
+                        setScheduleChoices([]),
+                      );
                   }}
                 >
                   Record publishing evidence
@@ -3135,24 +3965,28 @@ function Operations({
             <form
               onSubmit={async (event) => {
                 event.preventDefault();
-                const response = await fetch(
-                  `/api/pr-center/tasks/${selected.id}/comments`,
-                  {
-                    method: "POST",
-                    credentials: "same-origin",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ body: commentBody }),
-                  },
-                );
-                if (!response.ok) {
-                  setActivityError("Unable to add comment");
-                  return;
+                try {
+                  const response = await fetch(
+                    `/api/pr-center/tasks/${selected.id}/comments`,
+                    {
+                      method: "POST",
+                      credentials: "same-origin",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({ body: commentBody }),
+                    },
+                  );
+                  if (!response.ok) {
+                    setActivityError("Unable to add comment");
+                    return;
+                  }
+                  setCommentBody("");
+                  setActivityError("");
+                  await loadTaskActivity(selected.id).catch(() =>
+                    setActivityError("Unable to reload task activity"),
+                  );
+                } catch {
+                  setActivityError("Unable to add or reload task comment");
                 }
-                setCommentBody("");
-                setActivityError("");
-                await loadTaskActivity(selected.id).catch(() =>
-                  setActivityError("Unable to reload task activity"),
-                );
               }}
             >
               <label>
@@ -3189,13 +4023,189 @@ function Operations({
               ))}
             </ul>
           </section>
-          <AttachmentPanel taskId={selected.id} />
+          <AttachmentPanel
+            taskId={selected.id}
+            taskVersion={selected.version ?? 0}
+            revisionNumber={selected.revisionNumber}
+            finalAssetId={selected.finalAssetId}
+            onFinalAssetAssigned={(fileId) => onFinalAssetAssigned(selected.id, fileId)}
+          />
         </article>
       )}
     </>
   );
 }
-function AttachmentPanel({ taskId }: { taskId: string }) {
+function PublishingOperations({ language }: { language: Language }) {
+  const [range] = useState(() => {
+    const from = new Date();
+    from.setUTCHours(0, 0, 0, 0);
+    from.setUTCDate(from.getUTCDate() - 14);
+    const to = new Date(from);
+    to.setUTCDate(to.getUTCDate() + 44);
+    return { from: from.toISOString(), to: to.toISOString() };
+  });
+  const [status, setStatus] = useState<"ALL" | "SCHEDULED" | "PUBLISHED">("ALL");
+  const [reload, setReload] = useState(0);
+  const [result, setResult] = useState<{
+    key: number;
+    entries: CalendarEntry[];
+    failed: boolean;
+  } | null>(null);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    fetch(
+      `/api/pr-center/calendar?from=${encodeURIComponent(range.from)}&to=${encodeURIComponent(range.to)}`,
+      { credentials: "same-origin", signal: controller.signal },
+    )
+      .then(async (response) => {
+        if (!response.ok) throw new Error("Publishing records unavailable");
+        return parseCalendarEntries(await response.json());
+      })
+      .then((entries) => {
+        if (!controller.signal.aborted)
+          setResult({ key: reload, entries, failed: false });
+      })
+      .catch(() => {
+        if (!controller.signal.aborted)
+          setResult({ key: reload, entries: [], failed: true });
+      });
+    return () => controller.abort();
+  }, [range.from, range.to, reload]);
+
+  const current = result?.key === reload ? result : null;
+  const entries = (current?.entries ?? []).filter(
+    (entry) => entry.status !== "DRAFT" && (status === "ALL" || entry.status === status),
+  );
+  const locale = language === "th" ? "th-TH-u-ca-buddhist" : "en-GB";
+  const text = language === "th";
+
+  return (
+    <article className={styles.card}>
+      <SectionHeading
+        eyebrow={text ? "สถานะการเผยแพร่" : "PUBLISHING STATUS"}
+        title={
+          text ? "กำหนดการและหลักฐานที่บันทึกแล้ว" : "Schedules and recorded evidence"
+        }
+        action={
+          <button
+            type="button"
+            disabled={!current}
+            onClick={() => setReload((value) => value + 1)}
+          >
+            {text ? "รีเฟรช" : "Refresh"}
+          </button>
+        }
+      />
+      <p role="note">
+        {text
+          ? "ข้อมูลจากกำหนดการและหลักฐานที่บันทึกในระบบเท่านั้น หน้านี้ไม่เผยแพร่ ไม่ retry และไม่เชื่อมต่อช่องทางภายนอก · เวลา UTC"
+          : "Read-only schedule and evidence records only. This view does not publish, retry, or connect to external channels · Times in UTC."}
+      </p>
+      <label>
+        {text ? "สถานะ" : "Status"}{" "}
+        <select
+          value={status}
+          onChange={(event) => setStatus(event.target.value as typeof status)}
+        >
+          <option value="ALL">{text ? "ทั้งหมด" : "All"}</option>
+          <option value="SCHEDULED">{text ? "กำหนดเผยแพร่" : "Scheduled"}</option>
+          <option value="PUBLISHED">{text ? "เผยแพร่แล้ว" : "Published"}</option>
+        </select>
+      </label>
+      {!current && <p role="status">{text ? "กำลังโหลด…" : "Loading…"}</p>}
+      {current?.failed && (
+        <p role="alert">
+          {text ? "โหลดสถานะการเผยแพร่ไม่สำเร็จ" : "Unable to load publishing status."}
+        </p>
+      )}
+      {current && !current.failed && entries.length === 0 && (
+        <p role="status">
+          {text
+            ? "ไม่พบรายการในช่วง 14 วันย้อนหลังถึง 30 วันข้างหน้า"
+            : "No records from the last 14 days through the next 30 days."}
+        </p>
+      )}
+      {current && !current.failed && entries.length > 0 && (
+        <div className={styles.tableWrap}>
+          <table>
+            <thead>
+              <tr>
+                <th>{text ? "คำขอ / เนื้อหา" : "Request / content"}</th>
+                <th>{text ? "ช่องทาง" : "Channel"}</th>
+                <th>{text ? "ฉบับ" : "Revision"}</th>
+                <th>{text ? "สถานะ" : "Status"}</th>
+                <th>{text ? "เวลา (UTC)" : "Time (UTC)"}</th>
+                <th>{text ? "หลักฐานที่บันทึก" : "Recorded evidence"}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {entries.map((entry) => (
+                <tr key={entry.id}>
+                  <td>
+                    {entry.requestNumber} · {entry.title}
+                  </td>
+                  <td>{entry.channel}</td>
+                  <td>{entry.taskRevision ?? "—"}</td>
+                  <td>
+                    {entry.status === "PUBLISHED"
+                      ? text
+                        ? "เผยแพร่แล้ว"
+                        : "Published"
+                      : text
+                        ? "กำหนดเผยแพร่"
+                        : "Scheduled"}
+                  </td>
+                  <td>
+                    {new Date(entry.date).toLocaleString(locale, { timeZone: "UTC" })}
+                  </td>
+                  <td>
+                    {entry.status === "SCHEDULED" ? (
+                      text ? (
+                        "รอเผยแพร่/บันทึกหลักฐาน"
+                      ) : (
+                        "Awaiting publication/evidence"
+                      )
+                    ) : (
+                      <>
+                        {entry.publishedUrl ? (
+                          <a href={entry.publishedUrl} target="_blank" rel="noreferrer">
+                            {text ? "เปิดลิงก์" : "Open link"}
+                          </a>
+                        ) : text ? (
+                          "ไม่มี URL"
+                        ) : (
+                          "No URL"
+                        )}
+                        {entry.publishedReference && (
+                          <span> · {entry.publishedReference}</span>
+                        )}
+                      </>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </article>
+  );
+}
+
+function AttachmentPanel({
+  taskId,
+  taskVersion,
+  revisionNumber,
+  finalAssetId,
+  onFinalAssetAssigned,
+}: {
+  taskId: string;
+  taskVersion: number;
+  revisionNumber?: number;
+  finalAssetId?: string | null;
+  onFinalAssetAssigned: (fileId: string) => void;
+}) {
   const [attachments, setAttachments] = useState<
     Array<{
       id: string;
@@ -3296,16 +4306,43 @@ function AttachmentPanel({ taskId }: { taskId: string }) {
   };
 
   const handleRemove = async (attachmentId: string) => {
-    const res = await fetch(`/api/pr-center/attachments/${attachmentId}`, {
-      method: "DELETE",
-      credentials: "same-origin",
-    });
-    if (!res.ok) {
+    try {
+      const res = await fetch(`/api/pr-center/attachments/${attachmentId}`, {
+        method: "DELETE",
+        credentials: "same-origin",
+      });
+      if (!res.ok) throw new Error("Remove failed");
+      setNotice("Attachment removed");
+      reload();
+    } catch {
       setError("Remove failed");
-      return;
     }
-    setNotice("Attachment removed");
-    reload();
+  };
+
+  const handleAssignFinalAsset = async (fileId: string) => {
+    setError(null);
+    setNotice(null);
+    try {
+      const response = await fetch(`/api/pr-center/tasks/${taskId}/final-asset`, {
+        method: "POST",
+        credentials: "same-origin",
+        headers: {
+          "Content-Type": "application/json",
+          "If-Match": String(taskVersion),
+        },
+        body: JSON.stringify({ fileId, revisionNumber }),
+      });
+      if (!response.ok) {
+        const result = (await response.json().catch(() => null)) as {
+          message?: string;
+        } | null;
+        throw new Error(result?.message || "Could not set final asset");
+      }
+      onFinalAssetAssigned(fileId);
+      setNotice("Final asset assigned to this revision");
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Could not set final asset");
+    }
   };
 
   const handleDownload = (fileId: string) => {
@@ -3345,6 +4382,7 @@ function AttachmentPanel({ taskId }: { taskId: string }) {
             }}
           >
             <span>{att.file.fileName}</span>
+            {finalAssetId === att.file.id && <b>Final asset</b>}
             <span style={{ color: "#6b7280" }}>{formatSize(att.file.sizeBytes)}</span>
             <span style={{ color: "#6b7280" }}>
               {att.kind} v{att.version}
@@ -3396,6 +4434,17 @@ function AttachmentPanel({ taskId }: { taskId: string }) {
             >
               Remove
             </button>
+            {revisionNumber !== undefined && isClean && (
+              <button
+                type="button"
+                onClick={() => void handleAssignFinalAsset(att.file.id)}
+                disabled={finalAssetId === att.file.id}
+              >
+                {finalAssetId === att.file.id
+                  ? "Final asset selected"
+                  : "Set as final asset"}
+              </button>
+            )}
           </div>
         );
       })}
@@ -3659,21 +4708,21 @@ function Calendar({ language }: { language: Language }) {
 function Approvals({
   tasks: taskItems,
   requests,
-  role,
+  canDecideRequests,
+  canDecideTasks,
   onDecision,
   onRequestDecision,
 }: {
   tasks: Task[];
   requests: RequestApprovalItem[];
-  role: Role;
+  canDecideRequests: boolean;
+  canDecideTasks: boolean;
   onDecision: (
     taskId: string,
     decision: "APPROVED" | "REVISION_REQUIRED" | "REJECTED",
   ) => void;
   onRequestDecision: (requestId: string, decision: "APPROVED" | "REJECTED") => void;
 }) {
-  const canDecideRequests = role === "pr";
-  const canDecideTasks = role === "admin" || role === "pr";
   return (
     <>
       <SectionHeading eyebrow="REVIEW AND APPROVAL" title="Approval Queue" />
@@ -3687,6 +4736,36 @@ function Approvals({
               </p>
               <h2>{request.title}</h2>
               <span>Submitted by {request.requester.displayName}</span>
+              <p>
+                Type: {request.type} · Requested date:{" "}
+                {request.requestedFor?.slice(0, 10) || "—"}
+              </p>
+              {request.revisions[0]?.objective && (
+                <p>Objective: {request.revisions[0].objective}</p>
+              )}
+              {request.revisions[0]?.audience && (
+                <p>Audience: {request.revisions[0].audience}</p>
+              )}
+              {request.type === "OFFSITE" && (
+                <p>
+                  Off-site details:{" "}
+                  {(() => {
+                    const value = request.revisions[0]?.offsiteDetails;
+                    if (!value || typeof value !== "object" || Array.isArray(value))
+                      return "Missing details";
+                    const details = value as Record<string, unknown>;
+                    return `${typeof details.startTime === "string" ? details.startTime : "—"} · ${typeof details.travel === "string" ? details.travel : "—"}`;
+                  })()}
+                </p>
+              )}
+              {request.sources.map((source) => (
+                <p key={source.url}>
+                  Source:{" "}
+                  <a href={source.url} target="_blank" rel="noreferrer">
+                    {source.url}
+                  </a>
+                </p>
+              ))}
             </div>
             <div>
               <Status>Awaiting intake approval</Status>
@@ -3718,8 +4797,34 @@ function Approvals({
               <p>{STATUS_LABELS[task.status]}</p>
               <h2>{task.title}</h2>
               <span>
-                Submitted by {getUser(task.ownerId)?.name ?? "Unassigned"} · 2 hours ago
+                Assigned to{" "}
+                {getUser(task.ownerId)?.name ?? task.ownerName ?? "Unassigned"}
               </span>
+              {task.revisionNumber !== undefined && (
+                <p>Content revision {task.revisionNumber}</p>
+              )}
+              {task.contentBody && (
+                <p className={styles.approvalContent}>{task.contentBody}</p>
+              )}
+              {task.keyMessage && (
+                <p>
+                  <strong>Key message:</strong> {task.keyMessage}
+                </p>
+              )}
+              {task.sourceUrls?.map((url) => (
+                <p key={url}>
+                  Source:{" "}
+                  <a href={url} target="_blank" rel="noreferrer">
+                    {url}
+                  </a>
+                </p>
+              ))}
+              {task.finalAssetId ? (
+                <p>Final asset attached · {task.finalAssetId}</p>
+              ) : (
+                <p role="note">Final asset has not been assigned yet.</p>
+              )}
+              <ApprovalAttachments taskId={task.id} finalAssetId={task.finalAssetId} />
             </div>
             <div>
               <Status>Awaiting approval</Status>
@@ -3746,83 +4851,330 @@ function Approvals({
     </>
   );
 }
-function Library({
-  tasks,
-  language,
-  onNavigate,
+
+function ApprovalAttachments({
+  taskId,
+  finalAssetId,
 }: {
-  tasks: Task[];
-  language: Language;
-  onNavigate: (page: Page) => void;
+  taskId: string;
+  finalAssetId?: string | null;
 }) {
-  const published = tasks.filter((task) => ["published", "closed"].includes(task.status));
-  const totalReach = published.reduce(
-    (total, _, index) => total + 6700 + index * 1200,
-    0,
+  const [files, setFiles] = useState<
+    Array<{
+      id: string;
+      file: { id: string; fileName: string; scanStatus: string };
+    }>
+  >([]);
+  const [error, setError] = useState(false);
+  useEffect(() => {
+    let active = true;
+    fetch(`/api/pr-center/attachments?taskId=${taskId}`, {
+      credentials: "same-origin",
+      cache: "no-store",
+    })
+      .then(async (response) => {
+        if (!response.ok) throw new Error("Attachments unavailable");
+        return response.json();
+      })
+      .then((records: typeof files) => {
+        if (active) setFiles(records);
+      })
+      .catch(() => {
+        if (active) setError(true);
+      });
+    return () => {
+      active = false;
+    };
+  }, [taskId]);
+
+  if (error) return <p role="alert">Attachments could not be loaded.</p>;
+  if (files.length === 0) return null;
+  return (
+    <ul>
+      {files.map((attachment) => (
+        <li key={attachment.id}>
+          {attachment.file.fileName} · {attachment.file.scanStatus}
+          {finalAssetId === attachment.file.id ? " · Final asset" : ""}
+          {attachment.file.scanStatus === "CLEAN" && (
+            <a
+              href={`/api/pr-center/files/${attachment.file.id}/download`}
+              target="_blank"
+              rel="noreferrer"
+            >
+              Download
+            </a>
+          )}
+        </li>
+      ))}
+    </ul>
   );
-  const [selectedId, setSelectedId] = useState<string | null>(null);
-  const selected = published.find((task) => task.id === selectedId);
+}
+
+function libraryStatusLabel(status: string, language: Language) {
+  const labels: Record<string, { th: string; en: string }> = {
+    DRAFT: { th: "ฉบับร่าง", en: "Draft" },
+    SUBMITTED: { th: "ส่งคำขอแล้ว", en: "Submitted" },
+    APPROVED: { th: "อนุมัติแล้ว", en: "Approved" },
+    REJECTED: { th: "ไม่อนุมัติ", en: "Rejected" },
+    WITHDRAWN: { th: "ถอนคำขอ", en: "Withdrawn" },
+    CANCELLED: { th: "ยกเลิก", en: "Cancelled" },
+    CLOSED: { th: "ปิดคำขอ", en: "Closed" },
+  };
+  return labels[status]?.[language] ?? status.replaceAll("_", " ");
+}
+
+function Library({ language }: { language: Language }) {
+  const [items, setItems] = useState<ContentLibraryRecord[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [cursor, setCursor] = useState<string | null>(null);
+  const [hasMore, setHasMore] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+
+  const load = useCallback(
+    async (nextCursor?: string, append = false) => {
+      const query = new URLSearchParams({ take: "100" });
+      if (nextCursor) query.set("cursor", nextCursor);
+      try {
+        const response = await fetch(`/api/pr-center/content-library?${query}`, {
+          credentials: "same-origin",
+          cache: "no-store",
+        });
+        if (!response.ok) throw new Error("Unable to load Content Library");
+        const records = (await response.json()) as ContentLibraryRecord[];
+        const pageRecords = records.slice(0, 100);
+        setItems((previous) =>
+          append
+            ? [
+                ...previous,
+                ...pageRecords.filter(
+                  (item) => !previous.some((old) => old.id === item.id),
+                ),
+              ]
+            : pageRecords,
+        );
+        setCursor(pageRecords.at(-1)?.id ?? null);
+        setHasMore(records.length > pageRecords.length);
+        setError("");
+      } catch {
+        setError(
+          language === "th"
+            ? "โหลดข้อมูลคลังคำขอไม่สำเร็จ กรุณาลองอีกครั้ง"
+            : "Unable to load request content. Please try again.",
+        );
+      } finally {
+        setLoading(false);
+        setLoadingMore(false);
+      }
+    },
+    [language],
+  );
+
+  useEffect(() => {
+    let active = true;
+    void fetch("/api/pr-center/content-library?take=100", {
+      credentials: "same-origin",
+      cache: "no-store",
+    })
+      .then(async (response) => {
+        if (!response.ok) throw new Error("Unable to load Content Library");
+        return (await response.json()) as ContentLibraryRecord[];
+      })
+      .then((records) => {
+        if (!active) return;
+        const pageRecords = records.slice(0, 100);
+        setItems(pageRecords);
+        setCursor(pageRecords.at(-1)?.id ?? null);
+        setHasMore(records.length > pageRecords.length);
+      })
+      .catch(() => {
+        if (!active) return;
+        setError(
+          language === "th"
+            ? "โหลดข้อมูลคลังคำขอไม่สำเร็จ กรุณาลองอีกครั้ง"
+            : "Unable to load request content. Please try again.",
+        );
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [language]);
+
+  const refresh = () => {
+    if (loading || loadingMore) return;
+    setLoading(true);
+    setCursor(null);
+    void load();
+  };
+
+  const loadMore = () => {
+    if (!cursor || loading || loadingMore) return;
+    setLoadingMore(true);
+    void load(cursor, true);
+  };
+
   return (
     <>
       <SectionHeading
-        eyebrow="PUBLISHED CONTENT"
-        title="Content Library"
-        action={<span>{published.length} published or closed items</span>}
+        eyebrow="REQUEST CONTENT"
+        title={
+          language === "th" ? "คลัง Content จากคำขอ" : "Content Library from Requests"
+        }
+        action={
+          <button
+            type="button"
+            className={styles.secondaryButton}
+            onClick={refresh}
+            disabled={loading || loadingMore}
+          >
+            {language === "th" ? "รีเฟรช" : "Refresh"}
+          </button>
+        }
       />
-      <section className={styles.metrics}>
-        <Metric
-          value={String(published.length)}
-          label={language === "th" ? "เนื้อหาที่เผยแพร่" : "Published items"}
-          trend={language === "th" ? "จากข้อมูลเดโม" : "From demo data"}
-          tone="blue"
-        />
-        <Metric
-          value={`${(totalReach / 1000).toFixed(1)}K`}
-          label={language === "th" ? "จำนวนการเข้าถึงโดยประมาณ" : "Estimated reach"}
-          trend={language === "th" ? "อ้างอิงตามประเภทเนื้อหา" : "Based on content type"}
-          tone="green"
-        />
-      </section>
-      <section className={styles.library}>
-        {published.map((task, index) => (
-          <article key={task.id}>
-            <div
-              className={`${styles.libraryImage} ${index % 2 ? styles.libraryImageAlt : ""}`}
-            >
-              RTRDA
-            </div>
-            <small>{task.type}</small>
-            <h2>{task.title}</h2>
-            <p>
-              {statusLabel(task.status, language)} {formatDate(task.dueDate, language)}
-            </p>
-            <span>Owner: {getUser(task.ownerId)?.name ?? "Unassigned"}</span>
-            <button onClick={() => setSelectedId(task.id)}>
-              {language === "th" ? "ดูรายละเอียด" : "View details"}
-            </button>
-          </article>
-        ))}
-      </section>
-      {published.length === 0 && (
+      <p className={styles.libraryNotice}>
+        {language === "th"
+          ? "แสดงเนื้อหาและรายละเอียดจากคำขอ PR Center ตามขอบเขตสิทธิ์ของคุณ ไม่มีค่าประมาณ Reach"
+          : "Request content and details visible within your PR Center access scope. Reach estimates are not shown."}
+      </p>
+      {loading && <p role="status">{language === "th" ? "กำลังโหลด…" : "Loading…"}</p>}
+      {error && (
+        <p role="alert">
+          {error}{" "}
+          <button type="button" className={styles.secondaryButton} onClick={refresh}>
+            {language === "th" ? "ลองอีกครั้ง" : "Retry"}
+          </button>
+        </p>
+      )}
+      {!loading && !error && items.length === 0 && (
         <article className={styles.card}>
           <p>
             {language === "th"
-              ? "ยังไม่มีเนื้อหาที่เผยแพร่"
-              : "No published content yet."}
+              ? "ยังไม่มีข้อมูลคำขอในขอบเขตนี้"
+              : "No requests in your scope yet."}
           </p>
         </article>
       )}
-      {selected && (
-        <article className={styles.card}>
-          <p className={styles.eyebrow}>{selected.id}</p>
-          <h2>{selected.title}</h2>
-          <p>
-            {selected.type} · {formatDate(selected.dueDate, language)}
-          </p>
-          <button className={styles.primary} onClick={() => onNavigate("operations")}>
-            {language === "th" ? "เปิดงานต้นทาง" : "Open source task"}
-          </button>
-        </article>
+      <section className={styles.library} aria-busy={loading || loadingMore}>
+        {items.map((item) => {
+          const revision = item.revisions[0];
+          const sourceLinks = item.sources.map((source) => {
+            try {
+              const url = new URL(source.url);
+              return url.protocol === "https:" || url.protocol === "http:"
+                ? url.href
+                : null;
+            } catch {
+              return null;
+            }
+          });
+          return (
+            <article key={item.id} className={styles.libraryRecord}>
+              <small>
+                {item.requestNumber} ·{" "}
+                {item.type === "OFFSITE"
+                  ? language === "th"
+                    ? "ลงพื้นที่"
+                    : "Offsite"
+                  : "PR"}
+              </small>
+              <h2>{revision?.title || item.title}</h2>
+              <p>
+                {item.department.name} · {libraryStatusLabel(item.status, language)}
+              </p>
+              <dl>
+                <dt>{language === "th" ? "วัตถุประสงค์" : "Objective"}</dt>
+                <dd>
+                  {revision?.objective ||
+                    (language === "th" ? "ไม่ได้ระบุ" : "Not provided")}
+                </dd>
+                <dt>{language === "th" ? "กลุ่มเป้าหมาย" : "Audience"}</dt>
+                <dd>
+                  {revision?.audience ||
+                    (language === "th" ? "ไม่ได้ระบุ" : "Not provided")}
+                </dd>
+                {revision?.offsiteDetails != null && (
+                  <>
+                    <dt>
+                      {language === "th" ? "รายละเอียดการลงพื้นที่" : "Offsite details"}
+                    </dt>
+                    <dd>
+                      <pre>{JSON.stringify(revision.offsiteDetails, null, 2)}</pre>
+                    </dd>
+                  </>
+                )}
+              </dl>
+              {revision?.changeSummary && <p>{revision.changeSummary}</p>}
+              {item.sources.length > 0 && (
+                <div>
+                  <strong>{language === "th" ? "แหล่งข้อมูล" : "Sources"}</strong>
+                  <ul>
+                    {item.sources.map((source, index) => (
+                      <li key={source.id}>
+                        {sourceLinks[index] ? (
+                          <a
+                            href={sourceLinks[index]!}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                          >
+                            {source.label || sourceLinks[index]}
+                          </a>
+                        ) : (
+                          source.label || source.url
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+              {item.attachments.length > 0 && (
+                <div>
+                  <strong>
+                    {language === "th" ? "ไฟล์แนบในคำขอ" : "Request attachments"}
+                  </strong>
+                  <ul>
+                    {item.attachments.map((attachment) => (
+                      <li key={attachment.id}>
+                        {attachment.file.fileName} · {attachment.kind} ·{" "}
+                        {attachment.file.scanStatus}
+                        {attachment.file.deletedAt
+                          ? language === "th"
+                            ? " (ถูกลบแล้ว)"
+                            : " (deleted)"
+                          : ""}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+              <small>
+                {language === "th" ? "แก้ไขล่าสุด" : "Last updated"}:{" "}
+                {new Date(item.updatedAt).toLocaleDateString(
+                  language === "th" ? "th-TH" : "en-GB",
+                )}
+                {revision ? ` · v${revision.revisionNumber}` : ""}
+              </small>
+            </article>
+          );
+        })}
+      </section>
+      {hasMore && (
+        <button
+          type="button"
+          className={styles.secondaryButton}
+          onClick={loadMore}
+          disabled={loadingMore}
+        >
+          {loadingMore
+            ? language === "th"
+              ? "กำลังโหลด…"
+              : "Loading…"
+            : language === "th"
+              ? "โหลดเพิ่มเติม"
+              : "Load more"}
+        </button>
       )}
     </>
   );
@@ -5403,7 +6755,7 @@ function Help({
         </h2>
         <p>
           Use the sidebar to move between intake, production, approvals, and reporting.
-          Your available actions follow the selected demo role.
+          Your available actions are determined by your authenticated role and scope.
         </p>
       </article>
       <section className={styles.helpGrid}>
@@ -5425,8 +6777,8 @@ function Help({
           ],
           [
             "4",
-            "Review impact",
-            "See published content and its performance in the dashboard.",
+            "Review publication",
+            "Review publication evidence. Reach and engagement are shown only when a verified analytics source is available.",
           ],
         ].map(([number, title, description], index) => (
           <article key={number} className={styles.card}>

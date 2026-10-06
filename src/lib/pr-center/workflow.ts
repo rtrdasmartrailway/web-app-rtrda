@@ -77,8 +77,7 @@ export function canTransitionTask(
 }
 
 export function canApprove(role: PrCenterRoleInput): boolean {
-  // Approval authority is restricted to PR operations and scoped administrators.
-  return includesAnyRole(role, ["PR_OPERATIONS", "SCOPED_ADMINISTRATOR"]);
+  return includesAnyRole(role, ["APPROVER", "PR_OPERATIONS", "SCOPED_ADMINISTRATOR"]);
 }
 
 export function canDecideRequestIntake(role: PrCenterRoleInput): boolean {

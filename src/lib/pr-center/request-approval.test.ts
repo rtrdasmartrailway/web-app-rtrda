@@ -11,7 +11,7 @@ const { mockPrisma } = vi.hoisted(() => {
     prRequestRevision: { create: vi.fn() },
     prRequestSource: { deleteMany: vi.fn(), createMany: vi.fn() },
     prUserRole: { findMany: vi.fn() },
-    prTask: { findFirst: vi.fn(), updateMany: vi.fn() },
+    prTask: { findFirst: vi.fn(), findMany: vi.fn(), updateMany: vi.fn() },
     prCenterUser: { findFirst: vi.fn() },
     prStatusHistory: { create: vi.fn() },
     prNotification: { createMany: vi.fn() },
@@ -27,6 +27,7 @@ vi.mock("@/lib/db/client", () => ({ prisma: mockPrisma }));
 
 import {
   listRequestApprovalQueue,
+  listApprovalQueue,
   listRequests,
   requestDetail,
   recordRequestDecision,
@@ -75,6 +76,27 @@ beforeEach(() => {
 });
 
 describe("request intake approval", () => {
+  it("exposes the task approval queue to scoped APPROVER grants", async () => {
+    const approver: PrCenterActor = {
+      ...requesterActor,
+      role: "APPROVER",
+    };
+    mockPrisma.prTask.findMany.mockResolvedValue([]);
+
+    await listApprovalQueue(approver);
+
+    expect(mockPrisma.prTask.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          request: expect.objectContaining({
+            organizationId: approver.organizationId,
+            OR: [{ departmentId: "dept-1" }],
+          }),
+        }),
+      }),
+    );
+  });
+
   it("shows owners their requests and PR/admin users requests in their granted scope", async () => {
     mockPrisma.prRequest.findMany.mockResolvedValue([]);
 
@@ -310,6 +332,32 @@ describe("request intake approval", () => {
         expect.objectContaining({ userId: "requester-1", target: "my-requests" }),
         expect.objectContaining({ userId: "pr-recipient", target: "approvals" }),
       ]),
+    });
+  });
+
+  it("cancels the draft task atomically when its requester withdraws a request", async () => {
+    mockPrisma.prRequest.findFirst.mockResolvedValueOnce({
+      ...requestRecord,
+      status: "SUBMITTED",
+      version: 2,
+      tasks: [{ id: "task-1", status: "DRAFT", version: 1 }],
+    });
+    mockPrisma.prRequest.updateMany.mockResolvedValue({ count: 1 });
+    mockPrisma.prTask.updateMany.mockResolvedValue({ count: 1 });
+
+    await transitionRequest(requesterActor, requestRecord.id, 2, "WITHDRAWN");
+
+    expect(mockPrisma.prTask.updateMany).toHaveBeenCalledWith({
+      where: { id: "task-1", status: "DRAFT", version: 1 },
+      data: { status: "CANCELLED", version: { increment: 1 } },
+    });
+    expect(mockPrisma.prStatusHistory.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        taskId: "task-1",
+        fromState: "DRAFT",
+        toState: "CANCELLED",
+        actorId: requesterActor.id,
+      }),
     });
   });
 
