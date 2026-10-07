@@ -50,6 +50,7 @@ import {
 } from "./notification-policy";
 import { dispatchNotification } from "./notification-channels";
 import { normalizeCreateIdeaInput } from "./idea-input";
+import { isRootPrCenterAdministrator } from "./access-authority";
 import {
   latestReleaseEvidenceByGate,
   parseReleaseEvidenceInput,
@@ -66,6 +67,8 @@ export type PrCenterActor = {
   roleGrants?: PrCenterRoleGrant[];
   /** Legacy single-grant scope for service tests and older internal callers. */
   scopeDepartmentId?: string | null;
+  /** Root identity can grant/revoke SCOPED_ADMINISTRATOR assignments. */
+  isRootAdministrator?: boolean;
 };
 
 export type PrCenterRoleGrant = {
@@ -278,6 +281,7 @@ export async function sessionProfile(actor: PrCenterActor) {
     organizationId: actor.organizationId,
     departmentId: actor.departmentId,
     displayName: user.displayName,
+    isRootAdministrator: isRootPrCenterAdministrator(user.email),
     departmentName: user.department?.name || "",
     role: actor.role,
     roles: actorRoles(actor),
@@ -3094,7 +3098,14 @@ export async function listAdminUsers(actor: PrCenterActor) {
       department: { select: { id: true, name: true } },
       roles: {
         ...(!adminScope.organizationWide
-          ? { where: { departmentId: { in: adminScope.departmentIds } } }
+          ? {
+              where: {
+                OR: [
+                  { departmentId: { in: adminScope.departmentIds } },
+                  { departmentId: null },
+                ],
+              },
+            }
           : {}),
         select: { id: true, role: true, departmentId: true },
       },
@@ -3132,6 +3143,12 @@ export async function grantRole(
     throw new PrCenterError("You cannot grant roles", 403, "FORBIDDEN");
   if (!PR_CENTER_ROLES.includes(role))
     throw new PrCenterError("Invalid role code", 422, "INVALID_ROLE");
+  if (role === "SCOPED_ADMINISTRATOR" && !actor.isRootAdministrator)
+    throw new PrCenterError(
+      "Only the root PR Center administrator can grant administrator roles",
+      403,
+      "ROOT_ADMIN_REQUIRED",
+    );
   if (userId === actor.id)
     throw new PrCenterError(
       "You cannot grant roles to your own account",
@@ -3208,10 +3225,30 @@ export async function revokeRole(
   const roleRecord = await prisma.prUserRole.findFirst({
     where: { id: roleId, organizationId: actor.organizationId },
     include: {
-      user: { select: { id: true, displayName: true, departmentId: true, active: true } },
+      user: {
+        select: {
+          id: true,
+          displayName: true,
+          email: true,
+          departmentId: true,
+          active: true,
+        },
+      },
     },
   });
   if (!roleRecord) throw new PrCenterError("Role assignment not found", 404, "NOT_FOUND");
+  if (roleRecord.role === "SCOPED_ADMINISTRATOR" && !actor.isRootAdministrator)
+    throw new PrCenterError(
+      "Only the root PR Center administrator can revoke administrator roles",
+      403,
+      "ROOT_ADMIN_REQUIRED",
+    );
+  if (isRootPrCenterAdministrator(roleRecord.user.email))
+    throw new PrCenterError(
+      "The root PR Center administrator assignment is protected",
+      422,
+      "ROOT_ADMIN_PROTECTED",
+    );
   assertCanManageDepartmentScope(actor, roleRecord.departmentId);
   assertCanManageUserScope(actor, roleRecord.user);
   return runSerializableAccessTransaction(async (tx) => {
@@ -3256,9 +3293,25 @@ export async function toggleUserActive(
   const accessReason = normalizeAccessAdminReason(reason);
   const user = await prisma.prCenterUser.findFirst({
     where: { id: userId, organizationId: actor.organizationId },
+    include: { roles: { select: { role: true, departmentId: true } } },
   });
   if (!user) throw new PrCenterError("User not found", 404, "NOT_FOUND");
   assertCanManageUserScope(actor, user);
+  if (isRootPrCenterAdministrator(user.email))
+    throw new PrCenterError(
+      "The root PR Center administrator account cannot be deactivated",
+      422,
+      "ROOT_ADMIN_PROTECTED",
+    );
+  if (
+    !actor.isRootAdministrator &&
+    user.roles?.some((grant) => grant.role === "SCOPED_ADMINISTRATOR")
+  )
+    throw new PrCenterError(
+      "Only the root PR Center administrator can change another administrator's active status",
+      403,
+      "ROOT_ADMIN_REQUIRED",
+    );
   if (user.id === actor.id)
     throw new PrCenterError(
       "You cannot deactivate yourself",

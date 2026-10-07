@@ -21,6 +21,7 @@ import {
   type CalendarRequestDecision,
 } from "@/lib/pr-center/calendar-view";
 import { canEditOwnRequest } from "@/lib/pr-center/request-edit";
+import { isRootPrCenterAdministrator } from "@/lib/pr-center/access-authority";
 import { unavailableMetricDisplay } from "@/lib/pr-center/metric-display";
 import {
   RELEASE_EVIDENCE_GATES,
@@ -1009,6 +1010,7 @@ export function PrCenterApp({
     displayName: string;
     departmentName: string;
     role: PrCenterRoleCode;
+    isRootAdministrator?: boolean;
     roles?: PrCenterRoleCode[];
     roleGrants?: Array<{ role: PrCenterRoleCode; departmentId: string | null }>;
   };
@@ -6373,6 +6375,7 @@ function Directory({
     userId: string;
     displayName: string;
     role: string;
+    isRootAdministrator?: boolean;
     roleGrants?: Array<{ role: string; departmentId: string | null }>;
   };
   language: Language;
@@ -6403,13 +6406,17 @@ function Directory({
     departmentId: string | null;
   } | null>(null);
   const [revokeReason, setRevokeReason] = useState("");
-  const [revokeConfirmation, setRevokeConfirmation] = useState("");
   const [revokeSubmitting, setRevokeSubmitting] = useState(false);
   const [accessReason, setAccessReason] = useState("");
   const isOrganizationAdmin =
     actor.roleGrants?.some(
       (grant) => grant.role === "SCOPED_ADMINISTRATOR" && grant.departmentId === null,
     ) ?? false;
+  const canGrantAdministratorRole = actor.isRootAdministrator === true;
+  const isRootAccount = (user: { email: string }) =>
+    isRootPrCenterAdministrator(user.email);
+  const hasAdministratorRole = (user: (typeof users)[number]) =>
+    user.roles.some((grant) => grant.role === "SCOPED_ADMINISTRATOR");
   const activeOrganizationAdmins = users.filter(
     (user) =>
       user.active &&
@@ -6504,11 +6511,6 @@ function Directory({
     const reason = revokeReason.trim();
     if (!reason)
       return setError(language === "th" ? "กรุณาระบุเหตุผล" : "A reason is required");
-    if (revokeConfirmation.trim() !== "ตกลง")
-      return setError(
-        language === "th" ? 'กรุณาพิมพ์ "ตกลง" เพื่อยืนยัน' : 'Type "ตกลง" to confirm',
-      );
-
     setRevokeSubmitting(true);
     try {
       const res = await fetch(`/api/pr-center/admin/roles/${revokeTarget.roleId}`, {
@@ -6527,7 +6529,6 @@ function Directory({
       setNotice(language === "th" ? "ถอน role สำเร็จ" : "Role revoked");
       setRevokeTarget(null);
       setRevokeReason("");
-      setRevokeConfirmation("");
       reload();
     } catch {
       setError(
@@ -6565,6 +6566,13 @@ function Directory({
   return (
     <>
       <SectionHeading eyebrow="ACCESS ADMINISTRATION" title="User Directory" />
+      {!canGrantAdministratorRole && (
+        <p role="note" className={styles.libraryNotice}>
+          {language === "th"
+            ? "คุณจัดการ role ทั่วไปได้ตาม scope แต่การมอบหมาย/ถอน role ผู้ดูแลและการปิดบัญชีผู้ดูแลทำได้โดยผู้ดูแลหลักเท่านั้น"
+            : "You can manage regular roles within your scope. Only the root administrator can grant or revoke administrator roles or deactivate administrator accounts."}
+        </p>
+      )}
       <label style={{ display: "grid", gap: 4, margin: "8px 0 16px" }}>
         <span>
           {language === "th"
@@ -6609,13 +6617,23 @@ function Directory({
                     onClick={() => handleToggleActive(user.id)}
                     disabled={
                       user.id === actor.userId ||
+                      isRootAccount(user) ||
+                      (hasAdministratorRole(user) && !canGrantAdministratorRole) ||
                       isLastOrganizationAdmin(user) ||
                       !accessReason.trim()
                     }
                     title={
-                      isLastOrganizationAdmin(user)
-                        ? "At least one active organization-wide administrator must remain"
-                        : undefined
+                      isRootAccount(user)
+                        ? language === "th"
+                          ? "บัญชีผู้ดูแลหลักถูกป้องกันจากการปิดใช้งาน"
+                          : "The root administrator account is protected"
+                        : hasAdministratorRole(user) && !canGrantAdministratorRole
+                          ? language === "th"
+                            ? "เฉพาะผู้ดูแลหลักเท่านั้นที่เปลี่ยนสถานะผู้ดูแลได้"
+                            : "Only the root administrator can deactivate administrators"
+                          : isLastOrganizationAdmin(user)
+                            ? "At least one active organization-wide administrator must remain"
+                            : undefined
                     }
                     style={{ fontSize: 12, color: user.active ? "#dc2626" : "#16a34a" }}
                   >
@@ -6675,7 +6693,6 @@ function Directory({
                         setError(null);
                         setGrantTarget(null);
                         setRevokeReason("");
-                        setRevokeConfirmation("");
                         setRevokeTarget({
                           userId: user.id,
                           displayName: user.displayName,
@@ -6685,20 +6702,32 @@ function Directory({
                         });
                       }}
                       disabled={
-                        user.active &&
-                        r.role === "SCOPED_ADMINISTRATOR" &&
-                        r.departmentId === null &&
-                        activeOrganizationAdmins <= 1
+                        isRootAccount(user) ||
+                        (r.role === "SCOPED_ADMINISTRATOR" &&
+                          !canGrantAdministratorRole) ||
+                        (user.active &&
+                          r.role === "SCOPED_ADMINISTRATOR" &&
+                          r.departmentId === null &&
+                          activeOrganizationAdmins <= 1)
                       }
                       title={
-                        user.active &&
-                        r.role === "SCOPED_ADMINISTRATOR" &&
-                        r.departmentId === null &&
-                        activeOrganizationAdmins <= 1
-                          ? "At least one active organization-wide administrator must remain"
-                          : language === "th"
-                            ? "ถอน role"
-                            : "Revoke role"
+                        isRootAccount(user)
+                          ? language === "th"
+                            ? "บัญชีผู้ดูแลหลักถูกป้องกัน"
+                            : "The root administrator account is protected"
+                          : r.role === "SCOPED_ADMINISTRATOR" &&
+                              !canGrantAdministratorRole
+                            ? language === "th"
+                              ? "เฉพาะผู้ดูแลหลักเท่านั้นที่ถอน role ผู้ดูแลได้"
+                              : "Only the root administrator can revoke administrator roles"
+                            : user.active &&
+                                r.role === "SCOPED_ADMINISTRATOR" &&
+                                r.departmentId === null &&
+                                activeOrganizationAdmins <= 1
+                              ? "At least one active organization-wide administrator must remain"
+                              : language === "th"
+                                ? "ถอน role"
+                                : "Revoke role"
                       }
                       style={{
                         fontSize: 11,
@@ -6762,9 +6791,21 @@ function Directory({
                       <option value="PR_OPERATIONS">PR_OPERATIONS</option>
                       <option value="APPROVER">APPROVER</option>
                       <option value="EXECUTIVE_READ_ONLY">EXECUTIVE_READ_ONLY</option>
-                      <option value="SCOPED_ADMINISTRATOR">SCOPED_ADMINISTRATOR</option>
+                      <option
+                        value="SCOPED_ADMINISTRATOR"
+                        disabled={!canGrantAdministratorRole}
+                      >
+                        SCOPED_ADMINISTRATOR
+                      </option>
                     </select>
                   </label>
+                  {!canGrantAdministratorRole && (
+                    <p role="note">
+                      {language === "th"
+                        ? "เฉพาะผู้ดูแลหลัก admin@apprtrda.onmicrosoft.com เท่านั้นที่มอบหมาย role ผู้ดูแลได้"
+                        : "Only the root administrator can grant SCOPED_ADMINISTRATOR."}
+                    </p>
+                  )}
                   <label style={{ display: "grid", gap: 4 }}>
                     <span>{language === "th" ? "ขอบเขตสิทธิ์" : "Role scope"}</span>
                     {isOrganizationAdmin ? (
@@ -6903,18 +6944,11 @@ function Directory({
                       onChange={(event) => setRevokeReason(event.target.value)}
                       aria-required="true"
                     />
-                  </label>
-                  <label style={{ display: "grid", gap: 4 }}>
-                    <span>
+                    <small>
                       {language === "th"
-                        ? 'พิมพ์ "ตกลง" เพื่อยืนยันการถอนสิทธิ์'
-                        : 'Type "ตกลง" to confirm this role revocation'}
-                    </span>
-                    <input
-                      value={revokeConfirmation}
-                      onChange={(event) => setRevokeConfirmation(event.target.value)}
-                      autoComplete="off"
-                    />
+                        ? "กรอกเหตุผลเพื่อเปิดใช้งานปุ่มยืนยันถอน role"
+                        : "Enter a reason to enable role revocation."}
+                    </small>
                   </label>
                   <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
                     <button
@@ -6928,11 +6962,7 @@ function Directory({
                       type="button"
                       className={styles.primary}
                       onClick={() => void handleRevoke()}
-                      disabled={
-                        revokeSubmitting ||
-                        !revokeReason.trim() ||
-                        revokeConfirmation.trim() !== "ตกลง"
-                      }
+                      disabled={revokeSubmitting || !revokeReason.trim()}
                     >
                       {revokeSubmitting
                         ? language === "th"

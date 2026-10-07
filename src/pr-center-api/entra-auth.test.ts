@@ -5,8 +5,15 @@ import {
   resolvePrCenterLoginRole,
   validateIdentityMapping,
 } from "./entra-auth";
+import { isRootPrCenterAdministrator } from "@/lib/pr-center/access-authority";
 
 describe("organization-domain access and administrator role grants", () => {
+  it("recognizes only the designated root administrator identity", () => {
+    expect(isRootPrCenterAdministrator(" ADMIN@APPRTRDA.ONMICROSOFT.COM ")).toBe(true);
+    expect(isRootPrCenterAdministrator("other@apprtrda.onmicrosoft.com")).toBe(false);
+    expect(isRootPrCenterAdministrator("staff@rtrda.or.th")).toBe(false);
+  });
+
   it("allows only a non-empty address at the exact rtrda.or.th domain", () => {
     expect(isAllowedOrganizationEmail("staff@rtrda.or.th")).toBe(true);
     expect(isAllowedOrganizationEmail("STAFF@RTRDA.OR.TH")).toBe(true);
@@ -117,6 +124,41 @@ describe("isSessionAuthorityCurrent", () => {
         roles: [{ role: "REQUESTER", organizationId: "org-1", departmentId: "dept-1" }],
       }),
     ).toBe(true);
+  });
+
+  it("binds root-admin grant authority to the designated root account email", () => {
+    const rootActor = {
+      ...actor,
+      role: "SCOPED_ADMINISTRATOR" as const,
+      isRootAdministrator: true,
+      roleGrants: [{ role: "SCOPED_ADMINISTRATOR" as const, departmentId: null }],
+    };
+    const rootAuthority = {
+      active: true,
+      email: "admin@apprtrda.onmicrosoft.com",
+      organizationId: "org-1",
+      departmentId: "dept-1",
+      roles: [
+        {
+          role: "SCOPED_ADMINISTRATOR" as const,
+          organizationId: "org-1",
+          departmentId: null,
+        },
+      ],
+    };
+    expect(isSessionAuthorityCurrent(rootActor, rootAuthority)).toBe(true);
+    expect(
+      isSessionAuthorityCurrent(
+        { ...rootActor, isRootAdministrator: false },
+        rootAuthority,
+      ),
+    ).toBe(false);
+    expect(
+      isSessionAuthorityCurrent(rootActor, {
+        ...rootAuthority,
+        email: "other@rtrda.or.th",
+      }),
+    ).toBe(false);
   });
 
   it("preserves organization-wide PR authority independently of the user's home department", () => {

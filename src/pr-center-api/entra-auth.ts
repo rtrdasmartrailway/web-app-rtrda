@@ -8,6 +8,10 @@ import {
   type PrCenterRoleGrant,
 } from "@/lib/pr-center/service";
 import type { PrCenterRole } from "@/lib/pr-center/workflow";
+import {
+  isRootPrCenterAdministrator,
+  ROOT_PR_CENTER_ADMIN_EMAIL,
+} from "@/lib/pr-center/access-authority";
 
 const SESSION_COOKIE = "rtrda_pr_center_oidc_session";
 const STATE_COOKIE = "rtrda_pr_center_oidc_state";
@@ -91,9 +95,12 @@ export function isSessionAuthorityCurrent(
   const key = (grant: PrCenterRoleGrant) => `${grant.role}:${grant.departmentId ?? "*"}`;
   const expected = expectedGrants.map(key).sort();
   const current = currentGrants.map(key).sort();
-  return (
+  const grantsMatch =
     expected.length === current.length &&
-    expected.every((grant, index) => grant === current[index])
+    expected.every((grant, index) => grant === current[index]);
+  return (
+    grantsMatch &&
+    Boolean(actor.isRootAdministrator) === isRootPrCenterAdministrator(user.email)
   );
 }
 
@@ -130,7 +137,7 @@ export function validateIdentityMapping<T extends ExistingIdentity>(
   return existingUser;
 }
 
-const EXPLICITLY_ALLOWED_PR_CENTER_EMAILS = new Set(["admin@apprtrda.onmicrosoft.com"]);
+const EXPLICITLY_ALLOWED_PR_CENTER_EMAILS = new Set([ROOT_PR_CENTER_ADMIN_EMAIL]);
 
 export function isAllowedOrganizationEmail(email: string): boolean {
   const normalized = email.trim().toLowerCase();
@@ -270,7 +277,14 @@ export function createEntraAuth() {
         }),
       );
       const loginRole = resolvePrCenterLoginRole(email, databaseRoleAssignments);
-      const { role, roleGrants, autoProvisionRequester } = loginRole;
+      const {
+        role: resolvedRole,
+        roleGrants: resolvedRoleGrants,
+        autoProvisionRequester,
+      } = loginRole;
+      const roleGrants = [...resolvedRoleGrants];
+      const isRootAdministrator = isRootPrCenterAdministrator(email);
+      let role = resolvedRole;
       const user = existingUser
         ? await tx.prCenterUser.update({
             where: { id: existingUser.id },
@@ -307,6 +321,23 @@ export function createEntraAuth() {
             data: { userId: user.id, role: "REQUESTER", organizationId: organization.id },
           });
       }
+      if (isRootAdministrator) {
+        const hasOrganizationAdmin = roleGrants.some(
+          (grant) => grant.role === "SCOPED_ADMINISTRATOR" && grant.departmentId === null,
+        );
+        if (!hasOrganizationAdmin) {
+          await tx.prUserRole.create({
+            data: {
+              userId: user.id,
+              role: "SCOPED_ADMINISTRATOR",
+              organizationId: organization.id,
+              departmentId: null,
+            },
+          });
+          roleGrants.push({ role: "SCOPED_ADMINISTRATOR", departmentId: null });
+        }
+        role = "SCOPED_ADMINISTRATOR";
+      }
       await tx.prAuditEvent.create({
         data: {
           organizationId: organization.id,
@@ -324,8 +355,11 @@ export function createEntraAuth() {
         departmentId: user.departmentId,
         role,
         roleGrants,
-        scopeDepartmentId:
-          roleGrants.find((grant) => grant.role !== "REQUESTER")?.departmentId ?? null,
+        isRootAdministrator,
+        scopeDepartmentId: isRootAdministrator
+          ? null
+          : (roleGrants.find((grant) => grant.role !== "REQUESTER")?.departmentId ??
+            null),
       };
     });
   }

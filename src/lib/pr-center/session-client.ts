@@ -2,6 +2,7 @@ export type PrCenterSession = {
   userId: string;
   displayName: string;
   departmentName: string;
+  isRootAdministrator: boolean;
   role:
     | "REQUESTER"
     | "PR_OPERATIONS"

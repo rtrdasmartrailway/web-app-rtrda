@@ -5,6 +5,7 @@ const session: PrCenterSession = {
   userId: "user-1",
   displayName: "Test User",
   departmentName: "Communications",
+  isRootAdministrator: false,
   role: "PR_OPERATIONS",
   roles: ["REQUESTER", "PR_OPERATIONS"],
   roleGrants: [
