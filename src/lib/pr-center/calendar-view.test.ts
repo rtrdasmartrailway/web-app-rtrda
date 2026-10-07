@@ -1,5 +1,19 @@
 import { describe, expect, it } from "vitest";
-import { parseCalendarEntries } from "./calendar-view";
+import {
+  bangkokDateKey,
+  bangkokCalendarAnchor,
+  parseCalendarEntries,
+  parseCalendarRequestDecisions,
+} from "./calendar-view";
+
+describe("Bangkok calendar date boundaries", () => {
+  it("uses Bangkok calendar days for UTC timestamps", () => {
+    expect(bangkokDateKey("2026-10-11T18:00:00.000Z")).toBe("2026-10-12");
+    expect(
+      bangkokCalendarAnchor(new Date("2026-10-11T18:00:00.000Z")).toISOString(),
+    ).toBe("2026-10-12T00:00:00.000Z");
+  });
+});
 
 describe("parseCalendarEntries", () => {
   it("accepts scheduled, published, and draft entries with distinct date meaning", () => {
@@ -80,5 +94,30 @@ describe("parseCalendarEntries", () => {
         },
       ]),
     ).toThrow("Invalid calendar response");
+  });
+});
+
+describe("parseCalendarRequestDecisions", () => {
+  it("accepts only request approvals and rejections with attribution", () => {
+    expect(
+      parseCalendarRequestDecisions([
+        {
+          id: "history-1",
+          requestId: "request-1",
+          requestNumber: "PR-2026-001",
+          title: "Station opening",
+          decision: "REJECTED",
+          reason: "Missing source",
+          actorName: "PR Operations",
+          date: "2026-10-12T03:15:00.000Z",
+        },
+      ]),
+    ).toMatchObject([{ decision: "REJECTED", reason: "Missing source" }]);
+  });
+
+  it("rejects unsupported or malformed activity", () => {
+    expect(() => parseCalendarRequestDecisions([{ decision: "SUBMITTED" }])).toThrow(
+      "Invalid calendar decision response",
+    );
   });
 });

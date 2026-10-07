@@ -840,6 +840,24 @@
 .calendar > div:nth-child(7n) {
   border-right: 0;
 }
+.calendarDayButton {
+  background: transparent;
+  border: 0;
+  border-radius: 6px;
+  color: inherit;
+  cursor: pointer;
+  font-size: 11px;
+  padding: 2px 4px;
+}
+.calendarDayButton[aria-pressed="true"] {
+  background: #e7f0ff;
+  color: #245492;
+  font-weight: 700;
+}
+.calendarDayButton small {
+  color: #16834a;
+  font-size: 9px;
+}
 .calendar > div > b {
   font-size: 11px;
 }

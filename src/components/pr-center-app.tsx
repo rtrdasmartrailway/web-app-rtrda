@@ -12,7 +12,14 @@ import Image from "next/image";
 import type { CreateContentIdeaInput } from "@/lib/pr-center/idea-input";
 import { submitIdeaForm } from "@/lib/pr-center/idea-form";
 import { parseIdeaListPage, type IdeaListRecord } from "@/lib/pr-center/idea-view";
-import { parseCalendarEntries, type CalendarEntry } from "@/lib/pr-center/calendar-view";
+import {
+  bangkokCalendarAnchor,
+  bangkokDateKey,
+  parseCalendarEntries,
+  parseCalendarRequestDecisions,
+  type CalendarEntry,
+  type CalendarRequestDecision,
+} from "@/lib/pr-center/calendar-view";
 import { canEditOwnRequest } from "@/lib/pr-center/request-edit";
 import { unavailableMetricDisplay } from "@/lib/pr-center/metric-display";
 import {
@@ -4569,17 +4576,22 @@ function AttachmentPanel({
 
 function Calendar({ language }: { language: Language }) {
   const [anchorDate, setAnchorDate] = useState(() => {
-    const now = new Date();
-    return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+    return bangkokCalendarAnchor(new Date());
   });
   const [view, setView] = useState<"month" | "week">("month");
   const [statusFilter, setStatusFilter] = useState<"ALL" | CalendarEntry["status"]>(
     "ALL",
   );
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
+  const [selectedDayKey, setSelectedDayKey] = useState(() => bangkokDateKey(new Date()));
   const [result, setResult] = useState<{
     key: string;
     entries: CalendarEntry[];
+    failed: boolean;
+  } | null>(null);
+  const [decisionResult, setDecisionResult] = useState<{
+    key: string;
+    entries: CalendarRequestDecision[];
     failed: boolean;
   } | null>(null);
 
@@ -4597,8 +4609,8 @@ function Calendar({ language }: { language: Language }) {
   }
   const rangeEnd = new Date(rangeStart);
   rangeEnd.setUTCDate(rangeEnd.getUTCDate() + dayCount);
-  const from = rangeStart.toISOString();
-  const to = rangeEnd.toISOString();
+  const from = new Date(rangeStart.getTime() - 7 * 60 * 60 * 1000).toISOString();
+  const to = new Date(rangeEnd.getTime() - 7 * 60 * 60 * 1000).toISOString();
   const rangeKey = `${from}|${to}`;
 
   useEffect(() => {
@@ -4619,11 +4631,32 @@ function Calendar({ language }: { language: Language }) {
         if (!controller.signal.aborted)
           setResult({ key: rangeKey, entries: [], failed: true });
       });
+    fetch(
+      `/api/pr-center/calendar/request-decisions?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`,
+      { credentials: "same-origin", signal: controller.signal },
+    )
+      .then(async (response) => {
+        if (!response.ok) throw new Error("Calendar request decisions unavailable");
+        return parseCalendarRequestDecisions(await response.json());
+      })
+      .then((entries) => {
+        if (!controller.signal.aborted)
+          setDecisionResult({ key: rangeKey, entries, failed: false });
+      })
+      .catch(() => {
+        if (!controller.signal.aborted)
+          setDecisionResult({ key: rangeKey, entries: [], failed: true });
+      });
     return () => controller.abort();
   }, [from, rangeKey, to]);
 
   const currentResult = result?.key === rangeKey ? result : null;
   const entries = currentResult?.entries ?? [];
+  const currentDecisionResult = decisionResult?.key === rangeKey ? decisionResult : null;
+  const decisions = currentDecisionResult?.entries ?? [];
+  const selectedDayDecisions = decisions.filter(
+    (decision) => bangkokDateKey(decision.date) === selectedDayKey,
+  );
   const visibleEntries = entries.filter(
     (entry) => statusFilter === "ALL" || entry.status === statusFilter,
   );
@@ -4642,7 +4675,7 @@ function Calendar({ language }: { language: Language }) {
       hour: "2-digit",
       minute: "2-digit",
       hourCycle: "h23",
-      timeZone: "UTC",
+      timeZone: "Asia/Bangkok",
     });
   const entryKey = (entry: CalendarEntry) => `${entry.status}:${entry.id}`;
   const selected = visibleEntries.find((entry) => entryKey(entry) === selectedKey);
@@ -4668,6 +4701,13 @@ function Calendar({ language }: { language: Language }) {
       next.setUTCDate(next.getUTCDate() + direction * 7);
       return next;
     });
+    setSelectedKey(null);
+  };
+  const showToday = () => {
+    const today = bangkokCalendarAnchor(new Date());
+    setAnchorDate(today);
+    setSelectedDayKey(bangkokDateKey(today));
+    setSelectedKey(null);
   };
 
   return (
@@ -4689,13 +4729,16 @@ function Calendar({ language }: { language: Language }) {
             <button type="button" onClick={() => moveRange(1)}>
               {language === "th" ? "ถัดไป" : "Next"}
             </button>
+            <button type="button" onClick={showToday}>
+              {language === "th" ? "วันนี้" : "Today"}
+            </button>
           </div>
         }
       />
       <p role="note">
         {language === "th"
-          ? "เวลาแสดงเป็น UTC จนกว่าจะกำหนดเขตเวลาขององค์กร · วันฉบับร่างคือกำหนดส่ง ไม่ใช่กำหนดเผยแพร่"
-          : "Times are shown in UTC until the organization timezone is approved · Draft dates are due dates, not publication commitments."}
+          ? "เวลาแสดงตามเขตเวลา Asia/Bangkok · วันฉบับร่างคือกำหนดส่ง ไม่ใช่กำหนดเผยแพร่"
+          : "Times are shown in Asia/Bangkok · Draft dates are due dates, not publication commitments."}
       </p>
       <section className={styles.filterBar}>
         <label>
@@ -4749,7 +4792,10 @@ function Calendar({ language }: { language: Language }) {
           {days.map((day) => {
             const dayKey = day.toISOString().slice(0, 10);
             const dayEntries = visibleEntries.filter(
-              (entry) => new Date(entry.date).toISOString().slice(0, 10) === dayKey,
+              (entry) => bangkokDateKey(entry.date) === dayKey,
+            );
+            const dayDecisions = decisions.filter(
+              (decision) => bangkokDateKey(decision.date) === dayKey,
             );
             return (
               <div
@@ -4758,9 +4804,15 @@ function Calendar({ language }: { language: Language }) {
                   day.getUTCMonth() !== anchorDate.getUTCMonth() ? styles.mutedDay : ""
                 }
               >
-                <b>
+                <button
+                  type="button"
+                  className={styles.calendarDayButton}
+                  aria-pressed={selectedDayKey === dayKey}
+                  onClick={() => setSelectedDayKey(dayKey)}
+                >
                   {day.toLocaleDateString(locale, { day: "numeric", timeZone: "UTC" })}
-                </b>
+                  {dayDecisions.length > 0 && <small> · {dayDecisions.length} ✓</small>}
+                </button>
                 {dayEntries.map((entry) => (
                   <button
                     type="button"
@@ -4800,6 +4852,69 @@ function Calendar({ language }: { language: Language }) {
           )}
         </article>
       )}
+      <section className={styles.card} aria-labelledby="calendar-request-decisions-title">
+        <SectionHeading
+          eyebrow={language === "th" ? "กิจกรรมคำขอ" : "REQUEST ACTIVITY"}
+          title={new Date(`${selectedDayKey}T00:00:00.000Z`).toLocaleDateString(locale, {
+            dateStyle: "full",
+            timeZone: "UTC",
+          })}
+        />
+        <h2 id="calendar-request-decisions-title">
+          {language === "th"
+            ? "คำขอที่อนุมัติหรือปฏิเสธในวันนี้"
+            : "Requests approved or rejected on this day"}
+        </h2>
+        {currentDecisionResult === null && (
+          <p role="status">
+            {language === "th" ? "กำลังโหลดกิจกรรม…" : "Loading request activity…"}
+          </p>
+        )}
+        {currentDecisionResult?.failed && (
+          <p role="alert">
+            {language === "th"
+              ? "โหลดกิจกรรมคำขอไม่สำเร็จ"
+              : "Request activity could not be loaded."}
+          </p>
+        )}
+        {currentDecisionResult &&
+          !currentDecisionResult.failed &&
+          selectedDayDecisions.length === 0 && (
+            <p role="status">
+              {language === "th"
+                ? "วันนี้ยังไม่มีคำขอที่อนุมัติหรือปฏิเสธ"
+                : "No requests were approved or rejected on this day."}
+            </p>
+          )}
+        <div className={styles.list}>
+          {selectedDayDecisions.map((decision) => (
+            <article className={styles.listItem} key={decision.id}>
+              <div>
+                <Status>
+                  {decision.decision === "APPROVED"
+                    ? language === "th"
+                      ? "อนุมัติคำขอ"
+                      : "Request approved"
+                    : language === "th"
+                      ? "ปฏิเสธคำขอ"
+                      : "Request rejected"}
+                </Status>
+                <h3>
+                  {decision.requestNumber} · {decision.title}
+                </h3>
+                <p>
+                  {decision.actorName} · {formatTime(decision.date)} Asia/Bangkok
+                </p>
+                {decision.reason && (
+                  <p>
+                    {language === "th" ? "เหตุผล" : "Reason"}: {decision.reason}
+                  </p>
+                )}
+              </div>
+            </article>
+          ))}
+        </div>
+      </section>
     </>
   );
 }

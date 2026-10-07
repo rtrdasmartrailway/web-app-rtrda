@@ -3,16 +3,20 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({
   scheduleFindMany: vi.fn(),
   taskFindMany: vi.fn(),
+  statusHistoryFindMany: vi.fn(),
+  userFindMany: vi.fn(),
 }));
 
 vi.mock("@/lib/db/client", () => ({
   prisma: {
     prSchedule: { findMany: mocks.scheduleFindMany },
     prTask: { findMany: mocks.taskFindMany },
+    prStatusHistory: { findMany: mocks.statusHistoryFindMany },
+    prCenterUser: { findMany: mocks.userFindMany },
   },
 }));
 
-import { listCalendarEntries } from "./service";
+import { listCalendarEntries, listCalendarRequestDecisions } from "./service";
 
 const actor = {
   id: "user-1",
@@ -28,6 +32,8 @@ describe("listCalendarEntries", () => {
     vi.clearAllMocks();
     mocks.scheduleFindMany.mockResolvedValue([]);
     mocks.taskFindMany.mockResolvedValue([]);
+    mocks.statusHistoryFindMany.mockResolvedValue([]);
+    mocks.userFindMany.mockResolvedValue([]);
   });
 
   it("returns scoped schedules, publications, and draft due dates as distinct read-only entries", async () => {
@@ -165,4 +171,63 @@ describe("listCalendarEntries", () => {
       expect(mocks.taskFindMany).not.toHaveBeenCalled();
     },
   );
+});
+
+describe("listCalendarRequestDecisions", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mocks.statusHistoryFindMany.mockResolvedValue([]);
+    mocks.userFindMany.mockResolvedValue([]);
+  });
+
+  it("returns only scoped approvals and rejections with actor and request details", async () => {
+    mocks.statusHistoryFindMany.mockResolvedValue([
+      {
+        id: "history-1",
+        requestId: "request-1",
+        toState: "REJECTED",
+        reason: "Missing source",
+        actorId: "approver-1",
+        createdAt: new Date("2026-10-12T03:15:00.000Z"),
+        request: { requestNumber: "PR-2026-001", title: "Station opening" },
+      },
+      {
+        id: "history-2",
+        requestId: "request-2",
+        toState: "APPROVED",
+        reason: null,
+        actorId: "approver-2",
+        createdAt: new Date("2026-10-12T04:15:00.000Z"),
+        request: { requestNumber: "PR-2026-002", title: "Rail exhibition" },
+      },
+    ]);
+    mocks.userFindMany.mockResolvedValue([
+      { id: "approver-1", displayName: "Reviewer One" },
+      { id: "approver-2", displayName: "Reviewer Two" },
+    ]);
+
+    const result = await listCalendarRequestDecisions(actor, from, to);
+
+    expect(result).toMatchObject([
+      { decision: "REJECTED", reason: "Missing source", actorName: "Reviewer One" },
+      { decision: "APPROVED", reason: null, actorName: "Reviewer Two" },
+    ]);
+    expect(mocks.statusHistoryFindMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          requestId: { not: null },
+          toState: { in: ["APPROVED", "REJECTED"] },
+          createdAt: { gte: from, lt: to },
+          request: { is: { organizationId: "org-1", OR: [{ departmentId: "dept-1" }] } },
+        }),
+      }),
+    );
+  });
+
+  it("rejects invalid date ranges", async () => {
+    await expect(listCalendarRequestDecisions(actor, to, from)).rejects.toMatchObject({
+      code: "INVALID_CALENDAR_RANGE",
+    });
+    expect(mocks.statusHistoryFindMany).not.toHaveBeenCalled();
+  });
 });

@@ -2220,6 +2220,72 @@ export async function listCalendarEntries(actor: PrCenterActor, from: Date, to: 
   ].sort((left, right) => left.date.getTime() - right.date.getTime());
 }
 
+export async function listCalendarRequestDecisions(
+  actor: PrCenterActor,
+  from: Date,
+  to: Date,
+) {
+  const rangeMilliseconds = to.getTime() - from.getTime();
+  if (
+    !Number.isFinite(from.getTime()) ||
+    !Number.isFinite(to.getTime()) ||
+    rangeMilliseconds <= 0 ||
+    rangeMilliseconds > 45 * 24 * 60 * 60 * 1000
+  )
+    throw new PrCenterError(
+      "Calendar range must be valid and no longer than 45 days",
+      422,
+      "INVALID_CALENDAR_RANGE",
+    );
+
+  const events = await prisma.prStatusHistory.findMany({
+    where: {
+      requestId: { not: null },
+      toState: { in: ["APPROVED", "REJECTED"] },
+      createdAt: { gte: from, lt: to },
+      request: { is: requestScopeWhere(actor) },
+    },
+    select: {
+      id: true,
+      requestId: true,
+      toState: true,
+      reason: true,
+      actorId: true,
+      createdAt: true,
+      request: { select: { requestNumber: true, title: true } },
+    },
+    orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+  });
+  const actorIds = [...new Set(events.map((event) => event.actorId))];
+  const actors = actorIds.length
+    ? await prisma.prCenterUser.findMany({
+        where: { id: { in: actorIds }, organizationId: actor.organizationId },
+        select: { id: true, displayName: true },
+      })
+    : [];
+  const actorNames = new Map(actors.map((user) => [user.id, user.displayName]));
+  return events.flatMap((event) => {
+    if (
+      !event.requestId ||
+      (event.toState !== "APPROVED" && event.toState !== "REJECTED") ||
+      !event.request
+    )
+      return [];
+    return [
+      {
+        id: event.id,
+        requestId: event.requestId,
+        requestNumber: event.request.requestNumber,
+        title: event.request.title,
+        decision: event.toState,
+        reason: event.reason,
+        actorName: actorNames.get(event.actorId) || "Unknown user",
+        date: event.createdAt.toISOString(),
+      },
+    ];
+  });
+}
+
 export async function listTaskSchedules(actor: PrCenterActor, taskId: string) {
   if (!canManageTasks(actorRoles(actor)))
     throw new PrCenterError("You cannot view task schedules", 403, "FORBIDDEN");

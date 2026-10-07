@@ -8,6 +8,7 @@ import {
   convertIdea,
   currentMessageHouse,
   listCalendarEntries,
+  listCalendarRequestDecisions,
   messageHouseHistory,
   createTaskRevision,
   listIdeas,
@@ -228,6 +229,14 @@ export function buildPrCenterApi(
   app.get("/calendar", async (request) => {
     const query = request.query as { from?: string; to?: string };
     return listCalendarEntries(
+      request.prCenterActor!,
+      new Date(query.from ?? ""),
+      new Date(query.to ?? ""),
+    );
+  });
+  app.get("/calendar/request-decisions", async (request) => {
+    const query = request.query as { from?: string; to?: string };
+    return listCalendarRequestDecisions(
       request.prCenterActor!,
       new Date(query.from ?? ""),
       new Date(query.to ?? ""),

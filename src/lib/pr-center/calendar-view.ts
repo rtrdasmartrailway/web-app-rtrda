@@ -12,6 +12,32 @@ export type CalendarEntry = {
   publishedReference?: string | null;
 };
 
+export type CalendarRequestDecision = {
+  id: string;
+  requestId: string;
+  requestNumber: string;
+  title: string;
+  decision: "APPROVED" | "REJECTED";
+  reason: string | null;
+  actorName: string;
+  date: string;
+};
+
+const BANGKOK_OFFSET_MS = 7 * 60 * 60 * 1000;
+
+export function bangkokDateKey(value: string | Date): string {
+  const date = value instanceof Date ? value : new Date(value);
+  return new Date(date.getTime() + BANGKOK_OFFSET_MS).toISOString().slice(0, 10);
+}
+
+/** Date-only anchor whose UTC fields represent the Bangkok calendar date. */
+export function bangkokCalendarAnchor(value: Date): Date {
+  const shifted = new Date(value.getTime() + BANGKOK_OFFSET_MS);
+  return new Date(
+    Date.UTC(shifted.getUTCFullYear(), shifted.getUTCMonth(), shifted.getUTCDate()),
+  );
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
@@ -66,6 +92,35 @@ export function parseCalendarEntries(value: unknown): CalendarEntry[] {
       entry.publishedReference === null
         ? { publishedReference: entry.publishedReference }
         : {}),
+    };
+  });
+}
+
+export function parseCalendarRequestDecisions(value: unknown): CalendarRequestDecision[] {
+  if (!Array.isArray(value)) throw new Error("Invalid calendar decision response");
+  return value.map((entry) => {
+    if (
+      !isRecord(entry) ||
+      typeof entry.id !== "string" ||
+      typeof entry.requestId !== "string" ||
+      typeof entry.requestNumber !== "string" ||
+      typeof entry.title !== "string" ||
+      !["APPROVED", "REJECTED"].includes(String(entry.decision)) ||
+      !(entry.reason === null || typeof entry.reason === "string") ||
+      typeof entry.actorName !== "string" ||
+      typeof entry.date !== "string" ||
+      !Number.isFinite(Date.parse(entry.date))
+    )
+      throw new Error("Invalid calendar decision response");
+    return {
+      id: entry.id,
+      requestId: entry.requestId,
+      requestNumber: entry.requestNumber,
+      title: entry.title,
+      decision: entry.decision as CalendarRequestDecision["decision"],
+      reason: entry.reason,
+      actorName: entry.actorName,
+      date: entry.date,
     };
   });
 }
