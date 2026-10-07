@@ -106,3 +106,47 @@ describe("security middleware", () => {
     expect(response.headers.get("allow")).toBe("GET, HEAD, OPTIONS");
   });
 });
+
+describe("Intro gate on the production middleware", () => {
+  it.each(["https://test.rtrda.or.th", "https://www.rtrda.or.th"])(
+    "redirects %s/ to its own Intro page",
+    (origin) => {
+      const response = middleware(request(origin + "/"));
+      expect(response.status).toBe(307);
+      expect(response.headers.get("location")).toBe(origin + "/intro");
+      expect(response.headers.get("cache-control")).toBe("private, no-store");
+    },
+  );
+
+  it("consumes the return marker to serve the homepage only once", () => {
+    const response = middleware(
+      request("https://www.rtrda.or.th/", {
+        headers: { cookie: "rtrda-intro-return=1" },
+      }),
+    );
+    expect(response.headers.get("x-middleware-next")).toBe("1");
+    expect(response.headers.get("set-cookie")).toContain("rtrda-intro-return=;");
+    expect(response.headers.get("cache-control")).toBe("private, no-store");
+  });
+
+  it("keeps the Intro page publicly reachable", () => {
+    const response = middleware(request("https://www.rtrda.or.th/intro"));
+    expect(response.headers.get("x-middleware-next")).toBe("1");
+  });
+});
+
+describe("Intro root behind a reverse proxy", () => {
+  it("redirects to the public HTTPS Intro instead of the internal request URL", () => {
+    const response = middleware(
+      request("http://localhost:39877/", {
+        headers: {
+          host: "localhost:39877",
+          "x-forwarded-host": "www.rtrda.or.th",
+          "x-forwarded-proto": "https",
+        },
+      }),
+    );
+    expect(response.status).toBe(307);
+    expect(response.headers.get("location")).toBe("https://www.rtrda.or.th/intro");
+  });
+});

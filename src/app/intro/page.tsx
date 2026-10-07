@@ -1,3 +1,4 @@
+/* eslint-disable @next/next/no-html-link-for-pages -- The Intro exit needs a full GET to set the one-time return cookie. */
 import Image from "next/image";
 import styles from "./intro.module.css";
 
@@ -73,6 +74,13 @@ export default function IntroPage() {
             <span>ข้าพระพุทธเจ้า คณะผู้บริหาร และบุคลากร</span>
             <span>สถาบันวิจัยและพัฒนาเทคโนโลยีระบบราง (องค์การมหาชน)</span>
           </p>
+          <a
+            aria-label="เข้าสู่เว็บไซต์หลัก"
+            className={styles.websiteLink}
+            href="/intro/enter"
+          >
+            <Image alt="" height={55} src="/intro/website-button.svg" width={225} />
+          </a>
         </footer>
       </div>
     </main>
