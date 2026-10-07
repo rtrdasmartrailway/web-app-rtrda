@@ -73,6 +73,13 @@ export default function IntroPage() {
             <span>ข้าพระพุทธเจ้า คณะผู้บริหาร และบุคลากร</span>
             <span>สถาบันวิจัยและพัฒนาเทคโนโลยีระบบราง (องค์การมหาชน)</span>
           </p>
+          <a
+            aria-label="เข้าสู่เว็บไซต์หลัก"
+            className={styles.websiteLink}
+            href="/intro/enter"
+          >
+            <Image alt="" height={55} src="/intro/website-button.svg" width={225} />
+          </a>
         </footer>
       </div>
     </main>
