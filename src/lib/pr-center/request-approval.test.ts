@@ -295,11 +295,45 @@ describe("request intake approval", () => {
         where: expect.objectContaining({
           OR: [{ departmentId: "dept-2" }],
           status: "SUBMITTED",
-          requesterId: { not: prActor.id },
-          tasks: { every: { status: "DRAFT" } },
         }),
       }),
     );
+  });
+
+  it("keeps self-submitted and task-started requests visible with explicit decision blockers", async () => {
+    mockPrisma.prRequest.findMany.mockResolvedValue([
+      {
+        ...requestRecord,
+        requesterId: prActor.id,
+        tasks: [{ id: "task-self", status: "DRAFT" }],
+      },
+      {
+        ...requestRecord,
+        id: "request-started",
+        tasks: [{ id: "task-started", status: "IN_PRODUCTION" }],
+      },
+      {
+        ...requestRecord,
+        id: "request-ready",
+        tasks: [{ id: "task-ready", status: "DRAFT" }],
+      },
+    ]);
+
+    const queue = await listRequestApprovalQueue(prActor);
+
+    expect(mockPrisma.prRequest.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          status: "SUBMITTED",
+          OR: [{ departmentId: "dept-1" }],
+        }),
+      }),
+    );
+    expect(queue.map((request) => request.intakeDecisionBlockedReason)).toEqual([
+      "SELF_SUBMISSION",
+      "TASK_WORK_ALREADY_STARTED",
+      null,
+    ]);
   });
 
   it("routes newly submitted requests to scoped PR-only intake queues", async () => {

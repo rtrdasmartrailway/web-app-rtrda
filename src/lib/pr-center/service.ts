@@ -1710,20 +1710,31 @@ export async function listRequestApprovalQueue(actor: PrCenterActor) {
       403,
       "FORBIDDEN",
     );
-  return prisma.prRequest.findMany({
+  const requests = await prisma.prRequest.findMany({
     where: {
       ...requestScopeWhere(actor),
-      requesterId: { not: actor.id },
       status: "SUBMITTED",
-      tasks: { every: { status: "DRAFT" } },
     },
     include: {
       department: { select: { name: true } },
       requester: { select: { displayName: true } },
       revisions: { orderBy: { revisionNumber: "desc" }, take: 1 },
       sources: { select: { url: true } },
+      tasks: { select: { id: true, status: true } },
     },
     orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+  });
+  return requests.map((request) => {
+    const selfSubmitted = request.requesterId === actor.id;
+    const taskWorkStarted = request.tasks.some((task) => task.status !== "DRAFT");
+    return {
+      ...request,
+      intakeDecisionBlockedReason: selfSubmitted
+        ? "SELF_SUBMISSION"
+        : taskWorkStarted
+          ? "TASK_WORK_ALREADY_STARTED"
+          : null,
+    };
   });
 }
 

@@ -346,6 +346,7 @@ type RequestApprovalItem = {
     offsiteDetails: unknown;
   }>;
   sources: Array<{ url: string }>;
+  intakeDecisionBlockedReason: "SELF_SUBMISSION" | "TASK_WORK_ALREADY_STARTED" | null;
 };
 type TaskApprovalRecord = {
   id: string;
@@ -964,6 +965,9 @@ export function PrCenterApp({
   );
   const [approvalTasks, setApprovalTasks] = useState<Task[]>([]);
   const [approvalRequests, setApprovalRequests] = useState<RequestApprovalItem[]>([]);
+  const [requestApprovalQueueState, setRequestApprovalQueueState] = useState<
+    "loading" | "loaded" | "error"
+  >("loading");
   const [notice, setNotice] = useState<string | null>(null);
   const [requestCursor, setRequestCursor] = useState<string | null>(null);
   const [hasMoreRequests, setHasMoreRequests] = useState(false);
@@ -1038,14 +1042,26 @@ export function PrCenterApp({
   }, [actor, page]);
   useEffect(() => {
     const roleGrants = actor?.roles?.length ? actor.roles : actor ? [actor.role] : [];
-    if (!roleGrants.includes("PR_OPERATIONS") || page !== "approvals") return;
-    fetch("/api/pr-center/request-approvals", { credentials: "same-origin" })
+    if (page !== "approvals") return;
+    if (!roleGrants.includes("PR_OPERATIONS")) return;
+    const controller = new AbortController();
+    fetch("/api/pr-center/request-approvals", {
+      credentials: "same-origin",
+      signal: controller.signal,
+      cache: "no-store",
+    })
       .then(async (response) => {
         if (!response.ok) throw new Error("Request approval queue unavailable");
         const requests = (await response.json()) as RequestApprovalItem[];
         setApprovalRequests(requests);
+        setRequestApprovalQueueState("loaded");
       })
-      .catch(() => setNotice("Unable to load submitted request approvals"));
+      .catch(() => {
+        if (controller.signal.aborted) return;
+        setRequestApprovalQueueState("error");
+        setNotice("Unable to load submitted request approvals");
+      });
+    return () => controller.abort();
   }, [actor, page]);
   useEffect(() => {
     latestActorId.current = actor?.userId;
@@ -2355,6 +2371,9 @@ export function PrCenterApp({
               requests={approvalRequests}
               canDecideRequests={hasUiRole("pr")}
               canDecideTasks={hasUiRole("approver", "pr", "admin")}
+              requestQueueState={
+                hasUiRole("pr") ? requestApprovalQueueState : "not-authorized"
+              }
               onDecision={recordApproval}
               onRequestDecision={recordRequestDecision}
             />
@@ -4710,6 +4729,7 @@ function Approvals({
   requests,
   canDecideRequests,
   canDecideTasks,
+  requestQueueState,
   onDecision,
   onRequestDecision,
 }: {
@@ -4717,6 +4737,7 @@ function Approvals({
   requests: RequestApprovalItem[];
   canDecideRequests: boolean;
   canDecideTasks: boolean;
+  requestQueueState: "loading" | "loaded" | "error" | "not-authorized";
   onDecision: (
     taskId: string,
     decision: "APPROVED" | "REVISION_REQUIRED" | "REJECTED",
@@ -4728,6 +4749,20 @@ function Approvals({
       <SectionHeading eyebrow="REVIEW AND APPROVAL" title="Approval Queue" />
       <h2>Submitted Requests · Intake Decision</h2>
       <section className={styles.list}>
+        {requestQueueState === "loading" && (
+          <p role="status">Loading submitted requests…</p>
+        )}
+        {requestQueueState === "error" && (
+          <p role="alert">
+            Could not load submitted requests. Reopen the queue to retry.
+          </p>
+        )}
+        {requestQueueState === "not-authorized" && (
+          <p role="note">
+            Only PR Operations can view the request intake queue. Task-stage approvals
+            appear below when your role allows them.
+          </p>
+        )}
         {requests.map((request) => (
           <article key={request.id} className={styles.listItem}>
             <div>
@@ -4769,7 +4804,16 @@ function Approvals({
             </div>
             <div>
               <Status>Awaiting intake approval</Status>
-              {canDecideRequests ? (
+              {request.intakeDecisionBlockedReason === "SELF_SUBMISSION" ? (
+                <p role="note">
+                  You submitted this request. Another PR Operations user must decide it.
+                </p>
+              ) : request.intakeDecisionBlockedReason === "TASK_WORK_ALREADY_STARTED" ? (
+                <p role="alert">
+                  Task work has already started; intake decision is blocked. Use the task
+                  workflow.
+                </p>
+              ) : canDecideRequests ? (
                 <>
                   <button onClick={() => onRequestDecision(request.id, "REJECTED")}>
                     Reject
@@ -4787,7 +4831,12 @@ function Approvals({
             </div>
           </article>
         ))}
-        {requests.length === 0 && <p>No submitted requests awaiting intake decision.</p>}
+        {requestQueueState === "loaded" && requests.length === 0 && (
+          <p>
+            No submitted requests are currently visible in your PR Operations department
+            scope.
+          </p>
+        )}
       </section>
       <h2>Task Stage Approvals</h2>
       <section className={styles.list}>
