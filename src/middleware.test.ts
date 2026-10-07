@@ -134,3 +134,19 @@ describe("Intro gate on the production middleware", () => {
     expect(response.headers.get("x-middleware-next")).toBe("1");
   });
 });
+
+describe("Intro root behind a reverse proxy", () => {
+  it("redirects to the public HTTPS Intro instead of the internal request URL", () => {
+    const response = middleware(
+      request("http://localhost:39877/", {
+        headers: {
+          host: "localhost:39877",
+          "x-forwarded-host": "www.rtrda.or.th",
+          "x-forwarded-proto": "https",
+        },
+      }),
+    );
+    expect(response.status).toBe(307);
+    expect(response.headers.get("location")).toBe("https://www.rtrda.or.th/intro");
+  });
+});

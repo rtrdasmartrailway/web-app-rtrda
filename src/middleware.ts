@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { INTRO_RETURN_COOKIE } from "@/lib/intro-flow";
+import { INTRO_RETURN_COOKIE, introHomepageUrl } from "@/lib/intro-flow";
 
 const BROKEN_O5_PATH =
   "/%25E0%25%2520%2520B8%2584%25E0%25B8%25B9%25E0%25%2520%2520B9%2588%25E0%25B8%25A1%25E0%25%2520%2520B8%25B7%25E0%25B8%25ADO5";
@@ -124,7 +124,7 @@ export function middleware(request: NextRequest) {
       return response;
     }
 
-    const redirect = NextResponse.redirect(new URL("/intro", request.url), {
+    const redirect = NextResponse.redirect(new URL("/intro", introHomepageUrl(request)), {
       status: 307,
     });
     redirect.headers.set("cache-control", "private, no-store");
