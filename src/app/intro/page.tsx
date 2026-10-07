@@ -1,3 +1,4 @@
+/* eslint-disable @next/next/no-html-link-for-pages -- The Intro exit needs a full GET to set the one-time return cookie. */
 import Image from "next/image";
 import styles from "./intro.module.css";
 
