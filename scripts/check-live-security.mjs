@@ -1,5 +1,7 @@
 #!/usr/bin/env node
 
+import { verifyLandingPage } from "./check-live-security-landing.mjs";
+
 const target = process.argv[2];
 if (!target) {
   console.error("usage: node scripts/check-live-security.mjs https://host");
@@ -24,12 +26,13 @@ const httpsUrl = new URL(target);
 assert(httpsUrl.protocol === "https:", "target must use https");
 
 const page = await fetch(httpsUrl, { redirect: "manual" });
-assert(page.status === 200, `expected HTTPS 200, got ${page.status}`);
-for (const [name, expected] of requiredHeaders) {
-  const actual = page.headers.get(name) ?? "";
-  assert(expected.test(actual), `missing or invalid ${name}: ${actual || "<absent>"}`);
+for (const landingPage of await verifyLandingPage(httpsUrl, page, fetch)) {
+  for (const [name, expected] of requiredHeaders) {
+    const actual = landingPage.headers.get(name) ?? "";
+    assert(expected.test(actual), `missing or invalid ${name}: ${actual || "<absent>"}`);
+  }
+  assert(!landingPage.headers.has("x-powered-by"), "x-powered-by must be absent");
 }
-assert(!page.headers.has("x-powered-by"), "x-powered-by must be absent");
 
 for (const method of ["POST", "PUT", "PATCH", "DELETE"]) {
   const response = await fetch(httpsUrl, { method, redirect: "manual" });
