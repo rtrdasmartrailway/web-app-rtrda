@@ -8,6 +8,7 @@ import {
   classifyComparison,
   detectRenderedPageKind,
   extractFlipbookPdfPath,
+  expectedIntroLandingPath,
   extractPageSignals,
   extractRtrdaUrls,
   extractSitemapLocs,
@@ -60,11 +61,11 @@ const { fetchJson, fetchText } = createFetchTools({
 });
 
 /** Plain fetch that follows redirects and never throws on HTTP status. */
-async function fetchPage(url, { method = "GET" } = {}) {
+async function fetchPage(url, { method = "GET", redirect = "follow" } = {}) {
   try {
     const response = await fetch(url, {
       method,
-      redirect: "follow",
+      redirect,
       headers: {
         "user-agent": "rtrda-parity-audit/1.0",
         accept: method === "GET" ? "text/html,*/*" : "*/*",
@@ -75,6 +76,7 @@ async function fetchPage(url, { method = "GET" } = {}) {
     return {
       status: response.status,
       finalUrl: response.url,
+      location: response.headers.get("location") ?? "",
       contentType: response.headers.get("content-type") ?? "",
       contentLength: response.headers.get("content-length"),
       body,
@@ -83,6 +85,7 @@ async function fetchPage(url, { method = "GET" } = {}) {
     return {
       status: 0,
       finalUrl: url,
+      location: "",
       contentType: "",
       contentLength: null,
       body: "",
@@ -266,7 +269,19 @@ async function auditUrl(urlKey, options, assetCache) {
 
   const oldRes = await fetchPage(oldUrl);
   await sleep(OLD_FETCH_DELAY_MS);
-  const newRes = await fetchPage(newUrl);
+  const newRootRes = await fetchPage(
+    newUrl,
+    urlKey === "/" ? { redirect: "manual" } : {},
+  );
+  const introLandingPath = expectedIntroLandingPath({
+    urlKey,
+    status: newRootRes.status,
+    location: newRootRes.location,
+    oldBase: options.oldBase,
+  });
+  const newRes = introLandingPath
+    ? await fetchPage(new URL(introLandingPath, options.newBase).toString())
+    : newRootRes;
 
   const oldSignals = extractPageSignals(oldRes.body, detectRenderedPageKind(oldRes.body));
   const newSignals = extractPageSignals(newRes.body, "new");
@@ -387,6 +402,18 @@ async function auditUrl(urlKey, options, assetCache) {
     }
   }
 
+  if (introLandingPath) {
+    for (const assetPath of [
+      "/intro/website-button.svg",
+      "/intro/fonts/Charmonman-Regular.ttf",
+    ]) {
+      const asset = await fetchPage(new URL(assetPath, options.newBase).toString(), {
+        method: "HEAD",
+      });
+      if (asset.status !== 200) missingAssets.push(assetPath);
+    }
+  }
+
   let searchOk = null;
   if (urlKey.includes("?s=")) {
     searchOk =
@@ -403,6 +430,12 @@ async function auditUrl(urlKey, options, assetCache) {
     titleSimilarity,
     missingAssets,
     searchOk,
+    expectedIntroLanding: Boolean(introLandingPath),
+    introContentValid:
+      newRes.status === 200 &&
+      newSignals.title.includes("สถิตอยู่ในใจตราบนิรันดร์") &&
+      new URL(newRes.finalUrl).origin === new URL(options.newBase).origin &&
+      new URL(newRes.finalUrl).pathname === "/intro",
   });
 
   return {
