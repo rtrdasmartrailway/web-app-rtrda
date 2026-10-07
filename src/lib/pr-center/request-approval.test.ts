@@ -216,7 +216,7 @@ describe("request intake approval", () => {
       });
       mockPrisma.prRequest.findUniqueOrThrow.mockResolvedValueOnce({
         ...requestRecord,
-        status,
+        status: "DRAFT",
         version: 3,
       });
 
@@ -236,8 +236,11 @@ describe("request intake approval", () => {
 
       expect(mockPrisma.prRequest.updateMany).toHaveBeenCalledWith(
         expect.objectContaining({
-          where: { id: requestRecord.id, version: 2 },
-          data: expect.objectContaining({ version: { increment: 1 } }),
+          where: { id: requestRecord.id, version: 2, status },
+          data: expect.objectContaining({
+            ...(status === "DRAFT" ? {} : { status: "DRAFT" }),
+            version: { increment: 1 },
+          }),
         }),
       );
       expect(mockPrisma.prRequestRevision.create).toHaveBeenCalledWith(
@@ -251,6 +254,17 @@ describe("request intake approval", () => {
           }),
         }),
       );
+      if (status === "SUBMITTED") {
+        expect(mockPrisma.prNotification.createMany).toHaveBeenCalledWith({
+          data: expect.arrayContaining([
+            expect.objectContaining({
+              userId: "pr-recipient",
+              target: "approvals",
+              title: "Request amended; resubmission required",
+            }),
+          ]),
+        });
+      }
       expect(mockPrisma.prAuditEvent.create).toHaveBeenCalledWith(
         expect.objectContaining({
           data: expect.objectContaining({
@@ -259,6 +273,58 @@ describe("request intake approval", () => {
           }),
         }),
       );
+    },
+  );
+
+  it.each(["REJECTED", "WITHDRAWN"] as const)(
+    "reopens the original %s request and its cancelled task as a new draft revision",
+    async (status) => {
+      mockPrisma.prRequest.findFirst.mockResolvedValueOnce({
+        ...requestRecord,
+        status,
+        version: 4,
+        revisions: [{ revisionNumber: 2 }],
+        tasks: [{ id: "task-1", status: "CANCELLED", version: 3 }],
+      });
+      mockPrisma.prTask.updateMany.mockResolvedValueOnce({ count: 1 });
+      mockPrisma.prRequest.findUniqueOrThrow.mockResolvedValueOnce({
+        ...requestRecord,
+        status: "DRAFT",
+        version: 5,
+        revisions: [{ revisionNumber: 3 }],
+        tasks: [{ id: "task-1", status: "DRAFT", version: 4 }],
+      });
+
+      const reopened = await updateRequestDraft(requesterActor, requestRecord.id, 4, {
+        type: "PR",
+        title: "Updated after decision",
+        objective: "Revised objective",
+        audience: "Public",
+        sourceUrls: ["https://example.test/revised-source"],
+      });
+
+      expect(reopened).toMatchObject({
+        id: requestRecord.id,
+        requestNumber: requestRecord.requestNumber,
+        status: "DRAFT",
+        version: 5,
+      });
+      expect(mockPrisma.prRequest.updateMany).toHaveBeenCalledWith({
+        where: { id: requestRecord.id, version: 4, status },
+        data: expect.objectContaining({ status: "DRAFT", version: { increment: 1 } }),
+      });
+      expect(mockPrisma.prTask.updateMany).toHaveBeenCalledWith({
+        where: { id: "task-1", status: "CANCELLED", version: 3 },
+        data: { status: "DRAFT", version: { increment: 1 } },
+      });
+      expect(mockPrisma.prStatusHistory.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          requestId: requestRecord.id,
+          fromState: status,
+          toState: "DRAFT",
+          actorId: requesterActor.id,
+        }),
+      });
     },
   );
 
@@ -367,6 +433,20 @@ describe("request intake approval", () => {
         expect.objectContaining({ userId: "pr-recipient", target: "approvals" }),
       ]),
     });
+  });
+
+  it("does not submit a request when no active scoped PR Operations reviewer can be notified", async () => {
+    mockPrisma.prRequest.findFirst.mockResolvedValue({
+      ...requestRecord,
+      status: "DRAFT",
+      version: 1,
+    });
+    mockPrisma.prUserRole.findMany.mockResolvedValue([]);
+
+    await expect(
+      transitionRequest(requesterActor, requestRecord.id, 1, "SUBMITTED"),
+    ).rejects.toMatchObject({ code: "NO_INTAKE_REVIEWER", statusCode: 409 });
+    expect(mockPrisma.prNotification.createMany).not.toHaveBeenCalled();
   });
 
   it("cancels the draft task atomically when its requester withdraws a request", async () => {

@@ -9,6 +9,6 @@ export function canEditOwnRequest(
 ): boolean {
   return (
     request.requesterId === currentUserId &&
-    (request.status === "DRAFT" || request.status === "SUBMITTED")
+    ["DRAFT", "SUBMITTED", "REJECTED", "WITHDRAWN"].includes(request.status || "")
   );
 }

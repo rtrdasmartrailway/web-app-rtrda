@@ -598,9 +598,13 @@ export async function updateRequestDraft(
   const request = await requestInScope(actor, requestId);
   if (request.requesterId !== actor.id && !actorHasRole(actor, "SCOPED_ADMINISTRATOR"))
     throw new PrCenterError("You cannot amend this request", 403, "FORBIDDEN");
-  if (request.status !== "DRAFT" && request.status !== "SUBMITTED")
+  if (
+    !(["DRAFT", "SUBMITTED", "REJECTED", "WITHDRAWN"] as string[]).includes(
+      request.status,
+    )
+  )
     throw new PrCenterError(
-      "This request can no longer be amended",
+      "Only draft, pending, rejected, or withdrawn requests can be amended",
       422,
       "INVALID_TRANSITION",
     );
@@ -619,15 +623,26 @@ export async function updateRequestDraft(
     );
   const sourceUrls = [...new Set(input.sourceUrls.map(assertUrl))];
   const offsiteDetails = validateOffsiteDetails(input.type, input.offsiteDetails);
+  if (
+    request.tasks.some((task) => task.status !== "DRAFT" && task.status !== "CANCELLED")
+  )
+    throw new PrCenterError(
+      "This request has task work in progress and cannot be amended. Contact PR Operations.",
+      409,
+      "REQUEST_WORK_ALREADY_STARTED",
+    );
   return prisma.$transaction(async (tx) => {
     const revisionNumber = (request.revisions[0]?.revisionNumber || 0) + 1;
+    const returnToDraft = request.status !== "DRAFT";
     const updated = await tx.prRequest.updateMany({
-      where: { id: request.id, version: fromVersion },
+      where: { id: request.id, version: fromVersion, status: request.status },
       data: {
         title,
+        type: input.type,
         priority: input.priority || request.priority,
         priorityReason: input.priorityReason?.trim() || null,
         requestedFor: input.requestedFor,
+        ...(returnToDraft ? { status: "DRAFT" as const } : {}),
         version: { increment: 1 },
       },
     });
@@ -653,12 +668,72 @@ export async function updateRequestDraft(
       await tx.prRequestSource.createMany({
         data: sourceUrls.map((url) => ({ requestId: request.id, url })),
       });
+    if (returnToDraft) {
+      await tx.prStatusHistory.create({
+        data: {
+          requestId: request.id,
+          fromState: request.status,
+          toState: "DRAFT",
+          reason: `Requester amended revision ${revisionNumber}; resubmission required`,
+          actorId: actor.id,
+        },
+      });
+      for (const task of request.tasks) {
+        if (task.status === "DRAFT") continue;
+        const reopened = await tx.prTask.updateMany({
+          where: { id: task.id, status: "CANCELLED", version: task.version },
+          data: { status: "DRAFT", version: { increment: 1 } },
+        });
+        if (reopened.count !== 1)
+          throw new PrCenterError(
+            "A related task changed while reopening the request. Refresh and try again.",
+            409,
+            "STALE_UPDATE",
+          );
+        await tx.prStatusHistory.create({
+          data: {
+            taskId: task.id,
+            fromState: "CANCELLED",
+            toState: "DRAFT",
+            reason: `Parent request amended as revision ${revisionNumber}`,
+            actorId: actor.id,
+          },
+        });
+      }
+    }
+    if (request.status === "SUBMITTED") {
+      const operations = await tx.prUserRole.findMany({
+        where: {
+          organizationId: request.organizationId,
+          role: "PR_OPERATIONS",
+          OR: [{ departmentId: request.departmentId }, { departmentId: null }],
+          user: { active: true },
+        },
+        select: { userId: true },
+      });
+      const recipients = [...new Set(operations.map(({ userId }) => userId))];
+      if (recipients.length)
+        await tx.prNotification.createMany({
+          data: recipients.map((userId) => ({
+            userId,
+            title: "Request amended; resubmission required",
+            body: `${title} was amended and returned to draft by its requester. It will re-enter the approval queue after resubmission.`,
+            target: "approvals",
+          })),
+        });
+    }
     await auditAndOutbox(tx, {
       actor,
       action: "request.amended",
       entityType: "request",
       entityId: request.id,
-      after: { revisionNumber, version: fromVersion + 1 },
+      after: {
+        revisionNumber,
+        previousStatus: request.status,
+        status: returnToDraft ? "DRAFT" : request.status,
+        resubmissionRequired: returnToDraft,
+        version: fromVersion + 1,
+      },
       eventType: "pr.request.amended",
       correlationId,
     });
@@ -747,6 +822,12 @@ export async function transitionRequest(
         },
         select: { userId: true },
       });
+      if (approverRoles.length === 0)
+        throw new PrCenterError(
+          "No active PR Operations reviewer is assigned to this request department",
+          409,
+          "NO_INTAKE_REVIEWER",
+        );
       const recipients = new Set([
         request.requesterId,
         ...approverRoles.map((role) => role.userId),

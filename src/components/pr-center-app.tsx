@@ -1085,8 +1085,20 @@ export function PrCenterApp({
     return () => controller.abort();
   }, [actor?.userId, ideaSearch, ideaStatusFilter]);
   useEffect(() => {
-    fetch("/api/pr-center/notifications", { credentials: "same-origin" })
-      .then(async (response) => {
+    if (!actor?.userId) return;
+    let disposed = false;
+    let activeController: AbortController | null = null;
+    const loadNotifications = async () => {
+      if (disposed || document.visibilityState !== "visible") return;
+      activeController?.abort();
+      const controller = new AbortController();
+      activeController = controller;
+      try {
+        const response = await fetch("/api/pr-center/notifications", {
+          credentials: "same-origin",
+          cache: "no-store",
+          signal: controller.signal,
+        });
         if (!response.ok) throw new Error("Notifications unavailable");
         const notifications = (await response.json()) as Array<{
           id: string;
@@ -1097,6 +1109,7 @@ export function PrCenterApp({
           readAt: string | null;
           createdAt: string;
         }>;
+        if (disposed || controller.signal.aborted) return;
         setState((previous) => ({
           ...previous,
           notifications: notifications.map((notification) => ({
@@ -1111,8 +1124,25 @@ export function PrCenterApp({
             read: Boolean(notification.readAt),
           })),
         }));
-      })
-      .catch(() => setNotice("Unable to load notifications"));
+      } catch {
+        if (!disposed && !controller.signal.aborted)
+          setNotice("Unable to refresh notifications");
+      }
+    };
+    const refreshWhenVisible = () => void loadNotifications();
+    void loadNotifications();
+    const timer = window.setInterval(refreshWhenVisible, 30_000);
+    window.addEventListener("focus", refreshWhenVisible);
+    document.addEventListener("visibilitychange", refreshWhenVisible);
+    return () => {
+      disposed = true;
+      activeController?.abort();
+      window.clearInterval(timer);
+      window.removeEventListener("focus", refreshWhenVisible);
+      document.removeEventListener("visibilitychange", refreshWhenVisible);
+    };
+  }, [actor?.userId]);
+  useEffect(() => {
     fetch("/api/pr-center/audit?take=100", { credentials: "same-origin" })
       .then(async (response) => {
         if (!response.ok) throw new Error("Audit history unavailable");
@@ -1360,6 +1390,9 @@ export function PrCenterApp({
     }));
   };
   const createRequest = async (draft: RequestDraft, editId = requestEditId) => {
+    const priorStatus = editId
+      ? state.requests.find((request) => request.id === editId)?.status
+      : undefined;
     try {
       const response = await fetch(
         editId ? `/api/pr-center/requests/${editId}` : "/api/pr-center/requests",
@@ -1479,10 +1512,14 @@ export function PrCenterApp({
       announce(
         state.language === "th"
           ? editId
-            ? "บันทึกการแก้ไขคำขอแล้ว"
+            ? priorStatus && priorStatus !== "DRAFT"
+              ? "บันทึก revision ใหม่เป็นฉบับร่างแล้ว กรุณาตรวจรายละเอียดและส่งคำขออีกครั้ง"
+              : "บันทึกการแก้ไขคำขอแล้ว"
             : "บันทึกคำขอเป็นฉบับร่างแล้ว"
           : editId
-            ? "Request changes saved"
+            ? priorStatus && priorStatus !== "DRAFT"
+              ? "Revision saved as a draft. Review the details and submit the request again."
+              : "Request changes saved"
             : "Request saved as draft",
       );
       setPage("my-requests");
@@ -2308,6 +2345,7 @@ export function PrCenterApp({
           {page === "my-requests" && (
             <Requests
               t={t}
+              language={state.language}
               onOpenRequest={openRequest}
               onEditRequest={editRequest}
               onSubmitRequest={submitRequest}
@@ -2327,6 +2365,7 @@ export function PrCenterApp({
           {page === "requests" && (
             <Requests
               t={t}
+              language={state.language}
               onOpenRequest={openRequest}
               onEditRequest={editRequest}
               onSubmitRequest={submitRequest}
@@ -3304,6 +3343,7 @@ function NewRequest({
 }
 function Requests({
   t,
+  language,
   onOpenRequest,
   onEditRequest,
   onSubmitRequest,
@@ -3320,6 +3360,7 @@ function Requests({
   onLoadMore,
 }: {
   t: (typeof copy)[Language];
+  language: Language;
   onOpenRequest: () => void;
   onEditRequest: (request: Request) => void;
   onSubmitRequest: (request: Request) => void;
@@ -3339,13 +3380,28 @@ function Requests({
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState<"all" | StatusId>("all");
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const listStatus = (request: Request): StatusId => {
+    switch (request.status) {
+      case "DRAFT":
+        return "draft";
+      case "SUBMITTED":
+        return "management_approval";
+      case "REJECTED":
+        return "rejected";
+      case "WITHDRAWN":
+      case "CANCELLED":
+        return "cancelled";
+      default:
+        return requestStatus(request, taskItems);
+    }
+  };
   const visibleRequests = (
     mode === "mine"
       ? requestItems.filter((request) => request.requesterId === currentUserId)
       : requestItems
   ).filter(
     (request) =>
-      (status === "all" || requestStatus(request, taskItems) === status) &&
+      (status === "all" || listStatus(request) === status) &&
       `${request.id} ${request.title} ${request.department}`
         .toLowerCase()
         .includes(query.toLowerCase()),
@@ -3426,8 +3482,12 @@ function Requests({
                             ? "Approved · PR assignment"
                             : request.status === "REJECTED"
                               ? "Rejected"
-                              : request.status ||
-                                STATUS_LABELS[requestStatus(request, taskItems)]}
+                              : request.status === "WITHDRAWN"
+                                ? language === "th"
+                                  ? "ถอนแล้ว · แก้ไขและส่งใหม่ได้"
+                                  : "Withdrawn · can be amended"
+                                : request.status ||
+                                  STATUS_LABELS[requestStatus(request, taskItems)]}
                     </Status>
                   </td>
                   <td>{request.requestedDate}</td>
@@ -3465,6 +3525,17 @@ function Requests({
                 <strong>{t.rejectionReason}:</strong> {selected.rejectionReason}
               </p>
             )}
+            {(selected.status === "WITHDRAWN" || selected.status === "REJECTED") && (
+              <p role="note">
+                {selected.status === "WITHDRAWN"
+                  ? language === "th"
+                    ? "แก้ไขคำขอนี้ได้ เมื่อบันทึกแล้วคำขอจะกลับเป็นฉบับร่าง และต้องส่งเข้าคิวอนุมัติอีกครั้ง"
+                    : "You can amend this request. Saving returns it to draft; submit it again for approval."
+                  : language === "th"
+                    ? "แก้ไขคำขอนี้ได้ เมื่อบันทึกแล้วคำขอจะกลับเป็นฉบับร่าง และต้องส่งเข้าคิวอนุมัติอีกครั้ง"
+                    : "You can amend this rejected request. Saving returns it to draft; submit it again for approval."}
+              </p>
+            )}
             <p>{selected.objective || "No communication objective provided."}</p>
             <p>
               {selected.source
@@ -3485,7 +3556,15 @@ function Requests({
             </p>
             {canEditOwnRequest(selected, currentUserId) && (
               <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                <button onClick={() => onEditRequest(selected)}>Edit request</button>
+                <button onClick={() => onEditRequest(selected)}>
+                  {selected.status === "WITHDRAWN" || selected.status === "REJECTED"
+                    ? language === "th"
+                      ? "แก้ไขและส่งใหม่"
+                      : "Amend and resubmit"
+                    : language === "th"
+                      ? "แก้ไขคำขอ"
+                      : "Edit request"}
+                </button>
                 {selected.status === "DRAFT" && (
                   <button
                     className={styles.primary}
