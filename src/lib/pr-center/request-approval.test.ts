@@ -109,8 +109,8 @@ describe("request intake approval", () => {
         }),
         include: expect.objectContaining({
           statusHistory: expect.objectContaining({
-            where: { toState: "REJECTED" },
-            select: { reason: true },
+            where: { toState: { in: ["REJECTED", "APPROVED"] } },
+            select: expect.objectContaining({ reason: true, toState: true }),
           }),
         }),
       }),
@@ -137,8 +137,8 @@ describe("request intake approval", () => {
         where: { organizationId: "org-1" },
         include: expect.objectContaining({
           statusHistory: expect.objectContaining({
-            where: { toState: "REJECTED" },
-            select: { reason: true },
+            where: { toState: { in: ["REJECTED", "APPROVED"] } },
+            select: expect.objectContaining({ reason: true, toState: true }),
           }),
         }),
       }),
@@ -198,8 +198,8 @@ describe("request intake approval", () => {
         where: expect.objectContaining({ OR: [{ requesterId: requesterActor.id }] }),
         include: expect.objectContaining({
           statusHistory: expect.objectContaining({
-            where: { toState: "REJECTED" },
-            select: { reason: true },
+            where: { toState: { in: ["REJECTED", "APPROVED"] } },
+            select: expect.objectContaining({ reason: true, toState: true }),
           }),
         }),
       }),
@@ -393,6 +393,24 @@ describe("request intake approval", () => {
           status: "SUBMITTED",
           OR: [{ departmentId: "dept-1" }],
         }),
+        include: expect.objectContaining({
+          revisions: expect.objectContaining({ take: 1 }),
+          sources: { select: { url: true } },
+          attachments: expect.objectContaining({
+            where: { taskId: null },
+            select: expect.objectContaining({
+              file: expect.objectContaining({
+                select: expect.objectContaining({
+                  scanStatus: true,
+                  deletedAt: true,
+                }),
+              }),
+            }),
+          }),
+          statusHistory: expect.objectContaining({
+            where: { toState: { in: ["APPROVED", "REJECTED"] } },
+          }),
+        }),
       }),
     );
     expect(queue.map((request) => request.intakeDecisionBlockedReason)).toEqual([
@@ -506,6 +524,37 @@ describe("request intake approval", () => {
         actorId: prActor.id,
       }),
     });
+  });
+
+  it("stores an optional approval comment in history, audit, and requester notification", async () => {
+    await recordRequestDecision(prActor, requestRecord.id, 2, {
+      decision: "APPROVED",
+      reason: "Complete and ready for planning",
+    });
+
+    expect(mockPrisma.prStatusHistory.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        requestId: requestRecord.id,
+        toState: "APPROVED",
+        reason: "Complete and ready for planning",
+      }),
+    });
+    expect(mockPrisma.prNotification.createMany).toHaveBeenCalledWith({
+      data: expect.arrayContaining([
+        expect.objectContaining({
+          userId: requesterActor.id,
+          body: expect.stringContaining("Complete and ready for planning"),
+        }),
+      ]),
+    });
+    expect(mockPrisma.prOutboxEvent.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          eventType: "pr.request.approved",
+          payload: expect.objectContaining({ reason: "Complete and ready for planning" }),
+        }),
+      }),
+    );
   });
 
   it("denies administrators the request-intake decision endpoint", async () => {

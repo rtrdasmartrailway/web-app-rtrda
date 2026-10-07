@@ -114,6 +114,11 @@ type Request = {
     | "CLOSED";
   version?: number;
   rejectionReason?: string;
+  decisionHistory?: Array<{
+    status: "APPROVED" | "REJECTED";
+    reason: string | null;
+    createdAt: string;
+  }>;
   revisionNumber?: number;
   objective?: string;
   audience?: string;
@@ -285,7 +290,20 @@ type ApiRequestRecord = {
     offsiteDetails: unknown;
   }>;
   sources: { url: string }[];
-  statusHistory: { reason: string | null }[];
+  attachments: Array<{
+    id: string;
+    kind: string;
+    version: number;
+    file: {
+      id: string;
+      fileName: string;
+      mimeType: string;
+      sizeBytes: number;
+      scanStatus: string;
+      deletedAt: string | null;
+    };
+  }>;
+  statusHistory: { toState: string; reason: string | null; createdAt: string }[];
   tasks: Array<{
     id: string;
     title: string;
@@ -347,12 +365,36 @@ type RequestApprovalItem = {
   department: { name: string };
   requester: { displayName: string };
   requestedFor: string | null;
+  priority: string;
+  priorityReason: string | null;
   revisions: Array<{
+    revisionNumber: number;
+    title: string;
     objective: string | null;
     audience: string | null;
     offsiteDetails: unknown;
+    changeSummary: string | null;
+    createdAt: string;
   }>;
   sources: Array<{ url: string }>;
+  statusHistory: Array<{
+    toState: "APPROVED" | "REJECTED";
+    reason: string | null;
+    createdAt: string;
+  }>;
+  attachments: Array<{
+    id: string;
+    kind: string;
+    version: number;
+    file: {
+      id: string;
+      fileName: string;
+      mimeType: string;
+      sizeBytes: number;
+      scanStatus: string;
+      deletedAt: string | null;
+    };
+  }>;
   intakeDecisionBlockedReason: "SELF_SUBMISSION" | "TASK_WORK_ALREADY_STARTED" | null;
 };
 type TaskApprovalRecord = {
@@ -410,7 +452,20 @@ function mapRequestRecord(request: ApiRequestRecord): Request {
     taskIds: request.tasks.map((task) => task.id),
     status: request.status,
     version: request.version,
-    rejectionReason: request.statusHistory[0]?.reason || undefined,
+    rejectionReason:
+      request.statusHistory.find((entry) => entry.toState === "REJECTED")?.reason ||
+      undefined,
+    decisionHistory: request.statusHistory.flatMap((entry) =>
+      entry.toState === "APPROVED" || entry.toState === "REJECTED"
+        ? [
+            {
+              status: entry.toState,
+              reason: entry.reason,
+              createdAt: entry.createdAt,
+            },
+          ]
+        : [],
+    ),
     revisionNumber: request.revisions[0]?.revisionNumber,
     objective: request.revisions[0]?.objective || undefined,
     audience: request.revisions[0]?.audience || undefined,
@@ -1754,20 +1809,12 @@ export function PrCenterApp({
   const recordRequestDecision = async (
     requestId: string,
     decision: "APPROVED" | "REJECTED",
-  ) => {
+    comment: string,
+  ): Promise<boolean> => {
     const request = approvalRequests.find((item) => item.id === requestId);
-    if (!request) return;
-    const reason =
-      decision === "REJECTED"
-        ? window
-            .prompt(
-              state.language === "th"
-                ? "ระบุเหตุผลในการปฏิเสธคำขอ"
-                : "Enter a reason for rejecting this request",
-            )
-            ?.trim() || ""
-        : "";
-    if (decision === "REJECTED" && !reason) return;
+    if (!request) return false;
+    const reason = comment.trim();
+    if (decision === "REJECTED" && !reason) return false;
     try {
       const response = await fetch(`/api/pr-center/requests/${requestId}/decisions`, {
         method: "POST",
@@ -1784,25 +1831,9 @@ export function PrCenterApp({
         } | null;
         throw new Error(result?.message || "Request decision could not be saved");
       }
-      const updated = (await response.json()) as {
-        status: Request["status"];
-        version: number;
-      };
+      await response.json();
       setApprovalRequests((previous) => previous.filter((item) => item.id !== requestId));
-      setState((previous) => ({
-        ...previous,
-        requests: previous.requests.map((item) =>
-          item.id === requestId
-            ? { ...item, status: updated.status, version: updated.version }
-            : item,
-        ),
-        tasks: previous.tasks.map((task) =>
-          task.requestId === requestId
-            ? { ...task, requestStatus: updated.status }
-            : task,
-        ),
-      }));
-      if (decision === "APPROVED") await refreshRequests();
+      await refreshRequests();
       await refreshNotifications().catch(() => undefined);
       announce(
         decision === "APPROVED"
@@ -1813,8 +1844,10 @@ export function PrCenterApp({
             ? "ปฏิเสธคำขอแล้ว พร้อมแจ้งเหตุผลให้ผู้ส่งคำขอ"
             : "Request rejected; the requester has been notified with the reason",
       );
+      return true;
     } catch (error) {
       announce(error instanceof Error ? error.message : "Request decision failed");
+      return false;
     }
   };
   const scheduleTask = async (
@@ -2413,6 +2446,7 @@ export function PrCenterApp({
           {page === "calendar" && <Calendar language={state.language} />}
           {page === "approvals" && (
             <Approvals
+              language={state.language}
               tasks={approvalTasks}
               requests={approvalRequests}
               canDecideRequests={hasUiRole("pr")}
@@ -3527,11 +3561,21 @@ function Requests({
               {selected.id} · {selected.department}
             </p>
             <h2>{selected.title}</h2>
-            {selected.status === "REJECTED" && selected.rejectionReason && (
-              <p>
-                <strong>{t.rejectionReason}:</strong> {selected.rejectionReason}
+            {selected.decisionHistory?.map((decision, index) => (
+              <p key={`${decision.status}-${decision.createdAt}-${index}`}>
+                <strong>
+                  {decision.status === "APPROVED"
+                    ? language === "th"
+                      ? "อนุมัติแล้ว"
+                      : "Approved"
+                    : t.rejectionReason}
+                </strong>
+                {decision.reason ? `: ${decision.reason}` : ""} ·{" "}
+                {new Date(decision.createdAt).toLocaleString(
+                  language === "th" ? "th-TH-u-ca-buddhist" : "en-GB",
+                )}
               </p>
-            )}
+            ))}
             {(selected.status === "WITHDRAWN" || selected.status === "REJECTED") && (
               <p role="note">
                 {selected.status === "WITHDRAWN"
@@ -4919,6 +4963,7 @@ function Calendar({ language }: { language: Language }) {
   );
 }
 function Approvals({
+  language,
   tasks: taskItems,
   requests,
   canDecideRequests,
@@ -4927,6 +4972,7 @@ function Approvals({
   onDecision,
   onRequestDecision,
 }: {
+  language: Language;
   tasks: Task[];
   requests: RequestApprovalItem[];
   canDecideRequests: boolean;
@@ -4936,8 +4982,43 @@ function Approvals({
     taskId: string,
     decision: "APPROVED" | "REVISION_REQUIRED" | "REJECTED",
   ) => void;
-  onRequestDecision: (requestId: string, decision: "APPROVED" | "REJECTED") => void;
+  onRequestDecision: (
+    requestId: string,
+    decision: "APPROVED" | "REJECTED",
+    comment: string,
+  ) => Promise<boolean>;
 }) {
+  const [requestComments, setRequestComments] = useState<Record<string, string>>({});
+  const [requestDecisionErrors, setRequestDecisionErrors] = useState<
+    Record<string, string>
+  >({});
+  const [decidingRequestId, setDecidingRequestId] = useState<string | null>(null);
+
+  const submitRequestDecision = async (
+    request: RequestApprovalItem,
+    decision: "APPROVED" | "REJECTED",
+  ) => {
+    const comment = requestComments[request.id]?.trim() || "";
+    if (decision === "REJECTED" && !comment) {
+      setRequestDecisionErrors((previous) => ({
+        ...previous,
+        [request.id]:
+          language === "th"
+            ? "กรุณาระบุเหตุผลก่อนปฏิเสธคำขอ"
+            : "A reason is required to reject a request.",
+      }));
+      return;
+    }
+    setRequestDecisionErrors((previous) => ({ ...previous, [request.id]: "" }));
+    setDecidingRequestId(request.id);
+    const saved = await onRequestDecision(request.id, decision, comment);
+    setDecidingRequestId(null);
+    if (saved) {
+      setRequestComments((previous) => ({ ...previous, [request.id]: "" }));
+      setRequestDecisionErrors((previous) => ({ ...previous, [request.id]: "" }));
+    }
+  };
+
   return (
     <>
       <SectionHeading eyebrow="REVIEW AND APPROVAL" title="Approval Queue" />
@@ -4965,36 +5046,83 @@ function Approvals({
               </p>
               <h2>{request.title}</h2>
               <span>Submitted by {request.requester.displayName}</span>
-              <p>
-                Type: {request.type} · Requested date:{" "}
-                {request.requestedFor?.slice(0, 10) || "—"}
-              </p>
-              {request.revisions[0]?.objective && (
-                <p>Objective: {request.revisions[0].objective}</p>
-              )}
-              {request.revisions[0]?.audience && (
-                <p>Audience: {request.revisions[0].audience}</p>
-              )}
-              {request.type === "OFFSITE" && (
+              <details>
+                <summary>
+                  {language === "th" ? "ดูรายละเอียดคำขอ" : "View request details"}
+                </summary>
                 <p>
-                  Off-site details:{" "}
-                  {(() => {
-                    const value = request.revisions[0]?.offsiteDetails;
-                    if (!value || typeof value !== "object" || Array.isArray(value))
-                      return "Missing details";
-                    const details = value as Record<string, unknown>;
-                    return `${typeof details.startTime === "string" ? details.startTime : "—"} · ${typeof details.travel === "string" ? details.travel : "—"}`;
-                  })()}
+                  Type: {request.type} · Requested date:{" "}
+                  {request.requestedFor?.slice(0, 10) || "—"}
                 </p>
-              )}
-              {request.sources.map((source) => (
-                <p key={source.url}>
-                  Source:{" "}
-                  <a href={source.url} target="_blank" rel="noreferrer">
-                    {source.url}
-                  </a>
+                <p>
+                  Priority: {request.priority}
+                  {request.priorityReason ? ` · ${request.priorityReason}` : ""}
                 </p>
-              ))}
+                {request.revisions[0]?.title && (
+                  <p>
+                    Revision {request.revisions[0].revisionNumber}:{" "}
+                    {request.revisions[0].title}
+                    {request.revisions[0].changeSummary
+                      ? ` · ${request.revisions[0].changeSummary}`
+                      : ""}
+                  </p>
+                )}
+                {request.revisions[0]?.objective && (
+                  <p>Objective: {request.revisions[0].objective}</p>
+                )}
+                {request.revisions[0]?.audience && (
+                  <p>Audience: {request.revisions[0].audience}</p>
+                )}
+                {request.type === "OFFSITE" && (
+                  <p>
+                    Off-site details:{" "}
+                    {(() => {
+                      const value = request.revisions[0]?.offsiteDetails;
+                      if (!value || typeof value !== "object" || Array.isArray(value))
+                        return "Missing details";
+                      const details = value as Record<string, unknown>;
+                      return `${typeof details.startTime === "string" ? details.startTime : "—"} · ${typeof details.travel === "string" ? details.travel : "—"}`;
+                    })()}
+                  </p>
+                )}
+                {request.sources.map((source) => (
+                  <p key={source.url}>
+                    Source:{" "}
+                    <a href={source.url} target="_blank" rel="noreferrer">
+                      {source.url}
+                    </a>
+                  </p>
+                ))}
+                {request.attachments.map((attachment) => (
+                  <p key={attachment.id}>
+                    Evidence: {attachment.file.fileName} · {attachment.file.scanStatus}
+                    {attachment.file.scanStatus === "CLEAN" &&
+                    !attachment.file.deletedAt ? (
+                      <>
+                        {" · "}
+                        <a href={`/api/pr-center/files/${attachment.file.id}/download`}>
+                          Download
+                        </a>
+                      </>
+                    ) : (
+                      <>
+                        {" "}
+                        ·{" "}
+                        {language === "th"
+                          ? "ยังดาวน์โหลดไม่ได้"
+                          : "Not available for download"}
+                      </>
+                    )}
+                  </p>
+                ))}
+                {request.statusHistory.map((history, index) => (
+                  <p key={`${history.toState}-${history.createdAt}-${index}`}>
+                    Previous {history.toState.toLowerCase()} ·{" "}
+                    {new Date(history.createdAt).toLocaleString()}
+                    {history.reason ? ` · ${history.reason}` : ""}
+                  </p>
+                ))}
+              </details>
             </div>
             <div>
               <Status>Awaiting intake approval</Status>
@@ -5009,14 +5137,48 @@ function Approvals({
                 </p>
               ) : canDecideRequests ? (
                 <>
-                  <button onClick={() => onRequestDecision(request.id, "REJECTED")}>
-                    Reject
+                  <label>
+                    {language === "th"
+                      ? "คอมเมนต์ / เหตุผล (อนุมัติไม่บังคับ)"
+                      : "Comment / reason (optional for approval)"}
+                    <textarea
+                      value={requestComments[request.id] || ""}
+                      maxLength={5000}
+                      rows={3}
+                      onChange={(event) =>
+                        setRequestComments((previous) => ({
+                          ...previous,
+                          [request.id]: event.target.value,
+                        }))
+                      }
+                    />
+                  </label>
+                  {requestDecisionErrors[request.id] && (
+                    <p role="alert">{requestDecisionErrors[request.id]}</p>
+                  )}
+                  <button
+                    type="button"
+                    disabled={
+                      decidingRequestId === request.id ||
+                      !requestComments[request.id]?.trim()
+                    }
+                    onClick={() => void submitRequestDecision(request, "REJECTED")}
+                  >
+                    {language === "th" ? "ปฏิเสธคำขอ" : "Reject request"}
                   </button>
                   <button
+                    type="button"
                     className={styles.primary}
-                    onClick={() => onRequestDecision(request.id, "APPROVED")}
+                    disabled={decidingRequestId === request.id}
+                    onClick={() => void submitRequestDecision(request, "APPROVED")}
                   >
-                    Approve request
+                    {decidingRequestId === request.id
+                      ? language === "th"
+                        ? "กำลังบันทึก…"
+                        : "Saving…"
+                      : language === "th"
+                        ? "อนุมัติคำขอ"
+                        : "Approve request"}
                   </button>
                 </>
               ) : (

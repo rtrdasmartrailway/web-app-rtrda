@@ -74,6 +74,26 @@ describe("request intake approval API", () => {
     await app.close();
   });
 
+  it("forwards an optional reason with an approval decision", async () => {
+    decideRequest.mockResolvedValue({ id: requestId, status: "APPROVED" });
+    const app = buildPrCenterApi(async () => prActor);
+    const response = await app.inject({
+      method: "POST",
+      url: `/requests/${requestId}/decisions`,
+      headers: { "if-match": "3" },
+      payload: { decision: "APPROVED", reason: "Complete and ready for planning" },
+    });
+    expect(response.statusCode).toBe(200);
+    expect(decideRequest).toHaveBeenCalledWith(
+      prActor,
+      requestId,
+      3,
+      { decision: "APPROVED", reason: "Complete and ready for planning" },
+      expect.any(String),
+    );
+    await app.close();
+  });
+
   it("rejects unknown decisions before invoking the service", async () => {
     const app = buildPrCenterApi(async () => prActor);
     const response = await app.inject({

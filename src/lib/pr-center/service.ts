@@ -487,10 +487,10 @@ export async function listRequests(actor: PrCenterActor, take = 25, cursor?: str
       requester: { select: { displayName: true } },
       sources: { select: { url: true } },
       statusHistory: {
-        where: { toState: "REJECTED" },
+        where: { toState: { in: ["REJECTED", "APPROVED"] } },
         orderBy: { createdAt: "desc" },
-        take: 1,
-        select: { reason: true },
+        take: 5,
+        select: { toState: true, reason: true, createdAt: true },
       },
       tasks: {
         include: {
@@ -572,10 +572,10 @@ async function requestInScope(actor: PrCenterActor, requestId: string) {
       revisions: { orderBy: { revisionNumber: "desc" } },
       sources: true,
       statusHistory: {
-        where: { toState: "REJECTED" },
+        where: { toState: { in: ["REJECTED", "APPROVED"] } },
         orderBy: { createdAt: "desc" },
-        take: 1,
-        select: { reason: true },
+        take: 5,
+        select: { toState: true, reason: true, createdAt: true },
       },
       tasks: true,
     },
@@ -1801,7 +1801,32 @@ export async function listRequestApprovalQueue(actor: PrCenterActor) {
       requester: { select: { displayName: true } },
       revisions: { orderBy: { revisionNumber: "desc" }, take: 1 },
       sources: { select: { url: true } },
+      statusHistory: {
+        where: { toState: { in: ["APPROVED", "REJECTED"] } },
+        orderBy: { createdAt: "desc" },
+        take: 5,
+        select: { toState: true, reason: true, createdAt: true },
+      },
       tasks: { select: { id: true, status: true } },
+      attachments: {
+        where: { taskId: null },
+        orderBy: { createdAt: "desc" },
+        select: {
+          id: true,
+          kind: true,
+          version: true,
+          file: {
+            select: {
+              id: true,
+              fileName: true,
+              mimeType: true,
+              sizeBytes: true,
+              scanStatus: true,
+              deletedAt: true,
+            },
+          },
+        },
+      },
     },
     orderBy: [{ createdAt: "asc" }, { id: "asc" }],
   });
@@ -1926,7 +1951,7 @@ export async function recordRequestDecision(
         title: input.decision === "APPROVED" ? "Request approved" : "Request rejected",
         body:
           input.decision === "APPROVED"
-            ? `${request.title} was approved and is being returned to PR Operations for assignment and planning.`
+            ? `${request.title} was approved and is being returned to PR Operations for assignment and planning.${reason ? ` Comment: ${reason}` : ""}`
             : `${request.title} was rejected. Reason: ${reason}`,
         target: "my-requests",
       },
