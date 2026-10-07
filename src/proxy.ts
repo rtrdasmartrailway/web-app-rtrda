@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { INTRO_RETURN_COOKIE } from "@/lib/intro-flow";
+import { INTRO_RETURN_COOKIE, introHomepageUrl } from "@/lib/intro-flow";
 import { middleware } from "@/lib/request-policy";
 import { checkSurveyAccess, surveyPrivateHeaders } from "@/lib/survey/survey-private";
 
@@ -25,7 +25,7 @@ export async function proxy(request: NextRequest) {
       return response;
     }
 
-    const redirect = NextResponse.redirect(new URL("/intro", request.url), {
+    const redirect = NextResponse.redirect(new URL("/intro", introHomepageUrl(request)), {
       status: 307,
     });
     redirect.headers.set("cache-control", "private, no-store");

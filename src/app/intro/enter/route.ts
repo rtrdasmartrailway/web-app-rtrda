@@ -1,10 +1,10 @@
 import { NextResponse } from "next/server";
-import { INTRO_RETURN_COOKIE } from "@/lib/intro-flow";
+import { INTRO_RETURN_COOKIE, introHomepageUrl } from "@/lib/intro-flow";
 
 export const dynamic = "force-dynamic";
 
 export function GET(request: Request) {
-  const response = NextResponse.redirect(new URL("/", request.url), {
+  const response = NextResponse.redirect(introHomepageUrl(request), {
     status: 303,
   });
 

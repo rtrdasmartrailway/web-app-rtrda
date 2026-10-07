@@ -43,3 +43,19 @@ describe("survey page/API proxy", () => {
     ).toBe(503);
   });
 });
+
+describe("Intro root behind a reverse proxy", () => {
+  it("redirects to the public HTTPS Intro instead of the internal request URL", async () => {
+    const response = await proxy(
+      new NextRequest("http://localhost:39877/", {
+        headers: {
+          host: "localhost:39877",
+          "x-forwarded-host": "www.rtrda.or.th",
+          "x-forwarded-proto": "https",
+        },
+      }),
+    );
+    expect(response.status).toBe(307);
+    expect(response.headers.get("location")).toBe("https://www.rtrda.or.th/intro");
+  });
+});
