@@ -24,6 +24,13 @@ class MemoryStorage {
 }
 
 describe("LandingPopup", () => {
+  it("does not mount the retired campaign popup in the public site shell", () => {
+    const source = readFileSync(new URL("./site-shell.tsx", import.meta.url), "utf8");
+
+    expect(source).not.toContain("<LandingPopup");
+    expect(source).not.toContain("import { LandingPopup }");
+  });
+
   it("renders an optimized Mother's Day royal tribute popup at its square dimensions", () => {
     const html = renderToStaticMarkup(<LandingPopup path="/" forceOpen />);
     const source = readFileSync(new URL("./landing-popup.tsx", import.meta.url), "utf8");

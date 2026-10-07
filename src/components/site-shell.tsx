@@ -1,5 +1,4 @@
 import Link from "next/link";
-import { LandingPopup } from "./landing-popup";
 import { SafeImage } from "./safe-image";
 import { StickyFacebookButton } from "./sticky-facebook-button";
 import type { ShellData } from "@/lib/db/page-data";
@@ -121,7 +120,6 @@ export function SiteShell({
         language={language}
         navItems={shell.navItems}
       />
-      <LandingPopup path={shell.path} />
 
       <main>{children}</main>
 
