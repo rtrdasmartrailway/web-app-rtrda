@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { INTRO_RETURN_COOKIE } from "@/lib/intro-flow";
 
 const BROKEN_O5_PATH =
   "/%25E0%25%2520%2520B8%2584%25E0%25B8%25B9%25E0%25%2520%2520B9%2588%25E0%25B8%25A1%25E0%25%2520%2520B8%25B7%25E0%25B8%25ADO5";
@@ -113,6 +114,21 @@ export function middleware(request: NextRequest) {
 
   if (BROKEN_O10_ESERVICE_PDF_PATHS.includes(rawPath)) {
     return NextResponse.rewrite(new URL(CANONICAL_O10_ESERVICE_PDF_PATH, request.url));
+  }
+
+  if (rawPath === "/") {
+    if (request.cookies.get(INTRO_RETURN_COOKIE)?.value === "1") {
+      const response = NextResponse.next();
+      response.cookies.delete(INTRO_RETURN_COOKIE);
+      response.headers.set("cache-control", "private, no-store");
+      return response;
+    }
+
+    const redirect = NextResponse.redirect(new URL("/intro", request.url), {
+      status: 307,
+    });
+    redirect.headers.set("cache-control", "private, no-store");
+    return redirect;
   }
 
   return NextResponse.next();
