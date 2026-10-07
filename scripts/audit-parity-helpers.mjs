@@ -218,6 +218,17 @@ export const CATEGORY = {
  * "pass" | "warn" | "fail". OLD_SIDE_ERROR is excluded from the failure gate
  * because it means the source site itself misbehaved.
  */
+export function expectedIntroLandingPath({ urlKey, status, location, oldBase }) {
+  if (urlKey !== "/" || status !== 307 || !location) return null;
+  try {
+    const expected = new URL("/intro", oldBase);
+    if (expected.protocol !== "https:") return null;
+    return new URL(location).href === expected.href ? "/intro" : null;
+  } catch {
+    return null;
+  }
+}
+
 export function classifyComparison({
   urlKey,
   oldStatus,
@@ -226,6 +237,8 @@ export function classifyComparison({
   titleSimilarity,
   missingAssets,
   searchOk,
+  expectedIntroLanding = false,
+  introContentValid = false,
 }) {
   if (oldStatus < 200 || oldStatus >= 400) {
     return { category: CATEGORY.OLD_SIDE_ERROR, level: "warn" };
@@ -243,6 +256,11 @@ export function classifyComparison({
   }
   if (missingAssets?.length > 0) {
     return { category: CATEGORY.MISSING_ASSETS, level: "fail" };
+  }
+  if (expectedIntroLanding && urlKey === "/") {
+    return introContentValid
+      ? { category: CATEGORY.PASS, level: "pass" }
+      : { category: CATEGORY.STATUS_MISMATCH, level: "fail" };
   }
   if (similarity !== null && similarity < SIMILARITY_WARN) {
     return { category: CATEGORY.LOW_SIMILARITY, level: "fail" };

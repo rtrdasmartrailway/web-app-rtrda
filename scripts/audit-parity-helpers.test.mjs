@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   CATEGORY,
   classifyComparison,
+  expectedIntroLandingPath,
   detectRenderedPageKind,
   extractFlipbookPdfPath,
   extractPageSignals,
@@ -255,5 +256,64 @@ describe("summarizeResults", () => {
       fail: 2,
       byCategory: { PASS: 1, MISSING_ROUTE: 2, TITLE_MISMATCH: 1 },
     });
+  });
+});
+
+describe("intentional Intro landing parity", () => {
+  const base = {
+    urlKey: "/",
+    oldStatus: 200,
+    newStatus: 200,
+    similarity: 0.02,
+    titleSimilarity: 0.1,
+    missingAssets: [],
+    searchOk: null,
+    expectedIntroLanding: true,
+    introContentValid: true,
+  };
+
+  it("recognizes only an exact same-origin HTTPS Intro redirect from root", () => {
+    expect(
+      expectedIntroLandingPath({
+        urlKey: "/",
+        status: 307,
+        location: "https://www.rtrda.or.th/intro",
+        oldBase: "https://www.rtrda.or.th",
+      }),
+    ).toBe("/intro");
+    for (const location of [
+      "https://evil.example/intro",
+      "http://www.rtrda.or.th/intro",
+      "https://www.rtrda.or.th/intro?skip=1",
+      "https://www.rtrda.or.th/other",
+    ]) {
+      expect(
+        expectedIntroLandingPath({
+          urlKey: "/",
+          status: 307,
+          location,
+          oldBase: "https://www.rtrda.or.th",
+        }),
+      ).toBeNull();
+    }
+    expect(
+      expectedIntroLandingPath({
+        urlKey: "/news",
+        status: 307,
+        location: "https://www.rtrda.or.th/intro",
+        oldBase: "https://www.rtrda.or.th",
+      }),
+    ).toBeNull();
+  });
+
+  it("passes only a validated local Intro despite intentionally different home copy", () => {
+    expect(classifyComparison(base)).toEqual({ category: CATEGORY.PASS, level: "pass" });
+    expect(classifyComparison({ ...base, introContentValid: false }).level).toBe("fail");
+    expect(
+      classifyComparison({ ...base, missingAssets: ["/intro/website-button.svg"] }).level,
+    ).toBe("fail");
+    expect(classifyComparison({ ...base, expectedIntroLanding: false }).level).toBe(
+      "fail",
+    );
   });
 });
