@@ -7710,7 +7710,9 @@ function RequestModal({
               />
             </label>
             <label>
-              <FieldLabel required>{thai ? "เจ้าของโครงการ" : "Project owner"}</FieldLabel>
+              <FieldLabel required>
+                {thai ? "เจ้าของโครงการ" : "Project owner"}
+              </FieldLabel>
               <input
                 value={draft.owner}
                 placeholder={thai ? "ชื่อผู้รับผิดชอบโครงการ" : "Project owner name"}
