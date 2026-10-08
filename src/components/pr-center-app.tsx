@@ -1123,6 +1123,232 @@ function Metric({
   );
 }
 
+function DashboardScheduleInsights({
+  language,
+  onNavigate,
+}: {
+  language: Language;
+  onNavigate: (page: Page) => void;
+}) {
+  const thai = language === "th";
+  const locale = thai ? "th-TH-u-ca-buddhist" : "en-GB";
+  const [dashboardAnchor] = useState(() => new Date());
+  const now = dashboardAnchor;
+  const today = bangkokDateKey(now);
+  const rangeStart = bangkokCalendarAnchor(now);
+  rangeStart.setUTCDate(rangeStart.getUTCDate() - 14);
+  const rangeEnd = bangkokCalendarAnchor(now);
+  rangeEnd.setUTCDate(rangeEnd.getUTCDate() + 31);
+  const from = new Date(rangeStart.getTime() - 7 * 60 * 60 * 1000).toISOString();
+  const to = new Date(rangeEnd.getTime() - 7 * 60 * 60 * 1000).toISOString();
+  const [entries, setEntries] = useState<CalendarEntry[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    fetch(
+      `/api/pr-center/calendar?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`,
+      { credentials: "same-origin", signal: controller.signal, cache: "no-store" },
+    )
+      .then(async (response) => {
+        if (!response.ok) throw new Error("Calendar data unavailable");
+        return parseCalendarEntries(await response.json());
+      })
+      .then((result) => {
+        if (!controller.signal.aborted) {
+          setEntries(result);
+          setError(false);
+        }
+      })
+      .catch(() => {
+        if (!controller.signal.aborted) {
+          setEntries([]);
+          setError(true);
+        }
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setLoading(false);
+      });
+    return () => controller.abort();
+  }, [from, to]);
+
+  const upcoming = entries
+    .filter(
+      (entry) => entry.status === "SCHEDULED" && bangkokDateKey(entry.date) >= today,
+    )
+    .sort((left, right) => left.date.localeCompare(right.date))
+    .slice(0, 5);
+  const channelCounts = new Map<string, number>();
+  for (const entry of entries) {
+    if (entry.status !== "SCHEDULED" && entry.status !== "PUBLISHED") continue;
+    const channel = entry.channel?.trim();
+    if (!channel) continue;
+    channelCounts.set(channel, (channelCounts.get(channel) || 0) + 1);
+  }
+  const channelMix = [...channelCounts.entries()]
+    .map(([channel, count]) => ({ channel, count, percent: 0 }))
+    .sort(
+      (left, right) =>
+        right.count - left.count || left.channel.localeCompare(right.channel),
+    );
+  const channelTotal = channelMix.reduce((sum, item) => sum + item.count, 0);
+  let cursor = 0;
+  const colors = ["#1976d2", "#0b8c85", "#f4ad3d", "#8b5cf6", "#e05a73", "#56718f"];
+  const gradient = channelMix.length
+    ? `conic-gradient(${channelMix
+        .map((item, index) => {
+          const start = cursor;
+          cursor += (item.count / channelTotal) * 100;
+          item.percent = Math.round((item.count / channelTotal) * 100);
+          return `${colors[index % colors.length]} ${start}% ${cursor}%`;
+        })
+        .join(", ")})`
+    : "#e8edf3";
+  const publishedByMonth = new Map<string, number[]>([]);
+  for (const entry of entries.filter((item) => item.status === "PUBLISHED")) {
+    const dateKey = bangkokDateKey(entry.date);
+    const date = new Date(`${dateKey}T00:00:00Z`);
+    const monthKey = date.toLocaleDateString(locale, {
+      month: "short",
+      year: "numeric",
+      timeZone: "UTC",
+    });
+    const week = Math.min(5, Math.floor((date.getUTCDate() - 1) / 7));
+    const counts = publishedByMonth.get(monthKey) || [0, 0, 0, 0, 0];
+    counts[week] += 1;
+    publishedByMonth.set(monthKey, counts);
+  }
+
+  return (
+    <section className={styles.dashboardInsightsGrid}>
+      <article className={styles.card}>
+        <header>
+          <div>
+            <p className={styles.eyebrow}>
+              {thai ? "กำหนดเผยแพร่" : "UPCOMING PUBLICATIONS"}
+            </p>
+            <h2>{thai ? "รายการเผยแพร่เร็ว ๆ นี้" : "Upcoming publications"}</h2>
+          </div>
+          <button type="button" onClick={() => onNavigate("calendar")}>
+            {thai ? "เปิดปฏิทิน" : "Open calendar"}
+          </button>
+        </header>
+        {loading ? (
+          <p role="status">{thai ? "กำลังโหลดกำหนดการ…" : "Loading schedules…"}</p>
+        ) : error ? (
+          <p role="alert">
+            {thai ? "โหลดกำหนดการไม่สำเร็จ" : "Schedules could not be loaded."}
+          </p>
+        ) : upcoming.length === 0 ? (
+          <p className={styles.dashboardNote}>
+            {thai
+              ? "ยังไม่มีรายการที่กำหนดเผยแพร่"
+              : "No upcoming publications are scheduled."}
+          </p>
+        ) : (
+          <ul className={styles.upcomingList}>
+            {upcoming.map((entry) => (
+              <li key={entry.id}>
+                <span>{entry.title}</span>
+                <small>
+                  {entry.channel} ·{" "}
+                  {new Date(entry.date).toLocaleString(locale, {
+                    timeZone: "Asia/Bangkok",
+                    dateStyle: "medium",
+                    timeStyle: "short",
+                  })}
+                </small>
+              </li>
+            ))}
+          </ul>
+        )}
+      </article>
+      <article className={styles.card}>
+        <p className={styles.eyebrow}>{thai ? "สัดส่วนแผนเผยแพร่" : "CHANNEL MIX"}</p>
+        <h2>
+          {thai ? "กำหนดการและเผยแพร่ตามช่องทาง" : "Scheduled and published by channel"}
+        </h2>
+        {channelTotal > 0 ? (
+          <div className={styles.channelMix}>
+            <div
+              className={styles.channelMixDonut}
+              style={{ background: gradient }}
+              aria-label={thai ? "กราฟสัดส่วนช่องทาง" : "Channel mix chart"}
+            />
+            <ul>
+              {channelMix.map((item, index) => (
+                <li key={item.channel}>
+                  <span style={{ background: colors[index % colors.length] }} />
+                  <b>{item.channel}</b>
+                  <small>
+                    {item.count} · {item.percent}%
+                  </small>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ) : (
+          <p className={styles.dashboardNote}>
+            {thai
+              ? "ยังไม่มีข้อมูลตารางเผยแพร่สำหรับช่วงนี้"
+              : "No schedule data is available for this period."}
+          </p>
+        )}
+      </article>
+      <article className={`${styles.card} ${styles.wideCard}`}>
+        <p className={styles.eyebrow}>
+          {thai ? "ผลงานเผยแพร่รายสัปดาห์" : "WEEKLY PUBLISHED CONTENT"}
+        </p>
+        <h2>
+          {thai ? "จำนวนผลงานตามสัปดาห์ของเดือน" : "Published content by week of month"}
+        </h2>
+        {publishedByMonth.size > 0 ? (
+          <div className={styles.tableWrap}>
+            <table>
+              <thead>
+                <tr>
+                  <th>{thai ? "เดือน" : "Month"}</th>
+                  {[1, 2, 3, 4, 5].map((week) => (
+                    <th key={week}>W{week}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {[...publishedByMonth.entries()].map(([month, counts]) => (
+                  <tr key={month}>
+                    <th scope="row">{month}</th>
+                    {counts.map((count, index) => (
+                      <td key={index}>{count}</td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <p className={styles.dashboardNote}>
+            {thai
+              ? "ยังไม่มีผลงานเผยแพร่ในช่วงนี้"
+              : "No published content is available for this period."}
+          </p>
+        )}
+      </article>
+      <article className={styles.card}>
+        <p className={styles.eyebrow}>{thai ? "ข้อมูลวิเคราะห์" : "ANALYTICS"}</p>
+        <h2>
+          {thai ? "Reach, Engagement และผลงานเด่น" : "Reach, engagement and top content"}
+        </h2>
+        <p className={styles.dashboardNote}>
+          {thai
+            ? "ยังไม่มีแหล่งข้อมูล analytics ที่ตรวจสอบและยืนยันได้ จึงยังไม่แสดงแนวโน้ม Reach รายเดือนหรือ Top Content"
+            : "No verified analytics source is connected, so monthly reach trends and Top Content remain unavailable."}
+        </p>
+      </article>
+    </section>
+  );
+}
+
 export function PrCenterApp({
   actor,
   onSignOut,
@@ -3194,22 +3420,6 @@ function Dashboard({
             ))}
           </div>
         </article>
-        <article className={styles.card}>
-          <header>
-            <div>
-              <p className={styles.eyebrow}>{t.upcoming}</p>
-              <h2>{currentMonth}</h2>
-            </div>
-            <button type="button" onClick={() => onNavigate("calendar")}>
-              {thai ? "เปิดปฏิทิน" : "Open calendar"}
-            </button>
-          </header>
-          <p className={styles.dashboardNote}>
-            {thai
-              ? "เปิดปฏิทินเพื่อดูรายการกำหนดการและสถานะที่โหลดจากระบบ ไม่มีการแสดงรายการตัวอย่าง"
-              : "Open the calendar to view schedules and statuses loaded from the system. No sample entries are shown."}
-          </p>
-        </article>
         <article className={`${styles.card} ${styles.wideCard}`}>
           <header>
             <div>
@@ -3244,20 +3454,8 @@ function Dashboard({
             </p>
           )}
         </article>
-        <article className={styles.card}>
-          <header>
-            <div>
-              <p className={styles.eyebrow}>{thai ? "ข้อมูลวิเคราะห์" : "ANALYTICS"}</p>
-              <h2>{thai ? "ผลการเข้าถึงเนื้อหา" : "Content performance"}</h2>
-            </div>
-          </header>
-          <p className={styles.dashboardNote}>
-            {thai
-              ? "ยังไม่มีแหล่งข้อมูล analytics จริงที่ยืนยันแล้ว จึงไม่แสดงสัดส่วนช่องทางหรือค่าประมาณ Reach/Engagement"
-              : "No verified analytics source is connected. Channel shares and estimated Reach/Engagement are not shown."}
-          </p>
-        </article>
       </section>
+      <DashboardScheduleInsights language={language} onNavigate={onNavigate} />
     </>
   );
 }
@@ -3842,6 +4040,7 @@ function ExecutiveDashboard({
           View content operations
         </button>
       </article>
+      <DashboardScheduleInsights language={language} onNavigate={onNavigate} />
     </>
   );
 }

@@ -321,24 +321,6 @@ type CreateRequestInput = {
   };
 };
 
-const REQUEST_CONTENT_TYPES = new Set([
-  "Website News",
-  "Facebook Post",
-  "Carousel",
-  "Infographic",
-  "Quote Card",
-  "Short Video",
-  "Reel",
-  "YouTube Video",
-  "Photo Album",
-  "X Post",
-  "LinkedIn Post",
-  "Press Release",
-  "Newsletter",
-  "Executive Brief",
-  "Other",
-]);
-
 function validatedPriority(value?: string) {
   const priority = value?.trim().toUpperCase() || "NORMAL";
   if (!["LOW", "NORMAL", "HIGH", "URGENT"].includes(priority))
@@ -391,6 +373,7 @@ function validateOffsiteDetails(
 function validateRequestDetails(
   type: CreateRequestInput["type"],
   details: CreateRequestInput["requestDetails"],
+  allowedContentTypes: ReadonlySet<string>,
 ) {
   if (!details) return undefined;
   const projectOwner = details.projectOwner.trim();
@@ -413,7 +396,7 @@ function validateRequestDetails(
       422,
       "INVALID_REQUEST_DETAILS",
     );
-  if (contentTypes.some((item) => !REQUEST_CONTENT_TYPES.has(item)))
+  if (contentTypes.some((item) => !allowedContentTypes.has(item)))
     throw new PrCenterError(
       "One or more content types are not supported",
       422,
@@ -481,6 +464,25 @@ const DEFAULT_PR_MASTER_DATA = {
     "P08 National Impact",
   ],
 };
+
+async function allowedRequestContentTypes(organizationId: string) {
+  if (typeof prisma.prOrganizationSetting?.findUnique !== "function")
+    return new Set(DEFAULT_PR_MASTER_DATA.contentTypes);
+  const setting = await prisma.prOrganizationSetting.findUnique({
+    where: { organizationId_key: { organizationId, key: "pr-master-data" } },
+    select: { value: true },
+  });
+  const value =
+    setting?.value && typeof setting.value === "object" && !Array.isArray(setting.value)
+      ? (setting.value as Record<string, unknown>)
+      : null;
+  const configured = value?.contentTypes;
+  return new Set(
+    Array.isArray(configured) && configured.every((item) => typeof item === "string")
+      ? configured
+      : DEFAULT_PR_MASTER_DATA.contentTypes,
+  );
+}
 
 function normalizeMasterDataList(value: unknown, field: string): string[] {
   if (!Array.isArray(value) || value.length === 0 || value.length > 100)
@@ -797,7 +799,11 @@ export async function createRequest(
     input.offsiteDetails,
     Boolean(input.requestDetails),
   );
-  const requestDetails = validateRequestDetails(input.type, input.requestDetails);
+  const requestDetails = validateRequestDetails(
+    input.type,
+    input.requestDetails,
+    await allowedRequestContentTypes(actor.organizationId),
+  );
   if (requestDetails && sourceUrls.length === 0)
     throw new PrCenterError(
       "At least one source URL is required",
@@ -1067,7 +1073,11 @@ export async function updateRequestDraft(
     input.offsiteDetails,
     Boolean(input.requestDetails),
   );
-  const requestDetails = validateRequestDetails(input.type, input.requestDetails);
+  const requestDetails = validateRequestDetails(
+    input.type,
+    input.requestDetails,
+    await allowedRequestContentTypes(actor.organizationId),
+  );
   if (requestDetails && sourceUrls.length === 0)
     throw new PrCenterError(
       "At least one source URL is required",
