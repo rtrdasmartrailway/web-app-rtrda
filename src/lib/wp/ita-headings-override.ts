@@ -509,6 +509,10 @@ const ITA_LINK_OVERRIDES: ReadonlyArray<{
         href: sdcDownloadInlineHref("ita2569-o20-02"),
       },
       {
+        title: "รายงานผลการดำเนินงานตามนโยบาย No Gift Policy 2569",
+        href: "/policy_no_gift_policy_2569",
+      },
+      {
         title: "หลักเกณฑ์การรับทรัพย์สิน มาตรา 128",
         href: sdcDownloadInlineHref("ita2569-o20-03"),
       },

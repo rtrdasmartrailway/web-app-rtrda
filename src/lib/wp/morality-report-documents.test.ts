@@ -42,6 +42,11 @@ describe("getMoralityReportPage", () => {
         "รายงานการประเมินความเสี่ยงการทุจริต ประจำปีงบประมาณ พ.ศ. 2569 รอบที่ 2 รายงานผลการดำเนินการตามแผนบริหารจัดการความเสี่ยงการทุจริต",
       groups: null,
     },
+    {
+      path: "/policy_no_gift_policy_2569",
+      title: "รายงานผลการดำเนินงานตามนโยบาย No Gift Policy 2569",
+      groups: null,
+    },
   ])("creates a report page at $path", ({ path, title, groups }) => {
     expect(getMoralityReportPage(path)).toMatchObject({
       path,
@@ -65,6 +70,14 @@ describe("getMoralityReportPage", () => {
     expect(content).toContain(
       "/risk-reports/corruption-risk/report-2-2569.pdf?v=20260924-final",
     );
+    expect(content).toContain('<div class="standalone-pdf-page">');
+    expect(content).toContain("<iframe");
+    expect(content).toContain('data-pdf-reader-ignore="true"');
+  });
+
+  it("embeds the No Gift Policy 2569 PDF in its report page", () => {
+    const content = getMoralityReportPage("/policy_no_gift_policy_2569")?.contentHtml;
+    expect(content).toContain("/risk-reports/no-gift-policy/report-2569.pdf?v=20261008");
     expect(content).toContain('<div class="standalone-pdf-page">');
     expect(content).toContain("<iframe");
     expect(content).toContain('data-pdf-reader-ignore="true"');
