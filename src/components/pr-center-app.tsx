@@ -103,6 +103,8 @@ type Request = {
   requesterId: string;
   department: string;
   requestedDate: string;
+  createdAt?: string;
+  requesterName?: string;
   taskIds: string[];
   source?: string;
   status?:
@@ -280,7 +282,9 @@ type ApiRequestRecord = {
   title: string;
   type: "PR" | "OFFSITE";
   requestedFor: string | null;
+  createdAt: string;
   department: { name: string };
+  requester: { displayName: string };
   requesterId: string;
   status: Request["status"];
   version: number;
@@ -450,6 +454,8 @@ function mapRequestRecord(request: ApiRequestRecord): Request {
     requesterId: request.requesterId,
     department: request.department.name,
     requestedDate: request.requestedFor?.slice(0, 10) || "",
+    createdAt: request.createdAt,
+    requesterName: request.requester.displayName,
     taskIds: request.tasks.map((task) => task.id),
     status: request.status,
     version: request.version,
@@ -3510,50 +3516,124 @@ function Requests({
           <table>
             <thead>
               <tr>
-                <th>Request</th>
-                <th>Project / activity</th>
-                <th>Status</th>
-                <th>Requested date</th>
-                <th />
+                <th scope="col">โครงการ</th>
+                <th scope="col">ประเภทคำขอ</th>
+                <th scope="col">ฝ่าย / ผู้ส่งคำขอ</th>
+                <th scope="col">วันที่และเวลาที่สั่ง</th>
+                <th scope="col">วันที่ต้องการเผยแพร่</th>
+                <th scope="col">Content Package</th>
+                <th scope="col">สถานะ</th>
+                <th scope="col">จัดการ</th>
               </tr>
             </thead>
             <tbody>
-              {visibleRequests.map((request) => (
-                <tr key={request.id}>
-                  <td>{request.id}</td>
-                  <td>{request.title}</td>
-                  <td>
-                    <Status>
-                      {request.status === "DRAFT"
-                        ? "Draft"
-                        : request.status === "SUBMITTED"
-                          ? "Pending intake approval"
-                          : request.status === "APPROVED"
-                            ? "Approved · PR assignment"
-                            : request.status === "REJECTED"
-                              ? "Rejected"
-                              : request.status === "WITHDRAWN"
+              {visibleRequests.map((request) => {
+                const requestTasks = taskItems.filter(
+                  (task) => task.requestId === request.id,
+                );
+                const submittedAt = request.createdAt
+                  ? new Date(request.createdAt).toLocaleString(
+                      language === "th" ? "th-TH-u-ca-buddhist" : "en-GB",
+                      {
+                        dateStyle: "short",
+                        timeStyle: "short",
+                        timeZone: "Asia/Bangkok",
+                      },
+                    )
+                  : "—";
+                return (
+                  <tr key={request.id}>
+                    <td>
+                      <strong>{request.title}</strong>
+                      <small>{request.id}</small>
+                    </td>
+                    <td>
+                      {request.type === "offsite"
+                        ? language === "th"
+                          ? "นอกสถานที่"
+                          : "Off-site"
+                        : language === "th"
+                          ? "ประชาสัมพันธ์"
+                          : "PR"}
+                    </td>
+                    <td>
+                      <span>{request.department}</span>
+                      <small>{request.requesterName || "—"}</small>
+                    </td>
+                    <td>{submittedAt}</td>
+                    <td>
+                      {request.requestedDate
+                        ? new Date(
+                            `${request.requestedDate}T00:00:00Z`,
+                          ).toLocaleDateString(
+                            language === "th" ? "th-TH-u-ca-buddhist" : "en-GB",
+                            { timeZone: "Asia/Bangkok" },
+                          )
+                        : "—"}
+                    </td>
+                    <td>
+                      {requestTasks.length > 0 ? (
+                        <ul>
+                          {requestTasks.map((task) => (
+                            <li key={task.id}>
+                              {task.title} <small>({task.type})</small>
+                            </li>
+                          ))}
+                        </ul>
+                      ) : (
+                        <span>
+                          {language === "th"
+                            ? "ยังไม่มี Content Package"
+                            : "No Content Package yet"}
+                        </span>
+                      )}
+                    </td>
+                    <td>
+                      <Status>
+                        {request.status === "DRAFT"
+                          ? language === "th"
+                            ? "ฉบับร่าง"
+                            : "Draft"
+                          : request.status === "SUBMITTED"
+                            ? language === "th"
+                              ? "รออนุมัติคำขอ"
+                              : "Pending intake approval"
+                            : request.status === "APPROVED"
+                              ? language === "th"
+                                ? "อนุมัติแล้ว · รอมอบหมาย PR"
+                                : "Approved · PR assignment"
+                              : request.status === "REJECTED"
                                 ? language === "th"
-                                  ? "ถอนแล้ว · แก้ไขและส่งใหม่ได้"
-                                  : "Withdrawn · can be amended"
-                                : request.status ||
-                                  STATUS_LABELS[requestStatus(request, taskItems)]}
-                    </Status>
-                  </td>
-                  <td>{request.requestedDate}</td>
-                  <td>
-                    <button onClick={() => setSelectedId(request.id)}>Details</button>
-                    {canEditOwnRequest(request, currentUserId) && (
-                      <>
-                        <button onClick={() => onEditRequest(request)}>Edit</button>
-                        <button onClick={() => onWithdrawRequest(request)}>
-                          Withdraw
+                                  ? "ไม่อนุมัติ"
+                                  : "Rejected"
+                                : request.status === "WITHDRAWN"
+                                  ? language === "th"
+                                    ? "ถอนคำขอแล้ว"
+                                    : "Withdrawn"
+                                  : request.status ||
+                                    STATUS_LABELS[requestStatus(request, taskItems)]}
+                      </Status>
+                    </td>
+                    <td>
+                      <div className={styles.requestActions}>
+                        <button onClick={() => setSelectedId(request.id)}>
+                          {language === "th" ? "รายละเอียด" : "Details"}
                         </button>
-                      </>
-                    )}
-                  </td>
-                </tr>
-              ))}
+                        {canEditOwnRequest(request, currentUserId) && (
+                          <>
+                            <button onClick={() => onEditRequest(request)}>
+                              {language === "th" ? "แก้ไข" : "Edit"}
+                            </button>
+                            <button onClick={() => onWithdrawRequest(request)}>
+                              {language === "th" ? "ถอนคำขอ" : "Withdraw"}
+                            </button>
+                          </>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>

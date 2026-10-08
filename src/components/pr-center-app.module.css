@@ -674,6 +674,14 @@
   color: #285689;
   font-weight: 700;
 }
+.requestActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.requestActions button {
+  white-space: nowrap;
+}
 .donut {
   align-items: center;
   background: conic-gradient(
