@@ -2267,7 +2267,14 @@ export function PrCenterApp({
             <button
               key={item.id}
               className={page === item.id ? styles.navActive : ""}
-              onClick={() => go(item.id)}
+              onClick={() => {
+                if (item.id === "new-request") {
+                  openRequest();
+                  setSidebarOpen(false);
+                  return;
+                }
+                go(item.id);
+              }}
             >
               <span className={styles.navIcon} aria-hidden="true">
                 {item.icon}
