@@ -259,7 +259,7 @@ describe("request intake approval", () => {
           data: expect.arrayContaining([
             expect.objectContaining({
               userId: "pr-recipient",
-              target: "approvals",
+              target: "request:request-1",
               title: "Request amended; resubmission required",
             }),
           ]),
@@ -447,8 +447,8 @@ describe("request intake approval", () => {
     );
     expect(mockPrisma.prNotification.createMany).toHaveBeenCalledWith({
       data: expect.arrayContaining([
-        expect.objectContaining({ userId: "requester-1", target: "my-requests" }),
-        expect.objectContaining({ userId: "pr-recipient", target: "approvals" }),
+        expect.objectContaining({ userId: "requester-1", target: "request:request-1" }),
+        expect.objectContaining({ userId: "pr-recipient", target: "request:request-1" }),
       ]),
     });
   });
@@ -506,12 +506,12 @@ describe("request intake approval", () => {
       data: expect.arrayContaining([
         expect.objectContaining({
           userId: "requester-1",
-          target: "my-requests",
+          target: "request:request-1",
           title: "Request approved",
         }),
         expect.objectContaining({
           userId: "pr-recipient",
-          target: "requests",
+          target: "request:request-1",
           title: "Approved request ready for PR assignment",
         }),
       ]),
@@ -601,7 +601,7 @@ describe("request intake approval", () => {
       data: expect.arrayContaining([
         expect.objectContaining({
           userId: requesterActor.id,
-          target: "my-requests",
+          target: "request:request-1",
           body: expect.stringContaining("Missing required information"),
         }),
       ]),

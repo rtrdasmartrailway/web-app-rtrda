@@ -198,22 +198,26 @@ type Notification = {
   userId: string;
   title: string;
   message: string;
-  target: Page;
+  target: string;
   createdAt: string;
   read: boolean;
 };
 type IdeaStatus =
   | "proposed"
   | "under_review"
+  | "pending_approval"
+  | "revision_required"
   | "accepted"
   | "rejected"
   | "converted"
   | "archived";
 const IDEA_TRANSITIONS: Record<IdeaStatus, IdeaStatus[]> = {
   proposed: ["under_review", "rejected", "archived"],
-  under_review: ["accepted", "rejected", "archived"],
+  under_review: ["pending_approval", "rejected", "archived"],
+  pending_approval: ["accepted", "revision_required", "rejected"],
+  revision_required: ["under_review", "archived"],
   accepted: ["archived"],
-  rejected: [],
+  rejected: ["archived"],
   converted: ["archived"],
   archived: [],
 };
@@ -721,7 +725,14 @@ const STATUS_TRANSITIONS: Record<StatusId, StatusId[]> = {
 const ROLE_PAGES: Record<Role, Page[]> = {
   admin: pages.map(({ id }) => id),
   pr: pages.filter(({ id }) => id !== "new-request").map(({ id }) => id),
-  executive: ["home", "calendar", "notifications"],
+  executive: [
+    "executive",
+    "home",
+    "calendar",
+    "approvals",
+    "message-house",
+    "notifications",
+  ],
   project_owner: [
     "home",
     "new-request",
@@ -731,7 +742,7 @@ const ROLE_PAGES: Record<Role, Page[]> = {
     "notifications",
     "help",
   ],
-  approver: ["home", "calendar", "approvals", "notifications"],
+  approver: ["home", "calendar", "approvals", "ideas", "notifications"],
   writer: [
     "home",
     "new-request",
@@ -1256,9 +1267,7 @@ export function PrCenterApp({
             userId: notification.userId,
             title: notification.title,
             message: notification.body,
-            target: isPageEnabled(notification.target as Page)
-              ? (notification.target as Page)
-              : "home",
+            target: notification.target || "home",
             createdAt: notification.createdAt,
             read: Boolean(notification.readAt),
           })),
@@ -1558,9 +1567,7 @@ export function PrCenterApp({
         userId: notification.userId,
         title: notification.title,
         message: notification.body,
-        target: PHASE_1_PAGES.has(notification.target as Page)
-          ? (notification.target as Page)
-          : "home",
+        target: notification.target || "home",
         createdAt: notification.createdAt,
         read: Boolean(notification.readAt),
       })),
@@ -2256,10 +2263,47 @@ export function PrCenterApp({
       return false;
     }
   };
+  const updateIdea = async (
+    id: string,
+    input: CreateContentIdeaInput,
+  ): Promise<boolean> => {
+    const idea = state.ideas.find((item) => item.id === id);
+    if (!idea?.version) return false;
+    try {
+      const response = await fetch(`/api/pr-center/ideas/${id}`, {
+        method: "PATCH",
+        credentials: "same-origin",
+        headers: {
+          "Content-Type": "application/json",
+          "If-Match": String(idea.version),
+        },
+        body: JSON.stringify(input),
+      });
+      const payload = await response.json().catch(() => null);
+      if (!response.ok) throw new Error(payload?.message || "Idea could not be updated");
+      const updated = parseIdeaListPage({ items: [payload], nextOffset: null }).items[0];
+      setState((previous) => ({
+        ...previous,
+        ideas: previous.ideas.map((item) =>
+          item.id === id ? mapIdeaRecord(updated) : item,
+        ),
+      }));
+      announce(
+        state.language === "th"
+          ? "ส่งแนวคิดที่แก้ไขแล้วให้ PR ตรวจสอบ"
+          : "Revised idea returned to PR review",
+      );
+      return true;
+    } catch (error) {
+      announce(error instanceof Error ? error.message : "Idea could not be updated");
+      return false;
+    }
+  };
   const updateIdeaStatus = async (id: string, status: IdeaStatus) => {
     const idea = state.ideas.find((item) => item.id === id);
     if (!idea?.version) return;
-    const requiresReason = status === "accepted" || status === "rejected";
+    const requiresReason =
+      status === "accepted" || status === "rejected" || status === "revision_required";
     const reason = requiresReason
       ? window
           .prompt(
@@ -2267,9 +2311,13 @@ export function PrCenterApp({
               ? state.language === "th"
                 ? "ระบุเหตุผลในการปฏิเสธแนวคิด ผู้เสนอจะเห็นเหตุผลนี้"
                 : "Enter a rejection reason. The proposer will be able to see it."
-              : state.language === "th"
-                ? "ระบุเหตุผลในการยอมรับแนวคิด ผู้เสนอจะเห็นเหตุผลนี้"
-                : "Enter an acceptance rationale. The proposer will be able to see it.",
+              : status === "revision_required"
+                ? state.language === "th"
+                  ? "ระบุข้อมูลที่ต้องแก้ไข ผู้เสนอจะเห็นเหตุผลนี้"
+                  : "Explain the revision required. The proposer will see this reason."
+                : state.language === "th"
+                  ? "ระบุเหตุผลในการยอมรับแนวคิด ผู้เสนอจะเห็นเหตุผลนี้"
+                  : "Enter an acceptance rationale. The proposer will be able to see it.",
           )
           ?.trim() || ""
       : "";
@@ -2683,7 +2731,9 @@ export function PrCenterApp({
               ideas={ideasOwnerId === actor?.userId ? state.ideas : []}
               currentUser={currentUser}
               canReview={hasUiRole("pr", "admin")}
+              canApprove={hasUiRole("approver", "admin")}
               onCreate={createIdea}
+              onUpdate={updateIdea}
               onStatus={updateIdeaStatus}
               onConvert={convertIdea}
               language={state.language}
@@ -2698,6 +2748,7 @@ export function PrCenterApp({
           {page === "message-house" && (
             <MessageHouse
               data={state.messageHouse}
+              canEdit={hasUiRole("pr", "admin")}
               status={messageHouseStatus}
               history={messageHouseHistory}
               historyStatus={messageHouseHistoryStatus}
@@ -2707,7 +2758,7 @@ export function PrCenterApp({
           )}
           {page === "notifications" && (
             <Notifications
-              onNavigate={go}
+              onNavigate={navigateFromNotification}
               notifications={userNotifications}
               onRead={readNotifications}
               language={state.language}
@@ -3753,7 +3804,7 @@ function Requests({
                     )
                   : "—";
                 return (
-                  <tr key={request.id}>
+                  <tr key={request.id} id={`request-${request.id}`}>
                     <td>
                       <strong>{request.title}</strong>
                       <small>{request.id}</small>
@@ -4175,7 +4226,7 @@ function Operations({
               {visibleTasks
                 .filter((task) => statuses.includes(task.status))
                 .map((task) => (
-                  <article key={`${column}-${task.id}`}>
+                  <article key={`${column}-${task.id}`} id={`task-${task.id}`}>
                     <small>{task.type}</small>
                     <b>{task.title}</b>
                     <Status>{STATUS_LABELS[task.status]}</Status>
@@ -5513,7 +5564,7 @@ function Approvals({
       <h2>Task Stage Approvals</h2>
       <section className={styles.list}>
         {taskItems.map((task) => (
-          <article key={task.id} className={styles.listItem}>
+          <article key={task.id} id={`task-${task.id}`} className={styles.listItem}>
             <div>
               <p>{STATUS_LABELS[task.status]}</p>
               <h2>{task.title}</h2>
@@ -6051,7 +6102,9 @@ function Ideas({
   ideas,
   currentUser,
   canReview,
+  canApprove,
   onCreate,
+  onUpdate,
   onStatus,
   onConvert,
   language,
@@ -6065,7 +6118,9 @@ function Ideas({
   ideas: Idea[];
   currentUser: User;
   canReview: boolean;
+  canApprove: boolean;
   onCreate: (input: CreateContentIdeaInput) => Promise<boolean>;
+  onUpdate: (id: string, input: CreateContentIdeaInput) => Promise<boolean>;
   onStatus: (id: string, status: IdeaStatus) => Promise<void>;
   onConvert: (id: string) => Promise<void>;
   language: Language;
@@ -6088,6 +6143,7 @@ function Ideas({
   const [campaign, setCampaign] = useState("");
   const [evidenceText, setEvidenceText] = useState("");
   const [saving, setSaving] = useState(false);
+  const [editingIdeaId, setEditingIdeaId] = useState<string | null>(null);
   const visible = ideas.filter(
     (idea) =>
       (status === "all" || idea.status === status) &&
@@ -6105,8 +6161,31 @@ function Ideas({
         .toLowerCase()
         .includes(query.toLowerCase()),
   );
-  const ideaStatusLabel = (value: IdeaStatus) =>
-    language === "th" && value === "rejected" ? "ปฏิเสธ" : value.replace("_", " ");
+  const ideaStatusLabel = (value: IdeaStatus) => {
+    if (language === "th")
+      return {
+        proposed: "เสนอแล้ว",
+        under_review: "PR กำลังพิจารณา",
+        pending_approval: "รอผู้มีอำนาจอนุมัติ",
+        revision_required: "ขอให้แก้ไข",
+        accepted: "อนุมัติแล้ว",
+        rejected: "ปฏิเสธ",
+        converted: "แปลงเป็นคำขอแล้ว",
+        archived: "เก็บถาวร",
+      }[value];
+    return value.replaceAll("_", " ");
+  };
+  const transitionsForRole = (idea: Idea): IdeaStatus[] => {
+    if (canReview && canApprove) return IDEA_TRANSITIONS[idea.status];
+    if (canApprove && idea.status === "pending_approval")
+      return ["accepted", "revision_required", "rejected"];
+    if (!canReview) return [];
+    if (idea.status === "proposed") return ["under_review"];
+    if (idea.status === "under_review") return ["pending_approval", "rejected"];
+    if (idea.status === "revision_required") return ["under_review"];
+    if (idea.status === "accepted" || idea.status === "rejected") return ["archived"];
+    return [];
+  };
   return (
     <>
       <SectionHeading
@@ -6134,21 +6213,21 @@ function Ideas({
             event.preventDefault();
             setSaving(true);
             try {
+              const input = {
+                title: title.trim(),
+                rationale: summary.trim(),
+                audience,
+                pillar,
+                channel,
+                priority,
+                campaign,
+                evidenceUrls: evidenceText
+                  .split(/\r?\n/)
+                  .map((url) => url.trim())
+                  .filter(Boolean),
+              };
               const saved = await submitIdeaForm(
-                () =>
-                  onCreate({
-                    title: title.trim(),
-                    rationale: summary.trim(),
-                    audience,
-                    pillar,
-                    channel,
-                    priority,
-                    campaign,
-                    evidenceUrls: evidenceText
-                      .split(/\r?\n/)
-                      .map((url) => url.trim())
-                      .filter(Boolean),
-                  }),
+                () => (editingIdeaId ? onUpdate(editingIdeaId, input) : onCreate(input)),
                 () => {
                   setTitle("");
                   setSummary("");
@@ -6158,6 +6237,7 @@ function Ideas({
                   setPriority("");
                   setCampaign("");
                   setEvidenceText("");
+                  setEditingIdeaId(null);
                   setOpen(false);
                 },
               );
@@ -6168,7 +6248,15 @@ function Ideas({
             }
           }}
         >
-          <h2>{language === "th" ? "เสนอแนวคิดเนื้อหา" : "Propose an idea"}</h2>
+          <h2>
+            {editingIdeaId
+              ? language === "th"
+                ? "แก้ไขแนวคิดตามข้อเสนอแนะ"
+                : "Revise idea"
+              : language === "th"
+                ? "เสนอแนวคิดเนื้อหา"
+                : "Propose an idea"}
+          </h2>
           <label>
             {language === "th" ? "ชื่อแนวคิด" : "Idea title"}
             <input
@@ -6271,6 +6359,8 @@ function Ideas({
           {[
             "proposed",
             "under_review",
+            "pending_approval",
+            "revision_required",
             "accepted",
             "rejected",
             "converted",
@@ -6311,13 +6401,14 @@ function Ideas({
       )}
       <section className={styles.ideaGrid}>
         {visible.map((idea) => (
-          <article key={idea.id} className={styles.card}>
+          <article key={idea.id} id={`idea-${idea.id}`} className={styles.card}>
             <p className={styles.eyebrow}>
               {idea.id} · {ideaStatusLabel(idea.status)}
             </p>
             <h2>{idea.title}</h2>
             <p>{idea.summary}</p>
             {(idea.status === "rejected" ||
+              idea.status === "revision_required" ||
               idea.status === "accepted" ||
               idea.status === "converted" ||
               idea.status === "archived") &&
@@ -6367,7 +6458,7 @@ function Ideas({
             )}
             <footer>
               <span>{getUser(idea.authorId)?.name ?? "Unknown"}</span>
-              {canReview && (
+              {(canReview || canApprove) && (
                 <select
                   value=""
                   onChange={async (event) => {
@@ -6378,14 +6469,14 @@ function Ideas({
                   }}
                 >
                   <option value="">{ideaStatusLabel(idea.status)}</option>
-                  {IDEA_TRANSITIONS[idea.status].map((value) => (
+                  {transitionsForRole(idea).map((value) => (
                     <option key={value} value={value}>
                       {ideaStatusLabel(value as IdeaStatus)}
                     </option>
                   ))}
                 </select>
               )}
-              {idea.status === "accepted" && canReview && (
+              {idea.status === "accepted" && canReview && !idea.requestId && (
                 <button
                   className={styles.primary}
                   onClick={async () => {
@@ -6396,6 +6487,26 @@ function Ideas({
                   {language === "th" ? "แปลงเป็นคำขอ" : "Convert to request"}
                 </button>
               )}
+              {idea.status === "revision_required" &&
+                idea.authorId === currentUser.id && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEditingIdeaId(idea.id);
+                      setTitle(idea.title);
+                      setSummary(idea.summary);
+                      setAudience(idea.audience || "");
+                      setPillar(idea.pillar || "");
+                      setChannel(idea.channel || "");
+                      setPriority(idea.priority || "");
+                      setCampaign(idea.campaign || "");
+                      setEvidenceText(idea.evidenceUrls?.join("\n") || "");
+                      setOpen(true);
+                    }}
+                  >
+                    {language === "th" ? "แก้ไขและส่งกลับให้ตรวจ" : "Revise and resubmit"}
+                  </button>
+                )}
               {idea.requestId && (
                 <span>
                   {language === "th" ? "คำขอ" : "Request"}: {idea.requestId}
@@ -6437,6 +6548,7 @@ function Ideas({
 }
 function MessageHouse({
   data,
+  canEdit,
   status,
   history,
   historyStatus,
@@ -6444,6 +6556,7 @@ function MessageHouse({
   language,
 }: {
   data: MessageHouseData;
+  canEdit: boolean;
   status: "loading" | "empty" | "loaded" | "error";
   history: CurrentMessageHouse[];
   historyStatus: "loading" | "loaded" | "error";
@@ -6451,6 +6564,86 @@ function MessageHouse({
   language: Language;
 }) {
   const thai = language === "th";
+  const [draft, setDraft] = useState({
+    id: "",
+    vision: "",
+    positioning: "",
+    pillars: "",
+    foundation: "",
+    sourceRationale: "",
+  });
+  const [draftLoading, setDraftLoading] = useState(true);
+  const [draftSaving, setDraftSaving] = useState(false);
+  const [draftNotice, setDraftNotice] = useState("");
+
+  useEffect(() => {
+    if (!canEdit) return;
+    let cancelled = false;
+    fetch("/api/pr-center/message-house/draft", { credentials: "same-origin" })
+      .then(async (response) => {
+        if (!response.ok) throw new Error("Draft unavailable");
+        return response.json();
+      })
+      .then((value) => {
+        if (cancelled || !value) return;
+        setDraft({
+          id: typeof value.id === "string" ? value.id : "",
+          vision: typeof value.vision === "string" ? value.vision : "",
+          positioning: typeof value.positioning === "string" ? value.positioning : "",
+          pillars: Array.isArray(value.pillars) ? value.pillars.join("\n") : "",
+          foundation: typeof value.foundation === "string" ? value.foundation : "",
+          sourceRationale:
+            typeof value.sourceRationale === "string" ? value.sourceRationale : "",
+        });
+      })
+      .catch(() => {
+        if (!cancelled)
+          setDraftNotice(
+            thai
+              ? "โหลดฉบับร่าง Message House ไม่สำเร็จ"
+              : "Message House draft could not be loaded.",
+          );
+      })
+      .finally(() => {
+        if (!cancelled) setDraftLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [canEdit, thai]);
+
+  const saveDraft = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setDraftSaving(true);
+    setDraftNotice("");
+    try {
+      const response = await fetch("/api/pr-center/message-house/draft", {
+        method: "POST",
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: draft.id || undefined,
+          vision: draft.vision,
+          positioning: draft.positioning,
+          pillars: draft.pillars
+            .split(/\r?\n/)
+            .map((item) => item.trim())
+            .filter(Boolean),
+          foundation: draft.foundation,
+          sourceRationale: draft.sourceRationale,
+        }),
+      });
+      const value = await response.json().catch(() => null);
+      if (!response.ok)
+        throw new Error(value?.message || "Message House draft could not be saved");
+      setDraft((previous) => ({ ...previous, id: value.id }));
+      setDraftNotice(thai ? "บันทึกฉบับร่างแล้ว" : "Draft saved.");
+    } catch (error) {
+      setDraftNotice(error instanceof Error ? error.message : "Save failed");
+    } finally {
+      setDraftSaving(false);
+    }
+  };
   return (
     <>
       <SectionHeading
@@ -6458,7 +6651,15 @@ function MessageHouse({
         title="Message House"
         action={
           <div style={{ alignItems: "center", display: "flex", gap: 8 }}>
-            <span>{thai ? "อ่านอย่างเดียว" : "Read only"}</span>
+            <span>
+              {canEdit
+                ? thai
+                  ? "แก้ไขฉบับร่างได้"
+                  : "Draft editing enabled"
+                : thai
+                  ? "อ่านอย่างเดียว"
+                  : "Read only"}
+            </span>
             <button
               type="button"
               onClick={onRefresh}
@@ -6469,6 +6670,78 @@ function MessageHouse({
           </div>
         }
       />
+      {canEdit && (
+        <form className={styles.card} onSubmit={saveDraft}>
+          <h2>{thai ? "แก้ไขฉบับร่าง Message House" : "Edit Message House draft"}</h2>
+          {draftLoading && (
+            <p role="status">{thai ? "กำลังโหลดฉบับร่าง…" : "Loading draft…"}</p>
+          )}
+          <label>
+            {thai ? "วิสัยทัศน์ / พันธกิจ" : "Vision / Mission"}
+            <textarea
+              required
+              maxLength={5000}
+              value={draft.vision}
+              onChange={(event) => setDraft({ ...draft, vision: event.target.value })}
+            />
+          </label>
+          <label>
+            {thai ? "จุดยืนขององค์กร" : "Brand positioning"}
+            <textarea
+              required
+              maxLength={5000}
+              value={draft.positioning}
+              onChange={(event) =>
+                setDraft({ ...draft, positioning: event.target.value })
+              }
+            />
+          </label>
+          <label>
+            {thai
+              ? "เสาหลักการสื่อสาร (หนึ่งรายการต่อบรรทัด)"
+              : "Communication pillars (one per line)"}
+            <textarea
+              required
+              maxLength={5000}
+              value={draft.pillars}
+              onChange={(event) => setDraft({ ...draft, pillars: event.target.value })}
+            />
+          </label>
+          <label>
+            {thai ? "หลักการสนับสนุน" : "Foundation"}
+            <textarea
+              required
+              maxLength={5000}
+              value={draft.foundation}
+              onChange={(event) => setDraft({ ...draft, foundation: event.target.value })}
+            />
+          </label>
+          <label>
+            {thai ? "ที่มา/เหตุผลประกอบ (ไม่บังคับ)" : "Source rationale (optional)"}
+            <textarea
+              maxLength={5000}
+              value={draft.sourceRationale}
+              onChange={(event) =>
+                setDraft({ ...draft, sourceRationale: event.target.value })
+              }
+            />
+          </label>
+          <button
+            className={styles.primary}
+            type="submit"
+            disabled={draftSaving || draftLoading}
+          >
+            {draftSaving
+              ? thai
+                ? "กำลังบันทึก…"
+                : "Saving…"
+              : thai
+                ? "บันทึกฉบับร่าง"
+                : "Save draft"}
+          </button>
+          {draftNotice && <p role="status">{draftNotice}</p>}
+        </form>
+      )}
       {status === "loading" && (
         <section className={styles.card} role="status" aria-live="polite">
           {thai ? "กำลังโหลด Message House…" : "Loading Message House…"}
@@ -6598,7 +6871,7 @@ function Notifications({
   onRead,
   language,
 }: {
-  onNavigate: (page: Page) => void;
+  onNavigate: (target: string) => void;
   notifications: Notification[];
   onRead: (ids: string[]) => void;
   language: Language;

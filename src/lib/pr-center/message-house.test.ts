@@ -85,7 +85,13 @@ describe("currentMessageHouse", () => {
     ).resolves.toEqual(messageHouseVersions[0]);
   });
 
-  it.each(["REQUESTER", "APPROVER", "EXECUTIVE_READ_ONLY"] as const)(
+  it("allows executive read-only roles to read the current version", async () => {
+    await expect(
+      currentMessageHouse({ ...actor, role: "EXECUTIVE_READ_ONLY" }),
+    ).resolves.toBeNull();
+  });
+
+  it.each(["REQUESTER", "APPROVER"] as const)(
     "denies current-version reads to %s",
     async (role) => {
       await expect(currentMessageHouse({ ...actor, role })).rejects.toThrow(

@@ -3,6 +3,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => {
   const transactionClient = {
     prContentIdea: { create: vi.fn() },
+    prUserRole: { findMany: vi.fn() },
+    prNotification: { createMany: vi.fn() },
     prAuditEvent: { create: vi.fn() },
     prOutboxEvent: { create: vi.fn() },
   };
@@ -26,11 +28,16 @@ describe("createIdea persistence", () => {
       version: 1,
       createdAt: new Date("2026-10-04T00:00:00.000Z"),
     });
+    mocks.transactionClient.prUserRole.findMany.mockResolvedValue([]);
+    mocks.transactionClient.prNotification.createMany.mockResolvedValue({ count: 0 });
     mocks.transactionClient.prAuditEvent.create.mockResolvedValue({ id: "audit-1" });
     mocks.transactionClient.prOutboxEvent.create.mockResolvedValue({ id: "outbox-1" });
   });
 
   it("persists structured fields and records the mutation transactionally", async () => {
+    mocks.transactionClient.prUserRole.findMany.mockResolvedValue([
+      { userId: "pr-reviewer" },
+    ]);
     await createIdea(
       {
         id: "user-1",
@@ -69,5 +76,8 @@ describe("createIdea persistence", () => {
     });
     expect(mocks.transactionClient.prAuditEvent.create).toHaveBeenCalledOnce();
     expect(mocks.transactionClient.prOutboxEvent.create).toHaveBeenCalledOnce();
+    expect(mocks.transactionClient.prNotification.createMany).toHaveBeenCalledWith({
+      data: [expect.objectContaining({ userId: "pr-reviewer", target: "idea:idea-1" })],
+    });
   });
 });

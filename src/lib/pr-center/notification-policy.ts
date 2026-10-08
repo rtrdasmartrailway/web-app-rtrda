@@ -161,7 +161,7 @@ export async function createMaterialChangeNotification(
       userId: input.ownerId,
       title: prefixedTitle("CHANGE", input.changeDescription),
       body: input.taskTitle,
-      target: "operations",
+      target: `task:${input.taskId}`,
     },
   });
 }
@@ -216,7 +216,7 @@ export async function evaluateNotificationPolicy(): Promise<PolicyEvaluationResu
       userId: task.ownerId,
       title,
       body: `Task "${task.title}" is due ${task.dueAt!.toISOString().slice(0, 10)}. Status: ${task.status}.`,
-      target: "operations",
+      target: `task:${task.id}`,
     });
   }
 
@@ -229,7 +229,7 @@ export async function evaluateNotificationPolicy(): Promise<PolicyEvaluationResu
       userId: task.ownerId,
       title,
       body: `Task "${task.title}" was due ${task.dueAt!.toISOString().slice(0, 10)} and is now overdue. Status: ${task.status}.`,
-      target: "operations",
+      target: `task:${task.id}`,
     });
   }
 
@@ -245,7 +245,7 @@ export async function evaluateNotificationPolicy(): Promise<PolicyEvaluationResu
       userId: task.ownerId,
       title,
       body: `Task "${task.title}" has been awaiting action for over 24 hours. Status: ${task.status}.`,
-      target: "approvals",
+      target: `task:${task.id}`,
     });
   }
 

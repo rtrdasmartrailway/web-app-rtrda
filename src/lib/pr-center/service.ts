@@ -100,6 +100,12 @@ function actorHasRole(actor: PrCenterActor, role: PrCenterRole): boolean {
   return actorRoleGrants(actor).some((grant) => grant.role === role);
 }
 
+function canAccessIdeaReview(actor: PrCenterActor): boolean {
+  return ["PR_OPERATIONS", "APPROVER", "SCOPED_ADMINISTRATOR"].some((role) =>
+    actorHasRole(actor, role as PrCenterRole),
+  );
+}
+
 function actorHasOrganizationWideRole(
   actor: PrCenterActor,
   roles: readonly PrCenterRole[],
@@ -231,9 +237,10 @@ function ideaScopeWhere(
 ): Prisma.PrContentIdeaWhereInput {
   const reviewerScopes = roleDepartmentClauses(actor, [
     "PR_OPERATIONS",
+    "APPROVER",
     "SCOPED_ADMINISTRATOR",
   ]);
-  const clauses: Prisma.PrContentIdeaWhereInput[] = canReviewIdeas(actorRoles(actor))
+  const clauses: Prisma.PrContentIdeaWhereInput[] = canAccessIdeaReview(actor)
     ? reviewerScopes.map((scope) => scope)
     : [{ proposerId: actor.id }];
   return {
@@ -248,9 +255,13 @@ function ideaCommentScopeWhere(
   ideaId: string,
 ): Prisma.PrContentIdeaWhereInput {
   const scopes: Prisma.PrContentIdeaWhereInput[] = [{ proposerId: actor.id }];
-  if (canReviewIdeas(actorRoles(actor)))
+  if (canAccessIdeaReview(actor))
     scopes.push(
-      ...roleDepartmentClauses(actor, ["PR_OPERATIONS", "SCOPED_ADMINISTRATOR"]),
+      ...roleDepartmentClauses(actor, [
+        "PR_OPERATIONS",
+        "APPROVER",
+        "SCOPED_ADMINISTRATOR",
+      ]),
     );
   return { id: ideaId, organizationId: actor.organizationId, OR: scopes };
 }
@@ -434,6 +445,8 @@ function validateRequestDetails(
 type IdeaStatus =
   | "PROPOSED"
   | "UNDER_REVIEW"
+  | "PENDING_APPROVAL"
+  | "REVISION_REQUIRED"
   | "ACCEPTED"
   | "REJECTED"
   | "CONVERTED"
@@ -441,7 +454,9 @@ type IdeaStatus =
 
 const IDEA_TRANSITIONS: Record<IdeaStatus, IdeaStatus[]> = {
   PROPOSED: ["UNDER_REVIEW", "REJECTED", "ARCHIVED"],
-  UNDER_REVIEW: ["ACCEPTED", "REJECTED", "ARCHIVED"],
+  UNDER_REVIEW: ["PENDING_APPROVAL", "REJECTED", "ARCHIVED"],
+  PENDING_APPROVAL: ["ACCEPTED", "REVISION_REQUIRED", "REJECTED"],
+  REVISION_REQUIRED: ["UNDER_REVIEW", "ARCHIVED"],
   ACCEPTED: ["ARCHIVED"],
   REJECTED: [],
   CONVERTED: ["ARCHIVED"],
@@ -588,7 +603,7 @@ export async function createRequest(
         userId,
         title: "New PR request",
         body: `${title} was saved as a draft.`,
-        target: userId === actor.id ? "my-requests" : "requests",
+        target: `request:${request.id}`,
       })),
     });
     await auditAndOutbox(tx, {
@@ -900,7 +915,7 @@ export async function updateRequestDraft(
             userId,
             title: "Request amended; resubmission required",
             body: `${title} was amended and returned to draft by its requester. It will re-enter the approval queue after resubmission.`,
-            target: "approvals",
+            target: `request:${request.id}`,
           })),
         });
     }
@@ -1022,7 +1037,7 @@ export async function transitionRequest(
               ? "Request submitted"
               : "Request awaiting approval",
           body: `${request.title} was submitted and is waiting for PR review.`,
-          target: userId === request.requesterId ? "my-requests" : "approvals",
+          target: `request:${request.id}`,
         })),
       });
     }
@@ -1051,6 +1066,8 @@ export async function listIdeas(
   const allowedStatuses = [
     "PROPOSED",
     "UNDER_REVIEW",
+    "PENDING_APPROVAL",
+    "REVISION_REQUIRED",
     "ACCEPTED",
     "REJECTED",
     "CONVERTED",
@@ -1076,7 +1093,11 @@ export async function listIdeas(
   }
   const ideaClauses: Prisma.PrContentIdeaWhereInput[] = [{ proposerId: actor.id }];
   ideaClauses.push(
-    ...roleDepartmentClauses(actor, ["PR_OPERATIONS", "SCOPED_ADMINISTRATOR"]),
+    ...roleDepartmentClauses(actor, [
+      "PR_OPERATIONS",
+      "APPROVER",
+      "SCOPED_ADMINISTRATOR",
+    ]),
   );
   const searchClauses: Prisma.PrContentIdeaWhereInput[] = search
     ? [
@@ -1229,6 +1250,24 @@ export async function createIdea(
         evidenceUrls: ideaInput.evidenceUrls,
       },
     });
+    const reviewers = await tx.prUserRole.findMany({
+      where: {
+        organizationId: actor.organizationId,
+        role: "PR_OPERATIONS",
+        OR: [{ departmentId: actor.departmentId }, { departmentId: null }],
+        user: { active: true },
+      },
+      select: { userId: true },
+    });
+    if (reviewers.length > 0)
+      await tx.prNotification.createMany({
+        data: [...new Set(reviewers.map(({ userId }) => userId))].map((userId) => ({
+          userId,
+          title: "New Content Idea for review",
+          body: idea.title,
+          target: `idea:${idea.id}`,
+        })),
+      });
     await auditAndOutbox(tx, {
       actor,
       action: "idea.created",
@@ -1254,7 +1293,7 @@ export async function transitionIdea(
   reason: string | undefined,
   correlationId: string = randomUUID(),
 ) {
-  if (!canReviewIdeas(actorRoles(actor)))
+  if (!canAccessIdeaReview(actor))
     throw new PrCenterError("You cannot review an idea", 403, "FORBIDDEN");
   const ideaScope = ideaScopeWhere(actor, ideaId);
   const idea = await prisma.prContentIdea.findFirst({ where: ideaScope });
@@ -1271,10 +1310,31 @@ export async function transitionIdea(
       422,
       "INVALID_TRANSITION",
     );
-  const decisionReason = reason?.trim() || "";
-  if ((to === "ACCEPTED" || to === "REJECTED") && !decisionReason)
+  const admin = actorHasRole(actor, "SCOPED_ADMINISTRATOR");
+  const prReviewer = actorHasRole(actor, "PR_OPERATIONS");
+  const approver = actorHasRole(actor, "APPROVER");
+  const prReviewTransition =
+    (idea.status === "PROPOSED" && to === "UNDER_REVIEW") ||
+    (idea.status === "UNDER_REVIEW" &&
+      (to === "PENDING_APPROVAL" || to === "REJECTED")) ||
+    (idea.status === "REVISION_REQUIRED" && to === "UNDER_REVIEW") ||
+    ((idea.status === "ACCEPTED" || idea.status === "REJECTED") && to === "ARCHIVED");
+  const approvalDecision =
+    idea.status === "PENDING_APPROVAL" &&
+    ["ACCEPTED", "REVISION_REQUIRED", "REJECTED"].includes(to);
+  if (!admin && !((prReviewer && prReviewTransition) || (approver && approvalDecision)))
     throw new PrCenterError(
-      "A reason is required when accepting or rejecting an idea",
+      "This idea transition requires another workflow role",
+      403,
+      "FORBIDDEN",
+    );
+  const decisionReason = reason?.trim() || "";
+  if (
+    (to === "ACCEPTED" || to === "REJECTED" || to === "REVISION_REQUIRED") &&
+    !decisionReason
+  )
+    throw new PrCenterError(
+      "A reason is required for an idea decision",
       422,
       "REASON_REQUIRED",
     );
@@ -1296,6 +1356,29 @@ export async function transitionIdea(
         409,
         "STALE_UPDATE",
       );
+    const notifyApprovers = to === "PENDING_APPROVAL";
+    const notificationRecipients = notifyApprovers
+      ? await tx.prUserRole.findMany({
+          where: {
+            organizationId: idea.organizationId,
+            role: "APPROVER",
+            OR: [{ departmentId: idea.departmentId }, { departmentId: null }],
+            user: { active: true },
+          },
+          select: { userId: true },
+        })
+      : [{ userId: idea.proposerId }];
+    if (notificationRecipients.length > 0)
+      await tx.prNotification.createMany({
+        data: [...new Set(notificationRecipients.map(({ userId }) => userId))].map(
+          (userId) => ({
+            userId,
+            title: `Content Idea ${to.toLowerCase().replaceAll("_", " ")}`,
+            body: idea.title,
+            target: `idea:${idea.id}`,
+          }),
+        ),
+      });
     await auditAndOutbox(tx, {
       actor,
       action: "idea.transitioned",
@@ -1308,6 +1391,109 @@ export async function transitionIdea(
         reason: decisionReason || null,
       },
       eventType: "pr.idea.transitioned",
+      correlationId,
+    });
+    return tx.prContentIdea.findUniqueOrThrow({ where: { id: idea.id } });
+  });
+}
+
+export async function reviseIdea(
+  actor: PrCenterActor,
+  ideaId: string,
+  fromVersion: number,
+  input: unknown,
+  correlationId: string = randomUUID(),
+) {
+  if (!actor.departmentId)
+    throw new PrCenterError("An active department is required", 403, "SCOPE_REQUIRED");
+  const departmentId = actor.departmentId;
+  const idea = await prisma.prContentIdea.findFirst({
+    where: {
+      id: ideaId,
+      organizationId: actor.organizationId,
+      proposerId: actor.id,
+      departmentId,
+    },
+  });
+  if (!idea) throw new PrCenterError("Idea not found", 404, "NOT_FOUND");
+  if (idea.status !== "REVISION_REQUIRED")
+    throw new PrCenterError(
+      "Only ideas requiring revision can be amended",
+      422,
+      "INVALID_TRANSITION",
+    );
+  if (idea.version !== fromVersion)
+    throw new PrCenterError(
+      "This idea has changed. Refresh and try again.",
+      409,
+      "STALE_UPDATE",
+    );
+  let ideaInput;
+  try {
+    ideaInput = normalizeCreateIdeaInput(input);
+  } catch (error) {
+    throw new PrCenterError(
+      error instanceof Error ? error.message : "Invalid idea data",
+      422,
+      "INVALID_IDEA",
+    );
+  }
+  return prisma.$transaction(async (tx) => {
+    const updated = await tx.prContentIdea.updateMany({
+      where: {
+        id: idea.id,
+        organizationId: actor.organizationId,
+        proposerId: actor.id,
+        departmentId,
+        status: "REVISION_REQUIRED",
+        version: fromVersion,
+      },
+      data: {
+        title: ideaInput.title,
+        rationale: ideaInput.rationale,
+        audience: ideaInput.audience,
+        pillar: ideaInput.pillar,
+        channel: ideaInput.channel,
+        priority: ideaInput.priority,
+        campaign: ideaInput.campaign,
+        evidenceUrls: ideaInput.evidenceUrls,
+        status: "UNDER_REVIEW",
+        reviewerId: null,
+        decisionReason: null,
+        version: { increment: 1 },
+      },
+    });
+    if (updated.count !== 1)
+      throw new PrCenterError(
+        "This idea has changed. Refresh and try again.",
+        409,
+        "STALE_UPDATE",
+      );
+    const reviewers = await tx.prUserRole.findMany({
+      where: {
+        organizationId: actor.organizationId,
+        role: "PR_OPERATIONS",
+        OR: [{ departmentId: idea.departmentId }, { departmentId: null }],
+        user: { active: true },
+      },
+      select: { userId: true },
+    });
+    if (reviewers.length > 0)
+      await tx.prNotification.createMany({
+        data: [...new Set(reviewers.map(({ userId }) => userId))].map((userId) => ({
+          userId,
+          title: "Content Idea revised and ready for review",
+          body: ideaInput.title,
+          target: `idea:${idea.id}`,
+        })),
+      });
+    await auditAndOutbox(tx, {
+      actor,
+      action: "idea.revised",
+      entityType: "content_idea",
+      entityId: idea.id,
+      after: { from: "REVISION_REQUIRED", to: "UNDER_REVIEW", version: fromVersion + 1 },
+      eventType: "pr.idea.revised",
       correlationId,
     });
     return tx.prContentIdea.findUniqueOrThrow({ where: { id: idea.id } });
@@ -1397,8 +1583,122 @@ export async function convertIdea(
 }
 
 function assertCanReadMessageHouse(actor: PrCenterActor) {
-  if (!canManageTasks(actorRoles(actor)))
+  if (!canManageTasks(actorRoles(actor)) && !actorHasRole(actor, "EXECUTIVE_READ_ONLY"))
     throw new PrCenterError("You cannot view Message House", 403, "FORBIDDEN");
+}
+
+function assertCanManageMessageHouse(actor: PrCenterActor) {
+  if (!canManageTasks(actorRoles(actor)))
+    throw new PrCenterError("You cannot edit Message House", 403, "FORBIDDEN");
+}
+
+export async function messageHouseDraft(actor: PrCenterActor) {
+  assertCanManageMessageHouse(actor);
+  return prisma.prMessageHouseVersion.findFirst({
+    where: {
+      organizationId: actor.organizationId,
+      ownerId: actor.id,
+      status: "DRAFT",
+    },
+    orderBy: { versionNumber: "desc" },
+  });
+}
+
+export async function saveMessageHouseDraft(
+  actor: PrCenterActor,
+  input: unknown,
+  draftId?: string,
+  correlationId: string = randomUUID(),
+) {
+  assertCanManageMessageHouse(actor);
+  if (!input || typeof input !== "object" || Array.isArray(input))
+    throw new PrCenterError(
+      "Message House data is required",
+      422,
+      "INVALID_MESSAGE_HOUSE",
+    );
+  const value = input as Record<string, unknown>;
+  const vision = typeof value.vision === "string" ? value.vision.trim() : "";
+  const positioning =
+    typeof value.positioning === "string" ? value.positioning.trim() : "";
+  const foundation = typeof value.foundation === "string" ? value.foundation.trim() : "";
+  const sourceRationale =
+    typeof value.sourceRationale === "string" ? value.sourceRationale.trim() : "";
+  const pillars = Array.isArray(value.pillars)
+    ? [
+        ...new Set(
+          value.pillars
+            .filter((item): item is string => typeof item === "string")
+            .map((item) => item.trim())
+            .filter(Boolean),
+        ),
+      ]
+    : [];
+  if (
+    !vision ||
+    !positioning ||
+    !foundation ||
+    pillars.length === 0 ||
+    vision.length > 5000 ||
+    positioning.length > 5000 ||
+    foundation.length > 5000 ||
+    sourceRationale.length > 5000 ||
+    pillars.some((pillar) => pillar.length > 300)
+  )
+    throw new PrCenterError(
+      "Complete the required Message House fields with valid lengths",
+      422,
+      "INVALID_MESSAGE_HOUSE",
+    );
+
+  return prisma.$transaction(async (tx) => {
+    let saved;
+    if (draftId) {
+      const existing = await tx.prMessageHouseVersion.findFirst({
+        where: {
+          id: draftId,
+          organizationId: actor.organizationId,
+          ownerId: actor.id,
+          status: "DRAFT",
+        },
+      });
+      if (!existing)
+        throw new PrCenterError("Message House draft not found", 404, "NOT_FOUND");
+      saved = await tx.prMessageHouseVersion.update({
+        where: { id: existing.id },
+        data: { vision, positioning, pillars, foundation, sourceRationale },
+      });
+    } else {
+      const latest = await tx.prMessageHouseVersion.findFirst({
+        where: { organizationId: actor.organizationId },
+        orderBy: { versionNumber: "desc" },
+        select: { versionNumber: true },
+      });
+      saved = await tx.prMessageHouseVersion.create({
+        data: {
+          organizationId: actor.organizationId,
+          versionNumber: (latest?.versionNumber ?? 0) + 1,
+          status: "DRAFT",
+          vision,
+          positioning,
+          pillars,
+          foundation,
+          sourceRationale: sourceRationale || null,
+          ownerId: actor.id,
+        },
+      });
+    }
+    await auditAndOutbox(tx, {
+      actor,
+      action: "message_house.draft_saved",
+      entityType: "message_house_version",
+      entityId: saved.id,
+      after: { versionNumber: saved.versionNumber, status: saved.status },
+      eventType: "pr.message_house.draft_saved",
+      correlationId,
+    });
+    return saved;
+  });
 }
 
 export async function currentMessageHouse(actor: PrCenterActor) {
@@ -1506,7 +1806,7 @@ export async function updateTaskAssignment(
           userId: input.ownerId,
           title: prefixedTitle("ASSIGNMENT", "PR Center task assigned"),
           body: task.title,
-          target: "operations",
+          target: `task:${task.id}`,
         },
       });
     // Material-change notification: when dueAt changes
@@ -1522,7 +1822,7 @@ export async function updateTaskAssignment(
           userId: task.ownerId,
           title: prefixedTitle("CHANGE", changeDesc),
           body: task.title,
-          target: "operations",
+          target: `task:${task.id}`,
         },
       });
     }
@@ -2135,7 +2435,7 @@ export async function recordRequestDecision(
           input.decision === "APPROVED"
             ? `${request.title} was approved and is being returned to PR Operations for assignment and planning.${reason ? ` Comment: ${reason}` : ""}`
             : `${request.title} was rejected. Reason: ${reason}`,
-        target: "my-requests",
+        target: `request:${request.id}`,
       },
     ];
     if (input.decision === "APPROVED") {
@@ -2154,7 +2454,7 @@ export async function recordRequestDecision(
           userId,
           title: "Approved request ready for PR assignment",
           body: `${request.title} was approved. Assign an owner and begin planning.`,
-          target: "requests",
+          target: `request:${request.id}`,
         });
       }
     }

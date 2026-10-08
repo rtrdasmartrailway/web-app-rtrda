@@ -7,6 +7,9 @@ import {
   addTaskComment,
   convertIdea,
   currentMessageHouse,
+  messageHouseDraft,
+  saveMessageHouseDraft,
+  reviseIdea,
   listCalendarEntries,
   listCalendarRequestDecisions,
   messageHouseHistory,
@@ -199,6 +202,16 @@ export function buildPrCenterApi(
     const idea = await createIdea(request.prCenterActor!, input, correlationId(request));
     return reply.status(201).send(idea);
   });
+  app.patch("/ideas/:ideaId", async (request) => {
+    const input = await body(request);
+    return reviseIdea(
+      request.prCenterActor!,
+      taskId((request.params as { ideaId: string }).ideaId),
+      expectedVersion(request),
+      input,
+      correlationId(request),
+    );
+  });
   app.get("/ideas/:ideaId/comments", async (request) =>
     listIdeaComments(
       request.prCenterActor!,
@@ -219,14 +232,27 @@ export function buildPrCenterApi(
     const input = await body(request);
     if (
       typeof input.to !== "string" ||
-      !["UNDER_REVIEW", "ACCEPTED", "REJECTED", "ARCHIVED"].includes(input.to)
+      ![
+        "UNDER_REVIEW",
+        "PENDING_APPROVAL",
+        "REVISION_REQUIRED",
+        "ACCEPTED",
+        "REJECTED",
+        "ARCHIVED",
+      ].includes(input.to)
     )
       throw new PrCenterError("Unknown idea status", 422, "INVALID_STATUS");
     return transitionIdea(
       request.prCenterActor!,
       taskId((request.params as { ideaId: string }).ideaId),
       expectedVersion(request),
-      input.to as "UNDER_REVIEW" | "ACCEPTED" | "REJECTED" | "ARCHIVED",
+      input.to as
+        | "UNDER_REVIEW"
+        | "PENDING_APPROVAL"
+        | "REVISION_REQUIRED"
+        | "ACCEPTED"
+        | "REJECTED"
+        | "ARCHIVED",
       typeof input.reason === "string" ? input.reason : undefined,
       correlationId(request),
     );
@@ -245,6 +271,18 @@ export function buildPrCenterApi(
   app.get("/message-house/history", async (request) =>
     messageHouseHistory(request.prCenterActor!),
   );
+  app.get("/message-house/draft", async (request) =>
+    messageHouseDraft(request.prCenterActor!),
+  );
+  app.post("/message-house/draft", async (request) => {
+    const input = await body(request);
+    return saveMessageHouseDraft(
+      request.prCenterActor!,
+      input,
+      typeof input.id === "string" ? taskId(input.id) : undefined,
+      correlationId(request),
+    );
+  });
   app.get("/calendar", async (request) => {
     const query = request.query as { from?: string; to?: string };
     return listCalendarEntries(

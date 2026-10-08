@@ -12,6 +12,8 @@ export type IdeaListRecord = {
   status:
     | "PROPOSED"
     | "UNDER_REVIEW"
+    | "PENDING_APPROVAL"
+    | "REVISION_REQUIRED"
     | "ACCEPTED"
     | "REJECTED"
     | "CONVERTED"
@@ -34,6 +36,8 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 const statuses = [
   "PROPOSED",
   "UNDER_REVIEW",
+  "PENDING_APPROVAL",
+  "REVISION_REQUIRED",
   "ACCEPTED",
   "REJECTED",
   "CONVERTED",

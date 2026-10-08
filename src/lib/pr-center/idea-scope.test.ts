@@ -7,6 +7,8 @@ const mocks = vi.hoisted(() => {
       findUniqueOrThrow: vi.fn(),
     },
     prRequest: { create: vi.fn() },
+    prUserRole: { findMany: vi.fn() },
+    prNotification: { createMany: vi.fn() },
     prAuditEvent: { create: vi.fn() },
     prOutboxEvent: { create: vi.fn() },
   };
@@ -28,7 +30,7 @@ vi.mock("@/lib/db/client", () => ({
   },
 }));
 
-import { convertIdea, transitionIdea } from "./service";
+import { convertIdea, reviseIdea, transitionIdea } from "./service";
 
 const actor = {
   id: "reviewer-1",
@@ -53,6 +55,8 @@ describe("idea reviewer scope", () => {
     });
     mocks.transactionClient.prAuditEvent.create.mockResolvedValue({ id: "audit-1" });
     mocks.transactionClient.prOutboxEvent.create.mockResolvedValue({ id: "outbox-1" });
+    mocks.transactionClient.prUserRole.findMany.mockResolvedValue([]);
+    mocks.transactionClient.prNotification.createMany.mockResolvedValue({ count: 1 });
   });
 
   it("scopes idea review lookup and optimistic update to the role grant department", async () => {
@@ -88,12 +92,19 @@ describe("idea reviewer scope", () => {
         id: "idea-1",
         organizationId: "org-1",
         departmentId: "dept-1",
-        status: "UNDER_REVIEW",
+        status: to === "ACCEPTED" ? "PENDING_APPROVAL" : "UNDER_REVIEW",
         version: 3,
       });
 
       await expect(
-        transitionIdea(actor, "idea-1", 3, to, "  ", "corr-decision"),
+        transitionIdea(
+          to === "ACCEPTED" ? { ...actor, role: "APPROVER" as const } : actor,
+          "idea-1",
+          3,
+          to,
+          "  ",
+          "corr-decision",
+        ),
       ).rejects.toMatchObject({ statusCode: 422, code: "REASON_REQUIRED" });
       expect(mocks.transactionClient.prContentIdea.updateMany).not.toHaveBeenCalled();
     },
@@ -104,12 +115,12 @@ describe("idea reviewer scope", () => {
       id: "idea-1",
       organizationId: "org-1",
       departmentId: "dept-1",
-      status: "UNDER_REVIEW",
+      status: "PENDING_APPROVAL",
       version: 3,
     });
 
     await transitionIdea(
-      actor,
+      { ...actor, role: "APPROVER" },
       "idea-1",
       3,
       "REJECTED",
@@ -139,7 +150,7 @@ describe("idea reviewer scope", () => {
         entityId: "idea-1",
         correlationId: "corr-reject",
         after: {
-          from: "UNDER_REVIEW",
+          from: "PENDING_APPROVAL",
           to: "REJECTED",
           version: 4,
           reason: "Needs a clearer public benefit.",
@@ -153,12 +164,12 @@ describe("idea reviewer scope", () => {
       id: "idea-1",
       organizationId: "org-1",
       departmentId: "dept-1",
-      status: "UNDER_REVIEW",
+      status: "PENDING_APPROVAL",
       version: 3,
     });
 
     await transitionIdea(
-      actor,
+      { ...actor, role: "APPROVER" },
       "idea-1",
       3,
       "ACCEPTED",
@@ -179,12 +190,62 @@ describe("idea reviewer scope", () => {
         data: expect.objectContaining({
           correlationId: "corr-accept",
           after: expect.objectContaining({
+            from: "PENDING_APPROVAL",
             to: "ACCEPTED",
             reason: "Fits the approved safety campaign.",
           }),
         }),
       }),
     );
+  });
+
+  it("lets the proposer revise a returned idea and resubmits it to PR review", async () => {
+    mocks.findFirst.mockResolvedValue({
+      id: "idea-1",
+      organizationId: "org-1",
+      departmentId: "dept-1",
+      proposerId: "author-1",
+      status: "REVISION_REQUIRED",
+      version: 5,
+    });
+    mocks.transactionClient.prUserRole.findMany.mockResolvedValue([
+      { userId: "pr-recipient" },
+    ]);
+    const author = { ...actor, id: "author-1", role: "REQUESTER" as const };
+
+    await reviseIdea(
+      author,
+      "idea-1",
+      5,
+      {
+        title: "Revised safety idea",
+        rationale: "A clearer public-benefit rationale",
+        evidenceUrls: ["https://example.org/source"],
+      },
+      "corr-revise",
+    );
+
+    expect(mocks.transactionClient.prContentIdea.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          id: "idea-1",
+          proposerId: "author-1",
+          status: "REVISION_REQUIRED",
+          version: 5,
+        }),
+        data: expect.objectContaining({
+          title: "Revised safety idea",
+          status: "UNDER_REVIEW",
+          reviewerId: null,
+          decisionReason: null,
+        }),
+      }),
+    );
+    expect(mocks.transactionClient.prNotification.createMany).toHaveBeenCalledWith({
+      data: expect.arrayContaining([
+        expect.objectContaining({ userId: "pr-recipient", target: "idea:idea-1" }),
+      ]),
+    });
   });
 
   it("preserves an acceptance rationale when archiving the accepted idea", async () => {
