@@ -78,4 +78,87 @@ describe("off-site request creation", () => {
       }),
     );
   });
+
+  it("rejects an off-site end time before its start time", async () => {
+    await expect(
+      createRequest(requester, {
+        type: "OFFSITE",
+        title: "Rail site visit",
+        sourceUrls: ["https://example.org/brief"],
+        offsiteDetails: {
+          startTime: "11:00",
+          endTime: "10:30",
+          travel: "RTRDA transport confirmed",
+        },
+      }),
+    ).rejects.toMatchObject({ code: "INVALID_OFFSITE_DETAILS", statusCode: 422 });
+    expect(prisma.prRequest.create).not.toHaveBeenCalled();
+  });
+});
+
+describe("complete PR request details", () => {
+  it("stores request details and creates one content task per selected type", async () => {
+    await createRequest(requester, {
+      type: "PR",
+      title: "Rail research update",
+      sourceUrls: ["https://example.org/brief"],
+      priority: "HIGH",
+      priorityReason: "Announcement date is near",
+      requestDetails: {
+        projectOwner: "Project Lead",
+        assigner: "Communications Coordinator",
+        whyNow: "The research results are ready to announce.",
+        contentTypes: ["Website News", "Facebook Post"],
+        priorityReason: "Announcement date is near",
+        projectDetails: "",
+        confirmed: true,
+      },
+    });
+
+    expect(prisma.prRequest.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          priority: "HIGH",
+          priorityReason: "Announcement date is near",
+          revisions: {
+            create: expect.objectContaining({
+              offsiteDetails: expect.objectContaining({
+                projectOwner: "Project Lead",
+                assigner: "Communications Coordinator",
+                whyNow: "The research results are ready to announce.",
+                contentTypes: ["Website News", "Facebook Post"],
+                confirmed: true,
+              }),
+            }),
+          },
+          tasks: {
+            create: [
+              expect.objectContaining({ contentType: "Website News" }),
+              expect.objectContaining({ contentType: "Facebook Post" }),
+            ],
+          },
+        }),
+      }),
+    );
+  });
+
+  it("rejects PR details without source confirmation", async () => {
+    await expect(
+      createRequest(requester, {
+        type: "PR",
+        title: "Rail research update",
+        sourceUrls: ["https://example.org/brief"],
+        requestDetails: {
+          projectOwner: "Project Lead",
+          assigner: "Communications Coordinator",
+          whyNow: "Announcement date is near.",
+          contentTypes: ["Website News"],
+          priorityReason: "",
+          projectDetails: "",
+          confirmed: false,
+        },
+      }),
+    ).rejects.toMatchObject({ code: "INVALID_REQUEST_DETAILS", statusCode: 422 });
+    expect(prisma.prRequest.create).not.toHaveBeenCalled();
+  });
 });

@@ -111,6 +111,7 @@ type Request = {
   requesterName?: string;
   taskIds: string[];
   source?: string;
+  sources?: string[];
   status?:
     | "DRAFT"
     | "SUBMITTED"
@@ -130,7 +131,29 @@ type Request = {
   objective?: string;
   audience?: string;
   startTime?: string;
+  endTime?: string;
   travel?: string;
+  projectOwner?: string;
+  assigner?: string;
+  whyNow?: string;
+  contentTypes?: string[];
+  priority?: string;
+  priorityReason?: string;
+  projectDetails?: string;
+  confirmed?: boolean;
+  attachments?: Array<{
+    id: string;
+    kind: string;
+    version: number;
+    file: {
+      id: string;
+      fileName: string;
+      mimeType: string;
+      sizeBytes: number;
+      scanStatus: string;
+      deletedAt: string | null;
+    };
+  }>;
 };
 type RequestDraft = {
   type: RequestType;
@@ -142,7 +165,16 @@ type RequestDraft = {
   objective: string;
   audience: string;
   startTime: string;
+  endTime: string;
   travel: string;
+  assigner: string;
+  whyNow: string;
+  contentTypes: string[];
+  priority: string;
+  priorityReason: string;
+  projectDetails: string;
+  confirmed: boolean;
+  samples: File[];
 };
 type Task = {
   id: string;
@@ -286,6 +318,8 @@ type ApiRequestRecord = {
   title: string;
   type: "PR" | "OFFSITE";
   requestedFor: string | null;
+  priority: string;
+  priorityReason: string | null;
   createdAt: string;
   department: { name: string };
   requester: { displayName: string };
@@ -482,8 +516,30 @@ function mapRequestRecord(request: ApiRequestRecord): Request {
     audience: request.revisions[0]?.audience || undefined,
     startTime:
       typeof detailRecord?.startTime === "string" ? detailRecord.startTime : undefined,
+    endTime: typeof detailRecord?.endTime === "string" ? detailRecord.endTime : undefined,
     travel: typeof detailRecord?.travel === "string" ? detailRecord.travel : undefined,
+    projectOwner:
+      typeof detailRecord?.projectOwner === "string"
+        ? detailRecord.projectOwner
+        : undefined,
+    assigner:
+      typeof detailRecord?.assigner === "string" ? detailRecord.assigner : undefined,
+    whyNow: typeof detailRecord?.whyNow === "string" ? detailRecord.whyNow : undefined,
+    contentTypes: Array.isArray(detailRecord?.contentTypes)
+      ? detailRecord.contentTypes.filter(
+          (item): item is string => typeof item === "string",
+        )
+      : undefined,
+    priority: request.priority,
+    priorityReason: request.priorityReason || undefined,
+    projectDetails:
+      typeof detailRecord?.projectDetails === "string"
+        ? detailRecord.projectDetails
+        : undefined,
+    confirmed: detailRecord?.confirmed === true,
     source: request.sources[0]?.url,
+    sources: request.sources.map((source) => source.url),
+    attachments: request.attachments,
   };
 }
 
@@ -972,7 +1028,16 @@ function emptyRequestDraft(user: User): RequestDraft {
     objective: "",
     audience: "",
     startTime: "",
+    endTime: "",
     travel: "RTRDA transport confirmed",
+    assigner: "",
+    whyNow: "",
+    contentTypes: ["Website News"],
+    priority: "NORMAL",
+    priorityReason: "",
+    projectDetails: "",
+    confirmed: false,
+    samples: [],
   };
 }
 function label(page: (typeof pages)[number], language: Language) {
@@ -1386,6 +1451,35 @@ export function PrCenterApp({
     if (next === "message-house") void loadMessageHouse();
     setSidebarOpen(false);
   };
+  const navigateFromNotification = (target: string) => {
+    const match = /^(request|task|idea):(.+)$/.exec(target);
+    if (!match) {
+      const page = target as Page;
+      go(isPageEnabled(page) && visibleRolePages.includes(page) ? page : "home");
+      return;
+    }
+    const [, entity, id] = match;
+    const page: Page =
+      entity === "request"
+        ? hasUiRole("pr", "admin")
+          ? "requests"
+          : "my-requests"
+        : entity === "task"
+          ? "operations"
+          : "ideas";
+    if (!visibleRolePages.includes(page)) {
+      go("home");
+      return;
+    }
+    setPage(page);
+    setSidebarOpen(false);
+    window.setTimeout(() => {
+      document.getElementById(`${entity}-${id}`)?.scrollIntoView({
+        behavior: "smooth",
+        block: "center",
+      });
+    }, 100);
+  };
 
   const openRequest = () => {
     setRequestEditId(null);
@@ -1399,10 +1493,19 @@ export function PrCenterApp({
       type: request.type,
       title: request.title,
       requestedDate: request.requestedDate,
-      source: request.source || "",
+      source: request.sources?.join("\n") || request.source || "",
       objective: request.objective || "",
       audience: request.audience || "",
+      owner: request.projectOwner || currentUser.name,
+      assigner: request.assigner || "",
+      whyNow: request.whyNow || "",
+      contentTypes: request.contentTypes || ["Website News"],
+      priority: request.priority || "NORMAL",
+      priorityReason: request.priorityReason || "",
+      projectDetails: request.projectDetails || "",
+      confirmed: request.confirmed === true,
       startTime: request.startTime || "",
+      endTime: request.endTime || "",
       travel: request.travel || "RTRDA transport confirmed",
     });
     setRequestOpen(true);
@@ -1464,6 +1567,24 @@ export function PrCenterApp({
     }));
   };
   const createRequest = async (draft: RequestDraft, editId = requestEditId) => {
+    if (
+      !draft.confirmed ||
+      (draft.type === "pr" &&
+        (!draft.whyNow.trim() ||
+          draft.contentTypes.length === 0 ||
+          !draft.priority ||
+          !draft.objective.trim() ||
+          !draft.audience.trim())) ||
+      (draft.type === "offsite" &&
+        (!draft.startTime || !draft.endTime || draft.endTime <= draft.startTime))
+    ) {
+      announce(
+        state.language === "th"
+          ? "กรุณากรอกข้อมูลที่จำเป็นและยืนยันความถูกต้องก่อนบันทึก"
+          : "Complete the required fields and confirm the information before saving.",
+      );
+      return;
+    }
     const priorStatus = editId
       ? state.requests.find((request) => request.id === editId)?.status
       : undefined;
@@ -1490,10 +1611,28 @@ export function PrCenterApp({
             audience: draft.audience,
             offsiteDetails:
               draft.type === "offsite"
-                ? { startTime: draft.startTime, travel: draft.travel }
+                ? {
+                    startTime: draft.startTime,
+                    endTime: draft.endTime,
+                    travel: draft.travel,
+                  }
                 : undefined,
+            requestDetails: {
+              projectOwner: draft.owner,
+              assigner: draft.assigner,
+              whyNow: draft.whyNow,
+              contentTypes: draft.type === "pr" ? draft.contentTypes : [],
+              priorityReason: draft.priorityReason,
+              projectDetails: draft.projectDetails,
+              confirmed: draft.confirmed,
+            },
+            priority: draft.priority,
+            priorityReason: draft.priorityReason,
             requestedFor: draft.requestedDate || undefined,
-            sourceUrls: draft.source ? [draft.source] : [],
+            sourceUrls: draft.source
+              .split(/\n+/)
+              .map((url) => url.trim())
+              .filter(Boolean),
           }),
         },
       );
@@ -1511,6 +1650,8 @@ export function PrCenterApp({
         status: Request["status"];
         version: number;
         requestedFor: string | null;
+        priority: string;
+        priorityReason: string | null;
         department?: { name: string };
         revisions: Array<{
           revisionNumber: number;
@@ -1529,6 +1670,42 @@ export function PrCenterApp({
           version: number;
         }>;
       };
+      let samplesUploaded = true;
+      const uploadedSamples: NonNullable<Request["attachments"]> = [];
+      for (const file of draft.samples) {
+        try {
+          const bytes = new Uint8Array(await file.arrayBuffer());
+          let binary = "";
+          for (let offset = 0; offset < bytes.length; offset += 0x8000)
+            binary += String.fromCharCode(...bytes.subarray(offset, offset + 0x8000));
+          const uploadResponse = await fetch("/api/pr-center/files", {
+            method: "POST",
+            credentials: "same-origin",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              fileName: file.name,
+              mimeType: file.type || "application/octet-stream",
+              content: btoa(binary),
+            }),
+          });
+          if (!uploadResponse.ok) throw new Error("File upload failed");
+          const uploaded = (await uploadResponse.json()) as { id: string };
+          const attachResponse = await fetch("/api/pr-center/attachments", {
+            method: "POST",
+            credentials: "same-origin",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              fileId: uploaded.id,
+              requestId: updated.id,
+              kind: "request-sample",
+            }),
+          });
+          if (!attachResponse.ok) throw new Error("File attachment failed");
+          uploadedSamples.push(await attachResponse.json());
+        } catch {
+          samplesUploaded = false;
+        }
+      }
       const mappedRequest: Request = {
         id: updated.id,
         title: updated.title,
@@ -1538,8 +1715,12 @@ export function PrCenterApp({
         requestedDate: updated.requestedFor?.slice(0, 10) || "",
         taskIds: updated.tasks.map((task) => task.id),
         source: updated.sources[0]?.url,
+        sources: updated.sources.map((source) => source.url),
+        attachments: uploadedSamples,
         status: updated.status,
         version: updated.version,
+        priority: updated.priority,
+        priorityReason: updated.priorityReason || undefined,
         revisionNumber: updated.revisions[0]?.revisionNumber,
         objective: updated.revisions[0]?.objective || undefined,
         audience: updated.revisions[0]?.audience || undefined,
@@ -1551,7 +1732,22 @@ export function PrCenterApp({
           return {
             startTime:
               typeof fields.startTime === "string" ? fields.startTime : undefined,
+            endTime: typeof fields.endTime === "string" ? fields.endTime : undefined,
             travel: typeof fields.travel === "string" ? fields.travel : undefined,
+            projectOwner:
+              typeof fields.projectOwner === "string" ? fields.projectOwner : undefined,
+            assigner: typeof fields.assigner === "string" ? fields.assigner : undefined,
+            whyNow: typeof fields.whyNow === "string" ? fields.whyNow : undefined,
+            contentTypes: Array.isArray(fields.contentTypes)
+              ? fields.contentTypes.filter(
+                  (item): item is string => typeof item === "string",
+                )
+              : undefined,
+            projectDetails:
+              typeof fields.projectDetails === "string"
+                ? fields.projectDetails
+                : undefined,
+            confirmed: fields.confirmed === true,
           };
         })(),
       };
@@ -1584,17 +1780,21 @@ export function PrCenterApp({
       setRequestOpen(false);
       await refreshNotifications().catch(() => undefined);
       announce(
-        state.language === "th"
-          ? editId
-            ? priorStatus && priorStatus !== "DRAFT"
-              ? "บันทึก revision ใหม่เป็นฉบับร่างแล้ว กรุณาตรวจรายละเอียดและส่งคำขออีกครั้ง"
-              : "บันทึกการแก้ไขคำขอแล้ว"
-            : "บันทึกคำขอเป็นฉบับร่างแล้ว"
-          : editId
-            ? priorStatus && priorStatus !== "DRAFT"
-              ? "Revision saved as a draft. Review the details and submit the request again."
-              : "Request changes saved"
-            : "Request saved as draft",
+        !samplesUploaded
+          ? state.language === "th"
+            ? "บันทึกคำขอแล้ว แต่แนบไฟล์ตัวอย่างไม่สำเร็จ กรุณาแนบไฟล์จากรายละเอียดคำขออีกครั้ง"
+            : "Request saved, but sample files could not be attached. Add them from the request details."
+          : state.language === "th"
+            ? editId
+              ? priorStatus && priorStatus !== "DRAFT"
+                ? "บันทึก revision ใหม่เป็นฉบับร่างแล้ว กรุณาตรวจรายละเอียดและส่งคำขออีกครั้ง"
+                : "บันทึกการแก้ไขคำขอแล้ว"
+              : "บันทึกคำขอเป็นฉบับร่างแล้ว"
+            : editId
+              ? priorStatus && priorStatus !== "DRAFT"
+                ? "Revision saved as a draft. Review the details and submit the request again."
+                : "Request changes saved"
+              : "Request saved as draft",
       );
       setPage("my-requests");
     } catch (error) {
@@ -2537,6 +2737,7 @@ export function PrCenterApp({
       {requestOpen && (
         <RequestModal
           language={state.language}
+          requesterName={currentUser.name}
           isEditing={requestEditId !== null}
           draft={requestDraft}
           onChange={setRequestDraft}
@@ -3648,11 +3849,66 @@ function Requests({
               </p>
             )}
             <p>{selected.objective || "No communication objective provided."}</p>
+            {selected.whyNow && (
+              <p>
+                {language === "th" ? "เหตุผลที่ต้องสื่อสารช่วงนี้" : "Why now"}:{" "}
+                {selected.whyNow}
+              </p>
+            )}
+            {selected.projectOwner && (
+              <p>
+                {language === "th" ? "เจ้าของโครงการ" : "Project owner"}:{" "}
+                {selected.projectOwner}
+              </p>
+            )}
+            {selected.assigner && (
+              <p>
+                {language === "th" ? "ผู้มอบหมายงาน" : "Assigner"}: {selected.assigner}
+              </p>
+            )}
+            {selected.contentTypes && selected.contentTypes.length > 0 && (
+              <p>
+                {language === "th" ? "ประเภทเนื้อหา" : "Content types"}:{" "}
+                {selected.contentTypes.join(", ")}
+              </p>
+            )}
+            {selected.priority && (
+              <p>
+                {language === "th" ? "ความสำคัญ" : "Priority"}: {selected.priority}
+                {selected.priorityReason ? ` · ${selected.priorityReason}` : ""}
+              </p>
+            )}
+            {selected.projectDetails && <p>{selected.projectDetails}</p>}
+            {selected.type === "offsite" && (
+              <p>
+                {language === "th" ? "เวลาลงพื้นที่" : "Off-site time"}:{" "}
+                {selected.startTime || "—"}–{selected.endTime || "—"} ·{" "}
+                {selected.travel || "—"}
+              </p>
+            )}
             <p>
-              {selected.source
-                ? `Source: ${selected.source}`
+              {selected.sources?.length || selected.source
+                ? `Source: ${(selected.sources?.length ? selected.sources : [selected.source]).join(", ")}`
                 : "No source link provided."}
             </p>
+            {selected.attachments && selected.attachments.length > 0 && (
+              <div>
+                <b>{language === "th" ? "ไฟล์ตัวอย่าง" : "Sample files"}</b>
+                <ul>
+                  {selected.attachments.map((attachment) => (
+                    <li key={attachment.id}>
+                      {attachment.file.fileName} · {attachment.file.scanStatus}
+                      {attachment.file.scanStatus === "CLEAN" &&
+                        !attachment.file.deletedAt && (
+                          <a href={`/api/pr-center/files/${attachment.file.id}/download`}>
+                            {language === "th" ? " ดาวน์โหลด" : " Download"}
+                          </a>
+                        )}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
             <p>
               {selected.audience
                 ? `Audience: ${selected.audience}`
@@ -7304,8 +7560,29 @@ function Help({
     </>
   );
 }
+function FieldLabel({
+  required = false,
+  children,
+}: {
+  required?: boolean;
+  children: React.ReactNode;
+}) {
+  return (
+    <span>
+      {children}
+      {required && (
+        <span className={styles.requiredMark} aria-hidden="true">
+          {" "}
+          *
+        </span>
+      )}
+    </span>
+  );
+}
+
 function RequestModal({
   language,
+  requesterName,
   isEditing,
   draft,
   onChange,
@@ -7313,6 +7590,7 @@ function RequestModal({
   onSubmit,
 }: {
   language: Language;
+  requesterName: string;
   isEditing: boolean;
   draft: RequestDraft;
   onChange: (draft: RequestDraft) => void;
@@ -7321,164 +7599,358 @@ function RequestModal({
 }) {
   const thai = language === "th";
   return (
-    <div className={styles.modalBackdrop} role="presentation">
+    <div
+      className={`${styles.modalBackdrop} ${styles.requestModalBackdrop}`}
+      role="presentation"
+    >
       <form
-        className={styles.modal}
+        className={`${styles.modal} ${styles.requestModal}`}
         role="dialog"
         aria-modal="true"
         aria-labelledby="request-title"
         onSubmit={onSubmit}
       >
-        <header>
+        <header className={styles.requestModalHeader}>
           <div>
-            <p className={styles.eyebrow}>
-              {isEditing ? "EDIT WORK REQUEST" : "NEW WORK REQUEST"}
-            </p>
             <h2 id="request-title">
               {isEditing
                 ? thai
                   ? "แก้ไขคำขอ"
                   : "Edit work request"
                 : thai
-                  ? "ส่งคำของาน"
-                  : "Submit work request"}
+                  ? "ส่งคำขอสำหรับงาน"
+                  : "Submit a work request"}
             </h2>
           </div>
-          <button type="button" onClick={onClose}>
-            Close
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label={thai ? "ปิดหน้าต่าง" : "Close dialog"}
+          >
+            ×
           </button>
         </header>
-        <div className={styles.typePicker}>
-          <button
-            type="button"
-            className={draft.type === "pr" ? styles.selectedType : ""}
-            onClick={() => onChange({ ...draft, type: "pr" })}
-          >
-            <b>PR</b>
-            <span>
-              {thai ? "ผลิตและเผยแพร่เนื้อหา" : "Content production and publication"}
-            </span>
-          </button>
-          <button
-            type="button"
-            className={draft.type === "offsite" ? styles.selectedType : ""}
-            onClick={() => onChange({ ...draft, type: "offsite" })}
-          >
-            <b>OS</b>
-            <span>{thai ? "ลงพื้นที่ / ปฏิบัติงานนอกสถานที่" : "Off-site support"}</span>
-          </button>
-        </div>
-        <div className={styles.formGrid}>
-          <label>
-            {thai ? "ชื่อโครงการ / กิจกรรม" : "Project / activity"}
-            <input
-              value={draft.title}
-              minLength={3}
-              maxLength={300}
-              onChange={(event) => onChange({ ...draft, title: event.target.value })}
-              required
-            />
-          </label>
-          <label>
-            {thai ? "หน่วยงาน" : "Department"}
-            <input
-              value={draft.department}
-              onChange={(event) => onChange({ ...draft, department: event.target.value })}
-              required
-            />
-          </label>
-          <label>
-            {thai ? "เจ้าของโครงการ" : "Project owner"}
-            <input
-              value={draft.owner}
-              onChange={(event) => onChange({ ...draft, owner: event.target.value })}
-              required
-            />
-          </label>
-          <label>
-            {draft.type === "pr"
-              ? thai
-                ? "วันที่ต้องการเผยแพร่"
-                : "Requested publish date"
-              : thai
-                ? "วันที่ลงพื้นที่"
-                : "Off-site date"}
-            <input
-              type="date"
-              value={draft.requestedDate}
-              onChange={(event) =>
-                onChange({ ...draft, requestedDate: event.target.value })
-              }
-              required
-            />
-          </label>
-          <label className={styles.full}>
+        <div className={styles.requestModalBody}>
+          <div className={styles.requestFormHint}>
             {thai
-              ? "ลิงก์ข้อมูลต้นทาง / โฟลเดอร์โครงการ"
-              : "Source links / project folder"}
-            <input
-              type="url"
-              value={draft.source}
-              onChange={(event) => onChange({ ...draft, source: event.target.value })}
-              required
-            />
-          </label>
-          {draft.type === "pr" ? (
-            <>
-              <label>
-                {thai ? "วัตถุประสงค์การสื่อสาร" : "Communication objective"}
-                <textarea
-                  value={draft.objective}
-                  onChange={(event) =>
-                    onChange({ ...draft, objective: event.target.value })
-                  }
-                  required
-                />
-              </label>
-              <label>
-                {thai ? "กลุ่มเป้าหมาย" : "Target audience"}
-                <textarea
-                  value={draft.audience}
-                  onChange={(event) =>
-                    onChange({ ...draft, audience: event.target.value })
-                  }
-                  required
-                />
-              </label>
-            </>
-          ) : (
-            <>
-              <label>
-                {thai ? "เวลาเริ่มต้น" : "Start time"}
-                <input
-                  type="time"
-                  value={draft.startTime}
-                  onChange={(event) =>
-                    onChange({ ...draft, startTime: event.target.value })
-                  }
-                  required
-                />
-              </label>
-              <label>
-                {thai ? "การเดินทาง" : "Travel arrangement"}
-                <select
-                  value={draft.travel}
-                  onChange={(event) => onChange({ ...draft, travel: event.target.value })}
-                >
-                  <option value="RTRDA transport confirmed">
-                    {thai ? "จองรถของ สทร. สำเร็จแล้ว" : "RTRDA transport confirmed"}
-                  </option>
-                  <option value="Requester transport">
-                    {thai ? "เดินทางเอง" : "Requester transport"}
-                  </option>
-                </select>
-              </label>
-            </>
-          )}
+              ? "เลือกประเภทงานและกรอกข้อมูลที่จำเป็น ระบบจะแสดงช่องกรอกตามประเภทงาน"
+              : "Choose a request type and complete the required fields. The form adapts to your selection."}
+          </div>
+          <div className={styles.typePicker}>
+            <button
+              type="button"
+              className={draft.type === "pr" ? styles.selectedType : ""}
+              aria-pressed={draft.type === "pr"}
+              onClick={() => onChange({ ...draft, type: "pr" })}
+            >
+              <b aria-hidden="true">📣</b>
+              <span>
+                <strong>{thai ? "ประชาสัมพันธ์" : "Public relations"}</strong>
+                <small>
+                  {thai
+                    ? "ขอผลิตและเผยแพร่ Content ผ่านช่องทางขององค์กร"
+                    : "Request content production and publication through agency channels."}
+                </small>
+              </span>
+            </button>
+            <button
+              type="button"
+              className={draft.type === "offsite" ? styles.selectedType : ""}
+              aria-pressed={draft.type === "offsite"}
+              onClick={() => onChange({ ...draft, type: "offsite" })}
+            >
+              <b aria-hidden="true">🚐</b>
+              <span>
+                <strong>{thai ? "ออกนอกพื้นที่" : "Off-site"}</strong>
+                <small>
+                  {thai
+                    ? "ขอทีม PR ลงพื้นที่เพื่อเก็บภาพ วิดีโอ หรือปฏิบัติงานร่วมกับคณะทำงาน"
+                    : "Request PR support on location for photography, video, or team activities."}
+                </small>
+              </span>
+            </button>
+          </div>
+          <div className={styles.formGrid}>
+            <label>
+              <FieldLabel required>
+                {thai ? "ชื่อโครงการหรือกิจกรรม" : "Project / activity name"}
+              </FieldLabel>
+              <input
+                value={draft.title}
+                placeholder={
+                  thai
+                    ? "เช่น อัปเดตความคืบหน้าโครงการ AI Camera"
+                    : "e.g. AI Camera project update"
+                }
+                minLength={3}
+                maxLength={300}
+                onChange={(event) => onChange({ ...draft, title: event.target.value })}
+                required
+              />
+            </label>
+            <label>
+              <FieldLabel required>{thai ? "ฝ่าย" : "Department"}</FieldLabel>
+              <input value={draft.department} readOnly aria-required="true" />
+            </label>
+            <label>
+              <FieldLabel required>{thai ? "ผู้ยื่นคำขอ" : "Requester"}</FieldLabel>
+              <input value={requesterName} readOnly aria-required="true" />
+            </label>
+            <label>
+              <FieldLabel required>{thai ? "ผู้มอบหมายงาน" : "Assigner"}</FieldLabel>
+              <input
+                value={draft.assigner}
+                placeholder={
+                  thai
+                    ? "ชื่อหัวหน้าหรือผู้บริหารที่มอบหมาย"
+                    : "Name of assigning manager or executive"
+                }
+                onChange={(event) => onChange({ ...draft, assigner: event.target.value })}
+                required
+              />
+            </label>
+            <label>
+              <FieldLabel required>{thai ? "เจ้าของโครงการ" : "Project owner"}</FieldLabel>
+              <input
+                value={draft.owner}
+                placeholder={thai ? "ชื่อผู้รับผิดชอบโครงการ" : "Project owner name"}
+                onChange={(event) => onChange({ ...draft, owner: event.target.value })}
+                required
+              />
+            </label>
+            <label>
+              <FieldLabel required>
+                {draft.type === "pr"
+                  ? thai
+                    ? "วันที่ต้องการเผยแพร่"
+                    : "Requested publish date"
+                  : thai
+                    ? "วันที่ลงพื้นที่"
+                    : "Off-site date"}
+              </FieldLabel>
+              <input
+                type="date"
+                value={draft.requestedDate}
+                onChange={(event) =>
+                  onChange({ ...draft, requestedDate: event.target.value })
+                }
+                required
+              />
+            </label>
+            <label className={styles.full}>
+              {thai
+                ? "ลิงก์ข้อมูลต้นทาง / โฟลเดอร์โครงการ (ใส่ได้หลายลิงก์ แยกบรรทัด)"
+                : "Source links / project folder (one link per line)"}
+              <textarea
+                value={draft.source}
+                onChange={(event) => onChange({ ...draft, source: event.target.value })}
+                required
+              />
+            </label>
+            {draft.type === "pr" ? (
+              <>
+                <label>
+                  {thai ? "วัตถุประสงค์การสื่อสาร" : "Communication objective"}
+                  <textarea
+                    value={draft.objective}
+                    onChange={(event) =>
+                      onChange({ ...draft, objective: event.target.value })
+                    }
+                    required
+                  />
+                </label>
+                <label>
+                  {thai ? "เหตุผลที่ต้องสื่อสารในช่วงนี้" : "Why communicate now?"}
+                  <textarea
+                    value={draft.whyNow}
+                    onChange={(event) =>
+                      onChange({ ...draft, whyNow: event.target.value })
+                    }
+                    required
+                  />
+                </label>
+                <label>
+                  {thai ? "กลุ่มเป้าหมาย" : "Target audience"}
+                  <textarea
+                    value={draft.audience}
+                    onChange={(event) =>
+                      onChange({ ...draft, audience: event.target.value })
+                    }
+                    required
+                  />
+                </label>
+                <fieldset className={`${styles.contentTypeChoices} ${styles.full}`}>
+                  <legend>{thai ? "ประเภทเนื้อหาที่ต้องการ" : "Content types"}</legend>
+                  <div>
+                    {[
+                      "Website News",
+                      "Facebook Post",
+                      "Carousel",
+                      "Infographic",
+                      "Quote Card",
+                      "Short Video",
+                      "Reel",
+                      "YouTube Video",
+                      "Photo Album",
+                      "X Post",
+                      "LinkedIn Post",
+                      "Press Release",
+                      "Newsletter",
+                      "Executive Brief",
+                      "Other",
+                    ].map((contentType) => (
+                      <label key={contentType}>
+                        <input
+                          type="checkbox"
+                          checked={draft.contentTypes.includes(contentType)}
+                          onChange={(event) =>
+                            onChange({
+                              ...draft,
+                              contentTypes: event.target.checked
+                                ? [...draft.contentTypes, contentType]
+                                : draft.contentTypes.filter(
+                                    (item) => item !== contentType,
+                                  ),
+                            })
+                          }
+                        />
+                        {contentType}
+                      </label>
+                    ))}
+                  </div>
+                </fieldset>
+                <label>
+                  {thai ? "ระดับความสำคัญ" : "Priority"}
+                  <select
+                    value={draft.priority}
+                    onChange={(event) =>
+                      onChange({ ...draft, priority: event.target.value })
+                    }
+                    required
+                  >
+                    <option value="LOW">{thai ? "ปกติ · ต่ำ" : "Low"}</option>
+                    <option value="NORMAL">{thai ? "ปกติ" : "Normal"}</option>
+                    <option value="HIGH">{thai ? "สูง" : "High"}</option>
+                    <option value="URGENT">{thai ? "เร่งด่วน" : "Urgent"}</option>
+                  </select>
+                </label>
+                <label>
+                  {thai ? "เหตุผลประกอบความสำคัญ (ถ้ามี)" : "Priority reason (optional)"}
+                  <input
+                    value={draft.priorityReason}
+                    onChange={(event) =>
+                      onChange({ ...draft, priorityReason: event.target.value })
+                    }
+                  />
+                </label>
+              </>
+            ) : (
+              <>
+                <label className={styles.full}>
+                  {thai
+                    ? "รายละเอียดและวัตถุประสงค์ หรือความคืบหน้าของโครงการ (ไม่บังคับ)"
+                    : "Project details, objective, or progress (optional)"}
+                  <textarea
+                    value={draft.projectDetails}
+                    onChange={(event) =>
+                      onChange({ ...draft, projectDetails: event.target.value })
+                    }
+                  />
+                </label>
+                <label>
+                  {thai ? "เวลาเริ่มต้น" : "Start time"}
+                  <input
+                    type="time"
+                    value={draft.startTime}
+                    onChange={(event) =>
+                      onChange({ ...draft, startTime: event.target.value })
+                    }
+                    required
+                  />
+                </label>
+                <label>
+                  {thai ? "เวลาสิ้นสุด" : "End time"}
+                  <input
+                    type="time"
+                    min={draft.startTime || undefined}
+                    value={draft.endTime}
+                    onChange={(event) =>
+                      onChange({ ...draft, endTime: event.target.value })
+                    }
+                    required
+                  />
+                </label>
+                <label>
+                  {thai ? "การเดินทาง" : "Travel arrangement"}
+                  <select
+                    value={draft.travel}
+                    onChange={(event) =>
+                      onChange({ ...draft, travel: event.target.value })
+                    }
+                  >
+                    <option value="RTRDA transport confirmed">
+                      {thai ? "จองรถของ สทร. สำเร็จแล้ว" : "RTRDA transport confirmed"}
+                    </option>
+                    <option value="Public or private transport">
+                      {thai
+                        ? "เดินทางโดยรถสาธารณะ / รถส่วนตัว"
+                        : "Public transport / private vehicle"}
+                    </option>
+                    <option value="Rental vehicle with project lead approval">
+                      {thai
+                        ? "เดินทางร่วมกับคณะเดินทางโดยการเช่ารถ"
+                        : "Travel with the team by rental vehicle"}
+                    </option>
+                  </select>
+                  {draft.travel === "Public or private transport" && (
+                    <small className={styles.formHint}>
+                      {thai ? "สำหรับการเดินทางในกรุงเทพฯ" : "For travel within Bangkok."}
+                    </small>
+                  )}
+                  {draft.travel === "Rental vehicle with project lead approval" && (
+                    <small className={styles.formWarning}>
+                      {thai
+                        ? "สำหรับการเดินทางไปต่างจังหวัด โดยต้องได้รับอนุมัติจากหัวหน้าโครงการก่อน"
+                        : "For provincial travel; project-lead approval is required first."}
+                    </small>
+                  )}
+                </label>
+              </>
+            )}
+            <label className={styles.full}>
+              {thai
+                ? "ไฟล์ตัวอย่าง / เอกสารประกอบ"
+                : "Sample files / supporting documents"}
+              <input
+                type="file"
+                multiple
+                accept="image/*,video/*,.pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx"
+                onChange={(event) =>
+                  onChange({ ...draft, samples: Array.from(event.target.files || []) })
+                }
+              />
+              {draft.samples.length > 0 && (
+                <small>{draft.samples.map((file) => file.name).join(", ")}</small>
+              )}
+            </label>
+            <label className={`${styles.confirmAccuracy} ${styles.full}`}>
+              <input
+                type="checkbox"
+                checked={draft.confirmed}
+                onChange={(event) =>
+                  onChange({ ...draft, confirmed: event.target.checked })
+                }
+                required
+              />
+              {thai
+                ? "ขอยืนยันว่าข้อมูลและเอกสารต้นทางถูกต้อง ครบถ้วน และสามารถตรวจสอบได้"
+                : "I confirm the source information and documents are accurate, complete, and verifiable."}
+            </label>
+          </div>
         </div>
-        <footer>
+        <footer className={styles.requestModalFooter}>
           <button type="button" onClick={onClose}>
-            Cancel
+            {thai ? "ยกเลิก" : "Cancel"}
           </button>
           <button className={styles.primary} type="submit">
             {isEditing
@@ -7486,8 +7958,8 @@ function RequestModal({
                 ? "บันทึกการแก้ไข"
                 : "Save changes"
               : thai
-                ? "บันทึกคำขอ"
-                : "Save request"}
+                ? "ส่งคำขอ"
+                : "Submit request"}
           </button>
         </footer>
       </form>

@@ -80,6 +80,25 @@ async function body(request: FastifyRequest): Promise<Record<string, unknown>> {
   return request.body as Record<string, unknown>;
 }
 
+function requestDetailsInput(input: Record<string, unknown>) {
+  const value = input.requestDetails;
+  if (!value || typeof value !== "object" || Array.isArray(value)) return undefined;
+  const fields = value as Record<string, unknown>;
+  return {
+    projectOwner: typeof fields.projectOwner === "string" ? fields.projectOwner : "",
+    assigner: typeof fields.assigner === "string" ? fields.assigner : "",
+    whyNow: typeof fields.whyNow === "string" ? fields.whyNow : "",
+    contentTypes: Array.isArray(fields.contentTypes)
+      ? fields.contentTypes.filter((item): item is string => typeof item === "string")
+      : [],
+    priorityReason:
+      typeof fields.priorityReason === "string" ? fields.priorityReason : "",
+    projectDetails:
+      typeof fields.projectDetails === "string" ? fields.projectDetails : "",
+    confirmed: fields.confirmed === true,
+  };
+}
+
 function expectedVersion(request: FastifyRequest): number {
   const raw = request.headers["if-match"]?.replaceAll('"', "");
   const version = Number(raw);
@@ -323,6 +342,7 @@ export function buildPrCenterApi(
         priority: typeof input.priority === "string" ? input.priority : undefined,
         priorityReason:
           typeof input.priorityReason === "string" ? input.priorityReason : undefined,
+        requestDetails: requestDetailsInput(input),
         offsiteDetails:
           input.type === "OFFSITE" &&
           typeof input.offsiteDetails === "object" &&
@@ -334,6 +354,12 @@ export function buildPrCenterApi(
                   "string"
                     ? ((input.offsiteDetails as Record<string, unknown>)
                         .startTime as string)
+                    : "",
+                endTime:
+                  typeof (input.offsiteDetails as Record<string, unknown>).endTime ===
+                  "string"
+                    ? ((input.offsiteDetails as Record<string, unknown>)
+                        .endTime as string)
                     : "",
                 travel:
                   typeof (input.offsiteDetails as Record<string, unknown>).travel ===
@@ -368,6 +394,7 @@ export function buildPrCenterApi(
         priority: typeof input.priority === "string" ? input.priority : undefined,
         priorityReason:
           typeof input.priorityReason === "string" ? input.priorityReason : undefined,
+        requestDetails: requestDetailsInput(input),
         offsiteDetails:
           input.type === "OFFSITE" &&
           typeof input.offsiteDetails === "object" &&
@@ -379,6 +406,12 @@ export function buildPrCenterApi(
                   "string"
                     ? ((input.offsiteDetails as Record<string, unknown>)
                         .startTime as string)
+                    : "",
+                endTime:
+                  typeof (input.offsiteDetails as Record<string, unknown>).endTime ===
+                  "string"
+                    ? ((input.offsiteDetails as Record<string, unknown>)
+                        .endTime as string)
                     : "",
                 travel:
                   typeof (input.offsiteDetails as Record<string, unknown>).travel ===

@@ -298,15 +298,51 @@ type CreateRequestInput = {
   sourceUrls: string[];
   priority?: string;
   priorityReason?: string;
-  offsiteDetails?: { startTime: string; travel: string };
+  offsiteDetails?: { startTime: string; endTime?: string; travel: string };
+  requestDetails?: {
+    projectOwner: string;
+    assigner: string;
+    whyNow: string;
+    contentTypes: string[];
+    priorityReason: string;
+    projectDetails: string;
+    confirmed: boolean;
+  };
 };
+
+const REQUEST_CONTENT_TYPES = new Set([
+  "Website News",
+  "Facebook Post",
+  "Carousel",
+  "Infographic",
+  "Quote Card",
+  "Short Video",
+  "Reel",
+  "YouTube Video",
+  "Photo Album",
+  "X Post",
+  "LinkedIn Post",
+  "Press Release",
+  "Newsletter",
+  "Executive Brief",
+  "Other",
+]);
+
+function validatedPriority(value?: string) {
+  const priority = value?.trim().toUpperCase() || "NORMAL";
+  if (!["LOW", "NORMAL", "HIGH", "URGENT"].includes(priority))
+    throw new PrCenterError("Unknown request priority", 422, "INVALID_PRIORITY");
+  return priority;
+}
 
 function validateOffsiteDetails(
   type: CreateRequestInput["type"],
   details: CreateRequestInput["offsiteDetails"],
+  requireEndTime = false,
 ) {
   if (type !== "OFFSITE") return undefined;
   const startTime = details?.startTime?.trim() || "";
+  const endTime = details?.endTime?.trim() || "";
   const travel = details?.travel?.trim() || "";
   if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(startTime))
     throw new PrCenterError(
@@ -320,7 +356,79 @@ function validateOffsiteDetails(
       422,
       "INVALID_OFFSITE_DETAILS",
     );
-  return { startTime, travel };
+  if (endTime && !/^([01]\d|2[0-3]):[0-5]\d$/.test(endTime))
+    throw new PrCenterError(
+      "A valid off-site end time is required",
+      422,
+      "INVALID_OFFSITE_DETAILS",
+    );
+  if (requireEndTime && !endTime)
+    throw new PrCenterError(
+      "A valid off-site end time is required",
+      422,
+      "INVALID_OFFSITE_DETAILS",
+    );
+  if (endTime && endTime <= startTime)
+    throw new PrCenterError(
+      "Off-site end time must be after the start time",
+      422,
+      "INVALID_OFFSITE_DETAILS",
+    );
+  return { startTime, ...(endTime ? { endTime } : {}), travel };
+}
+
+function validateRequestDetails(
+  type: CreateRequestInput["type"],
+  details: CreateRequestInput["requestDetails"],
+) {
+  if (!details) return undefined;
+  const projectOwner = details.projectOwner.trim();
+  const assigner = details.assigner.trim();
+  const whyNow = details.whyNow.trim();
+  const contentTypes = [
+    ...new Set(details.contentTypes.map((item) => item.trim()).filter(Boolean)),
+  ];
+  const projectDetails = details.projectDetails.trim();
+  const priorityReason = details.priorityReason.trim();
+  if (!projectOwner || !assigner || !details.confirmed)
+    throw new PrCenterError(
+      "Project owner, assigner, and source confirmation are required",
+      422,
+      "INVALID_REQUEST_DETAILS",
+    );
+  if (type === "PR" && (!whyNow || contentTypes.length === 0))
+    throw new PrCenterError(
+      "Why-now and at least one content type are required for PR requests",
+      422,
+      "INVALID_REQUEST_DETAILS",
+    );
+  if (contentTypes.some((item) => !REQUEST_CONTENT_TYPES.has(item)))
+    throw new PrCenterError(
+      "One or more content types are not supported",
+      422,
+      "INVALID_REQUEST_DETAILS",
+    );
+  if (
+    projectOwner.length > 200 ||
+    assigner.length > 200 ||
+    whyNow.length > 5000 ||
+    priorityReason.length > 1000 ||
+    projectDetails.length > 5000
+  )
+    throw new PrCenterError(
+      "Request details exceed the allowed length",
+      422,
+      "INVALID_REQUEST_DETAILS",
+    );
+  return {
+    projectOwner,
+    assigner,
+    whyNow,
+    contentTypes,
+    priorityReason,
+    projectDetails,
+    confirmed: details.confirmed,
+  };
 }
 
 type IdeaStatus =
@@ -412,7 +520,25 @@ export async function createRequest(
       "INVALID_TITLE",
     );
   const sourceUrls = [...new Set(input.sourceUrls.map(assertUrl))];
-  const offsiteDetails = validateOffsiteDetails(input.type, input.offsiteDetails);
+  const offsiteDetails = validateOffsiteDetails(
+    input.type,
+    input.offsiteDetails,
+    Boolean(input.requestDetails),
+  );
+  const requestDetails = validateRequestDetails(input.type, input.requestDetails);
+  if (requestDetails && sourceUrls.length === 0)
+    throw new PrCenterError(
+      "At least one source URL is required",
+      422,
+      "INVALID_SOURCE_URL",
+    );
+  const revisionDetails = requestDetails
+    ? { ...requestDetails, ...(offsiteDetails || {}) }
+    : offsiteDetails;
+  const contentTypes =
+    input.type === "PR" && requestDetails?.contentTypes.length
+      ? requestDetails.contentTypes
+      : [input.type === "PR" ? "PR Content" : "Off-site Support"];
 
   return prisma.$transaction(async (tx) => {
     const request = await tx.prRequest.create({
@@ -423,7 +549,7 @@ export async function createRequest(
         requestNumber: requestNumber(input.type),
         type: input.type,
         title,
-        priority: input.priority || "NORMAL",
+        priority: validatedPriority(input.priority),
         priorityReason: input.priorityReason?.trim() || null,
         requestedFor: input.requestedFor,
         revisions: {
@@ -432,17 +558,17 @@ export async function createRequest(
             title,
             objective: input.objective?.trim() || null,
             audience: input.audience?.trim() || null,
-            offsiteDetails,
+            offsiteDetails: revisionDetails,
           },
         },
         sources: { create: sourceUrls.map((url) => ({ url })) },
         tasks: {
-          create: {
-            title,
-            contentType: input.type === "PR" ? "PR Content" : "Off-site Support",
+          create: contentTypes.map((contentType) => ({
+            title: `${contentType}: ${title}`,
+            contentType,
             ownerId: actor.id,
             dueAt: input.requestedFor,
-          },
+          })),
         },
       },
       include: { revisions: true, sources: true, tasks: true },
@@ -507,6 +633,25 @@ export async function listRequests(actor: PrCenterActor, take = 25, cursor?: str
               body: true,
               keyMessage: true,
               finalAssetId: true,
+            },
+          },
+        },
+      },
+      attachments: {
+        where: { taskId: null },
+        orderBy: { createdAt: "desc" },
+        select: {
+          id: true,
+          kind: true,
+          version: true,
+          file: {
+            select: {
+              id: true,
+              fileName: true,
+              mimeType: true,
+              sizeBytes: true,
+              scanStatus: true,
+              deletedAt: true,
             },
           },
         },
@@ -582,6 +727,25 @@ async function requestInScope(actor: PrCenterActor, requestId: string) {
         select: { toState: true, reason: true, createdAt: true },
       },
       tasks: true,
+      attachments: {
+        where: { taskId: null },
+        orderBy: { createdAt: "desc" },
+        select: {
+          id: true,
+          kind: true,
+          version: true,
+          file: {
+            select: {
+              id: true,
+              fileName: true,
+              mimeType: true,
+              sizeBytes: true,
+              scanStatus: true,
+              deletedAt: true,
+            },
+          },
+        },
+      },
     },
   });
   if (!request) throw new PrCenterError("Request not found", 404, "NOT_FOUND");
@@ -626,7 +790,21 @@ export async function updateRequestDraft(
       "INVALID_TITLE",
     );
   const sourceUrls = [...new Set(input.sourceUrls.map(assertUrl))];
-  const offsiteDetails = validateOffsiteDetails(input.type, input.offsiteDetails);
+  const offsiteDetails = validateOffsiteDetails(
+    input.type,
+    input.offsiteDetails,
+    Boolean(input.requestDetails),
+  );
+  const requestDetails = validateRequestDetails(input.type, input.requestDetails);
+  if (requestDetails && sourceUrls.length === 0)
+    throw new PrCenterError(
+      "At least one source URL is required",
+      422,
+      "INVALID_SOURCE_URL",
+    );
+  const revisionDetails = requestDetails
+    ? { ...requestDetails, ...(offsiteDetails || {}) }
+    : offsiteDetails;
   if (
     request.tasks.some((task) => task.status !== "DRAFT" && task.status !== "CANCELLED")
   )
@@ -643,7 +821,7 @@ export async function updateRequestDraft(
       data: {
         title,
         type: input.type,
-        priority: input.priority || request.priority,
+        priority: input.priority ? validatedPriority(input.priority) : request.priority,
         priorityReason: input.priorityReason?.trim() || null,
         requestedFor: input.requestedFor,
         ...(returnToDraft ? { status: "DRAFT" as const } : {}),
@@ -663,7 +841,7 @@ export async function updateRequestDraft(
         title,
         objective: input.objective?.trim() || null,
         audience: input.audience?.trim() || null,
-        offsiteDetails,
+        offsiteDetails: revisionDetails,
         changeSummary: "Requester amendment",
       },
     });
