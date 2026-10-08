@@ -77,7 +77,7 @@ describe("getMoralityReportPage", () => {
 
   it("embeds the No Gift Policy 2569 PDF in its report page", () => {
     const content = getMoralityReportPage("/policy_no_gift_policy_2569")?.contentHtml;
-    expect(content).toContain("/risk-reports/no-gift-policy/report-2569.pdf");
+    expect(content).toContain("/risk-reports/no-gift-policy/report-2569.pdf?v=20261008");
     expect(content).toContain('<div class="standalone-pdf-page">');
     expect(content).toContain("<iframe");
     expect(content).toContain('data-pdf-reader-ignore="true"');
