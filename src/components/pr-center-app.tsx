@@ -21,6 +21,7 @@ import {
   type CalendarRequestDecision,
 } from "@/lib/pr-center/calendar-view";
 import { canEditOwnRequest } from "@/lib/pr-center/request-edit";
+import { summarizeRequestTableTasks } from "@/lib/pr-center/request-table";
 import { isRootPrCenterAdministrator } from "@/lib/pr-center/access-authority";
 import { unavailableMetricDisplay } from "@/lib/pr-center/metric-display";
 import {
@@ -3531,6 +3532,12 @@ function Requests({
                 const requestTasks = taskItems.filter(
                   (task) => task.requestId === request.id,
                 );
+                const contentPackage = summarizeRequestTableTasks(
+                  requestTasks.map((task) => ({
+                    contentType: task.type,
+                    status: task.status,
+                  })),
+                );
                 const submittedAt = request.createdAt
                   ? new Date(request.createdAt).toLocaleString(
                       language === "th" ? "th-TH-u-ca-buddhist" : "en-GB",
@@ -3572,64 +3579,23 @@ function Requests({
                         : "—"}
                     </td>
                     <td>
-                      {requestTasks.length > 0 ? (
-                        <ul>
-                          {requestTasks.map((task) => (
-                            <li key={task.id}>
-                              {task.title} <small>({task.type})</small>
-                            </li>
-                          ))}
-                        </ul>
-                      ) : (
-                        <span>
-                          {language === "th"
-                            ? "ยังไม่มี Content Package"
-                            : "No Content Package yet"}
-                        </span>
-                      )}
+                      <strong>{contentPackage.count}</strong>{" "}
+                      {language === "th" ? "ชิ้น" : "items"}
+                      <small>
+                        {contentPackage.contentTypes.length > 0
+                          ? contentPackage.contentTypes.join(", ")
+                          : language === "th"
+                            ? "ยังไม่มีประเภท Content"
+                            : "No content types yet"}
+                      </small>
                     </td>
                     <td>
-                      <Status>
-                        {request.status === "DRAFT"
-                          ? language === "th"
-                            ? "ฉบับร่าง"
-                            : "Draft"
-                          : request.status === "SUBMITTED"
-                            ? language === "th"
-                              ? "รออนุมัติคำขอ"
-                              : "Pending intake approval"
-                            : request.status === "APPROVED"
-                              ? language === "th"
-                                ? "อนุมัติแล้ว · รอมอบหมาย PR"
-                                : "Approved · PR assignment"
-                              : request.status === "REJECTED"
-                                ? language === "th"
-                                  ? "ไม่อนุมัติ"
-                                  : "Rejected"
-                                : request.status === "WITHDRAWN"
-                                  ? language === "th"
-                                    ? "ถอนคำขอแล้ว"
-                                    : "Withdrawn"
-                                  : request.status ||
-                                    STATUS_LABELS[requestStatus(request, taskItems)]}
-                      </Status>
+                      <Status>{STATUS_LABELS[contentPackage.status]}</Status>
                     </td>
                     <td>
-                      <div className={styles.requestActions}>
-                        <button onClick={() => setSelectedId(request.id)}>
-                          {language === "th" ? "รายละเอียด" : "Details"}
-                        </button>
-                        {canEditOwnRequest(request, currentUserId) && (
-                          <>
-                            <button onClick={() => onEditRequest(request)}>
-                              {language === "th" ? "แก้ไข" : "Edit"}
-                            </button>
-                            <button onClick={() => onWithdrawRequest(request)}>
-                              {language === "th" ? "ถอนคำขอ" : "Withdraw"}
-                            </button>
-                          </>
-                        )}
-                      </div>
+                      <button onClick={() => setSelectedId(request.id)}>
+                        {language === "th" ? "เปิด" : "Open"}
+                      </button>
                     </td>
                   </tr>
                 );
