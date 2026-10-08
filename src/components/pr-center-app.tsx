@@ -21,7 +21,10 @@ import {
   type CalendarRequestDecision,
 } from "@/lib/pr-center/calendar-view";
 import { canEditOwnRequest } from "@/lib/pr-center/request-edit";
-import { summarizeRequestTableTasks } from "@/lib/pr-center/request-table";
+import {
+  requestTableStatusLabel,
+  summarizeRequestTableTasks,
+} from "@/lib/pr-center/request-table";
 import { isRootPrCenterAdministrator } from "@/lib/pr-center/access-authority";
 import { unavailableMetricDisplay } from "@/lib/pr-center/metric-display";
 import {
@@ -3590,7 +3593,9 @@ function Requests({
                       </small>
                     </td>
                     <td>
-                      <Status>{STATUS_LABELS[contentPackage.status]}</Status>
+                      <Status>
+                        {requestTableStatusLabel(contentPackage.status, language)}
+                      </Status>
                     </td>
                     <td>
                       <button onClick={() => setSelectedId(request.id)}>

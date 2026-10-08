@@ -18,6 +18,49 @@ const REQUEST_STATUS_PRIORITY = [
 
 export type RequestTableStatus = (typeof REQUEST_STATUS_PRIORITY)[number];
 
+const REQUEST_STATUS_LABELS_TH: Record<RequestTableStatus, string> = {
+  draft: "ร่าง",
+  waiting_for_information: "รอข้อมูล",
+  communication_planning: "วางแผนการสื่อสาร",
+  in_production: "กำลังผลิต",
+  source_fact_check: "ตรวจสอบข้อมูลต้นทาง",
+  technical_review: "ตรวจสอบทางเทคนิค",
+  pr_editorial_review: "PR Editorial Review",
+  management_approval: "รอผู้บริหารอนุมัติ",
+  revision_required: "ต้องแก้ไข",
+  approved: "อนุมัติครบแล้ว",
+  scheduled: "กำหนดเผยแพร่",
+  published: "เผยแพร่แล้ว",
+  closed: "ปิดงาน",
+  rejected: "ปฏิเสธ",
+  cancelled: "ยกเลิก",
+};
+
+export function requestTableStatusLabel(
+  status: RequestTableStatus,
+  language: "th" | "en",
+) {
+  if (language === "th") return REQUEST_STATUS_LABELS_TH[status];
+  const labels: Record<RequestTableStatus, string> = {
+    draft: "Draft",
+    waiting_for_information: "Waiting for information",
+    communication_planning: "Communication planning",
+    in_production: "In production",
+    source_fact_check: "Source fact check",
+    technical_review: "Technical review",
+    pr_editorial_review: "PR editorial review",
+    management_approval: "Awaiting approval",
+    revision_required: "Revision required",
+    approved: "Approved",
+    scheduled: "Scheduled",
+    published: "Published",
+    closed: "Closed",
+    rejected: "Rejected",
+    cancelled: "Cancelled",
+  };
+  return labels[status];
+}
+
 export type RequestTableTask = {
   contentType: string;
   status: string;

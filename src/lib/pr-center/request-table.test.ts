@@ -1,7 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { summarizeRequestTableTasks } from "./request-table";
+import { requestTableStatusLabel, summarizeRequestTableTasks } from "./request-table";
 
 describe("summarizeRequestTableTasks", () => {
+  it("localizes the status for the selected table language", () => {
+    expect(requestTableStatusLabel("scheduled", "th")).toBe("กำหนดเผยแพร่");
+    expect(requestTableStatusLabel("scheduled", "en")).toBe("Scheduled");
+  });
+
   it("shows the total task count and at most three unique content types", () => {
     expect(
       summarizeRequestTableTasks([
