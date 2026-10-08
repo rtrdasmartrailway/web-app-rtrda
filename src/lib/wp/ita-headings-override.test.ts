@@ -431,6 +431,10 @@ describe("applyItaHeadingsOverride", () => {
         href: "/sdc_download/ita2569-o20-02?inline=1",
       },
       {
+        title: "– รายงานผลการดำเนินงานตามนโยบาย No Gift Policy 2569",
+        href: "/policy_no_gift_policy_2569",
+      },
+      {
         title: "– หลักเกณฑ์การรับทรัพย์สิน มาตรา 128",
         href: "/sdc_download/ita2569-o20-03?inline=1",
       },
