@@ -10,6 +10,11 @@ import {
   messageHouseDraft,
   saveMessageHouseDraft,
   reviseIdea,
+  getPrMasterData,
+  savePrMasterData,
+  getUserDraft,
+  saveUserDraft,
+  deleteUserDraft,
   listCalendarEntries,
   listCalendarRequestDecisions,
   messageHouseHistory,
@@ -114,6 +119,13 @@ function expectedVersion(request: FastifyRequest): number {
   return version;
 }
 
+function draftKind(request: FastifyRequest): "REQUEST" | "IDEA" {
+  const raw = (request.params as { kind?: string }).kind?.toUpperCase();
+  if (raw !== "REQUEST" && raw !== "IDEA")
+    throw new PrCenterError("Unknown draft type", 404, "NOT_FOUND");
+  return raw;
+}
+
 function taskId(value: string): `${string}-${string}-${string}-${string}-${string}` {
   if (
     !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
@@ -182,6 +194,15 @@ export function buildPrCenterApi(
       request.prCenterActor!,
       taskId((request.params as { requestId: string }).requestId),
     ),
+  );
+  app.get("/drafts/:kind", async (request) =>
+    getUserDraft(request.prCenterActor!, draftKind(request)),
+  );
+  app.put("/drafts/:kind", async (request) =>
+    saveUserDraft(request.prCenterActor!, draftKind(request), await body(request)),
+  );
+  app.delete("/drafts/:kind", async (request) =>
+    deleteUserDraft(request.prCenterActor!, draftKind(request)),
   );
   app.get("/ideas", async (request) => {
     const query = request.query as {
@@ -267,6 +288,10 @@ export function buildPrCenterApi(
   );
   app.get("/message-house/current", async (request) =>
     currentMessageHouse(request.prCenterActor!),
+  );
+  app.get("/master-data", async (request) => getPrMasterData(request.prCenterActor!));
+  app.post("/admin/master-data", async (request) =>
+    savePrMasterData(request.prCenterActor!, await body(request), correlationId(request)),
   );
   app.get("/message-house/history", async (request) =>
     messageHouseHistory(request.prCenterActor!),

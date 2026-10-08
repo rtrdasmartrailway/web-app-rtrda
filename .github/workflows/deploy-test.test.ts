@@ -33,4 +33,11 @@ describe("Deploy test.rtrda.or.th workflow", () => {
     expect(workflow).toContain('RTRDA_RELEASE_SHA="${GITHUB_SHA}"');
     expect(workflow).toContain("org.opencontainers.image.revision");
   });
+
+  it("starts and health-checks the PR Center outbox worker", () => {
+    expect(workflow).toContain(
+      "web-app-rtrda-test pr-center-api pr-center-outbox-worker",
+    );
+    expect(workflow).toContain("http://127.0.0.1:3101/healthz");
+  });
 });

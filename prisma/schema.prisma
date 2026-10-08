@@ -160,15 +160,45 @@ enum PrOutboxStatus {
 }
 
 model PrOrganization {
-  id          String         @id @default(uuid()) @db.Uuid
-  code        String         @unique
+  id          String                  @id @default(uuid()) @db.Uuid
+  code        String                  @unique
   name        String
   departments PrDepartment[]
   users       PrCenterUser[]
+  settings    PrOrganizationSetting[]
+  drafts      PrUserDraft[]
   requests    PrRequest[]
   fileObjects PrFileObject[]
-  createdAt   DateTime       @default(now())
-  updatedAt   DateTime       @updatedAt
+  createdAt   DateTime                @default(now())
+  updatedAt   DateTime                @updatedAt
+}
+
+model PrOrganizationSetting {
+  id             String         @id @default(uuid()) @db.Uuid
+  organizationId String         @db.Uuid
+  key            String
+  value          Json
+  organization   PrOrganization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  @@unique([organizationId, key])
+  @@index([organizationId])
+}
+
+model PrUserDraft {
+  id             String         @id @default(uuid()) @db.Uuid
+  organizationId String         @db.Uuid
+  userId         String         @db.Uuid
+  kind           String
+  payload        Json
+  organization   PrOrganization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user           PrCenterUser   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  @@unique([userId, kind])
+  @@index([organizationId, updatedAt])
 }
 
 model PrDepartment {
@@ -203,6 +233,7 @@ model PrCenterUser {
   comments       PrComment[]
   approvals      PrApproval[]
   notifications  PrNotification[]
+  drafts         PrUserDraft[]
   auditEvents    PrAuditEvent[]
   createdAt      DateTime         @default(now())
   updatedAt      DateTime         @updatedAt

@@ -442,6 +442,155 @@ function validateRequestDetails(
   };
 }
 
+const DEFAULT_PR_MASTER_DATA = {
+  channels: [
+    "Website",
+    "Facebook",
+    "TikTok",
+    "YouTube",
+    "X",
+    "LinkedIn",
+    "Press Release",
+    "Internal",
+  ],
+  contentTypes: [
+    "Website News",
+    "Facebook Post",
+    "Carousel",
+    "Infographic",
+    "Quote Card",
+    "Short Video",
+    "Reel",
+    "YouTube Video",
+    "Photo Album",
+    "X Post",
+    "LinkedIn Post",
+    "Press Release",
+    "Newsletter",
+    "Executive Brief",
+    "Other",
+  ],
+  contentPillars: [
+    "P01 Rail Explained",
+    "P02 Behind the Standard",
+    "P03 Behind Every Safe Journey",
+    "P04 Human(s) of RTRDA",
+    "P05 Research to Reality",
+    "P06 Ask RTRDA",
+    "P07 Future Rail Thailand",
+    "P08 National Impact",
+  ],
+};
+
+function normalizeMasterDataList(value: unknown, field: string): string[] {
+  if (!Array.isArray(value) || value.length === 0 || value.length > 100)
+    throw new PrCenterError(
+      `${field} must contain 1 to 100 values`,
+      422,
+      "INVALID_MASTER_DATA",
+    );
+  const normalized = [
+    ...new Set(
+      value.map((item) => (typeof item === "string" ? item.trim() : "")).filter(Boolean),
+    ),
+  ];
+  if (normalized.length === 0 || normalized.some((item) => item.length > 200))
+    throw new PrCenterError(
+      `${field} values must be 1 to 200 characters`,
+      422,
+      "INVALID_MASTER_DATA",
+    );
+  return normalized;
+}
+
+export async function getPrMasterData(actor: PrCenterActor) {
+  const [setting, departments] = await Promise.all([
+    prisma.prOrganizationSetting.findUnique({
+      where: {
+        organizationId_key: {
+          organizationId: actor.organizationId,
+          key: "pr-master-data",
+        },
+      },
+    }),
+    prisma.prDepartment.findMany({
+      where: { organizationId: actor.organizationId, active: true },
+      orderBy: { name: "asc" },
+      select: { name: true },
+    }),
+  ]);
+  const value =
+    setting?.value && typeof setting.value === "object" && !Array.isArray(setting.value)
+      ? (setting.value as Record<string, unknown>)
+      : {};
+  const storedList = (key: keyof typeof DEFAULT_PR_MASTER_DATA) => {
+    const raw = value[key];
+    return Array.isArray(raw) && raw.every((item) => typeof item === "string")
+      ? normalizeMasterDataList(raw, key)
+      : DEFAULT_PR_MASTER_DATA[key];
+  };
+  return {
+    ...DEFAULT_PR_MASTER_DATA,
+    channels: storedList("channels"),
+    contentTypes: storedList("contentTypes"),
+    contentPillars: storedList("contentPillars"),
+    departments: departments.map((department) => department.name),
+    approvalStages: [
+      "Source fact check",
+      "Technical review",
+      "PR editorial review",
+      "Management approval",
+    ],
+  };
+}
+
+export async function savePrMasterData(
+  actor: PrCenterActor,
+  input: unknown,
+  correlationId: string = randomUUID(),
+) {
+  if (!actorHasOrganizationWideRole(actor, ["SCOPED_ADMINISTRATOR"]))
+    throw new PrCenterError(
+      "Organization-wide administrator role is required",
+      403,
+      "FORBIDDEN",
+    );
+  if (!input || typeof input !== "object" || Array.isArray(input))
+    throw new PrCenterError("Master data is required", 422, "INVALID_MASTER_DATA");
+  const value = input as Record<string, unknown>;
+  const masterData = {
+    channels: normalizeMasterDataList(value.channels, "channels"),
+    contentTypes: normalizeMasterDataList(value.contentTypes, "contentTypes"),
+    contentPillars: normalizeMasterDataList(value.contentPillars, "contentPillars"),
+  };
+  return prisma.$transaction(async (tx) => {
+    const saved = await tx.prOrganizationSetting.upsert({
+      where: {
+        organizationId_key: {
+          organizationId: actor.organizationId,
+          key: "pr-master-data",
+        },
+      },
+      create: {
+        organizationId: actor.organizationId,
+        key: "pr-master-data",
+        value: masterData,
+      },
+      update: { value: masterData },
+    });
+    await auditAndOutbox(tx, {
+      actor,
+      action: "pr.master_data.updated",
+      entityType: "master_data",
+      entityId: saved.id,
+      after: masterData,
+      eventType: "pr.master_data.updated",
+      correlationId,
+    });
+    return masterData;
+  });
+}
+
 type IdeaStatus =
   | "PROPOSED"
   | "UNDER_REVIEW"
@@ -479,6 +628,114 @@ function assertUrl(value: string): string {
 
 function requestNumber(type: CreateRequestInput["type"]): string {
   return `${type}-${new Date().getUTCFullYear()}-${randomUUID().slice(0, 8).toUpperCase()}`;
+}
+
+type PrUserDraftKind = "REQUEST" | "IDEA";
+
+const USER_DRAFT_FIELDS: Record<PrUserDraftKind, readonly string[]> = {
+  REQUEST: [
+    "type",
+    "title",
+    "department",
+    "owner",
+    "requestedDate",
+    "source",
+    "objective",
+    "audience",
+    "startTime",
+    "endTime",
+    "travel",
+    "assigner",
+    "whyNow",
+    "contentTypes",
+    "priority",
+    "priorityReason",
+    "projectDetails",
+    "confirmed",
+  ],
+  IDEA: [
+    "title",
+    "rationale",
+    "audience",
+    "pillar",
+    "channel",
+    "priority",
+    "campaign",
+    "evidenceUrls",
+  ],
+};
+
+function normalizeUserDraft(
+  kind: PrUserDraftKind,
+  value: unknown,
+): Prisma.InputJsonObject {
+  if (!value || typeof value !== "object" || Array.isArray(value))
+    throw new PrCenterError("Draft must be an object", 422, "INVALID_DRAFT");
+  const input = value as Record<string, unknown>;
+  const payload: Record<string, Prisma.InputJsonValue> = {};
+  for (const field of USER_DRAFT_FIELDS[kind]) {
+    const fieldValue = input[field];
+    if (typeof fieldValue === "string" || typeof fieldValue === "boolean") {
+      if (fieldValue.toString().length > 10_000)
+        throw new PrCenterError("Draft field is too long", 422, "INVALID_DRAFT");
+      payload[field] = fieldValue;
+    } else if (Array.isArray(fieldValue)) {
+      if (
+        fieldValue.length > 100 ||
+        !fieldValue.every((item) => typeof item === "string" && item.length <= 2048)
+      )
+        throw new PrCenterError("Draft list is invalid", 422, "INVALID_DRAFT");
+      payload[field] = fieldValue;
+    } else if (fieldValue !== undefined && fieldValue !== null) {
+      throw new PrCenterError("Draft field is invalid", 422, "INVALID_DRAFT");
+    }
+  }
+  if (JSON.stringify(payload).length > 100_000)
+    throw new PrCenterError("Draft exceeds the allowed size", 422, "INVALID_DRAFT");
+  return payload;
+}
+
+function assertCanSaveUserDraft(actor: PrCenterActor, kind: PrUserDraftKind) {
+  const allowed =
+    kind === "REQUEST"
+      ? canCreateRequest(actorRoles(actor))
+      : canCreateIdea(actorRoles(actor));
+  if (!allowed) throw new PrCenterError("You cannot save this draft", 403, "FORBIDDEN");
+}
+
+export async function getUserDraft(actor: PrCenterActor, kind: PrUserDraftKind) {
+  assertCanSaveUserDraft(actor, kind);
+  return prisma.prUserDraft.findUnique({
+    where: { userId_kind: { userId: actor.id, kind } },
+    select: { payload: true, updatedAt: true },
+  });
+}
+
+export async function saveUserDraft(
+  actor: PrCenterActor,
+  kind: PrUserDraftKind,
+  value: unknown,
+) {
+  assertCanSaveUserDraft(actor, kind);
+  const payload = normalizeUserDraft(kind, value);
+  return prisma.prUserDraft.upsert({
+    where: { userId_kind: { userId: actor.id, kind } },
+    create: {
+      organizationId: actor.organizationId,
+      userId: actor.id,
+      kind,
+      payload,
+    },
+    update: { organizationId: actor.organizationId, payload },
+    select: { updatedAt: true },
+  });
+}
+
+export async function deleteUserDraft(actor: PrCenterActor, kind: PrUserDraftKind) {
+  assertCanSaveUserDraft(actor, kind);
+  return prisma.prUserDraft.deleteMany({
+    where: { userId: actor.id, organizationId: actor.organizationId, kind },
+  });
 }
 
 function auditAndOutbox(

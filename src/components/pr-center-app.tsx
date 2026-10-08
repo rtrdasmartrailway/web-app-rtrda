@@ -298,6 +298,7 @@ function emptyMessageHouse(): MessageHouseData {
 type MasterData = {
   contentTypes: string[];
   channels: string[];
+  contentPillars: string[];
   departments: string[];
   approvalStages: string[];
 };
@@ -921,8 +922,43 @@ const defaultState: PrCenterState = {
   ],
   messageHouse: emptyMessageHouse(),
   masterData: {
-    contentTypes: ["Website News", "Facebook Post", "Short Video", "PR Content"],
-    channels: ["Website", "Facebook", "TikTok", "YouTube", "LinkedIn", "Internal"],
+    contentTypes: [
+      "Website News",
+      "Facebook Post",
+      "Carousel",
+      "Infographic",
+      "Quote Card",
+      "Short Video",
+      "Reel",
+      "YouTube Video",
+      "Photo Album",
+      "X Post",
+      "LinkedIn Post",
+      "Press Release",
+      "Newsletter",
+      "Executive Brief",
+      "Other",
+    ],
+    channels: [
+      "Website",
+      "Facebook",
+      "TikTok",
+      "YouTube",
+      "X",
+      "LinkedIn",
+      "Press Release",
+      "Internal",
+    ],
+    contentPillars: [
+      "P01 Rail Explained",
+      "P02 Behind the Standard",
+      "P03 Behind Every Safe Journey",
+      "P04 Human(s) of RTRDA",
+      "P05 Research to Reality",
+      "P06 Ask RTRDA",
+      "P07 Future Rail Thailand",
+      "P08 National Impact",
+    ],
     departments: ["Communications Office", "Strategy Division", "Digital Rail"],
     approvalStages: [
       "Source fact check",
@@ -1028,7 +1064,7 @@ function taskRows(items: Task[]) {
 function requestStatus(request: Request, allTasks: Task[]): StatusId {
   return allTasks.find((task) => request.taskIds.includes(task.id))?.status ?? "draft";
 }
-function emptyRequestDraft(user: User): RequestDraft {
+function emptyRequestDraft(user: Pick<User, "name" | "department">): RequestDraft {
   return {
     type: "pr",
     title: "",
@@ -1113,6 +1149,10 @@ export function PrCenterApp({
   const [requestDraft, setRequestDraft] = useState<RequestDraft>(() =>
     emptyRequestDraft(users[0]),
   );
+  const requestDraftDirty = useRef(false);
+  const requestDraftRevision = useRef(0);
+  const [requestDraftHydrated, setRequestDraftHydrated] = useState(false);
+  const [requestDraftSaving, setRequestDraftSaving] = useState(false);
   const [approvalTasks, setApprovalTasks] = useState<Task[]>([]);
   const [approvalRequests, setApprovalRequests] = useState<RequestApprovalItem[]>([]);
   const [requestApprovalQueueState, setRequestApprovalQueueState] = useState<
@@ -1291,6 +1331,41 @@ export function PrCenterApp({
     };
   }, [actor?.userId]);
   useEffect(() => {
+    if (!actor?.userId) return;
+    let cancelled = false;
+    fetch("/api/pr-center/master-data", { credentials: "same-origin" })
+      .then(async (response) => {
+        if (!response.ok) throw new Error("Master data unavailable");
+        const value = (await response.json()) as Partial<MasterData>;
+        if (
+          !Array.isArray(value.channels) ||
+          !Array.isArray(value.contentTypes) ||
+          !Array.isArray(value.contentPillars) ||
+          !Array.isArray(value.departments)
+        )
+          throw new Error("Master data response is invalid");
+        if (cancelled) return;
+        setState((previous) => ({
+          ...previous,
+          masterData: {
+            channels: value.channels!,
+            contentTypes: value.contentTypes!,
+            contentPillars: value.contentPillars!,
+            departments: value.departments!,
+            approvalStages: Array.isArray(value.approvalStages)
+              ? value.approvalStages
+              : previous.masterData.approvalStages,
+          },
+        }));
+      })
+      .catch(() => {
+        if (!cancelled) setNotice("Unable to load PR Center master data");
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [actor?.userId]);
+  useEffect(() => {
     fetch("/api/pr-center/audit?take=100", { credentials: "same-origin" })
       .then(async (response) => {
         if (!response.ok) throw new Error("Audit history unavailable");
@@ -1345,6 +1420,98 @@ export function PrCenterApp({
   const visiblePages = pages.filter(
     (item) => isPageEnabled(item.id) && visibleRolePages.includes(item.id),
   );
+  useEffect(() => {
+    if (!actor?.userId || !requestOpen || requestEditId) return;
+    let cancelled = false;
+    fetch("/api/pr-center/drafts/REQUEST", {
+      credentials: "same-origin",
+      cache: "no-store",
+    })
+      .then(async (response) => {
+        if (!response.ok) throw new Error("Request draft unavailable");
+        return response.json();
+      })
+      .then((result) => {
+        if (cancelled || requestDraftDirty.current || !result?.payload) return;
+        setRequestDraft({
+          ...emptyRequestDraft({
+            name: currentUser.name,
+            department: currentUser.department,
+          }),
+          ...result.payload,
+          samples: [],
+        });
+      })
+      .catch(() => {
+        if (!cancelled)
+          setNotice(
+            state.language === "th"
+              ? "ไม่สามารถโหลดร่างคำขอที่บันทึกไว้ได้"
+              : "Unable to load the saved request draft.",
+          );
+      })
+      .finally(() => {
+        if (!cancelled) setRequestDraftHydrated(true);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    actor?.userId,
+    currentUser.department,
+    currentUser.id,
+    currentUser.name,
+    requestEditId,
+    requestOpen,
+    state.language,
+  ]);
+
+  useEffect(() => {
+    if (
+      !actor?.userId ||
+      !requestOpen ||
+      requestEditId ||
+      !requestDraftHydrated ||
+      !requestDraftDirty.current
+    )
+      return;
+    const revision = requestDraftRevision.current;
+    const timer = window.setTimeout(() => {
+      const payload = JSON.parse(
+        JSON.stringify(requestDraft, (key, value) =>
+          key === "samples" ? undefined : value,
+        ),
+      );
+      setRequestDraftSaving(true);
+      void fetch("/api/pr-center/drafts/REQUEST", {
+        method: "PUT",
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      })
+        .then((response) => {
+          if (!response.ok) throw new Error("Request draft could not be saved");
+          if (revision === requestDraftRevision.current)
+            requestDraftDirty.current = false;
+        })
+        .catch(() => {
+          setNotice(
+            state.language === "th"
+              ? "บันทึกร่างคำขอไม่สำเร็จ กรุณาตรวจสอบการเชื่อมต่อ"
+              : "Request draft could not be saved. Check your connection.",
+          );
+        })
+        .finally(() => setRequestDraftSaving(false));
+    }, 700);
+    return () => window.clearTimeout(timer);
+  }, [
+    actor?.userId,
+    requestDraft,
+    requestDraftHydrated,
+    requestEditId,
+    requestOpen,
+    state.language,
+  ]);
   const loadMoreRequests = async () => {
     if (!requestCursor || loadingMoreRequests || loadingRequests) return;
     setLoadingMoreRequests(true);
@@ -1493,10 +1660,15 @@ export function PrCenterApp({
   const openRequest = () => {
     setRequestEditId(null);
     setRequestDraft(emptyRequestDraft(currentUser));
+    requestDraftDirty.current = false;
+    requestDraftRevision.current = 0;
+    setRequestDraftHydrated(!actor);
     setRequestOpen(true);
   };
   const editRequest = (request: Request) => {
     setRequestEditId(request.id);
+    setRequestDraftHydrated(true);
+    requestDraftDirty.current = false;
     setRequestDraft({
       ...emptyRequestDraft(currentUser),
       type: request.type,
@@ -1783,6 +1955,13 @@ export function PrCenterApp({
           ),
         ],
       }));
+      if (!editId) {
+        await fetch("/api/pr-center/drafts/REQUEST", {
+          method: "DELETE",
+          credentials: "same-origin",
+        }).catch(() => undefined);
+        requestDraftDirty.current = false;
+      }
       setRequestEditId(null);
       setRequestOpen(false);
       await refreshNotifications().catch(() => undefined);
@@ -2470,10 +2649,34 @@ export function PrCenterApp({
       setLoadingMoreIdeas(false);
     }
   };
-  const updateMasterData = (masterData: MasterData) =>
+  const updateMasterData = async (masterData: MasterData): Promise<boolean> => {
+    const response = await fetch("/api/pr-center/admin/master-data", {
+      method: "POST",
+      credentials: "same-origin",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        channels: masterData.channels,
+        contentTypes: masterData.contentTypes,
+        contentPillars: masterData.contentPillars,
+      }),
+    });
+    if (!response.ok) {
+      const result = (await response.json().catch(() => null)) as {
+        message?: string;
+      } | null;
+      announce(result?.message || "Master data could not be saved");
+      return false;
+    }
+    const saved = (await response.json()) as Pick<
+      MasterData,
+      "channels" | "contentTypes" | "contentPillars"
+    >;
     updateState((previous) =>
       addAudit(
-        { ...previous, masterData },
+        {
+          ...previous,
+          masterData: { ...previous.masterData, ...saved },
+        },
         "system",
         "master-data",
         "master_data_updated",
@@ -2481,6 +2684,9 @@ export function PrCenterApp({
         "Master data updated",
       ),
     );
+    announce(state.language === "th" ? "บันทึกข้อมูลหลักแล้ว" : "Master data saved");
+    return true;
+  };
   const readNotifications = async (ids: string[]) => {
     if (ids.length === 0) return;
     const response = await fetch("/api/pr-center/notifications/read", {
@@ -2692,6 +2898,7 @@ export function PrCenterApp({
           {page === "operations" && (
             <Operations
               tasks={state.tasks}
+              channels={state.masterData.channels}
               language={state.language}
               onTransition={transitionTask}
               onAssign={assignTask}
@@ -2730,6 +2937,8 @@ export function PrCenterApp({
             <Ideas
               ideas={ideasOwnerId === actor?.userId ? state.ideas : []}
               currentUser={currentUser}
+              channels={state.masterData.channels}
+              contentPillars={state.masterData.contentPillars}
               canReview={hasUiRole("pr", "admin")}
               canApprove={hasUiRole("approver", "admin")}
               onCreate={createIdea}
@@ -2789,9 +2998,19 @@ export function PrCenterApp({
         <RequestModal
           language={state.language}
           requesterName={currentUser.name}
+          contentTypes={state.masterData.contentTypes}
+          draftLoading={!requestDraftHydrated}
+          draftSaving={requestDraftSaving}
           isEditing={requestEditId !== null}
           draft={requestDraft}
-          onChange={setRequestDraft}
+          onChange={(draft) => {
+            if (!requestDraftHydrated) return;
+            setRequestDraft(draft);
+            if (!requestEditId) {
+              requestDraftDirty.current = true;
+              requestDraftRevision.current += 1;
+            }
+          }}
           onClose={() => {
             setRequestOpen(false);
             setRequestEditId(null);
@@ -4006,6 +4225,7 @@ function Requests({
 }
 function Operations({
   tasks: taskItems,
+  channels,
   language,
   onTransition,
   onAssign,
@@ -4017,6 +4237,7 @@ function Operations({
   canViewPublishing,
 }: {
   tasks: Task[];
+  channels: string[];
   language: Language;
   onTransition: (taskId: string, status: StatusId) => void;
   onAssign: (taskId: string, ownerId: string, dueDate: string) => Promise<void>;
@@ -4395,11 +4616,18 @@ function Operations({
             <>
               <label>
                 Channel{" "}
-                <input
+                <select
                   value={channel}
                   onChange={(event) => setChannel(event.target.value)}
                   required
-                />
+                >
+                  <option value="">Select a channel</option>
+                  {channels.map((item) => (
+                    <option key={item} value={item}>
+                      {item}
+                    </option>
+                  ))}
+                </select>
               </label>
               <label>
                 Schedule time{" "}
@@ -6101,6 +6329,8 @@ function IdeaComments({ ideaId, language }: { ideaId: string; language: Language
 function Ideas({
   ideas,
   currentUser,
+  channels,
+  contentPillars,
   canReview,
   canApprove,
   onCreate,
@@ -6117,6 +6347,8 @@ function Ideas({
 }: {
   ideas: Idea[];
   currentUser: User;
+  channels: string[];
+  contentPillars: string[];
   canReview: boolean;
   canApprove: boolean;
   onCreate: (input: CreateContentIdeaInput) => Promise<boolean>;
@@ -6143,6 +6375,9 @@ function Ideas({
   const [campaign, setCampaign] = useState("");
   const [evidenceText, setEvidenceText] = useState("");
   const [saving, setSaving] = useState(false);
+  const [ideaDraftHydrated, setIdeaDraftHydrated] = useState(false);
+  const [ideaDraftSaving, setIdeaDraftSaving] = useState(false);
+  const [ideaDraftMessage, setIdeaDraftMessage] = useState("");
   const [editingIdeaId, setEditingIdeaId] = useState<string | null>(null);
   const visible = ideas.filter(
     (idea) =>
@@ -6186,6 +6421,104 @@ function Ideas({
     if (idea.status === "accepted" || idea.status === "rejected") return ["archived"];
     return [];
   };
+
+  useEffect(() => {
+    if (!open || editingIdeaId) return;
+    let cancelled = false;
+    fetch("/api/pr-center/drafts/IDEA", {
+      credentials: "same-origin",
+      cache: "no-store",
+    })
+      .then(async (response) => {
+        if (!response.ok) throw new Error("Idea draft unavailable");
+        return response.json();
+      })
+      .then((result) => {
+        const payload = result?.payload;
+        if (cancelled || !payload) return;
+        setTitle(typeof payload.title === "string" ? payload.title : "");
+        setSummary(typeof payload.rationale === "string" ? payload.rationale : "");
+        setAudience(typeof payload.audience === "string" ? payload.audience : "");
+        setPillar(typeof payload.pillar === "string" ? payload.pillar : "");
+        setChannel(typeof payload.channel === "string" ? payload.channel : "");
+        setPriority(typeof payload.priority === "string" ? payload.priority : "");
+        setCampaign(typeof payload.campaign === "string" ? payload.campaign : "");
+        setEvidenceText(
+          Array.isArray(payload.evidenceUrls)
+            ? payload.evidenceUrls
+                .filter((url: unknown): url is string => typeof url === "string")
+                .join("\n")
+            : "",
+        );
+      })
+      .catch(() => {
+        if (!cancelled)
+          setIdeaDraftMessage(
+            language === "th"
+              ? "โหลดร่างแนวคิดไม่สำเร็จ"
+              : "Could not load the saved idea draft.",
+          );
+      })
+      .finally(() => {
+        if (!cancelled) setIdeaDraftHydrated(true);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [editingIdeaId, language, open]);
+
+  useEffect(() => {
+    if (!open || editingIdeaId || !ideaDraftHydrated) return;
+    const input = {
+      title: title.trim(),
+      rationale: summary.trim(),
+      audience,
+      pillar,
+      channel,
+      priority,
+      campaign,
+      evidenceUrls: evidenceText
+        .split(/\r?\n/)
+        .map((url) => url.trim())
+        .filter(Boolean),
+    };
+    if (!input.title && !input.rationale && !input.evidenceUrls.length) return;
+    const timer = window.setTimeout(() => {
+      setIdeaDraftSaving(true);
+      void fetch("/api/pr-center/drafts/IDEA", {
+        method: "PUT",
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(input),
+      })
+        .then((response) => {
+          if (!response.ok) throw new Error("Idea draft save failed");
+          setIdeaDraftMessage(
+            language === "th" ? "ร่างบันทึกอัตโนมัติแล้ว" : "Draft autosaved.",
+          );
+        })
+        .catch(() =>
+          setIdeaDraftMessage(
+            language === "th" ? "บันทึกร่างไม่สำเร็จ" : "Draft could not be autosaved.",
+          ),
+        )
+        .finally(() => setIdeaDraftSaving(false));
+    }, 700);
+    return () => window.clearTimeout(timer);
+  }, [
+    audience,
+    campaign,
+    channel,
+    editingIdeaId,
+    evidenceText,
+    ideaDraftHydrated,
+    language,
+    open,
+    pillar,
+    priority,
+    summary,
+    title,
+  ]);
   return (
     <>
       <SectionHeading
@@ -6200,7 +6533,19 @@ function Ideas({
             >
               {language === "th" ? "รีเฟรช" : "Refresh"}
             </button>
-            <button className={styles.primary} onClick={() => setOpen(!open)}>
+            <button
+              className={styles.primary}
+              onClick={() => {
+                if (open) {
+                  setOpen(false);
+                  return;
+                }
+                setEditingIdeaId(null);
+                setIdeaDraftHydrated(false);
+                setIdeaDraftMessage("");
+                setOpen(true);
+              }}
+            >
               + Propose idea
             </button>
           </div>
@@ -6229,6 +6574,7 @@ function Ideas({
               const saved = await submitIdeaForm(
                 () => (editingIdeaId ? onUpdate(editingIdeaId, input) : onCreate(input)),
                 () => {
+                  const shouldDeleteDraft = !editingIdeaId;
                   setTitle("");
                   setSummary("");
                   setAudience("");
@@ -6239,6 +6585,11 @@ function Ideas({
                   setEvidenceText("");
                   setEditingIdeaId(null);
                   setOpen(false);
+                  if (shouldDeleteDraft)
+                    void fetch("/api/pr-center/drafts/IDEA", {
+                      method: "DELETE",
+                      credentials: "same-origin",
+                    });
                 },
               );
               if (!saved) return;
@@ -6257,82 +6608,117 @@ function Ideas({
                 ? "เสนอแนวคิดเนื้อหา"
                 : "Propose an idea"}
           </h2>
-          <label>
-            {language === "th" ? "ชื่อแนวคิด" : "Idea title"}
-            <input
-              value={title}
-              onChange={(event) => setTitle(event.target.value)}
-              maxLength={300}
-              required
-            />
-          </label>
-          <label>
-            {language === "th" ? "เหตุผลและแนวทาง" : "Rationale and angle"}
-            <textarea
-              value={summary}
-              onChange={(event) => setSummary(event.target.value)}
-              maxLength={5000}
-              required
-            />
-          </label>
-          <label>
-            {language === "th" ? "กลุ่มเป้าหมาย" : "Audience"}
-            <input
-              value={audience}
-              onChange={(event) => setAudience(event.target.value)}
-              maxLength={500}
-            />
-          </label>
-          <label>
-            {language === "th" ? "เสาหลักเนื้อหา" : "Content pillar"}
-            <input
-              value={pillar}
-              onChange={(event) => setPillar(event.target.value)}
-              maxLength={100}
-            />
-          </label>
-          <label>
-            {language === "th" ? "ช่องทาง" : "Channel"}
-            <input
-              value={channel}
-              onChange={(event) => setChannel(event.target.value)}
-              maxLength={100}
-            />
-          </label>
-          <label>
-            {language === "th" ? "ลำดับความสำคัญ" : "Priority"}
-            <input
-              value={priority}
-              onChange={(event) => setPriority(event.target.value)}
-              maxLength={40}
-            />
-          </label>
-          <label>
-            {language === "th" ? "แคมเปญ" : "Campaign"}
-            <input
-              value={campaign}
-              onChange={(event) => setCampaign(event.target.value)}
-              maxLength={200}
-            />
-          </label>
-          <label>
-            {language === "th"
-              ? "ลิงก์หลักฐาน (HTTPS หนึ่งลิงก์ต่อบรรทัด)"
-              : "Evidence links (one HTTPS URL per line)"}
-            <textarea
-              value={evidenceText}
-              onChange={(event) => setEvidenceText(event.target.value)}
-              placeholder="https://…"
-            />
-          </label>
-          <button className={styles.primary} type="submit" disabled={saving}>
+          {(ideaDraftSaving || ideaDraftMessage) && (
+            <p role="status">
+              {ideaDraftSaving
+                ? language === "th"
+                  ? "กำลังบันทึกร่างอัตโนมัติ…"
+                  : "Autosaving draft…"
+                : ideaDraftMessage}
+            </p>
+          )}
+          <fieldset
+            disabled={!ideaDraftHydrated || saving}
+            className={styles.ideaDraftFields}
+          >
+            <label>
+              {language === "th" ? "ชื่อแนวคิด" : "Idea title"}
+              <input
+                value={title}
+                onChange={(event) => setTitle(event.target.value)}
+                maxLength={300}
+                required
+              />
+            </label>
+            <label>
+              {language === "th" ? "เหตุผลและแนวทาง" : "Rationale and angle"}
+              <textarea
+                value={summary}
+                onChange={(event) => setSummary(event.target.value)}
+                maxLength={5000}
+                required
+              />
+            </label>
+            <label>
+              {language === "th" ? "กลุ่มเป้าหมาย" : "Audience"}
+              <input
+                value={audience}
+                onChange={(event) => setAudience(event.target.value)}
+                maxLength={500}
+              />
+            </label>
+            <label>
+              {language === "th" ? "เสาหลักเนื้อหา" : "Content pillar"}
+              <select value={pillar} onChange={(event) => setPillar(event.target.value)}>
+                <option value="">
+                  {language === "th" ? "เลือกเสาหลัก" : "Select a pillar"}
+                </option>
+                {contentPillars.map((item) => (
+                  <option key={item} value={item}>
+                    {item}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>
+              {language === "th" ? "ช่องทาง" : "Channel"}
+              <select
+                value={channel}
+                onChange={(event) => setChannel(event.target.value)}
+              >
+                <option value="">
+                  {language === "th" ? "เลือกช่องทาง" : "Select a channel"}
+                </option>
+                {channels.map((item) => (
+                  <option key={item} value={item}>
+                    {item}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>
+              {language === "th" ? "ลำดับความสำคัญ" : "Priority"}
+              <input
+                value={priority}
+                onChange={(event) => setPriority(event.target.value)}
+                maxLength={40}
+              />
+            </label>
+            <label>
+              {language === "th" ? "แคมเปญ" : "Campaign"}
+              <input
+                value={campaign}
+                onChange={(event) => setCampaign(event.target.value)}
+                maxLength={200}
+              />
+            </label>
+            <label>
+              {language === "th"
+                ? "ลิงก์หลักฐาน (HTTPS หนึ่งลิงก์ต่อบรรทัด)"
+                : "Evidence links (one HTTPS URL per line)"}
+              <textarea
+                value={evidenceText}
+                onChange={(event) => setEvidenceText(event.target.value)}
+                placeholder="https://…"
+              />
+            </label>
+          </fieldset>
+          <button
+            className={styles.primary}
+            type="submit"
+            disabled={saving || !ideaDraftHydrated}
+          >
             {saving
               ? language === "th"
                 ? "กำลังบันทึก…"
                 : "Saving…"
-              : language === "th"
-                ? "บันทึกแนวคิด"
-                : "Save idea"}
+              : editingIdeaId
+                ? language === "th"
+                  ? "ส่งแนวคิดที่แก้ไขแล้ว"
+                  : "Resubmit revised idea"
+                : language === "th"
+                  ? "บันทึกแนวคิด"
+                  : "Save idea"}
           </button>
         </form>
       )}
@@ -6501,6 +6887,7 @@ function Ideas({
                       setPriority(idea.priority || "");
                       setCampaign(idea.campaign || "");
                       setEvidenceText(idea.evidenceUrls?.join("\n") || "");
+                      setIdeaDraftHydrated(true);
                       setOpen(true);
                     }}
                   >
@@ -7575,10 +7962,12 @@ function MasterDataEditor({
 }: {
   label: string;
   values: string[];
-  onSave: (values: string[]) => void;
+  onSave: (values: string[]) => Promise<boolean>;
 }) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(values.join("\n"));
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
   return (
     <article className={styles.card}>
       <header>
@@ -7601,18 +7990,29 @@ function MasterDataEditor({
           />
           <button
             className={styles.primary}
-            onClick={() => {
-              onSave(
-                draft
-                  .split("\n")
-                  .map((value) => value.trim())
-                  .filter(Boolean),
-              );
-              setEditing(false);
+            disabled={saving}
+            onClick={async () => {
+              setSaving(true);
+              setError("");
+              try {
+                const saved = await onSave(
+                  draft
+                    .split("\n")
+                    .map((value) => value.trim())
+                    .filter(Boolean),
+                );
+                if (saved) setEditing(false);
+                else setError("Master data save failed");
+              } catch {
+                setError("Master data save failed");
+              } finally {
+                setSaving(false);
+              }
             }}
           >
-            Save
+            {saving ? "Saving…" : "Save"}
           </button>
+          {error && <p role="alert">{error}</p>}
         </>
       ) : (
         <p>{values.join(" · ")}</p>
@@ -7702,7 +8102,7 @@ function SystemData({
 }: {
   state: PrCenterState;
   data: MasterData;
-  onSave: (data: MasterData) => void;
+  onSave: (data: MasterData) => Promise<boolean>;
   language: Language;
 }) {
   const exportData = () => {
@@ -7732,16 +8132,30 @@ function SystemData({
           onSave={(contentTypes) => onSave({ ...data, contentTypes })}
         />
         <MasterDataEditor
-          label={language === "th" ? "หน่วยงาน" : "Departments"}
-          values={data.departments}
-          onSave={(departments) => onSave({ ...data, departments })}
+          label={language === "th" ? "ช่องทางเผยแพร่" : "Publishing channels"}
+          values={data.channels}
+          onSave={(channels) => onSave({ ...data, channels })}
         />
+        <MasterDataEditor
+          label={language === "th" ? "เสาหลักเนื้อหา" : "Content pillars"}
+          values={data.contentPillars}
+          onSave={(contentPillars) => onSave({ ...data, contentPillars })}
+        />
+      </section>
+      <section className={styles.card}>
+        <h2>{language === "th" ? "หน่วยงานในระบบ" : "Departments"}</h2>
+        <p>
+          {data.departments.join(" · ") ||
+            (language === "th" ? "ยังไม่มีหน่วยงาน" : "No departments")}
+        </p>
+        <h2>{language === "th" ? "ขั้นอนุมัติ" : "Approval stages"}</h2>
+        <p>{data.approvalStages.join(" · ")}</p>
       </section>
       <section className={styles.filterBar}>
         <p style={{ color: "#6b7280", fontSize: 13 }}>
           {language === "th"
-            ? "การนำเข้าและการแก้ไขข้อมูลตัวอย่างยังไม่บันทึกไปยังเซิร์ฟเวอร์"
-            : "Import and demo-data edits are local only and are not saved to the server."}
+            ? "ช่องทาง ประเภทเนื้อหา และเสาหลักเนื้อหาบันทึกไว้ในฐานข้อมูลส่วนกลาง"
+            : "Channels, content types, and content pillars are saved centrally."}
         </p>
       </section>
     </>
@@ -7856,6 +8270,9 @@ function FieldLabel({
 function RequestModal({
   language,
   requesterName,
+  contentTypes,
+  draftLoading,
+  draftSaving,
   isEditing,
   draft,
   onChange,
@@ -7864,6 +8281,9 @@ function RequestModal({
 }: {
   language: Language;
   requesterName: string;
+  contentTypes: string[];
+  draftLoading: boolean;
+  draftSaving: boolean;
   isEditing: boolean;
   draft: RequestDraft;
   onChange: (draft: RequestDraft) => void;
@@ -7907,7 +8327,18 @@ function RequestModal({
           <div className={styles.requestFormHint}>
             {thai
               ? "เลือกประเภทงานและกรอกข้อมูลที่จำเป็น ระบบจะแสดงช่องกรอกตามประเภทงาน"
-              : "Choose a request type and complete the required fields. The form adapts to your selection."}
+              : "Choose a request type and complete the required fields. The form adapts to your selection."}{" "}
+            {draftLoading
+              ? thai
+                ? "กำลังตรวจสอบร่างที่บันทึกไว้…"
+                : "Checking for a saved draft…"
+              : draftSaving
+                ? thai
+                  ? "กำลังบันทึกร่าง…"
+                  : "Saving draft…"
+                : thai
+                  ? "บันทึกร่างอัตโนมัติแล้ว"
+                  : "Draft autosaves automatically."}
           </div>
           <div className={styles.typePicker}>
             <button
@@ -8057,23 +8488,7 @@ function RequestModal({
                 <fieldset className={`${styles.contentTypeChoices} ${styles.full}`}>
                   <legend>{thai ? "ประเภทเนื้อหาที่ต้องการ" : "Content types"}</legend>
                   <div>
-                    {[
-                      "Website News",
-                      "Facebook Post",
-                      "Carousel",
-                      "Infographic",
-                      "Quote Card",
-                      "Short Video",
-                      "Reel",
-                      "YouTube Video",
-                      "Photo Album",
-                      "X Post",
-                      "LinkedIn Post",
-                      "Press Release",
-                      "Newsletter",
-                      "Executive Brief",
-                      "Other",
-                    ].map((contentType) => (
+                    {contentTypes.map((contentType) => (
                       <label key={contentType}>
                         <input
                           type="checkbox"
@@ -8227,7 +8642,7 @@ function RequestModal({
           <button type="button" onClick={onClose}>
             {thai ? "ยกเลิก" : "Cancel"}
           </button>
-          <button className={styles.primary} type="submit">
+          <button className={styles.primary} type="submit" disabled={draftLoading}>
             {isEditing
               ? thai
                 ? "บันทึกการแก้ไข"
