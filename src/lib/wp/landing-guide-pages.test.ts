@@ -3,7 +3,7 @@ import { getLandingGuidePage, landingGuidePages } from "./landing-guide-pages";
 import { supplementalKnowledgePages } from "./knowledge-supplemental-documents";
 
 const noGiftSupplementalPath = "/บริการและข้อมูลสำคัญ/no-gift-policy";
-const noGiftNewsPath = "/สทร-ร่วมประกาศเจตนารมณ์-no-gift-policy-2569";
+const noGiftNewsPath = "/rtrda-no-gift-policy-2569";
 
 describe("landing guide pages", () => {
   it("keeps No Gift Policy only on /คู่มือO20 while accepting the legacy alias path", () => {

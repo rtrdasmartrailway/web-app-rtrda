@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { ContentPage } from "@/components/content-page";
 import { getPageData } from "@/lib/db/page-data";
 import { normalizeRoutePath } from "@/lib/wp/url";
@@ -10,6 +10,8 @@ export const revalidate = 300;
 export const dynamicParams = true;
 
 const logoImage = "/wp-content/uploads/2023/02/Logo_RTRDA_full-1.png";
+const NO_GIFT_POLICY_LEGACY_PATH = "/สทร-ร่วมประกาศเจตนารมณ์-no-gift-policy-2569";
+const NO_GIFT_POLICY_CANONICAL_PATH = "/rtrda-no-gift-policy-2569";
 
 export async function generateStaticParams() {
   return [];
@@ -25,7 +27,8 @@ export async function generateMetadata({
   params: Promise<{ slug?: string[] }>;
 }): Promise<Metadata> {
   const { slug } = await params;
-  const data = await getPageData(pathFromSlug(slug));
+  const path = pathFromSlug(slug);
+  const data = await getPageData(path);
 
   if (!data) {
     return {
@@ -70,7 +73,11 @@ export default async function MigratedPage({
   params: Promise<{ slug?: string[] }>;
 }) {
   const { slug } = await params;
-  const data = await getPageData(pathFromSlug(slug));
+  const path = pathFromSlug(slug);
+  if (path === NO_GIFT_POLICY_LEGACY_PATH) {
+    redirect(NO_GIFT_POLICY_CANONICAL_PATH);
+  }
+  const data = await getPageData(path);
 
   if (!data) {
     notFound();

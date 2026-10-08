@@ -191,7 +191,7 @@ describe("manifestToRows", () => {
       wpId: "8063",
       language: "th",
       kind: "post",
-      path: "/สทร-ร่วมประกาศเจตนารมณ์-no-gift-policy-2569",
+      path: "/rtrda-no-gift-policy-2569",
       categoryIds: [7],
       featuredMediaId: 8063,
       date: "2026-02-24T00:00:00",
@@ -367,9 +367,7 @@ describe("manifestToRows", () => {
     const category = rowsWithCategory.records.find(
       (record) => record.path === "/category/ข่าวและกิจกรรม",
     );
-    expect(category?.contentHtml).toContain(
-      "/สทร-ร่วมประกาศเจตนารมณ์-no-gift-policy-2569",
-    );
+    expect(category?.contentHtml).toContain("/rtrda-no-gift-policy-2569");
     expect(category?.contentHtml).toContain(
       "/พิพัฒน์-ต่อยอด-mou-tech-to-track-เร่งเทคโนโลยีไทยลงราง",
     );

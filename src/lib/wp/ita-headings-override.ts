@@ -498,7 +498,7 @@ const ITA_LINK_OVERRIDES: ReadonlyArray<{
       {
         title:
           "สทร.ร่วมประกาศเจตนารมณ์การต่อต้านการทุจริตคอร์รัปชันในองค์กร การไม่รับของขวัญ (No Gift Policy)",
-        href: "/สทร-ร่วมประกาศเจตนารมณ์-no-gift-policy-2569",
+        href: "/rtrda-no-gift-policy-2569",
       },
       {
         title: 'หนังสือประกาศเจตนารมณ์ No Gift Policy "ฉบับภาษาไทย"',
@@ -507,6 +507,10 @@ const ITA_LINK_OVERRIDES: ReadonlyArray<{
       {
         title: "รายงานผลการดำเนินงานตามนโยบาย No Gift Policy 2568",
         href: sdcDownloadInlineHref("ita2569-o20-02"),
+      },
+      {
+        title: "รายงานผลการดำเนินงานตามนโยบาย No Gift Policy 2569",
+        href: "/policy_no_gift_policy_2569",
       },
       {
         title: "หลักเกณฑ์การรับทรัพย์สิน มาตรา 128",
