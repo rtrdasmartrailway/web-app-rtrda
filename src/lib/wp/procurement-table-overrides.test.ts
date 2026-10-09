@@ -285,12 +285,18 @@ describe("applyProcurementTableOverrides", () => {
       "สถานะ",
       "เอกสาร",
     ]);
-    expect(updatedRows.map((row) => row[0])).toEqual(["2", "1"]);
-    expect(updatedRows[0]?.[1]).toBe("7 กรกฎาคม 2569");
-    expect(updatedRows[0]?.[2]).toContain("ประจำไตรมาสที่ 3");
-    expect(updatedRows[0]?.[2]).toContain("เดือน มิถุนายน 2569");
-    expect(updatedRows[0]?.[2]).not.toContain("เดือน มีนาคม 2569");
-    expect(updatedRows[1]?.[2]).toContain("ไตรมาสที่ 2");
+    expect(updatedRows.map((row) => row[0])).toEqual(["3", "2", "1"]);
+    expect(updatedRows[0]?.[1]).toBe("9 ตุลาคม 2569");
+    expect(updatedRows[0]?.[2]).toContain("ประจำไตรมาสที่ 4");
+    expect(updatedRows[0]?.[2]).toContain("เดือนกรกฎาคม 2569 ถึง เดือนกันยายน 2569");
+    expect(updatedRows[1]?.[1]).toBe("7 กรกฎาคม 2569");
+    expect(updatedRows[1]?.[2]).toContain("ประจำไตรมาสที่ 3");
+    expect(updatedRows[1]?.[2]).toContain("เดือน มิถุนายน 2569");
+    expect(updatedRows[1]?.[2]).not.toContain("เดือน มีนาคม 2569");
+    expect(updatedRows[2]?.[2]).toContain("ไตรมาสที่ 2");
+    expect(updated.contentHtml).toContain(
+      "/procurement-documents/procurement-quarterly-winner-q4-2569-20261009.pdf",
+    );
     expect(updated.contentHtml).toContain(
       "/wp-content/uploads/2026/07/procurement-quarterly-winner-q3-2569.pdf",
     );
@@ -298,6 +304,32 @@ describe("applyProcurementTableOverrides", () => {
 
     const appliedTwice = applyProcurementTableOverrides(updated);
     expect(appliedTwice.contentHtml).toBe(updated.contentHtml);
+  });
+
+  it("adds quarterly winner rows to year 2569 even when the source only has year 2570", () => {
+    const source = record(
+      "/จัดซื้อจัดจ้าง/ประกาศผลผู้ชนะการจัดซื",
+      `<div class="lightweight-accordion"><details><summary><strong>ปี 2570</strong></summary><div class="lightweight-accordion-body"><table><thead><tr><th>ลำดับ</th><th>วันที่ประกาศ</th><th>โครงการ</th><th>สถานะ</th><th>เอกสาร</th></tr></thead><tbody></tbody></table></div></details></div>`,
+    );
+    const updated = applyProcurementTableOverrides(source);
+    const $ = cheerio.load(updated.contentHtml, null, false);
+    const years = $(".lightweight-accordion")
+      .map((_, element) =>
+        $(element).find("summary").first().text().replace(/\s+/g, " ").trim(),
+      )
+      .get();
+    const rowsFor2569 = rowsForYear(updated.contentHtml, "ปี 2569");
+
+    expect(years).toEqual(["ปี 2569", "ปี 2570"]);
+    expect(rowsFor2569[0]?.[1]).toBe("9 ตุลาคม 2569");
+    expect(rowsFor2569[0]?.[2]).toContain("ประจำไตรมาสที่ 4");
+    expect(rowsFor2569[0]?.[2]).toContain("เดือนกรกฎาคม 2569 ถึง เดือนกันยายน 2569");
+    expect(rowsFor2569[0]?.[3]).toBe("เผยแพร่ขึ้นเว็บ");
+    expect(updated.contentHtml).toContain(
+      "/procurement-documents/procurement-quarterly-winner-q4-2569-20261009.pdf",
+    );
+    expect(rowsForYear(updated.contentHtml, "ปี 2570")).toEqual([]);
+    expect(applyProcurementTableOverrides(updated).contentHtml).toBe(updated.contentHtml);
   });
 
   it("adds the September, August, July, and June monthly procurement summary rows in reverse chronological order", () => {
