@@ -52,6 +52,15 @@ const procurementPriceRows: TableRowSpec[] = [
 
 const summaryRows: TableRowSpec[] = [
   {
+    matchText: "9 ตุลาคม 2569 สรุปผลการดำเนินการจัดซื้อจัดจ้างในรอบเดือน กันยายน 2569",
+    cells: [
+      "9 ตุลาคม 2569",
+      "สรุปผลการดำเนินการจัดซื้อจัดจ้างในรอบเดือน กันยายน 2569",
+      PUBLISHED_STATUS,
+    ],
+    href: "/procurement-documents/procurement-summary-september-2569-20261009.pdf",
+  },
+  {
     matchText: "2 กันยายน 2569 สรุปผลการดำเนินการจัดซื้อจัดจ้างในรอบเดือน สิงหาคม 2569",
     cells: [
       "2 กันยายน 2569",
