@@ -7,7 +7,6 @@ import { normalizeRoutePath } from "./url";
 const JOB_APPLICATION_PATH = "/ข่าวสาร-กิจกรรม/ร่วมงานกับ-สทร/สมัครงาน";
 const PREVIOUS_NOTICE_DATE = "28 กันยายน 2569";
 const TARGET_POSITION = "เจ้าหน้าที่สนับสนุนงานนโยบายและแผน";
-const APPLICATION_URL = "https://forms.gle/z3abJcX9QRk8zGGA7";
 const NOTICE_DOCUMENT_URL = "/job-application-policy-planning-support-25691001.pdf";
 
 function isJobApplicationPath(path: string): boolean {
@@ -50,26 +49,7 @@ export function applyJobApplicationNoticeOverride(
   );
   setCellText(3, "1 อัตรา");
 
-  const applicationCell = cells.eq(4);
-  let applicationLink: Cheerio<AnyNode> = applicationCell.find("a").first();
-  if (applicationLink.length === 0) {
-    applicationCell.empty();
-    applicationLink = $("<a></a>").text("สมัครงาน");
-    applicationCell.append(applicationLink);
-    changed = true;
-  }
-  if (applicationLink.attr("href") !== APPLICATION_URL) {
-    applicationLink.attr("href", APPLICATION_URL);
-    changed = true;
-  }
-  if (applicationLink.attr("target") !== "_blank") {
-    applicationLink.attr("target", "_blank");
-    changed = true;
-  }
-  if (applicationLink.attr("rel") !== "noreferrer noopener") {
-    applicationLink.attr("rel", "noreferrer noopener");
-    changed = true;
-  }
+  setCellText(4, "–");
 
   const documentCell = cells.eq(5);
   let documentLink: Cheerio<AnyNode> = documentCell.find("a").first();
