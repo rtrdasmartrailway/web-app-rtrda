@@ -333,6 +333,7 @@ type AuditEntry = {
   createdAt: string;
 };
 type ApiRequestRecord = {
+  assignedTaskOnly?: boolean;
   id: string;
   title: string;
   type: "PR" | "OFFSITE";
@@ -1468,7 +1469,9 @@ export function PrCenterApp({
         startTransition(() =>
           setState((previous) => ({
             ...previous,
-            requests: pageRecords.map(mapRequestRecord),
+            requests: pageRecords
+              .filter((record) => !record.assignedTaskOnly)
+              .map(mapRequestRecord),
             tasks: mapRequestTasks(pageRecords),
           })),
         );
@@ -1808,6 +1811,7 @@ export function PrCenterApp({
         requests: [
           ...previous.requests,
           ...pageRecords
+            .filter((record) => !record.assignedTaskOnly)
             .map(mapRequestRecord)
             .filter(
               (item) => !previous.requests.some((existing) => existing.id === item.id),
@@ -1846,7 +1850,9 @@ export function PrCenterApp({
       setHasMoreRequests(records.length > pageRecords.length);
       setState((previous) => ({
         ...previous,
-        requests: pageRecords.map(mapRequestRecord),
+        requests: pageRecords
+          .filter((record) => !record.assignedTaskOnly)
+          .map(mapRequestRecord),
         tasks: mapRequestTasks(pageRecords),
       }));
     } catch {

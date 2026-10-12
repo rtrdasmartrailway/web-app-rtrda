@@ -192,12 +192,38 @@ describe("request intake approval", () => {
     const assignedTask = { id: "owned-task", ownerId: assignedOwner.id };
     const siblingTask = { id: "sibling-task", ownerId: "another-owner" };
     mockPrisma.prRequest.findMany.mockResolvedValue([
-      { ...requestRecord, tasks: [assignedTask, siblingTask] },
+      {
+        ...requestRecord,
+        title: "Private campaign",
+        requester: { displayName: "Private requester" },
+        department: { name: "Private department" },
+        priorityReason: "Sensitive request detail",
+        revisions: [{ objective: "Private objective" }],
+        sources: [{ url: "https://private.example.org/source" }],
+        statusHistory: [{ toState: "REJECTED", reason: "Private reason" }],
+        attachments: [{ id: "private-attachment" }],
+        tasks: [assignedTask, siblingTask],
+      },
     ]);
 
     const requests = await listRequests(assignedOwner);
+    const assignedRequest = requests[0];
 
-    expect(requests[0]?.tasks).toEqual([assignedTask]);
+    expect(assignedRequest).toMatchObject({
+      id: requestRecord.id,
+      status: requestRecord.status,
+      requesterId: "",
+      sources: [],
+      tasks: [assignedTask],
+      assignedTaskOnly: true,
+    });
+    expect(assignedRequest).not.toHaveProperty("title");
+    expect(assignedRequest).not.toHaveProperty("requester");
+    expect(assignedRequest).not.toHaveProperty("department");
+    expect(assignedRequest).not.toHaveProperty("priorityReason");
+    expect(assignedRequest).not.toHaveProperty("revisions");
+    expect(assignedRequest).not.toHaveProperty("statusHistory");
+    expect(assignedRequest).not.toHaveProperty("attachments");
   });
 
   it("lets BORD open another user's request within its grant scope", async () => {

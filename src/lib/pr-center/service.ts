@@ -960,11 +960,16 @@ export async function listRequests(actor: PrCenterActor, take = 25, cursor?: str
     },
   });
   const roles = actorRoles(actor);
+  const canReadRequest = canReadAllRequests(roles);
   return requests.map((request) => {
-    if (request.requesterId === actor.id || canReadAllRequests(roles)) return request;
+    if (request.requesterId === actor.id || canReadRequest) return request;
     return {
-      ...request,
+      id: request.id,
+      status: request.status,
+      requesterId: "",
+      sources: [],
       tasks: request.tasks.filter((task) => task.ownerId === actor.id),
+      assignedTaskOnly: true as const,
     };
   });
 }
