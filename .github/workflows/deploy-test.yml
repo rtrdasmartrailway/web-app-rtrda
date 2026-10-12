@@ -69,11 +69,21 @@ jobs:
           done
           npm run db:migrate
 
-      - name: Seed database from content manifest
+      - name: Seed database from content manifest when changed
+        env:
+          DEPLOY_BASE_SHA: ${{ github.event.before }}
         run: |
           set -euo pipefail
           cd /srv/workspace/web-app-rtrda
-          npm run db:seed
+          if [ -z "$DEPLOY_BASE_SHA" ] || ! git cat-file -e "${DEPLOY_BASE_SHA}^{commit}" 2>/dev/null; then
+            DEPLOY_BASE_SHA="$(git rev-parse "${GITHUB_SHA}^")"
+          fi
+          if git diff --quiet "$DEPLOY_BASE_SHA" "$GITHUB_SHA" -- src/data/wp-content.json; then
+            echo "Content manifest unchanged; skipping the full-reload WordPress seed."
+          else
+            echo "Content manifest changed; applying the intentional full-reload WordPress seed."
+            npm run db:seed
+          fi
 
       - name: Run validation gates
         run: |

@@ -29,6 +29,15 @@ describe("Deploy test.rtrda.or.th workflow", () => {
     );
   });
 
+  it("runs the destructive WordPress seed only when the manifest changed", () => {
+    expect(workflow).toContain("DEPLOY_BASE_SHA: ${{ github.event.before }}");
+    expect(workflow).toContain(
+      'git diff --quiet "$DEPLOY_BASE_SHA" "$GITHUB_SHA" -- src/data/wp-content.json',
+    );
+    expect(workflow).toContain("skipping the full-reload WordPress seed");
+    expect(workflow).toContain("npm run db:seed");
+  });
+
   it("labels the running container with the exact pushed SHA", () => {
     expect(workflow).toContain('RTRDA_RELEASE_SHA="${GITHUB_SHA}"');
     expect(workflow).toContain("org.opencontainers.image.revision");
