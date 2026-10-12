@@ -71,6 +71,24 @@ describe("Message House draft editing", () => {
     );
   });
 
+  it("denies draft edits to RTRDA_BORD", async () => {
+    await expect(
+      saveMessageHouseDraft({ ...actor, role: "RTRDA_BORD" }, input, undefined, "corr-1"),
+    ).rejects.toMatchObject({ code: "FORBIDDEN", statusCode: 403 });
+    expect(mocks.tx.prMessageHouseVersion.findFirst).not.toHaveBeenCalled();
+    expect(mocks.tx.prMessageHouseVersion.create).not.toHaveBeenCalled();
+  });
+
+  it("allows RTRDA_ADMIN to create a versioned draft", async () => {
+    await saveMessageHouseDraft(
+      { ...actor, role: "RTRDA_ADMIN" },
+      input,
+      undefined,
+      "corr-1",
+    );
+    expect(mocks.tx.prMessageHouseVersion.create).toHaveBeenCalledOnce();
+  });
+
   it("updates only the actor's existing draft", async () => {
     mocks.tx.prMessageHouseVersion.findFirst.mockResolvedValue({
       id: "draft-1",

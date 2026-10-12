@@ -1851,13 +1851,13 @@ export async function convertIdea(
   });
 }
 
-function assertCanReadMessageHouse(actor: PrCenterActor) {
-  if (!canManageTasks(actorRoles(actor)) && !actorHasRole(actor, "RTRDA_BORD"))
-    throw new PrCenterError("You cannot view Message House", 403, "FORBIDDEN");
+function assertCanReadMessageHouse() {
+  // Any authenticated PR Center role may view the organization Message House;
+  // authoring remains restricted independently by assertCanManageMessageHouse.
 }
 
 function assertCanManageMessageHouse(actor: PrCenterActor) {
-  if (!canManageTasks(actorRoles(actor)))
+  if (!actorHasRole(actor, "RTRDA_PR") && !actorHasRole(actor, "RTRDA_ADMIN"))
     throw new PrCenterError("You cannot edit Message House", 403, "FORBIDDEN");
 }
 
@@ -1971,7 +1971,7 @@ export async function saveMessageHouseDraft(
 }
 
 export async function currentMessageHouse(actor: PrCenterActor) {
-  assertCanReadMessageHouse(actor);
+  assertCanReadMessageHouse();
   return prisma.prMessageHouseVersion.findFirst({
     where: {
       organizationId: actor.organizationId,
@@ -1991,7 +1991,7 @@ export async function currentMessageHouse(actor: PrCenterActor) {
 }
 
 export async function messageHouseHistory(actor: PrCenterActor) {
-  assertCanReadMessageHouse(actor);
+  assertCanReadMessageHouse();
   return prisma.prMessageHouseVersion.findMany({
     where: {
       organizationId: actor.organizationId,

@@ -739,10 +739,11 @@ const ROLE_PAGES: Record<Role, Page[]> = {
     "my-requests",
     "calendar",
     "ideas",
+    "message-house",
     "notifications",
     "help",
   ],
-  approver: ["home", "calendar", "approvals", "ideas", "notifications"],
+  approver: ["home", "calendar", "approvals", "ideas", "message-house", "notifications"],
   writer: [
     "home",
     "new-request",
@@ -750,17 +751,35 @@ const ROLE_PAGES: Record<Role, Page[]> = {
     "operations",
     "calendar",
     "ideas",
+    "message-house",
     "notifications",
     "help",
   ],
-  designer: ["home", "my-requests", "operations", "calendar", "notifications", "help"],
-  video: ["home", "my-requests", "operations", "calendar", "notifications", "help"],
+  designer: [
+    "home",
+    "my-requests",
+    "operations",
+    "calendar",
+    "message-house",
+    "notifications",
+    "help",
+  ],
+  video: [
+    "home",
+    "my-requests",
+    "operations",
+    "calendar",
+    "message-house",
+    "notifications",
+    "help",
+  ],
   requester: [
     "home",
     "new-request",
     "my-requests",
     "calendar",
     "ideas",
+    "message-house",
     "notifications",
     "help",
   ],
@@ -3203,7 +3222,13 @@ export function PrCenterApp({
           {page === "message-house" && (
             <MessageHouse
               data={state.messageHouse}
-              canEdit={hasUiRole("pr", "admin")}
+              canEdit={
+                actor
+                  ? actorRoleCodes.some(
+                      (role) => role === "RTRDA_PR" || role === "RTRDA_ADMIN",
+                    )
+                  : hasUiRole("pr", "admin")
+              }
               status={messageHouseStatus}
               history={messageHouseHistory}
               historyStatus={messageHouseHistoryStatus}

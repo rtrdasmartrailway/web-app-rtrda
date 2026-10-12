@@ -93,11 +93,12 @@ describe("currentMessageHouse", () => {
     );
   });
 
-  it("denies current-version reads to RTRDA_ALL_USER", async () => {
+  it("allows RTRDA_ALL_USER read-only access to the current Message House version", async () => {
+    mocks.findFirst.mockResolvedValue(messageHouseVersions[0]);
+
     await expect(
       currentMessageHouse({ ...actor, role: "RTRDA_ALL_USER" }),
-    ).rejects.toThrow("You cannot view Message House");
-    expect(mocks.findFirst).not.toHaveBeenCalled();
+    ).resolves.toEqual(messageHouseVersions[0]);
   });
 
   it("lists only approved or superseded versions that are already effective", async () => {
@@ -128,10 +129,8 @@ describe("currentMessageHouse", () => {
     await expect(messageHouseHistory(actor)).resolves.toEqual(messageHouseVersions);
   });
 
-  it("denies history reads to roles without Message House page access", async () => {
-    await expect(
-      messageHouseHistory({ ...actor, role: "RTRDA_ALL_USER" }),
-    ).rejects.toThrow("You cannot view Message House");
-    expect(mocks.findMany).not.toHaveBeenCalled();
+  it("allows RTRDA_ALL_USER read-only access to Message House history", async () => {
+    await messageHouseHistory({ ...actor, role: "RTRDA_ALL_USER" });
+    expect(mocks.findMany).toHaveBeenCalledOnce();
   });
 });

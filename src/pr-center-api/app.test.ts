@@ -485,7 +485,7 @@ describe("Message House current route", () => {
     await app.close();
   });
 
-  it("denies current and historical content to roles without page access", async () => {
+  it("allows authenticated RTRDA_ALL_USER through the Message House read gate", async () => {
     const requesterActor = { ...mockActor, role: "RTRDA_ALL_USER" as const };
     const app = buildPrCenterApi(async () => requesterActor);
     const [currentResponse, historyResponse] = await Promise.all([
@@ -493,8 +493,9 @@ describe("Message House current route", () => {
       app.inject({ method: "GET", url: "/message-house/history" }),
     ]);
 
-    expect(currentResponse.statusCode).toBe(403);
-    expect(historyResponse.statusCode).toBe(403);
+    // The route reaches the database-backed service; these API tests have no DB mock.
+    expect(currentResponse.statusCode).not.toBe(403);
+    expect(historyResponse.statusCode).not.toBe(403);
     await app.close();
   });
 });
