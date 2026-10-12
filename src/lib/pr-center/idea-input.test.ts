@@ -26,6 +26,16 @@ describe("normalizeCreateIdeaInput", () => {
     });
   });
 
+  it("preserves multiple selected channels in the existing channel text field", () => {
+    expect(
+      normalizeCreateIdeaInput({
+        title: "valid title",
+        rationale: "valid rationale",
+        channel: "Website, Facebook, YouTube",
+      }).channel,
+    ).toBe("Website, Facebook, YouTube");
+  });
+
   it("rejects missing or out-of-range title and rationale", () => {
     expect(() =>
       normalizeCreateIdeaInput({ title: "ab", rationale: "valid rationale" }),

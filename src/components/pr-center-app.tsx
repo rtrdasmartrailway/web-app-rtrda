@@ -11,6 +11,10 @@ import {
 import Image from "next/image";
 import type { CreateContentIdeaInput } from "@/lib/pr-center/idea-input";
 import { submitIdeaForm } from "@/lib/pr-center/idea-form";
+import {
+  createContentIdeasCsv,
+  createContentIdeasWordHtml,
+} from "@/lib/pr-center/idea-export";
 import { parseIdeaListPage, type IdeaListRecord } from "@/lib/pr-center/idea-view";
 import {
   bangkokCalendarAnchor,
@@ -3007,15 +3011,25 @@ export function PrCenterApp({
               height={38}
             />
             <div>
-              <h2>RTRDA PR Center</h2>
-              <p>Corporate communications workspace</p>
+              <h2>
+                {page === "ideas"
+                  ? state.language === "th"
+                    ? "เสนอ Content Ideas"
+                    : "Content Ideas"
+                  : "RTRDA PR Center"}
+              </h2>
+              {page !== "ideas" && <p>Corporate communications workspace</p>}
             </div>
           </div>
-          <label className={styles.search}>
-            <span>Search</span>
-            <input placeholder={t.search} />
-          </label>
-          <div className={styles.topActions}>
+          {page !== "ideas" && (
+            <label className={styles.search}>
+              <span>Search</span>
+              <input placeholder={t.search} />
+            </label>
+          )}
+          <div
+            className={`${styles.topActions} ${page === "ideas" ? styles.ideasTopActions : ""}`}
+          >
             {hasUiRole("requester", "pr", "admin") && (
               <button className={styles.topRequest} onClick={openRequest}>
                 + {t.newRequest}
@@ -3932,16 +3946,21 @@ function SectionHeading({
   eyebrow,
   title,
   action,
+  help,
 }: {
   eyebrow: string;
   title: string;
   action?: React.ReactNode;
+  help?: React.ReactNode;
 }) {
   return (
     <section className={styles.pageHeading}>
       <div>
         <p className={styles.eyebrow}>{eyebrow}</p>
-        <h1>{title}</h1>
+        <h1>
+          {title}
+          {help}
+        </h1>
       </div>
       {action}
     </section>
@@ -6531,6 +6550,30 @@ function IdeaComments({ ideaId, language }: { ideaId: string; language: Language
   );
 }
 
+function parseIdeaChannels(value?: string): string[] {
+  return [
+    ...new Set(
+      (value || "")
+        .split(",")
+        .map((item) => item.trim())
+        .filter(Boolean),
+    ),
+  ];
+}
+
+function ideaChannelMark(channel: string): string {
+  const normalized = channel.toLowerCase();
+  if (normalized === "website") return "◎";
+  if (normalized === "facebook") return "f";
+  if (normalized === "tiktok") return "♪";
+  if (normalized === "youtube") return "▶";
+  if (normalized === "x") return "𝕏";
+  if (normalized === "linkedin") return "in";
+  if (normalized === "press release") return "▤";
+  if (normalized === "internal") return "Ⅱ";
+  return channel.slice(0, 1).toUpperCase();
+}
+
 function Ideas({
   ideas,
   currentUser,
@@ -6571,6 +6614,9 @@ function Ideas({
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState<"all" | IdeaStatus>("all");
+  const [priorityFilter, setPriorityFilter] = useState("");
+  const [channelFilter, setChannelFilter] = useState("");
+  const [expandedIdeaId, setExpandedIdeaId] = useState<string | null>(null);
   const [title, setTitle] = useState("");
   const [summary, setSummary] = useState("");
   const [audience, setAudience] = useState("");
@@ -6587,6 +6633,11 @@ function Ideas({
   const visible = ideas.filter(
     (idea) =>
       (status === "all" || idea.status === status) &&
+      (!priorityFilter || idea.priority === priorityFilter) &&
+      (!channelFilter ||
+        parseIdeaChannels(idea.channel).some(
+          (item) => item.toLowerCase() === channelFilter.toLowerCase(),
+        )) &&
       [
         idea.title,
         idea.summary,
@@ -6601,6 +6652,19 @@ function Ideas({
         .toLowerCase()
         .includes(query.toLowerCase()),
   );
+  const channelOptions = [
+    ...new Set([
+      ...channels,
+      ...ideas.flatMap((idea) => parseIdeaChannels(idea.channel)),
+    ]),
+  ];
+  const priorityOptions = [
+    ...new Set(
+      ideas
+        .map((idea) => idea.priority)
+        .filter((value): value is string => Boolean(value)),
+    ),
+  ];
   const ideaStatusLabel = (value: IdeaStatus) => {
     if (language === "th")
       return {
@@ -6614,6 +6678,33 @@ function Ideas({
         archived: "เก็บถาวร",
       }[value];
     return value.replaceAll("_", " ");
+  };
+  const exportRows = visible.map((idea) => ({
+    id: idea.id,
+    title: idea.title,
+    summary: idea.summary,
+    channels: parseIdeaChannels(idea.channel).join(", ") || "—",
+    priority: idea.priority || "—",
+    status: ideaStatusLabel(idea.status),
+    author: getUser(idea.authorId)?.name ?? "Unknown",
+    links: idea.evidenceUrls || [],
+  }));
+  const downloadExport = (format: "word" | "excel") => {
+    const isWord = format === "word";
+    const content = isWord
+      ? createContentIdeasWordHtml(exportRows)
+      : createContentIdeasCsv(exportRows);
+    const blob = new Blob([content], {
+      type: isWord ? "application/msword;charset=utf-8" : "text/csv;charset=utf-8",
+    });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = `content-ideas-${new Date().toISOString().slice(0, 10)}.${isWord ? "doc" : "csv"}`;
+    document.body.append(anchor);
+    anchor.click();
+    anchor.remove();
+    window.setTimeout(() => URL.revokeObjectURL(url), 1000);
   };
   const transitionsForRole = (idea: Idea): IdeaStatus[] => {
     if (canReview && canApprove) return IDEA_TRANSITIONS[idea.status];
@@ -6641,6 +6732,9 @@ function Ideas({
       .then((result) => {
         const payload = result?.payload;
         if (cancelled || !payload) return;
+        setIdeaDraftMessage(
+          language === "th" ? "โหลดร่างที่บันทึกไว้แล้ว" : "Saved draft restored.",
+        );
         setTitle(typeof payload.title === "string" ? payload.title : "");
         setSummary(typeof payload.rationale === "string" ? payload.rationale : "");
         setAudience(typeof payload.audience === "string" ? payload.audience : "");
@@ -6724,13 +6818,75 @@ function Ideas({
     summary,
     title,
   ]);
+
+  useEffect(() => {
+    if (!open) return;
+    const dialog = document.querySelector<HTMLElement>(
+      '[role="dialog"][aria-labelledby="idea-modal-title"]',
+    );
+    const previouslyFocused =
+      document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const focusable = () =>
+      [
+        ...(dialog?.querySelectorAll<HTMLElement>(
+          "button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), a[href], summary",
+        ) || []),
+      ].filter((element) => element.getClientRects().length > 0);
+    focusable()[0]?.focus();
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        setOpen(false);
+        return;
+      }
+      if (event.key !== "Tab") return;
+      const elements = focusable();
+      const first = elements[0];
+      const last = elements.at(-1);
+      if (!first || !last) {
+        event.preventDefault();
+        dialog?.focus();
+      } else if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("keydown", onKeyDown);
+      document.body.style.overflow = previousOverflow;
+      previouslyFocused?.focus();
+    };
+  }, [open]);
+
   return (
     <>
       <SectionHeading
         eyebrow="COLLABORATION"
-        title="Content Ideas"
+        title={language === "th" ? "เสนอ Content Ideas" : "Content Ideas"}
+        help={
+          <button
+            type="button"
+            className={styles.ideaHelpButton}
+            aria-label={
+              language === "th" ? "ข้อมูลเกี่ยวกับ Content Ideas" : "About Content Ideas"
+            }
+            title={
+              language === "th"
+                ? "เสนอไอเดียให้ทีม PR ตรวจสอบก่อนส่งอนุมัติ"
+                : "Submit an idea for PR review before approval."
+            }
+          >
+            ?
+          </button>
+        }
         action={
-          <div style={{ alignItems: "center", display: "flex", gap: 8 }}>
+          <div className={styles.ideaToolbar}>
             <button
               className={styles.secondaryButton}
               onClick={() => void onRefresh()}
@@ -6739,47 +6895,30 @@ function Ideas({
               {language === "th" ? "รีเฟรช" : "Refresh"}
             </button>
             <button
+              className={styles.secondaryButton}
+              onClick={() => downloadExport("word")}
+              disabled={!visible.length}
+            >
+              ↓ Export Word
+            </button>
+            <button
+              className={styles.secondaryButton}
+              onClick={() => downloadExport("excel")}
+              disabled={!visible.length}
+              title={
+                language === "th" ? "ไฟล์ CSV เปิดด้วย Excel ได้" : "Excel-compatible CSV"
+              }
+            >
+              ↓ Export Excel
+            </button>
+            <button
               className={styles.primary}
               onClick={() => {
                 if (open) {
                   setOpen(false);
                   return;
                 }
-                setEditingIdeaId(null);
-                setIdeaDraftHydrated(false);
-                setIdeaDraftMessage("");
-                setOpen(true);
-              }}
-            >
-              + Propose idea
-            </button>
-          </div>
-        }
-      />
-      {open && (
-        <form
-          className={styles.card}
-          onSubmit={async (event) => {
-            event.preventDefault();
-            setSaving(true);
-            try {
-              const input = {
-                title: title.trim(),
-                rationale: summary.trim(),
-                audience,
-                pillar,
-                channel,
-                priority,
-                campaign,
-                evidenceUrls: evidenceText
-                  .split(/\r?\n/)
-                  .map((url) => url.trim())
-                  .filter(Boolean),
-              };
-              const saved = await submitIdeaForm(
-                () => (editingIdeaId ? onUpdate(editingIdeaId, input) : onCreate(input)),
-                () => {
-                  const shouldDeleteDraft = !editingIdeaId;
+                if (editingIdeaId) {
                   setTitle("");
                   setSummary("");
                   setAudience("");
@@ -6788,146 +6927,277 @@ function Ideas({
                   setPriority("");
                   setCampaign("");
                   setEvidenceText("");
-                  setEditingIdeaId(null);
-                  setOpen(false);
-                  if (shouldDeleteDraft)
-                    void fetch("/api/pr-center/drafts/IDEA", {
-                      method: "DELETE",
-                      credentials: "same-origin",
-                    });
-                },
-              );
-              if (!saved) return;
-              await onRefresh();
-            } finally {
-              setSaving(false);
-            }
-          }}
-        >
-          <h2>
-            {editingIdeaId
-              ? language === "th"
-                ? "แก้ไขแนวคิดตามข้อเสนอแนะ"
-                : "Revise idea"
-              : language === "th"
-                ? "เสนอแนวคิดเนื้อหา"
-                : "Propose an idea"}
-          </h2>
-          {(ideaDraftSaving || ideaDraftMessage) && (
-            <p role="status">
-              {ideaDraftSaving
-                ? language === "th"
-                  ? "กำลังบันทึกร่างอัตโนมัติ…"
-                  : "Autosaving draft…"
-                : ideaDraftMessage}
-            </p>
-          )}
-          <fieldset
-            disabled={!ideaDraftHydrated || saving}
-            className={styles.ideaDraftFields}
+                }
+                setEditingIdeaId(null);
+                setIdeaDraftHydrated(false);
+                setIdeaDraftMessage("");
+                setOpen(true);
+              }}
+            >
+              💡 {language === "th" ? "เสนอ Content Idea" : "Propose Content Idea"}
+            </button>
+          </div>
+        }
+      />
+      <div className={styles.ideaInfoBanner}>
+        <span aria-hidden="true">💡</span>
+        <p>
+          {language === "th"
+            ? "พนักงานทุกคนสามารถเสนอไอเดียได้ หัวหน้าทีม PR จะรวบรวม ตรวจสอบ และส่งให้ผู้มีสิทธิ์อนุมัติ"
+            : "All staff can submit ideas. The PR team reviews and routes them to the authorized approver."}
+        </p>
+      </div>
+      {open && (
+        <div className={styles.ideaModalBackdrop}>
+          <form
+            className={styles.ideaModal}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="idea-modal-title"
+            tabIndex={-1}
+            onSubmit={async (event) => {
+              event.preventDefault();
+              setSaving(true);
+              try {
+                const input = {
+                  title: title.trim(),
+                  rationale: summary.trim(),
+                  audience,
+                  pillar,
+                  channel,
+                  priority,
+                  campaign,
+                  evidenceUrls: evidenceText
+                    .split(/\r?\n/)
+                    .map((url) => url.trim())
+                    .filter(Boolean),
+                };
+                const saved = await submitIdeaForm(
+                  () =>
+                    editingIdeaId ? onUpdate(editingIdeaId, input) : onCreate(input),
+                  () => {
+                    const shouldDeleteDraft = !editingIdeaId;
+                    setTitle("");
+                    setSummary("");
+                    setAudience("");
+                    setPillar("");
+                    setChannel("");
+                    setPriority("");
+                    setCampaign("");
+                    setEvidenceText("");
+                    setEditingIdeaId(null);
+                    setOpen(false);
+                    if (shouldDeleteDraft)
+                      void fetch("/api/pr-center/drafts/IDEA", {
+                        method: "DELETE",
+                        credentials: "same-origin",
+                      });
+                  },
+                );
+                if (!saved) return;
+                await onRefresh();
+              } finally {
+                setSaving(false);
+              }
+            }}
           >
-            <label>
-              {language === "th" ? "ชื่อแนวคิด" : "Idea title"}
-              <input
-                value={title}
-                onChange={(event) => setTitle(event.target.value)}
-                maxLength={300}
-                required
-              />
-            </label>
-            <label>
-              {language === "th" ? "เหตุผลและแนวทาง" : "Rationale and angle"}
-              <textarea
-                value={summary}
-                onChange={(event) => setSummary(event.target.value)}
-                maxLength={5000}
-                required
-              />
-            </label>
-            <label>
-              {language === "th" ? "กลุ่มเป้าหมาย" : "Audience"}
-              <input
-                value={audience}
-                onChange={(event) => setAudience(event.target.value)}
-                maxLength={500}
-              />
-            </label>
-            <label>
-              {language === "th" ? "เสาหลักเนื้อหา" : "Content pillar"}
-              <select value={pillar} onChange={(event) => setPillar(event.target.value)}>
-                <option value="">
-                  {language === "th" ? "เลือกเสาหลัก" : "Select a pillar"}
-                </option>
-                {contentPillars.map((item) => (
-                  <option key={item} value={item}>
-                    {item}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label>
-              {language === "th" ? "ช่องทาง" : "Channel"}
-              <select
-                value={channel}
-                onChange={(event) => setChannel(event.target.value)}
+            <header className={styles.ideaModalHeader}>
+              <div>
+                <p className={styles.eyebrow}>CONTENT IDEAS</p>
+                <h2 id="idea-modal-title">
+                  {editingIdeaId
+                    ? language === "th"
+                      ? "แก้ไขแนวคิดตามข้อเสนอแนะ"
+                      : "Revise idea"
+                    : language === "th"
+                      ? "เสนอ Content Ideas"
+                      : "Propose a Content Idea"}
+                </h2>
+              </div>
+              <button
+                type="button"
+                className={styles.ideaModalClose}
+                onClick={() => setOpen(false)}
+                aria-label={language === "th" ? "ปิดหน้าต่าง" : "Close dialog"}
               >
-                <option value="">
-                  {language === "th" ? "เลือกช่องทาง" : "Select a channel"}
-                </option>
-                {channels.map((item) => (
-                  <option key={item} value={item}>
-                    {item}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label>
-              {language === "th" ? "ลำดับความสำคัญ" : "Priority"}
-              <input
-                value={priority}
-                onChange={(event) => setPriority(event.target.value)}
-                maxLength={40}
-              />
-            </label>
-            <label>
-              {language === "th" ? "แคมเปญ" : "Campaign"}
-              <input
-                value={campaign}
-                onChange={(event) => setCampaign(event.target.value)}
-                maxLength={200}
-              />
-            </label>
-            <label>
-              {language === "th"
-                ? "ลิงก์หลักฐาน (HTTPS หนึ่งลิงก์ต่อบรรทัด)"
-                : "Evidence links (one HTTPS URL per line)"}
-              <textarea
-                value={evidenceText}
-                onChange={(event) => setEvidenceText(event.target.value)}
-                placeholder="https://…"
-              />
-            </label>
-          </fieldset>
-          <button
-            className={styles.primary}
-            type="submit"
-            disabled={saving || !ideaDraftHydrated}
-          >
-            {saving
-              ? language === "th"
-                ? "กำลังบันทึก…"
-                : "Saving…"
-              : editingIdeaId
-                ? language === "th"
-                  ? "ส่งแนวคิดที่แก้ไขแล้ว"
-                  : "Resubmit revised idea"
-                : language === "th"
-                  ? "บันทึกแนวคิด"
-                  : "Save idea"}
-          </button>
-        </form>
+                ×
+              </button>
+            </header>
+            <div className={styles.ideaModalBody}>
+              <div className={styles.ideaModalNotice}>
+                <span className={styles.ideaDraftBadge} role="status">
+                  {ideaDraftSaving
+                    ? language === "th"
+                      ? "กำลังบันทึกร่าง…"
+                      : "Saving draft…"
+                    : ideaDraftMessage ||
+                      (editingIdeaId
+                        ? language === "th"
+                          ? "กำลังแก้ไขแนวคิดที่ได้รับข้อเสนอแนะ"
+                          : "Editing an idea revision"
+                        : language === "th"
+                          ? "ระบบบันทึกร่างอัตโนมัติเมื่อกรอกข้อมูล"
+                          : "Draft autosave is enabled")}
+                </span>
+                <span>
+                  {language === "th"
+                    ? "พนักงานทุกคนสามารถเสนอไอเดียได้ หัวหน้าทีม PR จะรวบรวม ตรวจสอบ และส่งให้ผู้มีสิทธิ์อนุมัติ"
+                    : "All staff can submit ideas. The PR team reviews and routes them to the authorized approver."}
+                </span>
+              </div>
+              <fieldset
+                disabled={!ideaDraftHydrated || saving}
+                className={styles.ideaDraftFields}
+              >
+                <label>
+                  <span>
+                    {language === "th" ? "หัวข้อ Content" : "Content title"}{" "}
+                    <i className={styles.ideaRequired}>*</i>
+                  </span>
+                  <input
+                    value={title}
+                    onChange={(event) => setTitle(event.target.value)}
+                    maxLength={300}
+                    required
+                  />
+                </label>
+                <label>
+                  <span>
+                    {language === "th"
+                      ? "เนื้อหา / รายละเอียด Content"
+                      : "Content details"}{" "}
+                    <i className={styles.ideaRequired}>*</i>
+                  </span>
+                  <textarea
+                    value={summary}
+                    onChange={(event) => setSummary(event.target.value)}
+                    maxLength={5000}
+                    required
+                  />
+                </label>
+                <fieldset className={styles.ideaChannelGroup}>
+                  <legend>{language === "th" ? "ช่องทาง" : "Channels"}</legend>
+                  <div className={styles.ideaChannelGrid}>
+                    {channelOptions.map((item) => (
+                      <label className={styles.ideaChannelOption} key={item}>
+                        <input
+                          type="checkbox"
+                          checked={parseIdeaChannels(channel).includes(item)}
+                          onChange={(event) => {
+                            const checked = event.currentTarget.checked;
+                            setChannel((current) => {
+                              const selected = parseIdeaChannels(current);
+                              const next = checked
+                                ? [...selected, item]
+                                : selected.filter((value) => value !== item);
+                              return [...new Set(next)].join(", ");
+                            });
+                          }}
+                        />
+                        <span
+                          className={styles.ideaChannelIcon}
+                          data-channel={item.toLowerCase().replaceAll(" ", "-")}
+                          aria-hidden="true"
+                        >
+                          {ideaChannelMark(item)}
+                        </span>
+                        <span>{item}</span>
+                      </label>
+                    ))}
+                  </div>
+                </fieldset>
+                <details className={styles.ideaOptionalFields}>
+                  <summary>
+                    {language === "th"
+                      ? "รายละเอียดเพิ่มเติม (ไม่บังคับ)"
+                      : "Additional details (optional)"}
+                  </summary>
+                  <div className={styles.ideaOptionalGrid}>
+                    <label>
+                      {language === "th" ? "กลุ่มเป้าหมาย" : "Audience"}
+                      <input
+                        value={audience}
+                        onChange={(event) => setAudience(event.target.value)}
+                        maxLength={500}
+                      />
+                    </label>
+                    <label>
+                      {language === "th" ? "เสาหลักเนื้อหา" : "Content pillar"}
+                      <select
+                        value={pillar}
+                        onChange={(event) => setPillar(event.target.value)}
+                      >
+                        <option value="">
+                          {language === "th" ? "เลือกเสาหลัก" : "Select a pillar"}
+                        </option>
+                        {contentPillars.map((item) => (
+                          <option key={item} value={item}>
+                            {item}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <label>
+                      {language === "th" ? "ระดับความสำคัญ" : "Priority"}
+                      <input
+                        value={priority}
+                        onChange={(event) => setPriority(event.target.value)}
+                        maxLength={40}
+                      />
+                    </label>
+                    <label>
+                      {language === "th" ? "แคมเปญ" : "Campaign"}
+                      <input
+                        value={campaign}
+                        onChange={(event) => setCampaign(event.target.value)}
+                        maxLength={200}
+                      />
+                    </label>
+                    <label className={styles.ideaEvidenceField}>
+                      {language === "th"
+                        ? "ลิงก์หลักฐาน (HTTPS หนึ่งลิงก์ต่อบรรทัด)"
+                        : "Evidence links (one HTTPS URL per line)"}
+                      <textarea
+                        value={evidenceText}
+                        onChange={(event) => setEvidenceText(event.target.value)}
+                        placeholder="https://…"
+                      />
+                    </label>
+                  </div>
+                </details>
+              </fieldset>
+            </div>
+            <footer className={styles.ideaModalFooter}>
+              <button
+                type="button"
+                className={styles.secondaryButton}
+                onClick={() => setOpen(false)}
+                disabled={saving}
+              >
+                {language === "th" ? "ยกเลิก" : "Cancel"}
+              </button>
+              <button
+                className={styles.primary}
+                type="submit"
+                disabled={saving || !ideaDraftHydrated}
+              >
+                {saving
+                  ? language === "th"
+                    ? "กำลังบันทึก…"
+                    : "Saving…"
+                  : editingIdeaId
+                    ? language === "th"
+                      ? "ส่งแนวคิดที่แก้ไขแล้ว"
+                      : "Resubmit revised idea"
+                    : language === "th"
+                      ? "บันทึกและเสนอไอเดีย"
+                      : "Save and submit idea"}
+              </button>
+            </footer>
+          </form>
+        </div>
       )}
-      <section className={styles.filterBar}>
+      <div className={styles.ideaFilters}>
         <input
           value={query}
           onChange={(event) => {
@@ -6936,8 +7206,23 @@ function Ideas({
             onFilters(value, status);
           }}
           maxLength={100}
-          placeholder={language === "th" ? "ค้นหาแนวคิด" : "Search ideas"}
+          placeholder={language === "th" ? "ค้นหา" : "Search"}
+          aria-label={language === "th" ? "ค้นหา Content Ideas" : "Search Content Ideas"}
         />
+        <select
+          value={priorityFilter}
+          onChange={(event) => setPriorityFilter(event.target.value)}
+          aria-label={language === "th" ? "กรองระดับความสำคัญ" : "Filter by priority"}
+        >
+          <option value="">
+            {language === "th" ? "ทุกระดับความสำคัญ" : "All priorities"}
+          </option>
+          {priorityOptions.map((value) => (
+            <option key={value} value={value}>
+              {value}
+            </option>
+          ))}
+        </select>
         <select
           value={status}
           onChange={(event) => {
@@ -6945,8 +7230,11 @@ function Ideas({
             setStatus(value);
             onFilters(query, value);
           }}
+          aria-label={language === "th" ? "กรองสถานะไอเดีย" : "Filter by status"}
         >
-          <option value="all">All statuses</option>
+          <option value="all">
+            {language === "th" ? "ทุกสถานะไอเดีย" : "All statuses"}
+          </option>
           {[
             "proposed",
             "under_review",
@@ -6962,11 +7250,36 @@ function Ideas({
             </option>
           ))}
         </select>
-      </section>
-      <p>
+        <select
+          value={channelFilter}
+          onChange={(event) => setChannelFilter(event.target.value)}
+          aria-label={language === "th" ? "กรองช่องทาง" : "Filter by channel"}
+        >
+          <option value="">{language === "th" ? "ทุกช่องทาง" : "All channels"}</option>
+          {channelOptions.map((value) => (
+            <option key={value} value={value}>
+              {value}
+            </option>
+          ))}
+        </select>
+        <button
+          type="button"
+          className={styles.ideaClearFilters}
+          onClick={() => {
+            setQuery("");
+            setStatus("all");
+            setPriorityFilter("");
+            setChannelFilter("");
+            onFilters("", "all");
+          }}
+        >
+          {language === "th" ? "ล้างตัวกรอง" : "Clear filters"}
+        </button>
+      </div>
+      <p className={styles.ideaScopeNote}>
         {language === "th"
-          ? "ระบบค้นหาและกรองตามสิทธิ์ของคุณ กดโหลดเพิ่มเพื่อดูผลลัพธ์หน้าถัดไป"
-          : "Search and status filters are applied within your authorized scope; load more for the next page."}
+          ? "ผลลัพธ์และการส่งออกจำกัดตามสิทธิ์ของคุณ; ตัวกรองช่องทาง/ความสำคัญใช้กับรายการที่โหลดแล้ว"
+          : "Results and exports stay within your authorized scope; channel and priority filters apply to loaded rows."}
       </p>
       {listStatus === "loading" && (
         <p>{language === "th" ? "กำลังโหลดแนวคิด…" : "Loading ideas…"}</p>
@@ -6990,127 +7303,239 @@ function Ideas({
               : "No loaded ideas match these filters."}
         </p>
       )}
-      <section className={styles.ideaGrid}>
-        {visible.map((idea) => (
-          <article key={idea.id} id={`idea-${idea.id}`} className={styles.card}>
-            <p className={styles.eyebrow}>
-              {idea.id} · {ideaStatusLabel(idea.status)}
-            </p>
-            <h2>{idea.title}</h2>
-            <p>{idea.summary}</p>
-            {(idea.status === "rejected" ||
-              idea.status === "revision_required" ||
-              idea.status === "accepted" ||
-              idea.status === "converted" ||
-              idea.status === "archived") &&
-              idea.decisionReason && (
-                <p role="note">
-                  <strong>
-                    {language === "th" ? "เหตุผลประกอบการตัดสินใจ" : "Decision rationale"}
-                    :
-                  </strong>{" "}
-                  {idea.decisionReason}
-                </p>
-              )}
-            {[
-              idea.audience,
-              idea.pillar,
-              idea.channel,
-              idea.priority,
-              idea.campaign,
-            ].some(Boolean) && (
-              <p>
-                {[
-                  idea.audience &&
-                    `${language === "th" ? "กลุ่มเป้าหมาย" : "Audience"}: ${idea.audience}`,
-                  idea.pillar &&
-                    `${language === "th" ? "เสาหลักเนื้อหา" : "Pillar"}: ${idea.pillar}`,
-                  idea.channel &&
-                    `${language === "th" ? "ช่องทาง" : "Channel"}: ${idea.channel}`,
-                  idea.priority &&
-                    `${language === "th" ? "ลำดับความสำคัญ" : "Priority"}: ${idea.priority}`,
-                  idea.campaign &&
-                    `${language === "th" ? "แคมเปญ" : "Campaign"}: ${idea.campaign}`,
-                ]
-                  .filter(Boolean)
-                  .join(" · ")}
-              </p>
-            )}
-            {!!idea.evidenceUrls?.length && (
-              <ul>
-                {idea.evidenceUrls.map((url) => (
-                  <li key={url}>
-                    <a href={url} target="_blank" rel="noopener noreferrer">
-                      {url}
-                    </a>
-                  </li>
-                ))}
-              </ul>
-            )}
-            <footer>
-              <span>{getUser(idea.authorId)?.name ?? "Unknown"}</span>
-              {(canReview || canApprove) && (
-                <select
-                  value=""
-                  onChange={async (event) => {
-                    const nextStatus = event.target.value as IdeaStatus;
-                    if (!nextStatus) return;
-                    await onStatus(idea.id, nextStatus);
-                    await onRefresh();
-                  }}
-                >
-                  <option value="">{ideaStatusLabel(idea.status)}</option>
-                  {transitionsForRole(idea).map((value) => (
-                    <option key={value} value={value}>
-                      {ideaStatusLabel(value as IdeaStatus)}
-                    </option>
-                  ))}
-                </select>
-              )}
-              {idea.status === "accepted" && canReview && !idea.requestId && (
-                <button
-                  className={styles.primary}
-                  onClick={async () => {
-                    await onConvert(idea.id);
-                    await onRefresh();
-                  }}
-                >
-                  {language === "th" ? "แปลงเป็นคำขอ" : "Convert to request"}
-                </button>
-              )}
-              {idea.status === "revision_required" &&
-                idea.authorId === currentUser.id && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setEditingIdeaId(idea.id);
-                      setTitle(idea.title);
-                      setSummary(idea.summary);
-                      setAudience(idea.audience || "");
-                      setPillar(idea.pillar || "");
-                      setChannel(idea.channel || "");
-                      setPriority(idea.priority || "");
-                      setCampaign(idea.campaign || "");
-                      setEvidenceText(idea.evidenceUrls?.join("\n") || "");
-                      setIdeaDraftHydrated(true);
-                      setOpen(true);
-                    }}
-                  >
-                    {language === "th" ? "แก้ไขและส่งกลับให้ตรวจ" : "Revise and resubmit"}
-                  </button>
-                )}
-              {idea.requestId && (
-                <span>
-                  {language === "th" ? "คำขอ" : "Request"}: {idea.requestId}
-                </span>
-              )}
-            </footer>
-            {(canReview || idea.authorId === currentUser.id) && (
-              <IdeaComments ideaId={idea.id} language={language} />
-            )}
-          </article>
-        ))}
-      </section>
+      <div className={styles.ideaTableWrap}>
+        <table className={styles.ideaTable}>
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>{language === "th" ? "หัวข้อ Content" : "Content title"}</th>
+              <th>
+                {language === "th" ? "เนื้อหา / รายละเอียด Content" : "Content details"}
+              </th>
+              <th>{language === "th" ? "ช่องทาง" : "Channels"}</th>
+              <th>{language === "th" ? "ระดับความสำคัญ" : "Priority"}</th>
+              <th>{language === "th" ? "สถานะไอเดีย" : "Idea status"}</th>
+              <th>{language === "th" ? "ผู้บันทึก" : "Submitted by"}</th>
+              <th>{language === "th" ? "Link / Folder โครงการ" : "Project links"}</th>
+              <th>{language === "th" ? "จัดการ" : "Actions"}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {visible.map((idea) => {
+              const ideaChannels = parseIdeaChannels(idea.channel);
+              const expanded = expandedIdeaId === idea.id;
+              const transitions = transitionsForRole(idea);
+              return (
+                <Fragment key={idea.id}>
+                  <tr id={`idea-${idea.id}`}>
+                    <td className={styles.ideaId}>{idea.id}</td>
+                    <td className={styles.ideaTitleCell}>
+                      <strong>{idea.title}</strong>
+                    </td>
+                    <td className={styles.ideaSummaryCell}>
+                      <span className={styles.ideaSummaryText}>
+                        {idea.summary || "—"}
+                      </span>
+                    </td>
+                    <td>
+                      <div className={styles.ideaChannelChips}>
+                        {ideaChannels.length
+                          ? ideaChannels.map((item) => (
+                              <span className={styles.ideaChannelChip} key={item}>
+                                <span
+                                  className={styles.ideaChannelIcon}
+                                  data-channel={item.toLowerCase().replaceAll(" ", "-")}
+                                  aria-hidden="true"
+                                >
+                                  {ideaChannelMark(item)}
+                                </span>
+                                {item}
+                              </span>
+                            ))
+                          : "—"}
+                      </div>
+                    </td>
+                    <td>
+                      {idea.priority ? (
+                        <span className={styles.ideaPriorityTag}>{idea.priority}</span>
+                      ) : (
+                        "—"
+                      )}
+                    </td>
+                    <td>
+                      <span
+                        className={`${styles.ideaStatusTag} ${styles[`ideaStatus_${idea.status}`]}`}
+                      >
+                        {ideaStatusLabel(idea.status)}
+                      </span>
+                    </td>
+                    <td>{getUser(idea.authorId)?.name ?? "Unknown"}</td>
+                    <td>
+                      {idea.evidenceUrls?.length ? (
+                        <div className={styles.ideaLinks}>
+                          {idea.evidenceUrls.slice(0, 2).map((url, index) => (
+                            <a
+                              href={url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              key={url}
+                            >
+                              {language === "th"
+                                ? `เปิด ${index + 1}`
+                                : `Open ${index + 1}`}
+                            </a>
+                          ))}
+                          {idea.evidenceUrls.length > 2 && (
+                            <span>+{idea.evidenceUrls.length - 2}</span>
+                          )}
+                        </div>
+                      ) : (
+                        "—"
+                      )}
+                    </td>
+                    <td>
+                      <div className={styles.ideaManageActions}>
+                        <button
+                          type="button"
+                          className={styles.ideaTextAction}
+                          aria-expanded={expanded}
+                          onClick={() => setExpandedIdeaId(expanded ? null : idea.id)}
+                        >
+                          {expanded
+                            ? language === "th"
+                              ? "ซ่อนรายละเอียด"
+                              : "Hide details"
+                            : language === "th"
+                              ? "รายละเอียด"
+                              : "Details"}
+                        </button>
+                        {(canReview || canApprove) && transitions.length > 0 && (
+                          <select
+                            value=""
+                            aria-label={
+                              language === "th"
+                                ? `เปลี่ยนสถานะ ${idea.title}`
+                                : `Change status for ${idea.title}`
+                            }
+                            onChange={async (event) => {
+                              const nextStatus = event.target.value as IdeaStatus;
+                              if (!nextStatus) return;
+                              await onStatus(idea.id, nextStatus);
+                              await onRefresh();
+                            }}
+                          >
+                            <option value="">
+                              {language === "th" ? "เปลี่ยนสถานะ…" : "Change status…"}
+                            </option>
+                            {transitions.map((value) => (
+                              <option key={value} value={value}>
+                                {ideaStatusLabel(value)}
+                              </option>
+                            ))}
+                          </select>
+                        )}
+                        {idea.status === "accepted" && canReview && !idea.requestId && (
+                          <button
+                            type="button"
+                            className={styles.ideaTextAction}
+                            onClick={async () => {
+                              await onConvert(idea.id);
+                              await onRefresh();
+                            }}
+                          >
+                            {language === "th" ? "แปลงเป็นคำขอ" : "Convert to request"}
+                          </button>
+                        )}
+                        {idea.status === "revision_required" &&
+                          idea.authorId === currentUser.id && (
+                            <button
+                              type="button"
+                              className={styles.ideaTextAction}
+                              onClick={() => {
+                                setEditingIdeaId(idea.id);
+                                setIdeaDraftMessage("");
+                                setTitle(idea.title);
+                                setSummary(idea.summary);
+                                setAudience(idea.audience || "");
+                                setPillar(idea.pillar || "");
+                                setChannel(idea.channel || "");
+                                setPriority(idea.priority || "");
+                                setCampaign(idea.campaign || "");
+                                setEvidenceText(idea.evidenceUrls?.join("\n") || "");
+                                setIdeaDraftHydrated(true);
+                                setOpen(true);
+                              }}
+                            >
+                              {language === "th"
+                                ? "แก้ไขและส่งกลับให้ตรวจ"
+                                : "Revise and resubmit"}
+                            </button>
+                          )}
+                        {idea.requestId && <span>{idea.requestId}</span>}
+                      </div>
+                    </td>
+                  </tr>
+                  {expanded && (
+                    <tr className={styles.ideaDetailsRow}>
+                      <td colSpan={9}>
+                        <div className={styles.ideaExpandedDetails}>
+                          <div>
+                            <strong>
+                              {language === "th" ? "รายละเอียด" : "Details"}
+                            </strong>
+                            <p>{idea.summary || "—"}</p>
+                            {[
+                              idea.audience &&
+                                `${language === "th" ? "กลุ่มเป้าหมาย" : "Audience"}: ${idea.audience}`,
+                              idea.pillar &&
+                                `${language === "th" ? "เสาหลักเนื้อหา" : "Pillar"}: ${idea.pillar}`,
+                              idea.campaign &&
+                                `${language === "th" ? "แคมเปญ" : "Campaign"}: ${idea.campaign}`,
+                            ]
+                              .filter(Boolean)
+                              .map((detail) => (
+                                <p key={detail}>{detail}</p>
+                              ))}
+                            {idea.decisionReason && (
+                              <p role="note">
+                                <strong>
+                                  {language === "th"
+                                    ? "เหตุผลประกอบการตัดสินใจ"
+                                    : "Decision rationale"}
+                                  :
+                                </strong>{" "}
+                                {idea.decisionReason}
+                              </p>
+                            )}
+                            {!!idea.evidenceUrls?.length && (
+                              <ul>
+                                {idea.evidenceUrls.map((url) => (
+                                  <li key={url}>
+                                    <a
+                                      href={url}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                    >
+                                      {url}
+                                    </a>
+                                  </li>
+                                ))}
+                              </ul>
+                            )}
+                          </div>
+                          {(canReview || idea.authorId === currentUser.id) && (
+                            <IdeaComments ideaId={idea.id} language={language} />
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  )}
+                </Fragment>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
       {listStatus === "loaded" && (
         <div className={styles.filterBar}>
           <span>
