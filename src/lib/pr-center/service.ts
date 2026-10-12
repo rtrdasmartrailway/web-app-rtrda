@@ -33,6 +33,7 @@ import {
   getFirstApprovalStage,
   getNextApprovalStage,
   hasApprovalAuthority,
+  isApprovalStageRequired,
   parseApprovalPolicy,
 } from "./approval-policy";
 import { isClamAvAvailable, scanWithClamAv } from "./clamav-scanner";
@@ -98,6 +99,19 @@ function actorRoles(actor: PrCenterActor): PrCenterRole[] {
 
 function actorHasRole(actor: PrCenterActor, role: PrCenterRole): boolean {
   return actorRoleGrants(actor).some((grant) => grant.role === role);
+}
+
+function actorHasRoleInDepartment(
+  actor: PrCenterActor,
+  role: PrCenterRole,
+  departmentId: string | null,
+): boolean {
+  return actorRoleGrants(actor).some(
+    (grant) =>
+      grant.role === role &&
+      (grant.departmentId === null ||
+        (departmentId !== null && grant.departmentId === departmentId)),
+  );
 }
 
 function canAccessIdeaReview(actor: PrCenterActor): boolean {
@@ -2052,16 +2066,34 @@ export async function updateTaskAssignment(
   actor: PrCenterActor,
   taskId: string,
   fromVersion: number,
-  input: { ownerId: string | null; dueAt: Date | null; planningKeyMessage?: string },
+  input: {
+    ownerId: string | null;
+    dueAt: Date | null;
+    planningKeyMessage?: string;
+    technicalReviewRequired?: boolean;
+    managementApprovalRequired?: boolean;
+  },
   correlationId: string = randomUUID(),
 ) {
   if (!canManageTasks(actorRoles(actor)))
     throw new PrCenterError("You cannot assign a task", 403, "FORBIDDEN");
+  const configuresApprovalRequirements =
+    input.technicalReviewRequired !== undefined ||
+    input.managementApprovalRequired !== undefined;
   const task = await prisma.prTask.findFirst({
     where: taskScopeWhere(actor, taskId),
-    include: { request: { select: { status: true } } },
+    include: { request: { select: { status: true, departmentId: true } } },
   });
   if (!task) throw new PrCenterError("Task not found", 404, "NOT_FOUND");
+  if (
+    configuresApprovalRequirements &&
+    !actorHasRoleInDepartment(actor, "RTRDA_PR", task.request.departmentId)
+  )
+    throw new PrCenterError(
+      "Only an in-scope PR grant may set task approval requirements",
+      403,
+      "APPROVAL_REQUIREMENT_AUTHORITY",
+    );
   if (
     task.request.status === "REJECTED" ||
     task.request.status === "CANCELLED" ||
@@ -2097,9 +2129,12 @@ export async function updateTaskAssignment(
     if (!owner)
       throw new PrCenterError("Task owner is not available", 422, "INVALID_OWNER");
   }
-  if (input.planningKeyMessage !== undefined && task.status !== "COMMUNICATION_PLANNING")
+  if (
+    (input.planningKeyMessage !== undefined || configuresApprovalRequirements) &&
+    task.status !== "COMMUNICATION_PLANNING"
+  )
     throw new PrCenterError(
-      "Planning key message can only be updated during communication planning",
+      "Planning key message and approval requirements can only be changed during communication planning",
       409,
       "INVALID_PLANNING_STATE",
     );
@@ -2120,6 +2155,12 @@ export async function updateTaskAssignment(
         dueAt: input.dueAt,
         ...(input.planningKeyMessage !== undefined
           ? { planningKeyMessage: input.planningKeyMessage.trim() || null }
+          : {}),
+        ...(input.technicalReviewRequired !== undefined
+          ? { technicalReviewRequired: input.technicalReviewRequired }
+          : {}),
+        ...(input.managementApprovalRequired !== undefined
+          ? { managementApprovalRequired: input.managementApprovalRequired }
           : {}),
         version: { increment: 1 },
       },
@@ -2158,7 +2199,9 @@ export async function updateTaskAssignment(
     }
     await auditAndOutbox(tx, {
       actor,
-      action: "task.assigned",
+      action: configuresApprovalRequirements
+        ? "task.approval_requirements_updated"
+        : "task.assigned",
       entityType: "task",
       entityId: task.id,
       after: {
@@ -2167,9 +2210,17 @@ export async function updateTaskAssignment(
         ...(input.planningKeyMessage !== undefined
           ? { planningKeyMessage: input.planningKeyMessage.trim() || null }
           : {}),
+        ...(input.technicalReviewRequired !== undefined
+          ? { technicalReviewRequired: input.technicalReviewRequired }
+          : {}),
+        ...(input.managementApprovalRequired !== undefined
+          ? { managementApprovalRequired: input.managementApprovalRequired }
+          : {}),
         version: fromVersion + 1,
       },
-      eventType: "pr.task.assigned",
+      eventType: configuresApprovalRequirements
+        ? "pr.task.approval_requirements_updated"
+        : "pr.task.assigned",
       correlationId,
     });
     return tx.prTask.findUniqueOrThrow({
@@ -2454,7 +2505,7 @@ export async function transitionTask(
     to === "APPROVED"
   ) {
     const policy = loadApprovalPolicy();
-    const firstStage = getFirstApprovalStage(policy);
+    const firstStage = getFirstApprovalStage(policy, task);
     const isAuthorizedEntry =
       (task.status === "IN_PRODUCTION" || task.status === "REVISION_REQUIRED") &&
       to === firstStage.status;
@@ -2477,6 +2528,21 @@ export async function transitionTask(
         "APPROVAL_STAGE_BYPASS_BLOCKED",
       );
     }
+  }
+  if (to === "CLOSED") {
+    const schedules = await prisma.prSchedule.findMany({
+      where: { taskId: task.id },
+      select: { publishedAt: true },
+    });
+    if (
+      schedules.length === 0 ||
+      schedules.some((schedule) => schedule.publishedAt === null)
+    )
+      throw new PrCenterError(
+        "All scheduled channels must be published with evidence before closing the task",
+        409,
+        "PUBLICATION_EVIDENCE_INCOMPLETE",
+      );
   }
 
   return prisma.$transaction(async (tx) => {
@@ -2672,7 +2738,8 @@ export async function createTaskRevision(
 export async function listApprovalQueue(actor: PrCenterActor) {
   if (!canApprove(actorRoles(actor)))
     throw new PrCenterError("You cannot view the approval queue", 403, "FORBIDDEN");
-  return prisma.prTask.findMany({
+  const policy = loadApprovalPolicy();
+  const tasks = await prisma.prTask.findMany({
     where: {
       request: requestScopeWhere(actor),
       status: {
@@ -2688,6 +2755,7 @@ export async function listApprovalQueue(actor: PrCenterActor) {
       request: {
         select: {
           title: true,
+          departmentId: true,
           requesterId: true,
           status: true,
           sources: { select: { url: true } },
@@ -2706,6 +2774,19 @@ export async function listApprovalQueue(actor: PrCenterActor) {
       },
     },
     orderBy: { updatedAt: "asc" },
+  });
+  return tasks.filter((task) => {
+    const stage = getApprovalStage(policy, task.status, task);
+    return (
+      task.request.requesterId !== actor.id &&
+      task.ownerId !== actor.id &&
+      stage !== null &&
+      hasApprovalAuthority({
+        stage,
+        roleGrants: actorRoleGrants(actor),
+        taskDepartmentId: task.request.departmentId,
+      })
+    );
   });
 }
 
@@ -2954,11 +3035,51 @@ export async function recordRequestDecision(
   });
 }
 
+type EditorialReviewChecklist = {
+  message: boolean;
+  language: boolean;
+  format: boolean;
+  appropriateness: boolean;
+};
+
+const EDITORIAL_REVIEW_CHECKLIST_FIELDS = [
+  "message",
+  "language",
+  "format",
+  "appropriateness",
+] as const;
+
+function parseEditorialReviewChecklist(value: unknown): EditorialReviewChecklist | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const record = value as Record<string, unknown>;
+  if (
+    Object.keys(record).length !== EDITORIAL_REVIEW_CHECKLIST_FIELDS.length ||
+    EDITORIAL_REVIEW_CHECKLIST_FIELDS.some((field) => typeof record[field] !== "boolean")
+  )
+    return null;
+  return {
+    message: record.message as boolean,
+    language: record.language as boolean,
+    format: record.format as boolean,
+    appropriateness: record.appropriateness as boolean,
+  };
+}
+
+function isCompleteEditorialReviewChecklist(
+  checklist: EditorialReviewChecklist,
+): boolean {
+  return EDITORIAL_REVIEW_CHECKLIST_FIELDS.every((field) => checklist[field]);
+}
+
 export async function recordApprovalDecision(
   actor: PrCenterActor,
   taskId: string,
   fromVersion: number,
-  input: { decision: "APPROVED" | "REVISION_REQUIRED" | "REJECTED"; comment?: string },
+  input: {
+    decision: "APPROVED" | "REVISION_REQUIRED" | "REJECTED";
+    comment?: string;
+    reviewChecklist?: unknown;
+  },
   correlationId: string = randomUUID(),
 ) {
   assertApprovalAuthority(actor);
@@ -2996,7 +3117,7 @@ export async function recordApprovalDecision(
       "REVISION_REQUIRED",
     );
   const policy = loadApprovalPolicy();
-  const stage = getApprovalStage(policy, task.status);
+  const stage = getApprovalStage(policy, task.status, task);
   if (!stage)
     throw new PrCenterError(
       "This stage is not required by the approved approval policy",
@@ -3015,12 +3136,58 @@ export async function recordApprovalDecision(
       403,
       "APPROVAL_AUTHORITY_MISMATCH",
     );
+  const editorialChecklist =
+    input.reviewChecklist === undefined
+      ? undefined
+      : parseEditorialReviewChecklist(input.reviewChecklist);
+  if (
+    input.reviewChecklist !== undefined &&
+    (!editorialChecklist || stage.status !== "PR_EDITORIAL_REVIEW")
+  )
+    throw new PrCenterError(
+      "Editorial review checklist is invalid for this stage",
+      422,
+      "INVALID_EDITORIAL_REVIEW_CHECKLIST",
+    );
+  if (stage.status === "PR_EDITORIAL_REVIEW" && !editorialChecklist)
+    throw new PrCenterError(
+      "Complete the editorial review checklist before deciding",
+      422,
+      "EDITORIAL_REVIEW_CHECKLIST_REQUIRED",
+    );
+  if (
+    stage.status === "PR_EDITORIAL_REVIEW" &&
+    input.decision === "APPROVED" &&
+    !isCompleteEditorialReviewChecklist(editorialChecklist!)
+  )
+    throw new PrCenterError(
+      "All editorial criteria must pass before approval",
+      422,
+      "EDITORIAL_REVIEW_CHECKLIST_INCOMPLETE",
+    );
   if (input.decision !== "APPROVED" && !input.comment?.trim())
     throw new PrCenterError(
       "A reason is required for revision or rejection decisions",
       422,
       "REASON_REQUIRED",
     );
+  if (stage.status === "SOURCE_FACT_CHECK" && input.decision === "APPROVED") {
+    const factCheck = await prisma.prTaskFactCheck.findFirst({
+      where: { taskId: task.id, taskRevision: revision.revisionNumber },
+      include: { items: { select: { result: true } } },
+      orderBy: { checkedAt: "desc" },
+    });
+    if (
+      !factCheck ||
+      factCheck.items.length === 0 ||
+      factCheck.items.some((item) => item.result !== "VERIFIED")
+    )
+      throw new PrCenterError(
+        "Every source claim must have current VERIFIED fact-check evidence before approval",
+        422,
+        "FACT_CHECK_INCOMPLETE",
+      );
+  }
   const priorStageDecision = await prisma.prApproval.findFirst({
     where: {
       taskId: task.id,
@@ -3037,7 +3204,7 @@ export async function recordApprovalDecision(
     );
   const next =
     input.decision === "APPROVED"
-      ? (getNextApprovalStage(policy, stage.status)?.status ?? "APPROVED")
+      ? (getNextApprovalStage(policy, stage.status, task)?.status ?? "APPROVED")
       : input.decision;
   return prisma.$transaction(async (tx) => {
     const updated = await tx.prTask.updateMany({
@@ -3058,6 +3225,8 @@ export async function recordApprovalDecision(
         decision: input.decision as PrApprovalDecision,
         comment: input.comment?.trim() || null,
         decidedById: actor.id,
+        approvalPolicyVersion: policy.version,
+        ...(editorialChecklist ? { reviewChecklist: editorialChecklist } : {}),
       },
     });
     await tx.prStatusHistory.create({
@@ -3081,6 +3250,7 @@ export async function recordApprovalDecision(
         approvalPolicyVersion: policy.version,
         approvalReference: policy.approvalReference,
         stage: stage.status,
+        ...(editorialChecklist ? { reviewChecklist: editorialChecklist } : {}),
         authorityRoles: actorRoleGrants(actor).map((grant) => ({
           role: grant.role,
           departmentId: grant.departmentId,
@@ -3332,6 +3502,12 @@ export async function scheduleTask(
       409,
       "STALE_UPDATE",
     );
+  if (input.scheduledFor.getTime() <= Date.now())
+    throw new PrCenterError(
+      "A publication schedule must be in the future",
+      422,
+      "INVALID_SCHEDULE",
+    );
   const duplicateChannelSchedule = await prisma.prSchedule.findFirst({
     where: { taskId, channel, taskRevision: currentRevision },
   });
@@ -3347,12 +3523,36 @@ export async function scheduleTask(
       422,
       "INVALID_TRANSITION",
     );
+  const policy = loadApprovalPolicy();
+  const requiredStages = policy.stages.filter((stage) =>
+    isApprovalStageRequired(stage, task),
+  );
+  const approvals = await prisma.prApproval.findMany({
+    where: {
+      taskId: task.id,
+      taskRevision: currentRevision,
+      approvalPolicyVersion: policy.version,
+      decision: "APPROVED",
+      stage: { in: requiredStages.map((stage) => stage.status) },
+    },
+    select: { stage: true },
+  });
+  const approvedStages = new Set(approvals.map((approval) => approval.stage));
+  const missingApprovals = requiredStages
+    .filter((stage) => !approvedStages.has(stage.status))
+    .map((stage) => stage.status);
+  if (missingApprovals.length)
+    throw new PrCenterError(
+      `Publication gate is incomplete: approvals (${missingApprovals.join(", ")})`,
+      422,
+      "PUBLICATION_APPROVALS_INCOMPLETE",
+    );
   const firstSchedule = task.status === "APPROVED";
   const revision = task.revisions[0];
   const cleanFinalAsset = revision?.finalAssetId
     ? Boolean(
         await prisma.prFileObject.findFirst({
-          where: { id: revision.finalAssetId, scanStatus: "CLEAN" },
+          where: { id: revision.finalAssetId, scanStatus: "CLEAN", deletedAt: null },
           select: { id: true },
         }),
       )
@@ -3471,67 +3671,96 @@ export async function recordPublishingEvidence(
       422,
       "INVALID_TRANSITION",
     );
+  const existingReference = await prisma.prSchedule.findUnique({
+    where: {
+      channel_publishedReference: {
+        channel: schedule.channel,
+        publishedReference,
+      },
+    },
+    select: { id: true },
+  });
+  if (existingReference && existingReference.id !== schedule.id)
+    throw new PrCenterError(
+      "This publication reference is already recorded for the channel",
+      409,
+      "DUPLICATE_PUBLICATION_REFERENCE",
+    );
   const firstPublication = task.status === "SCHEDULED";
-  return prisma.$transaction(async (tx) => {
-    if (firstPublication) {
-      const updated = await tx.prTask.updateMany({
-        where: { id: task.id, version: fromVersion, status: "SCHEDULED" },
-        data: { status: "PUBLISHED", version: { increment: 1 } },
+  try {
+    return await prisma.$transaction(async (tx) => {
+      if (firstPublication) {
+        const updated = await tx.prTask.updateMany({
+          where: { id: task.id, version: fromVersion, status: "SCHEDULED" },
+          data: { status: "PUBLISHED", version: { increment: 1 } },
+        });
+        if (updated.count !== 1)
+          throw new PrCenterError(
+            "This task has changed. Refresh and try again.",
+            409,
+            "STALE_UPDATE",
+          );
+      }
+      const publishedAt = new Date();
+      const evidence = await tx.prSchedule.updateMany({
+        where: { id: schedule.id, publishedAt: null },
+        data: { publishedUrl, publishedReference, publishedAt },
       });
-      if (updated.count !== 1)
+      if (evidence.count !== 1)
         throw new PrCenterError(
-          "This task has changed. Refresh and try again.",
+          "Publication evidence was already recorded",
           409,
           "STALE_UPDATE",
         );
-    }
-    const publishedAt = new Date();
-    const evidence = await tx.prSchedule.updateMany({
-      where: { id: schedule.id, publishedAt: null },
-      data: { publishedUrl, publishedReference, publishedAt },
-    });
-    if (evidence.count !== 1)
-      throw new PrCenterError(
-        "Publication evidence was already recorded",
-        409,
-        "STALE_UPDATE",
-      );
-    if (firstPublication)
-      await tx.prStatusHistory.create({
-        data: {
-          taskId: task.id,
-          fromState: "SCHEDULED",
-          toState: "PUBLISHED",
-          actorId: actor.id,
+      if (firstPublication)
+        await tx.prStatusHistory.create({
+          data: {
+            taskId: task.id,
+            fromState: "SCHEDULED",
+            toState: "PUBLISHED",
+            actorId: actor.id,
+          },
+        });
+      await auditAndOutbox(tx, {
+        actor,
+        action: firstPublication
+          ? "task.published"
+          : "task.publication_evidence_recorded",
+        entityType: "task",
+        entityId: task.id,
+        after: {
+          scheduleId: schedule.id,
+          channel: schedule.channel,
+          taskRevision: schedule.taskRevision,
+          publishedUrl,
+          publishedReference,
+          publishedAt: publishedAt.toISOString(),
+          version: firstPublication ? fromVersion + 1 : fromVersion,
         },
+        eventType: firstPublication
+          ? "pr.task.published"
+          : "pr.task.publication_evidence_recorded",
+        correlationId,
       });
-    await auditAndOutbox(tx, {
-      actor,
-      action: firstPublication ? "task.published" : "task.publication_evidence_recorded",
-      entityType: "task",
-      entityId: task.id,
-      after: {
-        scheduleId: schedule.id,
-        channel: schedule.channel,
-        taskRevision: schedule.taskRevision,
+      return {
+        id: schedule.id,
         publishedUrl,
         publishedReference,
-        publishedAt: publishedAt.toISOString(),
-        version: firstPublication ? fromVersion + 1 : fromVersion,
-      },
-      eventType: firstPublication
-        ? "pr.task.published"
-        : "pr.task.publication_evidence_recorded",
-      correlationId,
+        publishedAt,
+        taskVersion: firstPublication ? fromVersion + 1 : fromVersion,
+      };
     });
-    return {
-      id: schedule.id,
-      publishedUrl,
-      publishedReference,
-      publishedAt,
-      taskVersion: firstPublication ? fromVersion + 1 : fromVersion,
-    };
-  });
+  } catch (error) {
+    const errorCode =
+      error && typeof error === "object" && "code" in error ? error.code : undefined;
+    if (errorCode === "P2002")
+      throw new PrCenterError(
+        "This publication reference is already recorded for the channel",
+        409,
+        "DUPLICATE_PUBLICATION_REFERENCE",
+      );
+    throw error;
+  }
 }
 
 // ── File scanning (mock) ────────────────────────────────────────────────

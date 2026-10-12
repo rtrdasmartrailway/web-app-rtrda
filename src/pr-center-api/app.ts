@@ -586,6 +586,7 @@ export function buildPrCenterApi(
       {
         decision: input.decision as "APPROVED" | "REVISION_REQUIRED" | "REJECTED",
         comment: typeof input.comment === "string" ? input.comment : undefined,
+        reviewChecklist: input.reviewChecklist,
       },
       correlationId(request),
     );
@@ -629,6 +630,17 @@ export function buildPrCenterApi(
       typeof input.dueAt === "string" && input.dueAt ? new Date(input.dueAt) : null;
     if (dueAt && Number.isNaN(dueAt.getTime()))
       throw new PrCenterError("Due date is invalid", 422, "INVALID_DUE_DATE");
+    if (
+      ("technicalReviewRequired" in input &&
+        typeof input.technicalReviewRequired !== "boolean") ||
+      ("managementApprovalRequired" in input &&
+        typeof input.managementApprovalRequired !== "boolean")
+    )
+      throw new PrCenterError(
+        "Approval requirement fields must be boolean",
+        422,
+        "INVALID_APPROVAL_REQUIREMENTS",
+      );
     return updateTaskAssignment(
       request.prCenterActor!,
       taskId((request.params as { taskId: string }).taskId),
@@ -638,6 +650,12 @@ export function buildPrCenterApi(
         dueAt,
         ...(typeof input.planningKeyMessage === "string"
           ? { planningKeyMessage: input.planningKeyMessage }
+          : {}),
+        ...(typeof input.technicalReviewRequired === "boolean"
+          ? { technicalReviewRequired: input.technicalReviewRequired }
+          : {}),
+        ...(typeof input.managementApprovalRequired === "boolean"
+          ? { managementApprovalRequired: input.managementApprovalRequired }
           : {}),
       },
       correlationId(request),

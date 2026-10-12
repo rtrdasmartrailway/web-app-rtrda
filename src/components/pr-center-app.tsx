@@ -175,6 +175,42 @@ type RequestDraft = {
   confirmed: boolean;
   samples: File[];
 };
+type EditorialReviewChecklist = {
+  message: boolean;
+  language: boolean;
+  format: boolean;
+  appropriateness: boolean;
+};
+
+const EMPTY_EDITORIAL_REVIEW_CHECKLIST: EditorialReviewChecklist = {
+  message: false,
+  language: false,
+  format: false,
+  appropriateness: false,
+};
+
+const EDITORIAL_REVIEW_ITEMS: Array<{
+  key: keyof EditorialReviewChecklist;
+  label: { th: string; en: string };
+}> = [
+  {
+    key: "message",
+    label: {
+      th: "สารและเนื้อหาถูกต้องครบถ้วน",
+      en: "Message and content are accurate and complete",
+    },
+  },
+  { key: "language", label: { th: "ภาษาเหมาะสม", en: "Language is appropriate" } },
+  { key: "format", label: { th: "รูปแบบถูกต้อง", en: "Format is correct" } },
+  {
+    key: "appropriateness",
+    label: {
+      th: "เหมาะสมกับผู้รับสารและบริบท",
+      en: "Suitable for the audience and context",
+    },
+  },
+];
+
 type Task = {
   id: string;
   requestId: string;
@@ -189,6 +225,8 @@ type Task = {
   revisionNumber?: number;
   keyMessage?: string;
   planningKeyMessage?: string;
+  technicalReviewRequired?: boolean;
+  managementApprovalRequired?: boolean;
   factChecks?: Array<{
     id: string;
     taskRevision: number;
@@ -376,6 +414,8 @@ type ApiRequestRecord = {
     owner: { displayName: string } | null;
     dueAt: string | null;
     planningKeyMessage: string | null;
+    technicalReviewRequired: boolean;
+    managementApprovalRequired: boolean;
     factChecks: Task["factChecks"];
     version: number;
     revisions: Array<{
@@ -472,6 +512,8 @@ type TaskApprovalRecord = {
   owner?: { displayName: string } | null;
   dueAt: string | null;
   planningKeyMessage: string | null;
+  technicalReviewRequired: boolean;
+  managementApprovalRequired: boolean;
   version: number;
   revisions?: Array<{
     revisionNumber: number;
@@ -494,6 +536,8 @@ function mapTaskApprovalRecord(task: TaskApprovalRecord): Task {
     dueDate: task.dueAt?.slice(0, 10) || "",
     version: task.version,
     planningKeyMessage: task.planningKeyMessage || undefined,
+    technicalReviewRequired: task.technicalReviewRequired,
+    managementApprovalRequired: task.managementApprovalRequired,
     revisionNumber: task.revisions?.[0]?.revisionNumber,
     contentBody: task.revisions?.[0]?.body || undefined,
     keyMessage: task.revisions?.[0]?.keyMessage || undefined,
@@ -581,6 +625,8 @@ function mapRequestTasks(records: ApiRequestRecord[]): Task[] {
       ownerName: task.owner?.displayName,
       dueDate: task.dueAt?.slice(0, 10) || "",
       planningKeyMessage: task.planningKeyMessage || undefined,
+      technicalReviewRequired: task.technicalReviewRequired,
+      managementApprovalRequired: task.managementApprovalRequired,
       factChecks: task.factChecks,
       version: task.version,
       revisionNumber: task.revisions[0]?.revisionNumber,
@@ -2438,6 +2484,7 @@ export function PrCenterApp({
   const recordApproval = async (
     taskId: string,
     decision: "APPROVED" | "REVISION_REQUIRED" | "REJECTED",
+    reviewChecklist?: EditorialReviewChecklist,
   ) => {
     const task = approvalTasks.find((item) => item.id === taskId);
     if (!task?.version) return;
@@ -2457,7 +2504,11 @@ export function PrCenterApp({
         method: "POST",
         credentials: "same-origin",
         headers: { "Content-Type": "application/json", "If-Match": String(task.version) },
-        body: JSON.stringify({ decision, ...(comment ? { comment } : {}) }),
+        body: JSON.stringify({
+          decision,
+          ...(comment ? { comment } : {}),
+          ...(reviewChecklist ? { reviewChecklist } : {}),
+        }),
       });
       if (!response.ok) {
         const result = (await response.json().catch(() => null)) as {
@@ -2630,6 +2681,8 @@ export function PrCenterApp({
     ownerId: string,
     dueDate: string,
     planningKeyMessage?: string,
+    technicalReviewRequired?: boolean,
+    managementApprovalRequired?: boolean,
   ) => {
     const task = state.tasks.find((item) => item.id === taskId);
     if (!task) return;
@@ -2645,6 +2698,10 @@ export function PrCenterApp({
           ownerId: ownerId || null,
           dueAt: dueDate || null,
           planningKeyMessage,
+          ...(technicalReviewRequired !== undefined ? { technicalReviewRequired } : {}),
+          ...(managementApprovalRequired !== undefined
+            ? { managementApprovalRequired }
+            : {}),
         }),
       });
       if (!response.ok) {
@@ -2658,6 +2715,8 @@ export function PrCenterApp({
         owner: { displayName: string } | null;
         dueAt: string | null;
         planningKeyMessage: string | null;
+        technicalReviewRequired: boolean;
+        managementApprovalRequired: boolean;
         version: number;
       };
       setState((previous) => ({
@@ -2670,6 +2729,8 @@ export function PrCenterApp({
                 ownerName: updated.owner?.displayName,
                 dueDate: updated.dueAt?.slice(0, 10) || "",
                 planningKeyMessage: updated.planningKeyMessage || undefined,
+                technicalReviewRequired: updated.technicalReviewRequired,
+                managementApprovalRequired: updated.managementApprovalRequired,
                 version: updated.version,
               }
             : item,
@@ -3215,6 +3276,7 @@ export function PrCenterApp({
               canManageTasks={hasUiRole("pr", "admin")}
               currentUserId={currentUser.id}
               canFactCheckPR={actorRoleCodes.includes("RTRDA_PR")}
+              canConfigureApprovalRequirements={actorRoleCodes.includes("RTRDA_PR")}
               onFinalAssetAssigned={(taskId, fileId) =>
                 setState((previous) => ({
                   ...previous,
@@ -4528,6 +4590,7 @@ function Operations({
   canManageTasks,
   currentUserId,
   canFactCheckPR,
+  canConfigureApprovalRequirements,
   onFinalAssetAssigned,
   canViewPublishing,
 }: {
@@ -4540,6 +4603,8 @@ function Operations({
     ownerId: string,
     dueDate: string,
     planningKeyMessage?: string,
+    technicalReviewRequired?: boolean,
+    managementApprovalRequired?: boolean,
   ) => Promise<void>;
   onSchedule: (taskId: string, channel: string, scheduledFor: string) => Promise<boolean>;
   onPublish: (
@@ -4555,6 +4620,7 @@ function Operations({
     changeSummary: string,
   ) => Promise<boolean>;
   canManageTasks: boolean;
+  canConfigureApprovalRequirements: boolean;
   currentUserId: string;
   canFactCheckPR: boolean;
   onFinalAssetAssigned: (taskId: string, fileId: string) => void;
@@ -4566,6 +4632,8 @@ function Operations({
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [dueDate, setDueDate] = useState("");
   const [planningKeyMessage, setPlanningKeyMessage] = useState("");
+  const [technicalReviewRequired, setTechnicalReviewRequired] = useState(false);
+  const [managementApprovalRequired, setManagementApprovalRequired] = useState(false);
   const [channel, setChannel] = useState("");
   const [evidenceChannel, setEvidenceChannel] = useState("");
   const [scheduledFor, setScheduledFor] = useState("");
@@ -4768,6 +4836,10 @@ function Operations({
                         setDueDate(task.dueDate);
                         setAssigneeId(task.ownerId);
                         setPlanningKeyMessage(task.planningKeyMessage || "");
+                        setTechnicalReviewRequired(task.technicalReviewRequired === true);
+                        setManagementApprovalRequired(
+                          task.managementApprovalRequired === true,
+                        );
                         setRevisionBody(task.contentBody || "");
                         setRevisionKeyMessage(task.keyMessage || "");
                         setRevisionSummary("");
@@ -4920,6 +4992,40 @@ function Operations({
                   {selected.planningKeyMessage}
                 </p>
               )}
+              {selected.status === "communication_planning" &&
+                canConfigureApprovalRequirements && (
+                  <fieldset className={styles.card}>
+                    <legend>
+                      {language === "th"
+                        ? "ขั้นตอนตรวจอนุมัติของงานนี้"
+                        : "Review requirements for this task"}
+                    </legend>
+                    <label>
+                      <input
+                        type="checkbox"
+                        checked={technicalReviewRequired}
+                        onChange={(event) =>
+                          setTechnicalReviewRequired(event.target.checked)
+                        }
+                      />
+                      {language === "th"
+                        ? "ต้องตรวจงานเทคนิค (ผู้อนุมัติ/PR)"
+                        : "Require technical review (Approver/PR)"}
+                    </label>
+                    <label>
+                      <input
+                        type="checkbox"
+                        checked={managementApprovalRequired}
+                        onChange={(event) =>
+                          setManagementApprovalRequired(event.target.checked)
+                        }
+                      />
+                      {language === "th"
+                        ? "ต้องขออนุมัติจากผู้บริหาร"
+                        : "Require management approval"}
+                    </label>
+                  </fieldset>
+                )}
               {selected.status === "communication_planning" && (
                 <label>
                   {language === "th" ? "Key Message (แผนงาน)" : "Planning key message"}
@@ -4952,6 +5058,14 @@ function Operations({
                     dueDate,
                     selected.status === "communication_planning"
                       ? planningKeyMessage
+                      : undefined,
+                    selected.status === "communication_planning" &&
+                      canConfigureApprovalRequirements
+                      ? technicalReviewRequired
+                      : undefined,
+                    selected.status === "communication_planning" &&
+                      canConfigureApprovalRequirements
+                      ? managementApprovalRequired
                       : undefined,
                   )
                 }
@@ -6120,6 +6234,7 @@ function Approvals({
   onDecision: (
     taskId: string,
     decision: "APPROVED" | "REVISION_REQUIRED" | "REJECTED",
+    reviewChecklist?: EditorialReviewChecklist,
   ) => void;
   onRequestDecision: (
     requestId: string,
@@ -6132,6 +6247,14 @@ function Approvals({
     Record<string, string>
   >({});
   const [decidingRequestId, setDecidingRequestId] = useState<string | null>(null);
+  const [editorialChecklists, setEditorialChecklists] = useState<
+    Record<string, EditorialReviewChecklist>
+  >({});
+
+  const getEditorialChecklist = (taskId: string) =>
+    editorialChecklists[taskId] ?? EMPTY_EDITORIAL_REVIEW_CHECKLIST;
+  const isEditorialChecklistComplete = (checklist: EditorialReviewChecklist) =>
+    EDITORIAL_REVIEW_ITEMS.every((item) => checklist[item.key]);
 
   const submitRequestDecision = async (
     request: RequestApprovalItem,
@@ -6333,7 +6456,7 @@ function Approvals({
           </p>
         )}
       </section>
-      <h2>Task Stage Approvals</h2>
+      <h2>{language === "th" ? "คิวตรวจและอนุมัติงาน" : "Task Stage Approvals"}</h2>
       <section className={styles.list}>
         {taskItems.map((task) => (
           <article key={task.id} id={`task-${task.id}`} className={styles.listItem}>
@@ -6371,17 +6494,81 @@ function Approvals({
               <ApprovalAttachments taskId={task.id} finalAssetId={task.finalAssetId} />
             </div>
             <div>
-              <Status>Awaiting approval</Status>
+              <Status>
+                {language === "th" ? "รอการตรวจและอนุมัติ" : "Awaiting approval"}
+              </Status>
+              {canDecideTasks && task.status === "pr_editorial_review" && (
+                <fieldset>
+                  <legend>
+                    {language === "th"
+                      ? "ตรวจบรรณาธิการ PR — ยืนยันทุกข้อก่อนอนุมัติ"
+                      : "PR editorial review — confirm each criterion before approval"}
+                  </legend>
+                  {EDITORIAL_REVIEW_ITEMS.map((item) => (
+                    <label key={item.key}>
+                      <input
+                        type="checkbox"
+                        checked={getEditorialChecklist(task.id)[item.key]}
+                        onChange={(event) =>
+                          setEditorialChecklists((previous) => ({
+                            ...previous,
+                            [task.id]: {
+                              ...(previous[task.id] ?? EMPTY_EDITORIAL_REVIEW_CHECKLIST),
+                              [item.key]: event.target.checked,
+                            },
+                          }))
+                        }
+                      />
+                      {item.label[language]}
+                    </label>
+                  ))}
+                </fieldset>
+              )}
               {canDecideTasks ? (
                 <>
-                  <button onClick={() => onDecision(task.id, "REVISION_REQUIRED")}>
-                    Request revision
+                  <button
+                    onClick={() =>
+                      onDecision(
+                        task.id,
+                        "REVISION_REQUIRED",
+                        task.status === "pr_editorial_review"
+                          ? getEditorialChecklist(task.id)
+                          : undefined,
+                      )
+                    }
+                  >
+                    {language === "th" ? "ขอให้แก้ไข" : "Request revision"}
+                  </button>
+                  <button
+                    onClick={() =>
+                      onDecision(
+                        task.id,
+                        "REJECTED",
+                        task.status === "pr_editorial_review"
+                          ? getEditorialChecklist(task.id)
+                          : undefined,
+                      )
+                    }
+                  >
+                    {language === "th" ? "ปฏิเสธงาน" : "Reject"}
                   </button>
                   <button
                     className={styles.primary}
-                    onClick={() => onDecision(task.id, "APPROVED")}
+                    disabled={
+                      task.status === "pr_editorial_review" &&
+                      !isEditorialChecklistComplete(getEditorialChecklist(task.id))
+                    }
+                    onClick={() =>
+                      onDecision(
+                        task.id,
+                        "APPROVED",
+                        task.status === "pr_editorial_review"
+                          ? getEditorialChecklist(task.id)
+                          : undefined,
+                      )
+                    }
                   >
-                    Approve
+                    {language === "th" ? "อนุมัติ" : "Approve"}
                   </button>
                 </>
               ) : (

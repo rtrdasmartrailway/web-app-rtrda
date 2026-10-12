@@ -6,6 +6,7 @@ import {
   hasApprovalAuthority,
   parseApprovalPolicy,
   type ApprovalPolicy,
+  type ApprovalPolicyStage,
 } from "./approval-policy";
 
 const source: ApprovalPolicy = {
@@ -21,15 +22,23 @@ const source: ApprovalPolicy = {
     },
     {
       status: "TECHNICAL_REVIEW",
-      required: false,
-      roles: ["RTRDA_PR"],
+      required: true,
+      roles: ["RTRDA_PR", "RTRDA_BORD"],
       departmentScope: "TASK_DEPARTMENT",
+      condition: "TECHNICAL_REVIEW_REQUIRED",
     },
     {
       status: "PR_EDITORIAL_REVIEW",
       required: true,
-      roles: ["RTRDA_ADMIN"],
-      departmentScope: "ORGANIZATION",
+      roles: ["RTRDA_PR"],
+      departmentScope: "TASK_DEPARTMENT",
+    },
+    {
+      status: "MANAGEMENT_APPROVAL",
+      required: true,
+      roles: ["RTRDA_BORD"],
+      departmentScope: "TASK_DEPARTMENT",
+      condition: "MANAGEMENT_APPROVAL_REQUIRED",
     },
   ],
 };
@@ -57,6 +66,42 @@ describe("approval policy configuration", () => {
     expect(getNextApprovalStage(policy, "PR_EDITORIAL_REVIEW")).toBeNull();
   });
 
+  it("includes task-conditional technical and management stages only when PR marks them required", () => {
+    const policy = parseApprovalPolicy(JSON.stringify(source));
+    const requirements = {
+      technicalReviewRequired: true,
+      managementApprovalRequired: true,
+    };
+
+    expect(getApprovalStage(policy, "TECHNICAL_REVIEW")).toBeNull();
+    expect(getApprovalStage(policy, "TECHNICAL_REVIEW", requirements)?.roles).toEqual([
+      "RTRDA_PR",
+      "RTRDA_BORD",
+    ]);
+    expect(getNextApprovalStage(policy, "SOURCE_FACT_CHECK", requirements)?.status).toBe(
+      "TECHNICAL_REVIEW",
+    );
+    expect(getNextApprovalStage(policy, "TECHNICAL_REVIEW", requirements)?.status).toBe(
+      "PR_EDITORIAL_REVIEW",
+    );
+    expect(
+      getNextApprovalStage(policy, "PR_EDITORIAL_REVIEW", requirements)?.status,
+    ).toBe("MANAGEMENT_APPROVAL");
+    expect(getNextApprovalStage(policy, "MANAGEMENT_APPROVAL", requirements)).toBeNull();
+  });
+
+  it("rejects a task condition on a stage that cannot be conditional", () => {
+    const invalid = {
+      ...source,
+      stages: source.stages.map((stage) =>
+        stage.status === "PR_EDITORIAL_REVIEW"
+          ? { ...stage, condition: "MANAGEMENT_APPROVAL_REQUIRED" }
+          : stage,
+      ),
+    };
+    expect(() => parseApprovalPolicy(JSON.stringify(invalid))).toThrow(/condition/i);
+  });
+
   it("accepts RTRDA_BORD as an approval stage role", () => {
     const boardRolePolicy = {
       ...source,
@@ -73,7 +118,12 @@ describe("approval policy configuration", () => {
   it("unions matching role grants while enforcing each grant's department scope", () => {
     const policy = parseApprovalPolicy(JSON.stringify(source));
     const departmentStage = getApprovalStage(policy, "SOURCE_FACT_CHECK")!;
-    const organizationStage = getApprovalStage(policy, "PR_EDITORIAL_REVIEW")!;
+    const organizationStage: ApprovalPolicyStage = {
+      status: "PR_EDITORIAL_REVIEW",
+      required: true,
+      roles: ["RTRDA_ADMIN"],
+      departmentScope: "ORGANIZATION",
+    };
 
     expect(
       hasApprovalAuthority({

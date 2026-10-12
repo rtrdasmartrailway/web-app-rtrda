@@ -11,7 +11,12 @@ const { mockPrisma } = vi.hoisted(() => {
     prRequestRevision: { create: vi.fn() },
     prRequestSource: { deleteMany: vi.fn(), createMany: vi.fn() },
     prUserRole: { findMany: vi.fn() },
-    prTask: { findFirst: vi.fn(), findMany: vi.fn(), updateMany: vi.fn() },
+    prTask: {
+      findFirst: vi.fn(),
+      findMany: vi.fn(),
+      updateMany: vi.fn(),
+      findUniqueOrThrow: vi.fn(),
+    },
     prCenterUser: { findFirst: vi.fn() },
     prStatusHistory: { create: vi.fn() },
     prNotification: { createMany: vi.fn() },
@@ -65,6 +70,42 @@ const requestRecord = {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  vi.stubEnv(
+    "PR_CENTER_APPROVAL_POLICY_JSON",
+    JSON.stringify({
+      version: "test-policy-1",
+      approvalReference: "TEST-POLICY",
+      effectiveAt: "2026-01-01T00:00:00.000Z",
+      stages: [
+        {
+          status: "SOURCE_FACT_CHECK",
+          required: true,
+          roles: ["RTRDA_PR"],
+          departmentScope: "TASK_DEPARTMENT",
+        },
+        {
+          status: "TECHNICAL_REVIEW",
+          required: true,
+          roles: ["RTRDA_PR", "RTRDA_BORD"],
+          departmentScope: "TASK_DEPARTMENT",
+          condition: "TECHNICAL_REVIEW_REQUIRED",
+        },
+        {
+          status: "PR_EDITORIAL_REVIEW",
+          required: true,
+          roles: ["RTRDA_PR"],
+          departmentScope: "TASK_DEPARTMENT",
+        },
+        {
+          status: "MANAGEMENT_APPROVAL",
+          required: true,
+          roles: ["RTRDA_BORD"],
+          departmentScope: "TASK_DEPARTMENT",
+          condition: "MANAGEMENT_APPROVAL_REQUIRED",
+        },
+      ],
+    }),
+  );
   mockPrisma.$transaction.mockImplementation((callback) => callback(mockPrisma));
   mockPrisma.prRequest.findFirst.mockResolvedValue(requestRecord);
   mockPrisma.prRequest.updateMany.mockResolvedValue({ count: 1 });
@@ -726,6 +767,100 @@ describe("request intake approval", () => {
         reason: "Missing required information",
       }),
     });
+  });
+
+  it("restricts per-task review requirements to PR and persists them during planning", async () => {
+    const task = {
+      id: "task-1",
+      ownerId: null,
+      dueAt: null,
+      status: "COMMUNICATION_PLANNING",
+      version: 5,
+      request: { status: "APPROVED", departmentId: "dept-1" },
+    };
+    const boardActor: PrCenterActor = {
+      id: "board-user",
+      organizationId: "org-1",
+      departmentId: "dept-1",
+      role: "RTRDA_BORD",
+    };
+    mockPrisma.prTask.findFirst.mockResolvedValue(task);
+
+    await expect(
+      updateTaskAssignment(boardActor, "task-1", 5, {
+        ownerId: null,
+        dueAt: null,
+        technicalReviewRequired: true,
+      }),
+    ).rejects.toMatchObject({ code: "APPROVAL_REQUIREMENT_AUTHORITY", statusCode: 403 });
+    expect(mockPrisma.prTask.updateMany).not.toHaveBeenCalled();
+
+    mockPrisma.prTask.updateMany.mockResolvedValue({ count: 1 });
+    mockPrisma.prTask.findUniqueOrThrow.mockResolvedValue({
+      ...task,
+      technicalReviewRequired: true,
+      managementApprovalRequired: true,
+      version: 6,
+    });
+    const result = await updateTaskAssignment(prActor, "task-1", 5, {
+      ownerId: null,
+      dueAt: null,
+      technicalReviewRequired: true,
+      managementApprovalRequired: true,
+    });
+    expect(mockPrisma.prTask.updateMany).toHaveBeenCalledWith({
+      where: { id: "task-1", version: 5 },
+      data: {
+        ownerId: null,
+        dueAt: null,
+        technicalReviewRequired: true,
+        managementApprovalRequired: true,
+        version: { increment: 1 },
+      },
+    });
+    expect(result.technicalReviewRequired).toBe(true);
+    expect(result.managementApprovalRequired).toBe(true);
+    expect(mockPrisma.prAuditEvent.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          action: "task.approval_requirements_updated",
+          after: expect.objectContaining({
+            technicalReviewRequired: true,
+            managementApprovalRequired: true,
+          }),
+        }),
+      }),
+    );
+  });
+
+  it("does not let an out-of-scope PR grant set approval flags through a different role scope", async () => {
+    const actor: PrCenterActor = {
+      id: "multi-role-user",
+      organizationId: "org-1",
+      departmentId: "dept-1",
+      role: "RTRDA_BORD",
+      roleGrants: [
+        { role: "RTRDA_BORD", departmentId: "dept-1" },
+        { role: "RTRDA_PR", departmentId: "dept-2" },
+      ],
+    };
+    mockPrisma.prTask.findFirst.mockResolvedValue({
+      id: "task-1",
+      ownerId: null,
+      dueAt: null,
+      status: "COMMUNICATION_PLANNING",
+      version: 5,
+      request: { status: "APPROVED", departmentId: "dept-1" },
+    });
+
+    await expect(
+      updateTaskAssignment(actor, "task-1", 5, {
+        ownerId: null,
+        dueAt: null,
+        technicalReviewRequired: true,
+      }),
+    ).rejects.toMatchObject({ code: "APPROVAL_REQUIREMENT_AUTHORITY", statusCode: 403 });
+    expect(mockPrisma.prTask.updateMany).not.toHaveBeenCalled();
   });
 
   it("does not let task work or assignment begin before request approval", async () => {

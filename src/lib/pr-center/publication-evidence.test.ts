@@ -12,6 +12,7 @@ const { prisma, tx } = vi.hoisted(() => {
     tx,
     prisma: {
       prTask: { findFirst: vi.fn() },
+      prApproval: { findMany: vi.fn() },
       prSchedule: { findUnique: vi.fn(), findFirst: vi.fn() },
       prFileObject: { findFirst: vi.fn() },
       $transaction: vi.fn((callback: (client: typeof tx) => unknown) => callback(tx)),
@@ -35,9 +36,43 @@ const channelSchedule = (id: string, channel: string) => ({
   taskRevision: 2,
   publishedAt: null,
 });
+const approvalPolicyJson = JSON.stringify({
+  version: "test-policy-1",
+  approvalReference: "TEST-POLICY",
+  effectiveAt: "2026-01-01T00:00:00.000Z",
+  stages: [
+    {
+      status: "SOURCE_FACT_CHECK",
+      required: true,
+      roles: ["RTRDA_PR"],
+      departmentScope: "TASK_DEPARTMENT",
+    },
+    {
+      status: "TECHNICAL_REVIEW",
+      required: true,
+      roles: ["RTRDA_PR", "RTRDA_BORD"],
+      departmentScope: "TASK_DEPARTMENT",
+      condition: "TECHNICAL_REVIEW_REQUIRED",
+    },
+    {
+      status: "PR_EDITORIAL_REVIEW",
+      required: true,
+      roles: ["RTRDA_PR"],
+      departmentScope: "TASK_DEPARTMENT",
+    },
+    {
+      status: "MANAGEMENT_APPROVAL",
+      required: true,
+      roles: ["RTRDA_BORD"],
+      departmentScope: "TASK_DEPARTMENT",
+      condition: "MANAGEMENT_APPROVAL_REQUIRED",
+    },
+  ],
+});
 
 beforeEach(() => {
   vi.clearAllMocks();
+  vi.stubEnv("PR_CENTER_APPROVAL_POLICY_JSON", approvalPolicyJson);
   tx.prTask.updateMany.mockResolvedValue({ count: 1 });
   tx.prSchedule.updateMany.mockResolvedValue({ count: 1 });
   tx.prSchedule.create.mockResolvedValue({ id: "schedule-new", channel: "Web" });
@@ -46,6 +81,10 @@ beforeEach(() => {
   tx.prOutboxEvent.create.mockResolvedValue({});
   prisma.prSchedule.findUnique.mockResolvedValue(null);
   prisma.prSchedule.findFirst.mockResolvedValue(null);
+  prisma.prApproval.findMany.mockResolvedValue([
+    { stage: "SOURCE_FACT_CHECK" },
+    { stage: "PR_EDITORIAL_REVIEW" },
+  ]);
   prisma.prFileObject.findFirst.mockResolvedValue({ id: "asset" });
 });
 
@@ -70,7 +109,7 @@ describe("scheduleTask", () => {
 
     const result = await scheduleTask(actor, "task", 4, {
       channel: "Web",
-      scheduledFor: new Date("2026-10-12T08:00:00Z"),
+      scheduledFor: new Date(Date.now() + 60 * 60 * 1000),
       idempotencyKey: "web-key-0001",
     });
 
@@ -89,6 +128,62 @@ describe("scheduleTask", () => {
     expect(tx.prStatusHistory.create).not.toHaveBeenCalled();
   });
 
+  it("rejects schedules in the past", async () => {
+    prisma.prTask.findFirst.mockResolvedValue(scheduledTask);
+
+    await expect(
+      scheduleTask(actor, "task", 4, {
+        channel: "Web",
+        scheduledFor: new Date(Date.now() - 1000),
+        idempotencyKey: "past-key-0001",
+      }),
+    ).rejects.toMatchObject({ code: "INVALID_SCHEDULE", statusCode: 422 });
+    expect(tx.prSchedule.create).not.toHaveBeenCalled();
+  });
+
+  it("requires current-revision approval evidence for every selected review stage", async () => {
+    prisma.prTask.findFirst.mockResolvedValue({
+      ...scheduledTask,
+      status: "APPROVED",
+      technicalReviewRequired: true,
+      managementApprovalRequired: true,
+    });
+    prisma.prApproval.findMany.mockResolvedValue([
+      { stage: "SOURCE_FACT_CHECK" },
+      { stage: "TECHNICAL_REVIEW" },
+      { stage: "PR_EDITORIAL_REVIEW" },
+    ]);
+
+    await expect(
+      scheduleTask(actor, "task", 4, {
+        channel: "Web",
+        scheduledFor: new Date(Date.now() + 60 * 60 * 1000),
+        idempotencyKey: "missing-management-0001",
+      }),
+    ).rejects.toMatchObject({
+      code: "PUBLICATION_APPROVALS_INCOMPLETE",
+      statusCode: 422,
+    });
+    expect(tx.prSchedule.create).not.toHaveBeenCalled();
+  });
+
+  it("rejects a soft-deleted final asset even if its scan status was clean", async () => {
+    prisma.prTask.findFirst.mockResolvedValue(scheduledTask);
+    prisma.prFileObject.findFirst.mockResolvedValue(null);
+
+    await expect(
+      scheduleTask(actor, "task", 4, {
+        channel: "Web",
+        scheduledFor: new Date(Date.now() + 60 * 60 * 1000),
+        idempotencyKey: "deleted-asset-0001",
+      }),
+    ).rejects.toMatchObject({ code: "PUBLICATION_GATE_INCOMPLETE", statusCode: 422 });
+    expect(prisma.prFileObject.findFirst).toHaveBeenCalledWith({
+      where: { id: "asset", scanStatus: "CLEAN", deletedAt: null },
+      select: { id: true },
+    });
+  });
+
   it("rejects a second schedule for the same channel and revision", async () => {
     prisma.prTask.findFirst.mockResolvedValue(scheduledTask);
     prisma.prSchedule.findFirst.mockResolvedValue({ id: "existing" });
@@ -96,7 +191,7 @@ describe("scheduleTask", () => {
     await expect(
       scheduleTask(actor, "task", 4, {
         channel: "Web",
-        scheduledFor: new Date("2026-10-12T08:00:00Z"),
+        scheduledFor: new Date(Date.now() + 60 * 60 * 1000),
         idempotencyKey: "web-key-0002",
       }),
     ).rejects.toMatchObject({ code: "CHANNEL_SCHEDULE_EXISTS", statusCode: 409 });
@@ -136,6 +231,45 @@ describe("recordPublishingEvidence", () => {
         data: expect.objectContaining({ action: "task.publication_evidence_recorded" }),
       }),
     );
+  });
+
+  it("rejects a publication reference already used by another schedule on the same channel", async () => {
+    prisma.prTask.findFirst.mockResolvedValue({
+      id: "task",
+      version: 4,
+      status: "PUBLISHED",
+      schedules: [channelSchedule("schedule-web", "Web")],
+    });
+    prisma.prSchedule.findUnique.mockResolvedValue({ id: "another-schedule" });
+
+    await expect(
+      recordPublishingEvidence(actor, "task", 4, {
+        channel: "Web",
+        publishedUrl: "https://example.com/story",
+        publishedReference: "already-used-ref",
+      }),
+    ).rejects.toMatchObject({ code: "DUPLICATE_PUBLICATION_REFERENCE", statusCode: 409 });
+    expect(tx.prSchedule.updateMany).not.toHaveBeenCalled();
+  });
+
+  it("maps a concurrent duplicate-reference database conflict to 409", async () => {
+    prisma.prTask.findFirst.mockResolvedValue({
+      id: "task",
+      version: 3,
+      status: "SCHEDULED",
+      schedules: [channelSchedule("schedule-web", "Web")],
+    });
+    tx.prSchedule.updateMany.mockRejectedValue(
+      Object.assign(new Error("unique constraint"), { code: "P2002" }),
+    );
+
+    await expect(
+      recordPublishingEvidence(actor, "task", 3, {
+        channel: "Web",
+        publishedUrl: "https://example.com/story",
+        publishedReference: "racing-reference",
+      }),
+    ).rejects.toMatchObject({ code: "DUPLICATE_PUBLICATION_REFERENCE", statusCode: 409 });
   });
 
   it("records task PUBLISHED only for the first channel publication", async () => {

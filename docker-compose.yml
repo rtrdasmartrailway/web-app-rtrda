@@ -83,6 +83,8 @@ services:
       PR_CENTER_API_HOST: 0.0.0.0
       PR_CENTER_API_PORT: 3100
       PR_CENTER_EMAIL_ONLY_ENABLED: "true"
+      PR_CENTER_APPROVAL_POLICY_JSON: >-
+        {"version":"2026-10-12-v1","approvalReference":"User instruction to follow workflow screenshot file_98.jpg steps 6-7","effectiveAt":"2026-10-12T00:00:00+07:00","stages":[{"status":"SOURCE_FACT_CHECK","required":true,"roles":["RTRDA_PR"],"departmentScope":"TASK_DEPARTMENT"},{"status":"TECHNICAL_REVIEW","required":true,"roles":["RTRDA_PR","RTRDA_BORD"],"departmentScope":"TASK_DEPARTMENT","condition":"TECHNICAL_REVIEW_REQUIRED"},{"status":"PR_EDITORIAL_REVIEW","required":true,"roles":["RTRDA_PR"],"departmentScope":"TASK_DEPARTMENT"},{"status":"MANAGEMENT_APPROVAL","required":true,"roles":["RTRDA_BORD"],"departmentScope":"TASK_DEPARTMENT","condition":"MANAGEMENT_APPROVAL_REQUIRED"}]}
       PR_CENTER_EMAIL_ENABLED: ${PR_CENTER_EMAIL_ENABLED:-false}
       PR_CENTER_EMAIL_ONLY_ALLOWLIST: nattapol.y@rtrda.or.th,panissa.t@rtrda.or.th
       PR_CENTER_OUTBOX_WORKER_URL: http://pr-center-outbox-worker:3101/readyz
