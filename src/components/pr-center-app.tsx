@@ -2474,6 +2474,15 @@ export function PrCenterApp({
             : item,
         ),
       }));
+      announce(
+        updated.status === "CLOSED"
+          ? state.language === "th"
+            ? "ปิดงานแล้ว"
+            : "Task closed"
+          : state.language === "th"
+            ? "เปลี่ยนสถานะงานแล้ว"
+            : "Task status updated",
+      );
     } catch {
       announce(
         state.language === "th"
@@ -4668,6 +4677,7 @@ function Operations({
   const [scheduleChoices, setScheduleChoices] = useState<
     { id: string; channel: string; scheduledFor: string }[]
   >([]);
+  const [scheduleChoicesTaskId, setScheduleChoicesTaskId] = useState<string | null>(null);
   const [activity, setActivity] = useState<{
     comments: {
       id: string;
@@ -4690,6 +4700,7 @@ function Operations({
     setActivityTaskId(taskId);
   };
   const loadTaskSchedules = async (taskId: string) => {
+    setScheduleChoicesTaskId(null);
     const response = await fetch(`/api/pr-center/tasks/${taskId}/schedules`, {
       credentials: "same-origin",
     });
@@ -4700,6 +4711,7 @@ function Operations({
       scheduledFor: string;
     }[];
     setScheduleChoices(schedules);
+    setScheduleChoicesTaskId(taskId);
     if (schedules[0])
       setEvidenceChannel((previous) =>
         schedules.some((schedule) => schedule.channel === previous)
@@ -4717,6 +4729,7 @@ function Operations({
   }, [canManageTasks]);
   useEffect(() => {
     if (!selectedId || !canManageTasks) return;
+    let cancelled = false;
     fetch(`/api/pr-center/tasks/${selectedId}/history`, {
       credentials: "same-origin",
     })
@@ -4736,7 +4749,9 @@ function Operations({
           channel: string;
           scheduledFor: string;
         }[];
+        if (cancelled) return;
         setScheduleChoices(schedules);
+        setScheduleChoicesTaskId(selectedId);
         if (schedules[0])
           setEvidenceChannel((previous) =>
             schedules.some((schedule) => schedule.channel === previous)
@@ -4744,7 +4759,14 @@ function Operations({
               : schedules[0].channel,
           );
       })
-      .catch(() => setScheduleChoices([]));
+      .catch(() => {
+        if (cancelled) return;
+        setScheduleChoices([]);
+        setScheduleChoicesTaskId(null);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [selectedId, canManageTasks]);
   const visibleTasks = taskItems.filter(
     (task) =>
@@ -5101,7 +5123,10 @@ function Operations({
             )}
           {canManageTasks &&
             STATUS_TRANSITIONS[selected.status].filter(
-              (next) => next !== "scheduled" && next !== "published",
+              (next) =>
+                next !== "scheduled" &&
+                next !== "published" &&
+                !(selected.status === "published" && next === "closed"),
             ).length > 0 && (
               <label>
                 Move to{" "}
@@ -5218,6 +5243,41 @@ function Operations({
                 </button>
               </>
             )}
+          {canManageTasks && selected.status === "published" && (
+            <section className={styles.card} aria-labelledby="close-published-task">
+              <h3 id="close-published-task">
+                {language === "th" ? "10. ปิดงาน" : "10. Close task"}
+              </h3>
+              {scheduleChoicesTaskId !== selected.id ? (
+                <p role="status">
+                  {language === "th"
+                    ? "กำลังตรวจสอบสถานะหลักฐานเผยแพร่ของทุกช่องทาง"
+                    : "Checking publication evidence for every scheduled channel…"}
+                </p>
+              ) : scheduleChoices.length > 0 ? (
+                <p role="status">
+                  {language === "th"
+                    ? `ยังต้องเผยแพร่และบันทึกหลักฐานอีก ${scheduleChoices.length} ช่องทางก่อนปิดงาน`
+                    : `Publish and record evidence for ${scheduleChoices.length} remaining channel(s) before closing.`}
+                </p>
+              ) : (
+                <p role="status">
+                  {language === "th"
+                    ? "บันทึกหลักฐานครบทุกช่องทางแล้ว สามารถปิดงานได้"
+                    : "Publication evidence is recorded for every scheduled channel. The task is ready to close."}
+                </p>
+              )}
+              <button
+                type="button"
+                disabled={
+                  scheduleChoicesTaskId !== selected.id || scheduleChoices.length > 0
+                }
+                onClick={() => onTransition(selected.id, "closed")}
+              >
+                {language === "th" ? "ปิดงาน" : "Close task"}
+              </button>
+            </section>
+          )}
           {canManageTasks && (
             <section className={styles.card}>
               <h3>Comments and activity</h3>

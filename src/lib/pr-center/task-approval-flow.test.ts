@@ -284,6 +284,34 @@ describe("task-stage approval flow", () => {
     });
   });
 
+  it("closes a published task after every scheduled channel has evidence", async () => {
+    const task = taskAt("PUBLISHED");
+    prisma.prTask.findFirst.mockResolvedValue(task);
+    prisma.prTask.findUniqueOrThrow.mockResolvedValue({ id: task.id, status: "CLOSED" });
+    prisma.prSchedule.findMany.mockResolvedValue([
+      { publishedAt: new Date("2026-10-01T00:00:00.000Z") },
+      { publishedAt: new Date("2026-10-02T00:00:00.000Z") },
+    ]);
+
+    const closed = await transitionTask(
+      prActor,
+      task.id,
+      task.version,
+      "CLOSED",
+      undefined,
+    );
+
+    expect(closed.status).toBe("CLOSED");
+    expect(prisma.prSchedule.findMany).toHaveBeenCalledWith({
+      where: { taskId: task.id },
+      select: { publishedAt: true },
+    });
+    expect(prisma.prTask.updateMany).toHaveBeenCalledWith({
+      where: { id: task.id, version: task.version },
+      data: { status: "CLOSED", version: { increment: 1 } },
+    });
+  });
+
   it("requires publication evidence for every channel before closing", async () => {
     const task = taskAt("PUBLISHED");
     prisma.prTask.findFirst.mockResolvedValue(task);
