@@ -1100,6 +1100,216 @@
   padding: 40px;
   text-align: center;
 }
+.messageHouseForm {
+  margin-top: 18px;
+  overflow: hidden;
+  padding: 0;
+}
+.messageHouseFormHeader {
+  align-items: flex-start;
+  background: linear-gradient(115deg, #f2f8fd, #f7fbfc);
+  border-bottom: 1px solid #e3ebf2;
+  gap: 20px;
+  padding: 24px 28px;
+}
+.messageHouseFormHeader > div {
+  min-width: 0;
+}
+.messageHouseDraftBadge {
+  background: #e3f1ff;
+  border-radius: 999px;
+  color: #14598d;
+  display: inline-flex;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  margin-bottom: 8px;
+  padding: 5px 9px;
+}
+.messageHouseFormHeader h2 {
+  color: #153b59;
+  font-size: 20px;
+  margin: 0 !important;
+}
+.messageHouseFormHeader p,
+.messageHouseSectionHeader p,
+.messageHouseFormFooter p {
+  color: #617487;
+  font-size: 12px;
+  line-height: 1.65;
+  margin: 5px 0 0;
+}
+.messageHouseFieldCount {
+  background: #fff;
+  border: 1px solid #dce7f0;
+  border-radius: 999px;
+  color: #425f78;
+  flex: 0 0 auto;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 7px 11px;
+}
+.messageHouseLoading {
+  background: #f7fafc;
+  border: 1px solid #e4edf4;
+  border-radius: 8px;
+  color: #49657a;
+  margin: 20px 28px 0;
+  padding: 10px 12px;
+}
+.messageHouseFieldset {
+  border: 0;
+  margin: 0;
+  min-width: 0;
+  padding: 24px 28px 8px;
+}
+.messageHouseFieldset:disabled {
+  opacity: 0.72;
+}
+.messageHouseSection + .messageHouseSection {
+  border-top: 1px solid #e8eef3;
+  margin-top: 24px;
+  padding-top: 24px;
+}
+.messageHouseSectionHeader {
+  align-items: flex-start;
+  display: flex;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+.messageHouseStep {
+  align-items: center;
+  background: #e8f3fb;
+  border-radius: 10px;
+  color: #165b8c;
+  display: inline-flex;
+  flex: 0 0 36px;
+  font-size: 11px;
+  font-weight: 800;
+  height: 36px;
+  justify-content: center;
+}
+.messageHouseSectionHeader h3 {
+  color: #1c3d58;
+  font-size: 14px;
+  margin: 0;
+}
+.messageHouseSectionHeader p {
+  margin-top: 3px;
+}
+.messageHouseGrid {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.messageHouseField {
+  align-content: start;
+  background: #fbfcfe;
+  border: 1px solid #e2eaf1;
+  border-radius: 11px;
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  padding: 15px;
+}
+.messageHouseField:focus-within {
+  background: #fff;
+  border-color: #72a9d2;
+  box-shadow: 0 0 0 3px rgba(38, 122, 183, 0.1);
+}
+.messageHouseLabelRow {
+  align-items: center;
+  color: #1b3852;
+  display: flex;
+  flex-wrap: wrap;
+  font-size: 13px;
+  font-weight: 750;
+  gap: 8px;
+  justify-content: space-between;
+}
+.messageHouseRequired,
+.messageHouseOptional {
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 3px 8px;
+}
+.messageHouseRequired {
+  background: #e9f2fa;
+  color: #345f7e;
+}
+.messageHouseOptional {
+  background: #eef4f1;
+  color: #4a705c;
+}
+.messageHouseHelp {
+  color: #687d90;
+  font-size: 11px;
+  line-height: 1.55;
+  min-height: 34px;
+}
+.messageHouseField textarea {
+  background: #fff;
+  border: 1px solid #d5e0e9;
+  border-radius: 7px;
+  box-sizing: border-box;
+  color: #203448;
+  font: inherit;
+  font-size: 13px;
+  line-height: 1.6;
+  min-height: 118px;
+  padding: 10px 11px;
+  resize: vertical;
+  width: 100%;
+}
+.messageHouseField textarea:focus-visible {
+  border-color: #347fb4;
+  outline: 2px solid rgba(52, 127, 180, 0.22);
+  outline-offset: 1px;
+}
+.messageHouseField textarea:disabled {
+  background: #f1f4f7;
+  cursor: wait;
+}
+.messageHouseFieldWide {
+  grid-column: 1 / -1;
+}
+.messageHouseFieldWide textarea {
+  min-height: 140px;
+}
+.messageHouseCounter {
+  color: #7a8b9a;
+  font-size: 10px;
+  justify-self: end;
+  line-height: 1.2;
+}
+.messageHouseFormFooter {
+  align-items: center;
+  background: #f7fafc;
+  border-top: 1px solid #e4ebf1;
+  display: flex;
+  gap: 18px;
+  justify-content: space-between;
+  padding: 18px 28px;
+}
+.messageHouseFormFooter strong {
+  color: #284b65;
+  font-size: 12px;
+}
+.messageHouseFormFooter p {
+  margin-top: 3px;
+}
+.messageHouseFormFooter button {
+  flex: 0 0 auto;
+  min-width: 170px;
+}
+.messageHouseNotice {
+  color: #176044 !important;
+  font-weight: 700;
+}
+.messageHouseNoticeError {
+  color: #a72b2b !important;
+}
 .roof {
   background: #194c8e;
   clip-path: polygon(50% 0, 100% 100%, 0 100%);
@@ -1646,6 +1856,32 @@
   }
   .messageHouse {
     padding: 20px 12px;
+  }
+  .messageHouseFormHeader {
+    align-items: flex-start;
+    flex-direction: column;
+    padding: 20px 18px;
+  }
+  .messageHouseFieldset {
+    padding: 20px 18px 6px;
+  }
+  .messageHouseGrid {
+    grid-template-columns: 1fr;
+  }
+  .messageHouseFieldWide {
+    grid-column: auto;
+  }
+  .messageHouseFormFooter {
+    align-items: stretch;
+    flex-direction: column;
+    padding: 16px 18px;
+  }
+  .messageHouseFormFooter button {
+    width: 100%;
+  }
+  .messageHouseLoading {
+    margin-left: 18px;
+    margin-right: 18px;
   }
   .topActions select {
     max-width: 54px;

@@ -7617,6 +7617,7 @@ function MessageHouse({
   const [draftLoading, setDraftLoading] = useState(true);
   const [draftSaving, setDraftSaving] = useState(false);
   const [draftNotice, setDraftNotice] = useState("");
+  const [draftNoticeTone, setDraftNoticeTone] = useState<"success" | "error" | "">("");
 
   useEffect(() => {
     if (!canEdit) return;
@@ -7639,12 +7640,14 @@ function MessageHouse({
         });
       })
       .catch(() => {
-        if (!cancelled)
+        if (!cancelled) {
           setDraftNotice(
             thai
               ? "โหลดฉบับร่าง Message House ไม่สำเร็จ"
               : "Message House draft could not be loaded.",
           );
+          setDraftNoticeTone("error");
+        }
       })
       .finally(() => {
         if (!cancelled) setDraftLoading(false);
@@ -7658,6 +7661,7 @@ function MessageHouse({
     event.preventDefault();
     setDraftSaving(true);
     setDraftNotice("");
+    setDraftNoticeTone("");
     try {
       const response = await fetch("/api/pr-center/message-house/draft", {
         method: "POST",
@@ -7680,8 +7684,10 @@ function MessageHouse({
         throw new Error(value?.message || "Message House draft could not be saved");
       setDraft((previous) => ({ ...previous, id: value.id }));
       setDraftNotice(thai ? "บันทึกฉบับร่างแล้ว" : "Draft saved.");
+      setDraftNoticeTone("success");
     } catch (error) {
       setDraftNotice(error instanceof Error ? error.message : "Save failed");
+      setDraftNoticeTone("error");
     } finally {
       setDraftSaving(false);
     }
@@ -7713,75 +7719,253 @@ function MessageHouse({
         }
       />
       {canEdit && (
-        <form className={styles.card} onSubmit={saveDraft}>
-          <h2>{thai ? "แก้ไขฉบับร่าง Message House" : "Edit Message House draft"}</h2>
+        <form
+          className={`${styles.card} ${styles.messageHouseForm}`}
+          onSubmit={saveDraft}
+        >
+          <header className={styles.messageHouseFormHeader}>
+            <div>
+              <span className={styles.messageHouseDraftBadge}>
+                {thai ? "ฉบับร่าง" : "WORKING DRAFT"}
+              </span>
+              <h2>{thai ? "แก้ไขกรอบสารหลัก" : "Edit Message House"}</h2>
+              <p>
+                {thai
+                  ? "กรอกข้อมูลจากภาพรวมไปสู่รายละเอียด ระบบจะบันทึกเป็นฉบับร่างเท่านั้น"
+                  : "Work from the core message to supporting detail. Changes are saved as a draft only."}
+              </p>
+            </div>
+            <span className={styles.messageHouseFieldCount}>
+              {thai ? "5 ช่องกรอก" : "5 fields"}
+            </span>
+          </header>
           {draftLoading && (
-            <p role="status">{thai ? "กำลังโหลดฉบับร่าง…" : "Loading draft…"}</p>
+            <p className={styles.messageHouseLoading} role="status" aria-live="polite">
+              {thai ? "กำลังโหลดฉบับร่าง…" : "Loading draft…"}
+            </p>
           )}
-          <label>
-            {thai ? "วิสัยทัศน์ / พันธกิจ" : "Vision / Mission"}
-            <textarea
-              required
-              maxLength={5000}
-              value={draft.vision}
-              onChange={(event) => setDraft({ ...draft, vision: event.target.value })}
-            />
-          </label>
-          <label>
-            {thai ? "จุดยืนขององค์กร" : "Brand positioning"}
-            <textarea
-              required
-              maxLength={5000}
-              value={draft.positioning}
-              onChange={(event) =>
-                setDraft({ ...draft, positioning: event.target.value })
-              }
-            />
-          </label>
-          <label>
-            {thai
-              ? "เสาหลักการสื่อสาร (หนึ่งรายการต่อบรรทัด)"
-              : "Communication pillars (one per line)"}
-            <textarea
-              required
-              maxLength={5000}
-              value={draft.pillars}
-              onChange={(event) => setDraft({ ...draft, pillars: event.target.value })}
-            />
-          </label>
-          <label>
-            {thai ? "หลักการสนับสนุน" : "Foundation"}
-            <textarea
-              required
-              maxLength={5000}
-              value={draft.foundation}
-              onChange={(event) => setDraft({ ...draft, foundation: event.target.value })}
-            />
-          </label>
-          <label>
-            {thai ? "ที่มา/เหตุผลประกอบ (ไม่บังคับ)" : "Source rationale (optional)"}
-            <textarea
-              maxLength={5000}
-              value={draft.sourceRationale}
-              onChange={(event) =>
-                setDraft({ ...draft, sourceRationale: event.target.value })
-              }
-            />
-          </label>
-          <button
-            className={styles.primary}
-            type="submit"
-            disabled={draftSaving || draftLoading}
+          <fieldset
+            className={styles.messageHouseFieldset}
+            disabled={draftLoading || draftSaving}
+            aria-busy={draftLoading || draftSaving}
           >
-            {draftSaving
-              ? thai
-                ? "กำลังบันทึก…"
-                : "Saving…"
-              : thai
-                ? "บันทึกฉบับร่าง"
-                : "Save draft"}
-          </button>
-          {draftNotice && <p role="status">{draftNotice}</p>}
+            <section className={styles.messageHouseSection}>
+              <div className={styles.messageHouseSectionHeader}>
+                <span className={styles.messageHouseStep}>01</span>
+                <div>
+                  <h3>{thai ? "แกนหลักขององค์กร" : "Core identity"}</h3>
+                  <p>
+                    {thai
+                      ? "กำหนดภาพที่องค์กรต้องการสื่อและจุดยืนที่ต้องการให้คนจดจำ"
+                      : "Set the organization’s purpose and the position it wants people to remember."}
+                  </p>
+                </div>
+              </div>
+              <div className={styles.messageHouseGrid}>
+                <label className={styles.messageHouseField} htmlFor="mh-vision">
+                  <span className={styles.messageHouseLabelRow}>
+                    <span>{thai ? "วิสัยทัศน์ / พันธกิจ" : "Vision / Mission"}</span>
+                    <span className={styles.messageHouseRequired}>
+                      {thai ? "จำเป็น" : "Required"}
+                    </span>
+                  </span>
+                  <span className={styles.messageHouseHelp} id="mh-vision-help">
+                    {thai
+                      ? "องค์กรต้องการมุ่งไปทางใด และมีหน้าที่สำคัญอะไร"
+                      : "Where is the organization headed, and what is its core purpose?"}
+                  </span>
+                  <textarea
+                    id="mh-vision"
+                    aria-describedby="mh-vision-help mh-vision-count"
+                    required
+                    maxLength={5000}
+                    rows={5}
+                    value={draft.vision}
+                    onChange={(event) =>
+                      setDraft({ ...draft, vision: event.target.value })
+                    }
+                  />
+                  <span className={styles.messageHouseCounter} id="mh-vision-count">
+                    {draft.vision.length}/5000
+                  </span>
+                </label>
+                <label className={styles.messageHouseField} htmlFor="mh-positioning">
+                  <span className={styles.messageHouseLabelRow}>
+                    <span>{thai ? "จุดยืนขององค์กร" : "Brand positioning"}</span>
+                    <span className={styles.messageHouseRequired}>
+                      {thai ? "จำเป็น" : "Required"}
+                    </span>
+                  </span>
+                  <span className={styles.messageHouseHelp} id="mh-positioning-help">
+                    {thai
+                      ? "อยากให้ประชาชนเข้าใจหรือจดจำองค์กรในฐานะใด"
+                      : "How should people understand and remember the organization?"}
+                  </span>
+                  <textarea
+                    id="mh-positioning"
+                    aria-describedby="mh-positioning-help mh-positioning-count"
+                    required
+                    maxLength={5000}
+                    rows={5}
+                    value={draft.positioning}
+                    onChange={(event) =>
+                      setDraft({ ...draft, positioning: event.target.value })
+                    }
+                  />
+                  <span className={styles.messageHouseCounter} id="mh-positioning-count">
+                    {draft.positioning.length}/5000
+                  </span>
+                </label>
+              </div>
+            </section>
+
+            <section className={styles.messageHouseSection}>
+              <div className={styles.messageHouseSectionHeader}>
+                <span className={styles.messageHouseStep}>02</span>
+                <div>
+                  <h3>{thai ? "เสาหลักการสื่อสาร" : "Communication pillars"}</h3>
+                  <p>
+                    {thai
+                      ? "แยกประเด็นสำคัญเป็นข้อ ๆ เพื่อให้ทีมสื่อสารนำไปใช้ได้ชัดเจน"
+                      : "List the key themes separately so the communications team can use them consistently."}
+                  </p>
+                </div>
+              </div>
+              <label
+                className={`${styles.messageHouseField} ${styles.messageHouseFieldWide}`}
+                htmlFor="mh-pillars"
+              >
+                <span className={styles.messageHouseLabelRow}>
+                  <span>{thai ? "รายการเสาหลัก" : "Pillar list"}</span>
+                  <span className={styles.messageHouseRequired}>
+                    {thai ? "จำเป็น" : "Required"}
+                  </span>
+                </span>
+                <span className={styles.messageHouseHelp} id="mh-pillars-help">
+                  {thai
+                    ? "ใส่หนึ่งเสาหลักต่อหนึ่งบรรทัด ระบบจะแยกแต่ละบรรทัดเป็นรายการ"
+                    : "Enter one pillar per line. Each line is saved as a separate item."}
+                </span>
+                <textarea
+                  id="mh-pillars"
+                  aria-describedby="mh-pillars-help mh-pillars-count"
+                  required
+                  maxLength={5000}
+                  rows={5}
+                  value={draft.pillars}
+                  onChange={(event) =>
+                    setDraft({ ...draft, pillars: event.target.value })
+                  }
+                />
+                <span className={styles.messageHouseCounter} id="mh-pillars-count">
+                  {draft.pillars.length}/5000
+                </span>
+              </label>
+            </section>
+
+            <section className={styles.messageHouseSection}>
+              <div className={styles.messageHouseSectionHeader}>
+                <span className={styles.messageHouseStep}>03</span>
+                <div>
+                  <h3>{thai ? "หลักการและที่มา" : "Supporting rationale"}</h3>
+                  <p>
+                    {thai
+                      ? "ระบุหลักที่รองรับกรอบสาร และเพิ่มที่มาเพื่อให้ตรวจสอบย้อนหลังได้"
+                      : "Ground the message in clear principles and provide a source when available."}
+                  </p>
+                </div>
+              </div>
+              <div className={styles.messageHouseGrid}>
+                <label className={styles.messageHouseField} htmlFor="mh-foundation">
+                  <span className={styles.messageHouseLabelRow}>
+                    <span>{thai ? "หลักการสนับสนุน" : "Foundation"}</span>
+                    <span className={styles.messageHouseRequired}>
+                      {thai ? "จำเป็น" : "Required"}
+                    </span>
+                  </span>
+                  <span className={styles.messageHouseHelp} id="mh-foundation-help">
+                    {thai
+                      ? "หลักฐาน ค่านิยม หรือนโยบายที่เป็นฐานของข้อความ"
+                      : "Evidence, values, or policy that supports the message."}
+                  </span>
+                  <textarea
+                    id="mh-foundation"
+                    aria-describedby="mh-foundation-help mh-foundation-count"
+                    required
+                    maxLength={5000}
+                    rows={4}
+                    value={draft.foundation}
+                    onChange={(event) =>
+                      setDraft({ ...draft, foundation: event.target.value })
+                    }
+                  />
+                  <span className={styles.messageHouseCounter} id="mh-foundation-count">
+                    {draft.foundation.length}/5000
+                  </span>
+                </label>
+                <label className={styles.messageHouseField} htmlFor="mh-source">
+                  <span className={styles.messageHouseLabelRow}>
+                    <span>{thai ? "ที่มา / เหตุผลประกอบ" : "Source rationale"}</span>
+                    <span className={styles.messageHouseOptional}>
+                      {thai ? "ไม่บังคับ" : "Optional"}
+                    </span>
+                  </span>
+                  <span className={styles.messageHouseHelp} id="mh-source-help">
+                    {thai
+                      ? "อ้างอิงเอกสาร แหล่งข้อมูล หรือเหตุผลที่ใช้ประกอบการกำหนดกรอบสาร"
+                      : "Reference the document, source, or reasoning behind this framework."}
+                  </span>
+                  <textarea
+                    id="mh-source"
+                    aria-describedby="mh-source-help mh-source-count"
+                    maxLength={5000}
+                    rows={4}
+                    value={draft.sourceRationale}
+                    onChange={(event) =>
+                      setDraft({ ...draft, sourceRationale: event.target.value })
+                    }
+                  />
+                  <span className={styles.messageHouseCounter} id="mh-source-count">
+                    {draft.sourceRationale.length}/5000
+                  </span>
+                </label>
+              </div>
+            </section>
+          </fieldset>
+          <footer className={styles.messageHouseFormFooter}>
+            <div>
+              <strong>{thai ? "บันทึกเป็นฉบับร่าง" : "Draft only"}</strong>
+              <p>
+                {thai
+                  ? "การบันทึกที่นี่จะยังไม่เผยแพร่หรือเปลี่ยนเวอร์ชันที่มีผลใช้งาน"
+                  : "Saving here will not publish changes or replace the effective version."}
+              </p>
+              {draftNotice && (
+                <p
+                  className={`${styles.messageHouseNotice} ${
+                    draftNoticeTone === "error" ? styles.messageHouseNoticeError : ""
+                  }`}
+                  role={draftNoticeTone === "error" ? "alert" : "status"}
+                  aria-live={draftNoticeTone === "error" ? "assertive" : "polite"}
+                >
+                  {draftNotice}
+                </p>
+              )}
+            </div>
+            <button
+              className={styles.primary}
+              type="submit"
+              disabled={draftSaving || draftLoading}
+            >
+              {draftSaving
+                ? thai
+                  ? "กำลังบันทึก…"
+                  : "Saving…"
+                : thai
+                  ? "บันทึกฉบับร่าง"
+                  : "Save draft"}
+            </button>
+          </footer>
         </form>
       )}
       {status === "loading" && (
