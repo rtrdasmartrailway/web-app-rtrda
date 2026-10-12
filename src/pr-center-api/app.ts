@@ -65,6 +65,7 @@ import {
   PrCenterError,
   type PrCenterActor,
 } from "@/lib/pr-center/service";
+import { parseAbsoluteScheduleDate } from "@/lib/pr-center/schedule-time";
 import {
   TASK_TRANSITIONS,
   type PrCenterRole,
@@ -599,10 +600,7 @@ export function buildPrCenterApi(
       expectedVersion(request),
       {
         channel: typeof input.channel === "string" ? input.channel : "",
-        scheduledFor:
-          typeof input.scheduledFor === "string"
-            ? new Date(input.scheduledFor)
-            : new Date("invalid"),
+        scheduledFor: parseAbsoluteScheduleDate(input.scheduledFor),
         idempotencyKey:
           typeof input.idempotencyKey === "string" ? input.idempotencyKey : "",
       },

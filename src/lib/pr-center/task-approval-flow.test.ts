@@ -266,6 +266,24 @@ describe("task-stage approval flow", () => {
     ).rejects.toMatchObject({ code: "SELF_APPROVAL_BLOCKED", statusCode: 403 });
   });
 
+  it("reserves conditional management approval for the executive BORD role", async () => {
+    const task = taskAt("MANAGEMENT_APPROVAL");
+    prisma.prTask.findFirst.mockResolvedValue(task);
+
+    await expect(
+      recordApprovalDecision(prActor, task.id, task.version, { decision: "APPROVED" }),
+    ).rejects.toMatchObject({ code: "APPROVAL_AUTHORITY_MISMATCH", statusCode: 403 });
+    expect(prisma.prTask.updateMany).not.toHaveBeenCalled();
+
+    await recordApprovalDecision(boardActor, task.id, task.version, {
+      decision: "APPROVED",
+    });
+    expect(prisma.prTask.updateMany).toHaveBeenCalledWith({
+      where: { id: task.id, version: task.version },
+      data: { status: "APPROVED", version: { increment: 1 } },
+    });
+  });
+
   it("requires publication evidence for every channel before closing", async () => {
     const task = taskAt("PUBLISHED");
     prisma.prTask.findFirst.mockResolvedValue(task);

@@ -25,6 +25,7 @@ import {
   type CalendarRequestDecision,
 } from "@/lib/pr-center/calendar-view";
 import { canEditOwnRequest } from "@/lib/pr-center/request-edit";
+import { bangkokLocalDateTimeToISOString } from "@/lib/pr-center/schedule-time";
 import {
   requestTableStatusLabel,
   summarizeRequestTableTasks,
@@ -2592,6 +2593,23 @@ export function PrCenterApp({
   ): Promise<boolean> => {
     const task = state.tasks.find((item) => item.id === taskId);
     if (!task) return false;
+    const scheduledForIso = bangkokLocalDateTimeToISOString(scheduledFor);
+    if (!scheduledForIso) {
+      announce(
+        state.language === "th"
+          ? "วันเวลาเผยแพร่ไม่ถูกต้อง กรุณาเลือกเวลาไทย"
+          : "Invalid publication time. Select a valid Asia/Bangkok time.",
+      );
+      return false;
+    }
+    if (Date.parse(scheduledForIso) <= Date.now()) {
+      announce(
+        state.language === "th"
+          ? "ต้องตั้งเวลาเผยแพร่ในอนาคต"
+          : "Publication time must be in the future.",
+      );
+      return false;
+    }
     try {
       const response = await fetch(`/api/pr-center/tasks/${taskId}/schedule`, {
         method: "POST",
@@ -2602,8 +2620,8 @@ export function PrCenterApp({
         },
         body: JSON.stringify({
           channel,
-          scheduledFor,
-          idempotencyKey: `schedule:${taskId}:${channel}:${scheduledFor}`,
+          scheduledFor: scheduledForIso,
+          idempotencyKey: `schedule:${taskId}:${channel}:${scheduledForIso}`,
         }),
       });
       if (!response.ok) {
@@ -5124,7 +5142,9 @@ function Operations({
                   </select>
                 </label>
                 <label>
-                  Schedule time{" "}
+                  {language === "th"
+                    ? "วันและเวลาเผยแพร่ (เวลาไทย, Asia/Bangkok)"
+                    : "Schedule time (Thailand, Asia/Bangkok)"}{" "}
                   <input
                     type="datetime-local"
                     value={scheduledFor}
