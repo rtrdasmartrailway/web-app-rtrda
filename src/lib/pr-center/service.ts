@@ -195,6 +195,24 @@ function requestReadWhere(actor: PrCenterActor): Prisma.PrRequestWhereInput {
   };
 }
 
+function assignedRequestReadWhere(actor: PrCenterActor): Prisma.PrRequestWhereInput {
+  const roleScopes: Prisma.PrRequestWhereInput[] = roleDepartmentClauses(actor, [
+    "RTRDA_PR",
+    "RTRDA_BORD",
+    "RTRDA_ADMIN",
+  ]);
+  if (roleScopes.some((scope) => Object.keys(scope).length === 0))
+    return { organizationId: actor.organizationId };
+  return {
+    organizationId: actor.organizationId,
+    OR: [
+      { requesterId: actor.id },
+      { tasks: { some: { ownerId: actor.id } } },
+      ...roleScopes,
+    ],
+  };
+}
+
 function canReadRequestRecord(
   actor: PrCenterActor,
   request: {
@@ -881,8 +899,8 @@ export async function createRequest(
 
 export async function listRequests(actor: PrCenterActor, take = 25, cursor?: string) {
   const limit = Math.min(Math.max(take, 1), 100);
-  const where = requestReadWhere(actor);
-  return prisma.prRequest.findMany({
+  const where = assignedRequestReadWhere(actor);
+  const requests = await prisma.prRequest.findMany({
     where,
     take: limit + 1,
     ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
@@ -910,6 +928,13 @@ export async function listRequests(actor: PrCenterActor, take = 25, cursor?: str
               finalAssetId: true,
             },
           },
+          factChecks: {
+            orderBy: { checkedAt: "desc" },
+            include: {
+              checkedBy: { select: { displayName: true } },
+              items: true,
+            },
+          },
         },
       },
       attachments: {
@@ -933,6 +958,14 @@ export async function listRequests(actor: PrCenterActor, take = 25, cursor?: str
       },
       revisions: { orderBy: { revisionNumber: "desc" }, take: 1 },
     },
+  });
+  const roles = actorRoles(actor);
+  return requests.map((request) => {
+    if (request.requesterId === actor.id || canReadAllRequests(roles)) return request;
+    return {
+      ...request,
+      tasks: request.tasks.filter((task) => task.ownerId === actor.id),
+    };
   });
 }
 
@@ -2014,7 +2047,7 @@ export async function updateTaskAssignment(
   actor: PrCenterActor,
   taskId: string,
   fromVersion: number,
-  input: { ownerId: string | null; dueAt: Date | null },
+  input: { ownerId: string | null; dueAt: Date | null; planningKeyMessage?: string },
   correlationId: string = randomUUID(),
 ) {
   if (!canManageTasks(actorRoles(actor)))
@@ -2059,10 +2092,32 @@ export async function updateTaskAssignment(
     if (!owner)
       throw new PrCenterError("Task owner is not available", 422, "INVALID_OWNER");
   }
+  if (input.planningKeyMessage !== undefined && task.status !== "COMMUNICATION_PLANNING")
+    throw new PrCenterError(
+      "Planning key message can only be updated during communication planning",
+      409,
+      "INVALID_PLANNING_STATE",
+    );
+  if (
+    input.planningKeyMessage !== undefined &&
+    input.planningKeyMessage.trim().length > 2000
+  )
+    throw new PrCenterError(
+      "Planning key message is too long",
+      422,
+      "INVALID_KEY_MESSAGE",
+    );
   return prisma.$transaction(async (tx) => {
     const updated = await tx.prTask.updateMany({
       where: { id: task.id, version: fromVersion },
-      data: { ownerId: input.ownerId, dueAt: input.dueAt, version: { increment: 1 } },
+      data: {
+        ownerId: input.ownerId,
+        dueAt: input.dueAt,
+        ...(input.planningKeyMessage !== undefined
+          ? { planningKeyMessage: input.planningKeyMessage.trim() || null }
+          : {}),
+        version: { increment: 1 },
+      },
     });
     if (updated.count !== 1)
       throw new PrCenterError(
@@ -2104,6 +2159,9 @@ export async function updateTaskAssignment(
       after: {
         ownerId: input.ownerId,
         dueAt: input.dueAt?.toISOString() || null,
+        ...(input.planningKeyMessage !== undefined
+          ? { planningKeyMessage: input.planningKeyMessage.trim() || null }
+          : {}),
         version: fromVersion + 1,
       },
       eventType: "pr.task.assigned",
@@ -2113,6 +2171,116 @@ export async function updateTaskAssignment(
       where: { id: task.id },
       include: { owner: { select: { displayName: true } } },
     });
+  });
+}
+
+export type TaskFactCheckInput = {
+  claim: string;
+  evidenceUrl: string;
+  note?: string;
+  result: "VERIFIED" | "NEEDS_CORRECTION" | "NEEDS_EVIDENCE";
+};
+
+export async function submitTaskFactCheck(
+  actor: PrCenterActor,
+  id: string,
+  items: TaskFactCheckInput[],
+  summary?: string,
+  correlationId: string = randomUUID(),
+) {
+  if (!Array.isArray(items) || items.length < 1 || items.length > 50)
+    throw new PrCenterError("Add 1 to 50 fact-check items", 422, "INVALID_FACT_CHECK");
+  const task = await prisma.prTask.findFirst({
+    where: { id, request: assignedRequestReadWhere(actor) },
+    include: {
+      request: { select: { status: true } },
+      revisions: {
+        orderBy: { revisionNumber: "desc" },
+        take: 1,
+        select: { revisionNumber: true },
+      },
+    },
+  });
+  if (!task) throw new PrCenterError("Task not found", 404, "NOT_FOUND");
+  if (task.ownerId !== actor.id && !actorHasRole(actor, "RTRDA_PR"))
+    throw new PrCenterError(
+      "Only the assigned owner or PR may fact-check this task",
+      403,
+      "FORBIDDEN",
+    );
+  if (task.request.status !== "APPROVED" || !task.revisions[0])
+    throw new PrCenterError(
+      "An approved request with a content revision is required",
+      409,
+      "FACT_CHECK_NOT_READY",
+    );
+  if (!["IN_PRODUCTION", "SOURCE_FACT_CHECK", "REVISION_REQUIRED"].includes(task.status))
+    throw new PrCenterError(
+      "Fact-checking is available during production and source review",
+      409,
+      "INVALID_FACT_CHECK_STATE",
+    );
+  const normalized = items.map((item) => {
+    const claim = typeof item.claim === "string" ? item.claim.trim() : "";
+    const evidenceUrl =
+      typeof item.evidenceUrl === "string" ? item.evidenceUrl.trim() : "";
+    let parsed: URL;
+    try {
+      parsed = new URL(evidenceUrl);
+    } catch {
+      throw new PrCenterError(
+        "Each check needs a valid HTTPS evidence URL",
+        422,
+        "INVALID_FACT_CHECK",
+      );
+    }
+    if (
+      !claim ||
+      claim.length > 2000 ||
+      parsed.protocol !== "https:" ||
+      parsed.username ||
+      parsed.password
+    )
+      throw new PrCenterError(
+        "Each check needs a claim and a valid HTTPS evidence URL",
+        422,
+        "INVALID_FACT_CHECK",
+      );
+    if (!["VERIFIED", "NEEDS_CORRECTION", "NEEDS_EVIDENCE"].includes(item.result))
+      throw new PrCenterError("Fact-check result is invalid", 422, "INVALID_FACT_CHECK");
+    const note = typeof item.note === "string" ? item.note.trim() : "";
+    if (note.length > 2000)
+      throw new PrCenterError("Fact-check note is too long", 422, "INVALID_FACT_CHECK");
+    return { claim, evidenceUrl, note: note || null, result: item.result };
+  });
+  const text = summary?.trim() || null;
+  if (text && text.length > 2000)
+    throw new PrCenterError("Fact-check summary is too long", 422, "INVALID_FACT_CHECK");
+  return prisma.$transaction(async (tx) => {
+    const record = await tx.prTaskFactCheck.create({
+      data: {
+        taskId: task.id,
+        taskRevision: task.revisions[0].revisionNumber,
+        checkedById: actor.id,
+        summary: text,
+        items: { create: normalized },
+      },
+      include: { items: true, checkedBy: { select: { displayName: true } } },
+    });
+    await auditAndOutbox(tx, {
+      actor,
+      action: "task.fact_check_submitted",
+      entityType: "task",
+      entityId: task.id,
+      after: {
+        factCheckId: record.id,
+        taskRevision: record.taskRevision,
+        itemCount: normalized.length,
+      },
+      eventType: "pr.task.fact_check_submitted",
+      correlationId,
+    });
+    return record;
   });
 }
 

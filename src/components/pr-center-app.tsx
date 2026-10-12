@@ -178,6 +178,7 @@ type RequestDraft = {
 type Task = {
   id: string;
   requestId: string;
+  requesterId?: string;
   type: string;
   title: string;
   status: StatusId;
@@ -187,6 +188,20 @@ type Task = {
   version?: number;
   revisionNumber?: number;
   keyMessage?: string;
+  planningKeyMessage?: string;
+  factChecks?: Array<{
+    id: string;
+    taskRevision: number;
+    checkedAt: string;
+    summary: string | null;
+    checkedBy: { displayName: string };
+    items: Array<{
+      claim: string;
+      evidenceUrl: string;
+      note: string | null;
+      result: "VERIFIED" | "NEEDS_CORRECTION" | "NEEDS_EVIDENCE";
+    }>;
+  }>;
   contentBody?: string;
   finalAssetId?: string | null;
   requestStatus?: Request["status"];
@@ -359,6 +374,8 @@ type ApiRequestRecord = {
     ownerId: string | null;
     owner: { displayName: string } | null;
     dueAt: string | null;
+    planningKeyMessage: string | null;
+    factChecks: Task["factChecks"];
     version: number;
     revisions: Array<{
       revisionNumber: number;
@@ -453,6 +470,7 @@ type TaskApprovalRecord = {
   ownerId: string | null;
   owner?: { displayName: string } | null;
   dueAt: string | null;
+  planningKeyMessage: string | null;
   version: number;
   revisions?: Array<{
     revisionNumber: number;
@@ -474,6 +492,7 @@ function mapTaskApprovalRecord(task: TaskApprovalRecord): Task {
     ownerName: task.owner?.displayName,
     dueDate: task.dueAt?.slice(0, 10) || "",
     version: task.version,
+    planningKeyMessage: task.planningKeyMessage || undefined,
     revisionNumber: task.revisions?.[0]?.revisionNumber,
     contentBody: task.revisions?.[0]?.body || undefined,
     keyMessage: task.revisions?.[0]?.keyMessage || undefined,
@@ -552,6 +571,7 @@ function mapRequestTasks(records: ApiRequestRecord[]): Task[] {
     request.tasks.map((task) => ({
       id: task.id,
       requestId: request.id,
+      requesterId: request.requesterId,
       requestStatus: request.status,
       type: task.contentType,
       title: task.title,
@@ -559,6 +579,8 @@ function mapRequestTasks(records: ApiRequestRecord[]): Task[] {
       ownerId: task.ownerId || "",
       ownerName: task.owner?.displayName,
       dueDate: task.dueAt?.slice(0, 10) || "",
+      planningKeyMessage: task.planningKeyMessage || undefined,
+      factChecks: task.factChecks,
       version: task.version,
       revisionNumber: task.revisions[0]?.revisionNumber,
       contentBody: task.revisions[0]?.body || undefined,
@@ -777,6 +799,7 @@ const ROLE_PAGES: Record<Role, Page[]> = {
     "home",
     "new-request",
     "my-requests",
+    "operations",
     "calendar",
     "ideas",
     "message-house",
@@ -2101,6 +2124,7 @@ export function PrCenterApp({
           status: string;
           ownerId: string | null;
           dueAt: string | null;
+          planningKeyMessage: string | null;
           version: number;
         }>;
       };
@@ -2202,6 +2226,7 @@ export function PrCenterApp({
             ownerId: task.ownerId || currentUser.id,
             ownerName: currentUser.name,
             dueDate: task.dueAt?.slice(0, 10) || "",
+            planningKeyMessage: task.planningKeyMessage || undefined,
             version: task.version,
             revisionNumber: undefined,
           })),
@@ -2594,7 +2619,12 @@ export function PrCenterApp({
       return false;
     }
   };
-  const assignTask = async (taskId: string, ownerId: string, dueDate: string) => {
+  const assignTask = async (
+    taskId: string,
+    ownerId: string,
+    dueDate: string,
+    planningKeyMessage?: string,
+  ) => {
     const task = state.tasks.find((item) => item.id === taskId);
     if (!task) return;
     try {
@@ -2605,7 +2635,11 @@ export function PrCenterApp({
           "Content-Type": "application/json",
           "If-Match": String(task.version ?? 0),
         },
-        body: JSON.stringify({ ownerId: ownerId || null, dueAt: dueDate || null }),
+        body: JSON.stringify({
+          ownerId: ownerId || null,
+          dueAt: dueDate || null,
+          planningKeyMessage,
+        }),
       });
       if (!response.ok) {
         const result = (await response.json().catch(() => null)) as {
@@ -2617,6 +2651,7 @@ export function PrCenterApp({
         ownerId: string | null;
         owner: { displayName: string } | null;
         dueAt: string | null;
+        planningKeyMessage: string | null;
         version: number;
       };
       setState((previous) => ({
@@ -2628,6 +2663,7 @@ export function PrCenterApp({
                 ownerId: updated.ownerId || "",
                 ownerName: updated.owner?.displayName,
                 dueDate: updated.dueAt?.slice(0, 10) || "",
+                planningKeyMessage: updated.planningKeyMessage || undefined,
                 version: updated.version,
               }
             : item,
@@ -3171,6 +3207,8 @@ export function PrCenterApp({
               onPublish={publishTask}
               onCreateRevision={createTaskRevision}
               canManageTasks={hasUiRole("pr", "admin")}
+              currentUserId={currentUser.id}
+              canFactCheckPR={actorRoleCodes.includes("RTRDA_PR")}
               onFinalAssetAssigned={(taskId, fileId) =>
                 setState((previous) => ({
                   ...previous,
@@ -4482,6 +4520,8 @@ function Operations({
   onPublish,
   onCreateRevision,
   canManageTasks,
+  currentUserId,
+  canFactCheckPR,
   onFinalAssetAssigned,
   canViewPublishing,
 }: {
@@ -4489,7 +4529,12 @@ function Operations({
   channels: string[];
   language: Language;
   onTransition: (taskId: string, status: StatusId) => void;
-  onAssign: (taskId: string, ownerId: string, dueDate: string) => Promise<void>;
+  onAssign: (
+    taskId: string,
+    ownerId: string,
+    dueDate: string,
+    planningKeyMessage?: string,
+  ) => Promise<void>;
   onSchedule: (taskId: string, channel: string, scheduledFor: string) => Promise<boolean>;
   onPublish: (
     taskId: string,
@@ -4504,6 +4549,8 @@ function Operations({
     changeSummary: string,
   ) => Promise<boolean>;
   canManageTasks: boolean;
+  currentUserId: string;
+  canFactCheckPR: boolean;
   onFinalAssetAssigned: (taskId: string, fileId: string) => void;
   canViewPublishing: boolean;
 }) {
@@ -4512,6 +4559,7 @@ function Operations({
   const [ownerId, setOwnerId] = useState("all");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [dueDate, setDueDate] = useState("");
+  const [planningKeyMessage, setPlanningKeyMessage] = useState("");
   const [channel, setChannel] = useState("");
   const [evidenceChannel, setEvidenceChannel] = useState("");
   const [scheduledFor, setScheduledFor] = useState("");
@@ -4568,14 +4616,15 @@ function Operations({
       );
   };
   useEffect(() => {
+    if (!canManageTasks) return;
     fetch("/api/pr-center/users/assignable", { credentials: "same-origin" })
       .then(async (response) => {
         if (response.ok) setAssignableUsers(await response.json());
       })
       .catch(() => undefined);
-  }, []);
+  }, [canManageTasks]);
   useEffect(() => {
-    if (!selectedId) return;
+    if (!selectedId || !canManageTasks) return;
     fetch(`/api/pr-center/tasks/${selectedId}/history`, {
       credentials: "same-origin",
     })
@@ -4604,9 +4653,12 @@ function Operations({
           );
       })
       .catch(() => setScheduleChoices([]));
-  }, [selectedId]);
+  }, [selectedId, canManageTasks]);
   const visibleTasks = taskItems.filter(
     (task) =>
+      (canManageTasks ||
+        task.ownerId === currentUserId ||
+        task.requesterId === currentUserId) &&
       (status === "all" || task.status === status) &&
       (ownerId === "all" || task.ownerId === ownerId),
   );
@@ -4625,7 +4677,7 @@ function Operations({
     ],
     ["Scheduled", ["approved", "scheduled", "published", "closed"]],
   ];
-  const selected = taskItems.find((task) => task.id === selectedId);
+  const selected = visibleTasks.find((task) => task.id === selectedId);
   const currentActivity = activityTaskId === selected?.id ? activity : null;
   return (
     <>
@@ -4709,6 +4761,7 @@ function Operations({
                         setSelectedId(task.id);
                         setDueDate(task.dueDate);
                         setAssigneeId(task.ownerId);
+                        setPlanningKeyMessage(task.planningKeyMessage || "");
                         setRevisionBody(task.contentBody || "");
                         setRevisionKeyMessage(task.keyMessage || "");
                         setRevisionSummary("");
@@ -4742,6 +4795,28 @@ function Operations({
             {selected.revisionNumber ?? "—"}
             {selected.keyMessage ? ` · ${selected.keyMessage}` : ""}
           </p>
+          {selected.contentBody && (
+            <section className={styles.card}>
+              <h3>{language === "th" ? "เนื้อหาฉบับปัจจุบัน" : "Current content"}</h3>
+              <p style={{ whiteSpace: "pre-wrap" }}>{selected.contentBody}</p>
+            </section>
+          )}
+          {selected.sourceUrls && selected.sourceUrls.length > 0 && (
+            <section className={styles.card}>
+              <h3>
+                {language === "th" ? "แหล่งข้อมูลที่แนบกับคำขอ" : "Request sources"}
+              </h3>
+              <ul>
+                {selected.sourceUrls.map((url) => (
+                  <li key={url}>
+                    <a href={url} target="_blank" rel="noreferrer">
+                      {url}
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
           {canManageTasks &&
             selected.requestStatus === "APPROVED" &&
             ["in_production", "revision_required"].includes(selected.status) && (
@@ -4812,95 +4887,146 @@ function Operations({
                 </button>
               </form>
             )}
-          <label>
-            Assign to{" "}
-            <select
-              value={assigneeId}
-              onChange={(event) => setAssigneeId(event.target.value)}
-            >
-              <option value="">Unassigned</option>
-              {assignableUsers.map((user) => (
-                <option key={user.id} value={user.id}>
-                  {user.displayName}
-                  {user.department?.name ? ` · ${user.department.name}` : ""}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label>
-            Due date{" "}
-            <input
-              type="date"
-              value={dueDate}
-              onChange={(event) => setDueDate(event.target.value)}
-            />
-          </label>
-          <button onClick={() => onAssign(selected.id, assigneeId, dueDate)}>
-            Save assignment
-          </button>
-          {STATUS_TRANSITIONS[selected.status].filter(
-            (next) => next !== "scheduled" && next !== "published",
-          ).length > 0 && (
-            <label>
-              Move to{" "}
-              <select
-                value=""
-                onChange={(event) => {
-                  if (event.target.value)
-                    onTransition(selected.id, event.target.value as StatusId);
-                }}
-              >
-                <option value="">Choose a legal next state</option>
-                {STATUS_TRANSITIONS[selected.status]
-                  .filter((next) => next !== "scheduled" && next !== "published")
-                  .map((next) => (
-                    <option key={next} value={next}>
-                      {STATUS_LABELS[next]}
-                    </option>
-                  ))}
-              </select>
-            </label>
-          )}
-          {(selected.status === "approved" || selected.status === "scheduled") && (
+          {canManageTasks && (
             <>
               <label>
-                Channel{" "}
+                Assign to{" "}
                 <select
-                  value={channel}
-                  onChange={(event) => setChannel(event.target.value)}
-                  required
+                  value={assigneeId}
+                  onChange={(event) => setAssigneeId(event.target.value)}
                 >
-                  <option value="">Select a channel</option>
-                  {channels.map((item) => (
-                    <option key={item} value={item}>
-                      {item}
+                  <option value="">Unassigned</option>
+                  {assignableUsers.map((user) => (
+                    <option key={user.id} value={user.id}>
+                      {user.displayName}
+                      {user.department?.name ? ` · ${user.department.name}` : ""}
                     </option>
                   ))}
                 </select>
               </label>
+              {selected.planningKeyMessage && (
+                <p>
+                  <strong>
+                    {language === "th"
+                      ? "Key Message สำหรับแผนงาน:"
+                      : "Planning key message:"}
+                  </strong>{" "}
+                  {selected.planningKeyMessage}
+                </p>
+              )}
+              {selected.status === "communication_planning" && (
+                <label>
+                  {language === "th" ? "Key Message (แผนงาน)" : "Planning key message"}
+                  <textarea
+                    value={planningKeyMessage}
+                    onChange={(event) => setPlanningKeyMessage(event.target.value)}
+                    maxLength={2000}
+                    rows={2}
+                    placeholder={
+                      language === "th"
+                        ? "ใจความสำคัญที่ต้องการสื่อ"
+                        : "Core message to communicate"
+                    }
+                  />
+                </label>
+              )}
               <label>
-                Schedule time{" "}
+                Due date{" "}
                 <input
-                  type="datetime-local"
-                  value={scheduledFor}
-                  onChange={(event) => setScheduledFor(event.target.value)}
-                  required
+                  type="date"
+                  value={dueDate}
+                  onChange={(event) => setDueDate(event.target.value)}
                 />
               </label>
               <button
-                onClick={async () => {
-                  const saved = await onSchedule(selected.id, channel, scheduledFor);
-                  if (saved)
-                    await loadTaskSchedules(selected.id).catch(() =>
-                      setScheduleChoices([]),
-                    );
-                }}
+                onClick={() =>
+                  onAssign(
+                    selected.id,
+                    assigneeId,
+                    dueDate,
+                    selected.status === "communication_planning"
+                      ? planningKeyMessage
+                      : undefined,
+                  )
+                }
               >
-                Schedule channel
+                Save assignment
               </button>
             </>
           )}
-          {(selected.status === "scheduled" || selected.status === "published") &&
+          {(canFactCheckPR || selected.ownerId === currentUserId) &&
+            selected.revisionNumber !== undefined &&
+            ["in_production", "source_fact_check", "revision_required"].includes(
+              selected.status,
+            ) && (
+              <TaskFactCheckPanel key={selected.id} task={selected} language={language} />
+            )}
+          {canManageTasks &&
+            STATUS_TRANSITIONS[selected.status].filter(
+              (next) => next !== "scheduled" && next !== "published",
+            ).length > 0 && (
+              <label>
+                Move to{" "}
+                <select
+                  value=""
+                  onChange={(event) => {
+                    if (event.target.value)
+                      onTransition(selected.id, event.target.value as StatusId);
+                  }}
+                >
+                  <option value="">Choose a legal next state</option>
+                  {STATUS_TRANSITIONS[selected.status]
+                    .filter((next) => next !== "scheduled" && next !== "published")
+                    .map((next) => (
+                      <option key={next} value={next}>
+                        {STATUS_LABELS[next]}
+                      </option>
+                    ))}
+                </select>
+              </label>
+            )}
+          {canManageTasks &&
+            (selected.status === "approved" || selected.status === "scheduled") && (
+              <>
+                <label>
+                  Channel{" "}
+                  <select
+                    value={channel}
+                    onChange={(event) => setChannel(event.target.value)}
+                    required
+                  >
+                    <option value="">Select a channel</option>
+                    {channels.map((item) => (
+                      <option key={item} value={item}>
+                        {item}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label>
+                  Schedule time{" "}
+                  <input
+                    type="datetime-local"
+                    value={scheduledFor}
+                    onChange={(event) => setScheduledFor(event.target.value)}
+                    required
+                  />
+                </label>
+                <button
+                  onClick={async () => {
+                    const saved = await onSchedule(selected.id, channel, scheduledFor);
+                    if (saved)
+                      await loadTaskSchedules(selected.id).catch(() =>
+                        setScheduleChoices([]),
+                      );
+                  }}
+                >
+                  Schedule channel
+                </button>
+              </>
+            )}
+          {canManageTasks &&
+            (selected.status === "scheduled" || selected.status === "published") &&
             scheduleChoices.length > 0 && (
               <>
                 <label>
@@ -4952,82 +5078,245 @@ function Operations({
                 </button>
               </>
             )}
-          <section className={styles.card}>
-            <h3>Comments and activity</h3>
-            {activityError && <p role="alert">{activityError}</p>}
-            <form
-              onSubmit={async (event) => {
-                event.preventDefault();
-                try {
-                  const response = await fetch(
-                    `/api/pr-center/tasks/${selected.id}/comments`,
-                    {
-                      method: "POST",
-                      credentials: "same-origin",
-                      headers: { "Content-Type": "application/json" },
-                      body: JSON.stringify({ body: commentBody }),
-                    },
-                  );
-                  if (!response.ok) {
-                    setActivityError("Unable to add comment");
-                    return;
+          {canManageTasks && (
+            <section className={styles.card}>
+              <h3>Comments and activity</h3>
+              {activityError && <p role="alert">{activityError}</p>}
+              <form
+                onSubmit={async (event) => {
+                  event.preventDefault();
+                  try {
+                    const response = await fetch(
+                      `/api/pr-center/tasks/${selected.id}/comments`,
+                      {
+                        method: "POST",
+                        credentials: "same-origin",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ body: commentBody }),
+                      },
+                    );
+                    if (!response.ok) {
+                      setActivityError("Unable to add comment");
+                      return;
+                    }
+                    setCommentBody("");
+                    setActivityError("");
+                    await loadTaskActivity(selected.id).catch(() =>
+                      setActivityError("Unable to reload task activity"),
+                    );
+                  } catch {
+                    setActivityError("Unable to add or reload task comment");
                   }
-                  setCommentBody("");
-                  setActivityError("");
-                  await loadTaskActivity(selected.id).catch(() =>
-                    setActivityError("Unable to reload task activity"),
-                  );
-                } catch {
-                  setActivityError("Unable to add or reload task comment");
-                }
-              }}
-            >
-              <label>
-                Add comment{" "}
-                <textarea
-                  value={commentBody}
-                  onChange={(event) => setCommentBody(event.target.value)}
-                  maxLength={5000}
-                  required
-                />
-              </label>
-              <button type="submit" disabled={!commentBody.trim()}>
-                Add comment
-              </button>
-            </form>
-            <ul>
-              {currentActivity?.comments.map((comment) => (
-                <li key={comment.id}>
-                  <b>{comment.author.displayName}</b> ·{" "}
-                  {new Date(comment.createdAt).toLocaleString()}
-                  <p>{comment.body}</p>
-                </li>
-              ))}
-              {currentActivity?.statuses.map((entry) => (
-                <li key={entry.id}>
-                  Status: {entry.fromState} → {entry.toState} ·{" "}
-                  {new Date(entry.createdAt).toLocaleString()}
-                </li>
-              ))}
-              {currentActivity?.audit.map((entry) => (
-                <li key={entry.id}>
-                  {entry.action} · {new Date(entry.createdAt).toLocaleString()}
-                </li>
-              ))}
-            </ul>
-          </section>
-          <AttachmentPanel
-            taskId={selected.id}
-            taskVersion={selected.version ?? 0}
-            revisionNumber={selected.revisionNumber}
-            finalAssetId={selected.finalAssetId}
-            onFinalAssetAssigned={(fileId) => onFinalAssetAssigned(selected.id, fileId)}
-          />
+                }}
+              >
+                <label>
+                  Add comment{" "}
+                  <textarea
+                    value={commentBody}
+                    onChange={(event) => setCommentBody(event.target.value)}
+                    maxLength={5000}
+                    required
+                  />
+                </label>
+                <button type="submit" disabled={!commentBody.trim()}>
+                  Add comment
+                </button>
+              </form>
+              <ul>
+                {currentActivity?.comments.map((comment) => (
+                  <li key={comment.id}>
+                    <b>{comment.author.displayName}</b> ·{" "}
+                    {new Date(comment.createdAt).toLocaleString()}
+                    <p>{comment.body}</p>
+                  </li>
+                ))}
+                {currentActivity?.statuses.map((entry) => (
+                  <li key={entry.id}>
+                    Status: {entry.fromState} → {entry.toState} ·{" "}
+                    {new Date(entry.createdAt).toLocaleString()}
+                  </li>
+                ))}
+                {currentActivity?.audit.map((entry) => (
+                  <li key={entry.id}>
+                    {entry.action} · {new Date(entry.createdAt).toLocaleString()}
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
+          {canManageTasks && (
+            <AttachmentPanel
+              taskId={selected.id}
+              taskVersion={selected.version ?? 0}
+              revisionNumber={selected.revisionNumber}
+              finalAssetId={selected.finalAssetId}
+              onFinalAssetAssigned={(fileId) => onFinalAssetAssigned(selected.id, fileId)}
+            />
+          )}
         </article>
       )}
     </>
   );
 }
+function TaskFactCheckPanel({ task, language }: { task: Task; language: Language }) {
+  type FactCheck = NonNullable<Task["factChecks"]>[number];
+  const [checks, setChecks] = useState<FactCheck[]>(task.factChecks || []);
+  const [claim, setClaim] = useState("");
+  const [evidenceUrl, setEvidenceUrl] = useState("");
+  const [note, setNote] = useState("");
+  const [result, setResult] =
+    useState<FactCheck["items"][number]["result"]>("NEEDS_EVIDENCE");
+  const [summary, setSummary] = useState("");
+  const [error, setError] = useState("");
+  const [saving, setSaving] = useState(false);
+  return (
+    <section className={styles.card}>
+      <h3>
+        {language === "th"
+          ? "ตรวจสอบข้อเท็จจริงและแหล่งอ้างอิง"
+          : "Fact-check and sources"}
+      </h3>
+      <p>
+        {language === "th"
+          ? `ตรวจเนื้อหา revision ${task.revisionNumber} โดยบันทึกทีละข้อ`
+          : `Record one checked claim at a time for revision ${task.revisionNumber}.`}
+      </p>
+      <form
+        onSubmit={async (event) => {
+          event.preventDefault();
+          if (saving) return;
+          setSaving(true);
+          setError("");
+          try {
+            const response = await fetch(`/api/pr-center/tasks/${task.id}/fact-checks`, {
+              method: "POST",
+              credentials: "same-origin",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                summary,
+                items: [{ claim, evidenceUrl, note, result }],
+              }),
+            });
+            const payload = (await response.json().catch(() => null)) as
+              | (FactCheck & { message?: string })
+              | null;
+            if (!response.ok || !payload?.id)
+              throw new Error(payload?.message || "Unable to save fact check");
+            setChecks((previous) => [payload, ...previous]);
+            setClaim("");
+            setEvidenceUrl("");
+            setNote("");
+            setSummary("");
+          } catch (cause) {
+            setError(
+              cause instanceof Error ? cause.message : "Unable to save fact check",
+            );
+          } finally {
+            setSaving(false);
+          }
+        }}
+      >
+        <label>
+          {language === "th" ? "ข้อเท็จจริง/ข้อความที่ตรวจ" : "Claim checked"}
+          <textarea
+            value={claim}
+            onChange={(event) => setClaim(event.target.value)}
+            maxLength={2000}
+            required
+            rows={2}
+          />
+        </label>
+        <label>
+          {language === "th" ? "URL หลักฐาน (HTTPS)" : "Evidence URL (HTTPS)"}
+          <input
+            type="url"
+            value={evidenceUrl}
+            onChange={(event) => setEvidenceUrl(event.target.value)}
+            required
+          />
+        </label>
+        <label>
+          {language === "th" ? "ผลตรวจ" : "Result"}
+          <select
+            value={result}
+            onChange={(event) =>
+              setResult(event.target.value as FactCheck["items"][number]["result"])
+            }
+          >
+            <option value="VERIFIED">
+              {language === "th" ? "ยืนยันแล้ว" : "Verified"}
+            </option>
+            <option value="NEEDS_CORRECTION">
+              {language === "th" ? "ต้องแก้ไข" : "Needs correction"}
+            </option>
+            <option value="NEEDS_EVIDENCE">
+              {language === "th" ? "หลักฐานยังไม่พอ" : "Needs evidence"}
+            </option>
+          </select>
+        </label>
+        <label>
+          {language === "th" ? "หมายเหตุ" : "Note"}
+          <textarea
+            value={note}
+            onChange={(event) => setNote(event.target.value)}
+            maxLength={2000}
+            rows={2}
+          />
+        </label>
+        <label>
+          {language === "th" ? "สรุปผลตรวจ (ถ้ามี)" : "Check summary (optional)"}
+          <input
+            value={summary}
+            onChange={(event) => setSummary(event.target.value)}
+            maxLength={2000}
+          />
+        </label>
+        {error && <p role="alert">{error}</p>}
+        <button type="submit" disabled={saving || !claim.trim() || !evidenceUrl.trim()}>
+          {saving
+            ? language === "th"
+              ? "กำลังบันทึก…"
+              : "Saving…"
+            : language === "th"
+              ? "บันทึกผลตรวจ"
+              : "Record fact check"}
+        </button>
+      </form>
+      <ul>
+        {checks.map((check) => (
+          <li key={check.id}>
+            <strong>
+              {check.taskRevision === task.revisionNumber
+                ? ""
+                : language === "th"
+                  ? "ผลตรวจของ revision เก่า · "
+                  : "Older revision · "}
+              {check.items[0]?.result}
+            </strong>
+            <span>
+              {" "}
+              · {check.checkedBy.displayName} ·{" "}
+              {new Date(check.checkedAt).toLocaleString()}
+            </span>
+            {check.items.map((item, index) => (
+              <div key={`${check.id}-${index}`}>
+                <p>
+                  {item.claim} — {item.result}
+                </p>
+                <a href={item.evidenceUrl} target="_blank" rel="noreferrer">
+                  {item.evidenceUrl}
+                </a>
+                {item.note && <p>{item.note}</p>}
+              </div>
+            ))}
+            {check.summary && <p>{check.summary}</p>}
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
 function PublishingOperations({ language }: { language: Language }) {
   const [range] = useState(() => {
     const from = new Date();

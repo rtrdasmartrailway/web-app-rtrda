@@ -40,6 +40,7 @@ import {
   transitionIdea,
   taskHistory,
   updateTaskAssignment,
+  submitTaskFactCheck,
   transitionTask,
   uploadFile,
   downloadFile,
@@ -549,6 +550,31 @@ export function buildPrCenterApi(
       correlationId(request),
     );
   });
+  app.post("/tasks/:taskId/fact-checks", async (request, reply) => {
+    const input = await body(request);
+    const items = Array.isArray(input.items)
+      ? input.items.map((value) => {
+          const item =
+            value && typeof value === "object" && !Array.isArray(value)
+              ? (value as Record<string, unknown>)
+              : {};
+          return {
+            claim: typeof item.claim === "string" ? item.claim : "",
+            evidenceUrl: typeof item.evidenceUrl === "string" ? item.evidenceUrl : "",
+            note: typeof item.note === "string" ? item.note : undefined,
+            result: typeof item.result === "string" ? item.result : "",
+          };
+        })
+      : [];
+    const record = await submitTaskFactCheck(
+      request.prCenterActor!,
+      taskId((request.params as { taskId: string }).taskId),
+      items as Parameters<typeof submitTaskFactCheck>[2],
+      typeof input.summary === "string" ? input.summary : undefined,
+      correlationId(request),
+    );
+    return reply.status(201).send(record);
+  });
   app.post("/tasks/:taskId/approvals", async (request) => {
     const input = await body(request);
     if (!["APPROVED", "REVISION_REQUIRED", "REJECTED"].includes(String(input.decision)))
@@ -607,7 +633,13 @@ export function buildPrCenterApi(
       request.prCenterActor!,
       taskId((request.params as { taskId: string }).taskId),
       expectedVersion(request),
-      { ownerId: typeof input.ownerId === "string" ? input.ownerId : null, dueAt },
+      {
+        ownerId: typeof input.ownerId === "string" ? input.ownerId : null,
+        dueAt,
+        ...(typeof input.planningKeyMessage === "string"
+          ? { planningKeyMessage: input.planningKeyMessage }
+          : {}),
+      },
       correlationId(request),
     );
   });

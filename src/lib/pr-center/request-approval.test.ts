@@ -103,7 +103,11 @@ describe("request intake approval", () => {
       expect.objectContaining({
         where: {
           organizationId: "org-1",
-          OR: [{ requesterId: "board-user" }, { departmentId: "dept-1" }],
+          OR: [
+            { requesterId: "board-user" },
+            { tasks: { some: { ownerId: "board-user" } } },
+            { departmentId: "dept-1" },
+          ],
         },
       }),
     );
@@ -117,7 +121,10 @@ describe("request intake approval", () => {
       expect.objectContaining({
         where: expect.objectContaining({
           organizationId: "org-1",
-          OR: [{ requesterId: requesterActor.id }],
+          OR: [
+            { requesterId: requesterActor.id },
+            { tasks: { some: { ownerId: requesterActor.id } } },
+          ],
         }),
         include: expect.objectContaining({
           requester: { select: { displayName: true } },
@@ -134,7 +141,11 @@ describe("request intake approval", () => {
     expect(prWhere).toEqual(
       expect.objectContaining({
         organizationId: "org-1",
-        OR: [{ requesterId: prActor.id }, { departmentId: "dept-1" }],
+        OR: [
+          { requesterId: prActor.id },
+          { tasks: { some: { ownerId: prActor.id } } },
+          { departmentId: "dept-1" },
+        ],
       }),
     );
     expect(prWhere).not.toHaveProperty("requesterId");
@@ -166,10 +177,27 @@ describe("request intake approval", () => {
       expect.objectContaining({
         where: expect.objectContaining({
           organizationId: "org-1",
-          OR: [{ requesterId: departmentAdmin.id }, { departmentId: "dept-2" }],
+          OR: [
+            { requesterId: departmentAdmin.id },
+            { tasks: { some: { ownerId: departmentAdmin.id } } },
+            { departmentId: "dept-2" },
+          ],
         }),
       }),
     );
+  });
+
+  it("returns only the assigned task to a non-requester task owner", async () => {
+    const assignedOwner: PrCenterActor = { ...requesterActor, id: "assigned-owner" };
+    const assignedTask = { id: "owned-task", ownerId: assignedOwner.id };
+    const siblingTask = { id: "sibling-task", ownerId: "another-owner" };
+    mockPrisma.prRequest.findMany.mockResolvedValue([
+      { ...requestRecord, tasks: [assignedTask, siblingTask] },
+    ]);
+
+    const requests = await listRequests(assignedOwner);
+
+    expect(requests[0]?.tasks).toEqual([assignedTask]);
   });
 
   it("lets BORD open another user's request within its grant scope", async () => {

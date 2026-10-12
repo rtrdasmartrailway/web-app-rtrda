@@ -126,6 +126,12 @@ enum PrApprovalDecision {
   REPLACED
 }
 
+enum PrFactCheckResult {
+  VERIFIED
+  NEEDS_CORRECTION
+  NEEDS_EVIDENCE
+}
+
 enum PrFileScanStatus {
   PENDING
   CLEAN
@@ -216,26 +222,27 @@ model PrDepartment {
 }
 
 model PrCenterUser {
-  id             String           @id @default(uuid()) @db.Uuid
-  organizationId String           @db.Uuid
-  departmentId   String?          @db.Uuid
-  ssoSubject     String           @unique
-  email          String           @unique
+  id             String            @id @default(uuid()) @db.Uuid
+  organizationId String            @db.Uuid
+  departmentId   String?           @db.Uuid
+  ssoSubject     String            @unique
+  email          String            @unique
   displayName    String
   position       String?
-  active         Boolean          @default(true)
-  organization   PrOrganization   @relation(fields: [organizationId], references: [id], onDelete: Restrict)
-  department     PrDepartment?    @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+  active         Boolean           @default(true)
+  organization   PrOrganization    @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  department     PrDepartment?     @relation(fields: [departmentId], references: [id], onDelete: SetNull)
   roles          PrUserRole[]
-  requests       PrRequest[]      @relation("PrRequester")
-  assignedTasks  PrTask[]         @relation("PrTaskOwner")
+  requests       PrRequest[]       @relation("PrRequester")
+  assignedTasks  PrTask[]          @relation("PrTaskOwner")
+  factChecks     PrTaskFactCheck[] @relation("PrTaskFactChecker")
   comments       PrComment[]
   approvals      PrApproval[]
   notifications  PrNotification[]
   drafts         PrUserDraft[]
   auditEvents    PrAuditEvent[]
-  createdAt      DateTime         @default(now())
-  updatedAt      DateTime         @updatedAt
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
 
   @@index([organizationId, departmentId, active])
 }
@@ -357,25 +364,27 @@ model PrRequestSource {
 }
 
 model PrTask {
-  id            String            @id @default(uuid()) @db.Uuid
-  requestId     String            @db.Uuid
-  ownerId       String?           @db.Uuid
-  title         String
-  contentType   String
-  channel       String?
-  status        PrTaskStatus      @default(DRAFT)
-  dueAt         DateTime?
-  version       Int               @default(1)
-  request       PrRequest         @relation(fields: [requestId], references: [id], onDelete: Cascade)
-  owner         PrCenterUser?     @relation("PrTaskOwner", fields: [ownerId], references: [id], onDelete: SetNull)
-  revisions     PrTaskRevision[]
-  approvals     PrApproval[]
-  schedules     PrSchedule[]
-  comments      PrComment[]
-  attachments   PrAttachment[]
-  statusHistory PrStatusHistory[]
-  createdAt     DateTime          @default(now())
-  updatedAt     DateTime          @updatedAt
+  id                 String            @id @default(uuid()) @db.Uuid
+  requestId          String            @db.Uuid
+  ownerId            String?           @db.Uuid
+  title              String
+  contentType        String
+  channel            String?
+  status             PrTaskStatus      @default(DRAFT)
+  dueAt              DateTime?
+  planningKeyMessage String?
+  version            Int               @default(1)
+  request            PrRequest         @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  owner              PrCenterUser?     @relation("PrTaskOwner", fields: [ownerId], references: [id], onDelete: SetNull)
+  revisions          PrTaskRevision[]
+  factChecks         PrTaskFactCheck[]
+  approvals          PrApproval[]
+  schedules          PrSchedule[]
+  comments           PrComment[]
+  attachments        PrAttachment[]
+  statusHistory      PrStatusHistory[]
+  createdAt          DateTime          @default(now())
+  updatedAt          DateTime          @updatedAt
 
   @@index([requestId, status])
   @@index([ownerId, status, dueAt])
@@ -393,6 +402,32 @@ model PrTaskRevision {
   createdAt      DateTime  @default(now())
 
   @@unique([taskId, revisionNumber])
+}
+
+model PrTaskFactCheck {
+  id           String                @id @default(uuid()) @db.Uuid
+  taskId       String                @db.Uuid
+  taskRevision Int
+  checkedById  String                @db.Uuid
+  checkedAt    DateTime              @default(now())
+  summary      String?
+  task         PrTask                @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  checkedBy    PrCenterUser          @relation("PrTaskFactChecker", fields: [checkedById], references: [id], onDelete: Restrict)
+  items        PrTaskFactCheckItem[]
+
+  @@index([taskId, taskRevision, checkedAt])
+}
+
+model PrTaskFactCheckItem {
+  id          String            @id @default(uuid()) @db.Uuid
+  factCheckId String            @db.Uuid
+  claim       String
+  evidenceUrl String
+  note        String?
+  result      PrFactCheckResult
+  factCheck   PrTaskFactCheck   @relation(fields: [factCheckId], references: [id], onDelete: Cascade)
+
+  @@index([factCheckId])
 }
 
 model PrApproval {

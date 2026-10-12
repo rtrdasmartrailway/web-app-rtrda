@@ -100,6 +100,26 @@ describe("File and attachment route guards", () => {
     await app.close();
   });
 
+  it("rejects unauthenticated fact-check submission", async () => {
+    const app = buildPrCenterApi(async () => null);
+    const response = await app.inject({
+      method: "POST",
+      url: "/tasks/task-id/fact-checks",
+      payload: {
+        items: [
+          {
+            claim: "Example factual claim",
+            evidenceUrl: "https://example.org/evidence",
+            result: "VERIFIED",
+          },
+        ],
+      },
+    });
+
+    expect(response.statusCode).toBe(401);
+    await app.close();
+  });
+
   it("rejects unauthenticated final asset assignment", async () => {
     const app = buildPrCenterApi(async () => null);
     const response = await app.inject({
