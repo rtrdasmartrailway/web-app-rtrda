@@ -24,11 +24,7 @@ export type ApprovalPolicy = {
   stages: ApprovalPolicyStage[];
 };
 
-const APPROVER_ROLES: PrCenterRole[] = [
-  "APPROVER",
-  "PR_OPERATIONS",
-  "SCOPED_ADMINISTRATOR",
-];
+const APPROVER_ROLES: PrCenterRole[] = ["RTRDA_PR", "RTRDA_BORD", "RTRDA_ADMIN"];
 const TOP_LEVEL_KEYS = new Set(["version", "approvalReference", "effectiveAt", "stages"]);
 const STAGE_KEYS = new Set(["status", "required", "roles", "departmentScope"]);
 

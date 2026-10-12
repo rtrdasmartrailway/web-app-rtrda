@@ -6,11 +6,11 @@ const session: PrCenterSession = {
   displayName: "Test User",
   departmentName: "Communications",
   isRootAdministrator: false,
-  role: "PR_OPERATIONS",
-  roles: ["REQUESTER", "PR_OPERATIONS"],
+  role: "RTRDA_PR",
+  roles: ["RTRDA_ALL_USER", "RTRDA_PR"],
   roleGrants: [
-    { role: "PR_OPERATIONS", departmentId: "dept-1" },
-    { role: "REQUESTER", departmentId: null },
+    { role: "RTRDA_PR", departmentId: "dept-1" },
+    { role: "RTRDA_ALL_USER", departmentId: null },
   ],
 };
 

@@ -12,7 +12,7 @@ const actor = {
   id: "user-1",
   organizationId: "org-1",
   departmentId: "dept-1",
-  role: "PR_OPERATIONS" as const,
+  role: "RTRDA_PR" as const,
 };
 const idea = (id: string) => ({
   id,
@@ -117,7 +117,7 @@ describe("listIdeas pagination and scope", () => {
   });
 
   it("limits requester results to their own records", async () => {
-    await listIdeas({ ...actor, role: "REQUESTER" }, { take: 50, offset: 0 });
+    await listIdeas({ ...actor, role: "RTRDA_ALL_USER" }, { take: 50, offset: 0 });
 
     expect(mocks.findMany.mock.calls[0][0].where).toEqual({
       organizationId: "org-1",
@@ -134,7 +134,7 @@ describe("listIdeas pagination and scope", () => {
     mocks.findMany.mockResolvedValue([rejectedIdea]);
 
     const result = await listIdeas(
-      { ...actor, role: "REQUESTER" },
+      { ...actor, role: "RTRDA_ALL_USER" },
       { take: 50, offset: 0 },
     );
 
@@ -153,7 +153,7 @@ describe("listIdeas pagination and scope", () => {
     const administrator = {
       ...actor,
       id: "admin-1",
-      role: "SCOPED_ADMINISTRATOR" as const,
+      role: "RTRDA_ADMIN" as const,
       scopeDepartmentId: "dept-review",
     };
     await listIdeas(administrator, { take: 50, offset: 0 });

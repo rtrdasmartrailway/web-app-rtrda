@@ -20,7 +20,7 @@ const actor = {
   id: "user-1",
   organizationId: "org-1",
   departmentId: "dept-1",
-  role: "PR_OPERATIONS" as const,
+  role: "RTRDA_PR" as const,
 };
 
 const messageHouseVersions = [
@@ -80,26 +80,25 @@ describe("currentMessageHouse", () => {
   it("allows scoped administrators to read the current organization version", async () => {
     mocks.findFirst.mockResolvedValue(messageHouseVersions[0]);
 
-    await expect(
-      currentMessageHouse({ ...actor, role: "SCOPED_ADMINISTRATOR" }),
-    ).resolves.toEqual(messageHouseVersions[0]);
+    await expect(currentMessageHouse({ ...actor, role: "RTRDA_ADMIN" })).resolves.toEqual(
+      messageHouseVersions[0],
+    );
   });
 
-  it("allows executive read-only roles to read the current version", async () => {
-    await expect(
-      currentMessageHouse({ ...actor, role: "EXECUTIVE_READ_ONLY" }),
-    ).resolves.toBeNull();
+  it("allows RTRDA_BORD read-only access to the current Message House version", async () => {
+    mocks.findFirst.mockResolvedValue(messageHouseVersions[0]);
+
+    await expect(currentMessageHouse({ ...actor, role: "RTRDA_BORD" })).resolves.toEqual(
+      messageHouseVersions[0],
+    );
   });
 
-  it.each(["REQUESTER", "APPROVER"] as const)(
-    "denies current-version reads to %s",
-    async (role) => {
-      await expect(currentMessageHouse({ ...actor, role })).rejects.toThrow(
-        "You cannot view Message House",
-      );
-      expect(mocks.findFirst).not.toHaveBeenCalled();
-    },
-  );
+  it("denies current-version reads to RTRDA_ALL_USER", async () => {
+    await expect(
+      currentMessageHouse({ ...actor, role: "RTRDA_ALL_USER" }),
+    ).rejects.toThrow("You cannot view Message House");
+    expect(mocks.findFirst).not.toHaveBeenCalled();
+  });
 
   it("lists only approved or superseded versions that are already effective", async () => {
     await messageHouseHistory(actor);
@@ -130,9 +129,9 @@ describe("currentMessageHouse", () => {
   });
 
   it("denies history reads to roles without Message House page access", async () => {
-    await expect(messageHouseHistory({ ...actor, role: "REQUESTER" })).rejects.toThrow(
-      "You cannot view Message House",
-    );
+    await expect(
+      messageHouseHistory({ ...actor, role: "RTRDA_ALL_USER" }),
+    ).rejects.toThrow("You cannot view Message House");
     expect(mocks.findMany).not.toHaveBeenCalled();
   });
 });

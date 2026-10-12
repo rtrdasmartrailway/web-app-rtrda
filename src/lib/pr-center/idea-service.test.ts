@@ -43,7 +43,7 @@ describe("createIdea persistence", () => {
         id: "user-1",
         organizationId: "org-1",
         departmentId: "dept-1",
-        role: "REQUESTER",
+        role: "RTRDA_ALL_USER",
       },
       {
         title: "Safer road travel",

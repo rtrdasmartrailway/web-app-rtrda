@@ -26,7 +26,7 @@ const actor = {
   id: "pr-lead",
   organizationId: "org-1",
   departmentId: "dept-1",
-  role: "PR_OPERATIONS" as const,
+  role: "RTRDA_PR" as const,
 };
 
 const input = {
@@ -104,7 +104,7 @@ describe("Message House draft editing", () => {
 
   it("denies non-PR editors", async () => {
     await expect(
-      saveMessageHouseDraft({ ...actor, role: "REQUESTER" }, input),
+      saveMessageHouseDraft({ ...actor, role: "RTRDA_ALL_USER" }, input),
     ).rejects.toMatchObject({ code: "FORBIDDEN", statusCode: 403 });
     expect(mocks.prisma.$transaction).not.toHaveBeenCalled();
   });

@@ -3,26 +3,10 @@ export type PrCenterSession = {
   displayName: string;
   departmentName: string;
   isRootAdministrator: boolean;
-  role:
-    | "REQUESTER"
-    | "PR_OPERATIONS"
-    | "APPROVER"
-    | "EXECUTIVE_READ_ONLY"
-    | "SCOPED_ADMINISTRATOR";
-  roles: Array<
-    | "REQUESTER"
-    | "PR_OPERATIONS"
-    | "APPROVER"
-    | "EXECUTIVE_READ_ONLY"
-    | "SCOPED_ADMINISTRATOR"
-  >;
+  role: "RTRDA_ALL_USER" | "RTRDA_PR" | "RTRDA_BORD" | "RTRDA_ADMIN";
+  roles: Array<"RTRDA_ALL_USER" | "RTRDA_PR" | "RTRDA_BORD" | "RTRDA_ADMIN">;
   roleGrants: Array<{
-    role:
-      | "REQUESTER"
-      | "PR_OPERATIONS"
-      | "APPROVER"
-      | "EXECUTIVE_READ_ONLY"
-      | "SCOPED_ADMINISTRATOR";
+    role: "RTRDA_ALL_USER" | "RTRDA_PR" | "RTRDA_BORD" | "RTRDA_ADMIN";
     departmentId: string | null;
   }>;
 };

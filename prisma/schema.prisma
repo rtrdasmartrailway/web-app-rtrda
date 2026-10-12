@@ -79,11 +79,10 @@ model SiteMeta {
 }
 
 enum PrCenterRoleCode {
-  REQUESTER
-  PR_OPERATIONS
-  APPROVER
-  EXECUTIVE_READ_ONLY
-  SCOPED_ADMINISTRATOR
+  RTRDA_ALL_USER
+  RTRDA_PR
+  RTRDA_BORD
+  RTRDA_ADMIN
 }
 
 enum PrRequestType {

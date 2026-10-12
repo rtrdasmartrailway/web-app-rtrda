@@ -24,7 +24,7 @@ const actor = {
   id: "root-admin",
   organizationId: "org-1",
   departmentId: null,
-  role: "SCOPED_ADMINISTRATOR" as const,
+  role: "RTRDA_ADMIN" as const,
   scopeDepartmentId: null,
 };
 
@@ -40,7 +40,7 @@ describe("PR Center master data", () => {
   });
 
   it("returns handoff defaults and live departments until an organization overrides them", async () => {
-    const data = await getPrMasterData({ ...actor, role: "REQUESTER" });
+    const data = await getPrMasterData({ ...actor, role: "RTRDA_ALL_USER" });
     expect(data.channels).toEqual([
       "Website",
       "Facebook",
@@ -96,7 +96,7 @@ describe("PR Center master data", () => {
   it("requires an organization-wide administrator grant to edit master data", async () => {
     await expect(
       savePrMasterData(
-        { ...actor, role: "PR_OPERATIONS", scopeDepartmentId: "dept-1" },
+        { ...actor, role: "RTRDA_PR", scopeDepartmentId: "dept-1" },
         {
           channels: ["Website"],
           contentTypes: ["Website News"],

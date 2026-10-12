@@ -40,22 +40,22 @@ const scopedPr: PrCenterActor = {
   id: "pr-1",
   organizationId: "org-1",
   departmentId: "dept-home",
-  role: "PR_OPERATIONS",
-  roleGrants: [{ role: "PR_OPERATIONS", departmentId: "dept-1" }],
+  role: "RTRDA_PR",
+  roleGrants: [{ role: "RTRDA_PR", departmentId: "dept-1" }],
 };
 const scopedAdmin: PrCenterActor = {
   id: "admin-1",
   organizationId: "org-1",
   departmentId: "dept-1",
-  role: "SCOPED_ADMINISTRATOR",
-  roleGrants: [{ role: "SCOPED_ADMINISTRATOR", departmentId: "dept-1" }],
+  role: "RTRDA_ADMIN",
+  roleGrants: [{ role: "RTRDA_ADMIN", departmentId: "dept-1" }],
 };
 const organizationAdmin: PrCenterActor = {
   id: "org-admin-1",
   organizationId: "org-1",
   departmentId: "dept-1",
-  role: "SCOPED_ADMINISTRATOR",
-  roleGrants: [{ role: "SCOPED_ADMINISTRATOR", departmentId: null }],
+  role: "RTRDA_ADMIN",
+  roleGrants: [{ role: "RTRDA_ADMIN", departmentId: null }],
 };
 const requestScope = {
   organizationId: "org-1",
@@ -138,7 +138,7 @@ describe("scope-sensitive file and audit operations", () => {
         after: {
           filters,
           count: 0,
-          authorityRoles: [{ role: "SCOPED_ADMINISTRATOR", departmentId: null }],
+          authorityRoles: [{ role: "RTRDA_ADMIN", departmentId: null }],
         },
       },
     });

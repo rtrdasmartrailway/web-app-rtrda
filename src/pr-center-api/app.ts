@@ -708,7 +708,7 @@ export function buildPrCenterApi(
       correlationId(request),
     );
   });
-  // ── Access Administration routes (SCOPED_ADMINISTRATOR only) ────────────
+  // ── Access Administration routes (RTRDA_ADMIN only) ────────────
   app.get("/admin/users", async (request) => listAdminUsers(request.prCenterActor!));
   app.post("/admin/users/:userId/roles", async (request, reply) => {
     const input =
@@ -781,7 +781,7 @@ export function buildPrCenterApi(
       correlationId(request),
     ),
   );
-  // ── Audit export (SCOPED_ADMINISTRATOR) ──────────────────────────────
+  // ── Audit export (RTRDA_ADMIN) ──────────────────────────────
   app.post("/audit/export", async (request) => {
     const input = await body(request);
     return exportAuditEvents(request.prCenterActor!, {
@@ -791,7 +791,7 @@ export function buildPrCenterApi(
       actorId: typeof input.actorId === "string" ? input.actorId : undefined,
     });
   });
-  // ── Restore / compensating-change (SCOPED_ADMINISTRATOR) ─────────────
+  // ── Restore / compensating-change (RTRDA_ADMIN) ─────────────
   app.post("/requests/:requestId/restore", async (request) => {
     const input = await body(request);
     return restoreRequest(
@@ -802,7 +802,7 @@ export function buildPrCenterApi(
       correlationId(request),
     );
   });
-  // ── Release readiness (SCOPED_ADMINISTRATOR) ─────────────────────────
+  // ── Release readiness (RTRDA_ADMIN) ─────────────────────────
   app.get("/admin/release-readiness", async (request) =>
     releaseReadinessCheck(request.prCenterActor!),
   );

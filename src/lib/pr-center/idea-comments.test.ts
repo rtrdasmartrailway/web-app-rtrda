@@ -24,13 +24,13 @@ const owner = {
   id: "user-owner",
   organizationId: "org-1",
   departmentId: "dept-2",
-  role: "REQUESTER" as const,
+  role: "RTRDA_ALL_USER" as const,
 };
 const reviewer = {
   id: "user-pr",
   organizationId: "org-1",
   departmentId: "dept-1",
-  role: "PR_OPERATIONS" as const,
+  role: "RTRDA_PR" as const,
 };
 
 beforeEach(() => {

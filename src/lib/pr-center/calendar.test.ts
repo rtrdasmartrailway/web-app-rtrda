@@ -22,7 +22,7 @@ const actor = {
   id: "user-1",
   organizationId: "org-1",
   departmentId: "dept-1",
-  role: "PR_OPERATIONS" as const,
+  role: "RTRDA_PR" as const,
 };
 const from = new Date("2026-10-01T00:00:00.000Z");
 const to = new Date("2026-11-01T00:00:00.000Z");
@@ -105,7 +105,12 @@ describe("listCalendarEntries", () => {
           { scheduledFor: { gte: from, lt: to }, publishedAt: null },
           { publishedAt: { gte: from, lt: to } },
         ],
-        task: { request: { organizationId: "org-1", OR: [{ departmentId: "dept-1" }] } },
+        task: {
+          request: {
+            organizationId: "org-1",
+            OR: [{ requesterId: "user-1" }, { departmentId: "dept-1" }],
+          },
+        },
       },
       select: {
         id: true,
@@ -129,7 +134,10 @@ describe("listCalendarEntries", () => {
       where: {
         status: "DRAFT",
         dueAt: { gte: from, lt: to },
-        request: { organizationId: "org-1", OR: [{ departmentId: "dept-1" }] },
+        request: {
+          organizationId: "org-1",
+          OR: [{ requesterId: "user-1" }, { departmentId: "dept-1" }],
+        },
       },
       select: {
         id: true,
@@ -143,7 +151,7 @@ describe("listCalendarEntries", () => {
   });
 
   it("scopes requester calendar data to their own requests", async () => {
-    const requester = { ...actor, id: "requester-1", role: "REQUESTER" as const };
+    const requester = { ...actor, id: "requester-1", role: "RTRDA_ALL_USER" as const };
     await listCalendarEntries(requester, from, to);
 
     expect(mocks.scheduleFindMany.mock.calls[0][0].where.task.request).toEqual({
@@ -218,7 +226,12 @@ describe("listCalendarRequestDecisions", () => {
           requestId: { not: null },
           toState: { in: ["APPROVED", "REJECTED"] },
           createdAt: { gte: from, lt: to },
-          request: { is: { organizationId: "org-1", OR: [{ departmentId: "dept-1" }] } },
+          request: {
+            is: {
+              organizationId: "org-1",
+              OR: [{ requesterId: "user-1" }, { departmentId: "dept-1" }],
+            },
+          },
         }),
       }),
     );

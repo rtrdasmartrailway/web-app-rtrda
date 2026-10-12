@@ -20,9 +20,9 @@ const requester = {
   id: "requester-1",
   organizationId: "org-1",
   departmentId: "dept-1",
-  role: "REQUESTER" as const,
+  role: "RTRDA_ALL_USER" as const,
 };
-const prActor = { ...requester, id: "pr-1", role: "PR_OPERATIONS" as const };
+const prActor = { ...requester, id: "pr-1", role: "RTRDA_PR" as const };
 
 afterEach(() => vi.clearAllMocks());
 

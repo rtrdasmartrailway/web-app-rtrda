@@ -26,15 +26,15 @@ const scopedAdministrator: PrCenterActor = {
   id: "admin-1",
   organizationId: "org-1",
   departmentId: "dept-1",
-  role: "SCOPED_ADMINISTRATOR",
-  roleGrants: [{ role: "SCOPED_ADMINISTRATOR", departmentId: "dept-1" }],
+  role: "RTRDA_ADMIN",
+  roleGrants: [{ role: "RTRDA_ADMIN", departmentId: "dept-1" }],
 };
 const organizationAdministrator: PrCenterActor = {
   id: "org-admin-1",
   organizationId: "org-1",
   departmentId: "dept-1",
-  role: "SCOPED_ADMINISTRATOR",
-  roleGrants: [{ role: "SCOPED_ADMINISTRATOR", departmentId: null }],
+  role: "RTRDA_ADMIN",
+  roleGrants: [{ role: "RTRDA_ADMIN", departmentId: null }],
   isRootAdministrator: true,
 };
 
@@ -60,7 +60,7 @@ describe("scoped access administration", () => {
     "rejects an empty or oversized access reason",
     async (reason) => {
       await expect(
-        grantRole(scopedAdministrator, "user-1", "PR_OPERATIONS", "dept-1", reason),
+        grantRole(scopedAdministrator, "user-1", "RTRDA_PR", "dept-1", reason),
       ).rejects.toMatchObject({
         statusCode: 422,
         code: reason.trim() ? "INVALID_REASON" : "REASON_REQUIRED",
@@ -98,7 +98,7 @@ describe("scoped access administration", () => {
         grantRole(
           scopedAdministrator,
           "user-1",
-          "PR_OPERATIONS",
+          "RTRDA_PR",
           departmentId,
           "role assignment",
         ),
@@ -111,7 +111,7 @@ describe("scoped access administration", () => {
     await grantRole(
       scopedAdministrator,
       "user-1",
-      "PR_OPERATIONS",
+      "RTRDA_PR",
       "dept-1",
       "coverage assignment",
       "corr-1",
@@ -120,7 +120,7 @@ describe("scoped access administration", () => {
     expect(mockPrisma.prUserRole.create).toHaveBeenCalledWith({
       data: {
         userId: "user-1",
-        role: "PR_OPERATIONS",
+        role: "RTRDA_PR",
         organizationId: "org-1",
         departmentId: "dept-1",
       },
@@ -131,10 +131,10 @@ describe("scoped access administration", () => {
           action: "access.role_granted",
           correlationId: "corr-1",
           after: expect.objectContaining({
-            role: "PR_OPERATIONS",
+            role: "RTRDA_PR",
             departmentId: "dept-1",
             reason: "coverage assignment",
-            authorityRoles: [{ role: "SCOPED_ADMINISTRATOR", departmentId: "dept-1" }],
+            authorityRoles: [{ role: "RTRDA_ADMIN", departmentId: "dept-1" }],
           }),
         }),
       }),
@@ -143,13 +143,7 @@ describe("scoped access administration", () => {
 
   it("allows only the root administrator to grant a delegated administrator role", async () => {
     await expect(
-      grantRole(
-        scopedAdministrator,
-        "user-2",
-        "SCOPED_ADMINISTRATOR",
-        "dept-1",
-        "admin coverage",
-      ),
+      grantRole(scopedAdministrator, "user-2", "RTRDA_ADMIN", "dept-1", "admin coverage"),
     ).rejects.toMatchObject({ code: "ROOT_ADMIN_REQUIRED", statusCode: 403 });
     expect(mockPrisma.prUserRole.create).not.toHaveBeenCalled();
 
@@ -157,7 +151,7 @@ describe("scoped access administration", () => {
       grantRole(
         organizationAdministrator,
         "user-2",
-        "SCOPED_ADMINISTRATOR",
+        "RTRDA_ADMIN",
         null,
         "delegated admin",
       ),
@@ -165,7 +159,7 @@ describe("scoped access administration", () => {
     expect(mockPrisma.prUserRole.create).toHaveBeenCalledWith({
       data: {
         userId: "user-2",
-        role: "SCOPED_ADMINISTRATOR",
+        role: "RTRDA_ADMIN",
         organizationId: "org-1",
         departmentId: null,
       },
@@ -175,7 +169,7 @@ describe("scoped access administration", () => {
   it("denies revoking an out-of-scope grant before mutation", async () => {
     mockPrisma.prUserRole.findFirst.mockResolvedValue({
       id: "grant-2",
-      role: "PR_OPERATIONS",
+      role: "RTRDA_PR",
       organizationId: "org-1",
       departmentId: "dept-2",
       userId: "user-1",
@@ -194,7 +188,7 @@ describe("scoped access administration", () => {
   it("allows revoking an in-scope grant and audits the authority used", async () => {
     mockPrisma.prUserRole.findFirst.mockResolvedValue({
       id: "grant-1",
-      role: "PR_OPERATIONS",
+      role: "RTRDA_PR",
       organizationId: "org-1",
       departmentId: "dept-1",
       userId: "user-1",
@@ -219,10 +213,10 @@ describe("scoped access administration", () => {
           action: "access.role_revoked",
           correlationId: "corr-2",
           before: expect.objectContaining({
-            role: "PR_OPERATIONS",
+            role: "RTRDA_PR",
             departmentId: "dept-1",
             reason: "assignment ended",
-            authorityRoles: [{ role: "SCOPED_ADMINISTRATOR", departmentId: "dept-1" }],
+            authorityRoles: [{ role: "RTRDA_ADMIN", departmentId: "dept-1" }],
           }),
         }),
       }),
@@ -232,7 +226,7 @@ describe("scoped access administration", () => {
   it("prevents delegated administrators from revoking administrator roles", async () => {
     mockPrisma.prUserRole.findFirst.mockResolvedValue({
       id: "admin-grant",
-      role: "SCOPED_ADMINISTRATOR",
+      role: "RTRDA_ADMIN",
       organizationId: "org-1",
       departmentId: "dept-1",
       userId: "user-2",
@@ -252,13 +246,7 @@ describe("scoped access administration", () => {
     });
 
     await expect(
-      grantRole(
-        scopedAdministrator,
-        "user-2",
-        "PR_OPERATIONS",
-        "dept-1",
-        "role assignment",
-      ),
+      grantRole(scopedAdministrator, "user-2", "RTRDA_PR", "dept-1", "role assignment"),
     ).rejects.toMatchObject({ statusCode: 403, code: "FORBIDDEN" });
     expect(mockPrisma.prUserRole.create).not.toHaveBeenCalled();
   });
@@ -268,7 +256,7 @@ describe("scoped access administration", () => {
       grantRole(
         organizationAdministrator,
         "org-admin-1",
-        "PR_OPERATIONS",
+        "RTRDA_PR",
         null,
         "role assignment",
       ),
@@ -280,7 +268,7 @@ describe("scoped access administration", () => {
   it("prevents revoking the last active organization-wide administrator", async () => {
     mockPrisma.prUserRole.findFirst.mockResolvedValue({
       id: "org-admin-grant",
-      role: "SCOPED_ADMINISTRATOR",
+      role: "RTRDA_ADMIN",
       organizationId: "org-1",
       departmentId: null,
       userId: "admin-2",
@@ -303,7 +291,7 @@ describe("scoped access administration", () => {
   it("allows revocation when another active organization-wide administrator remains", async () => {
     mockPrisma.prUserRole.findFirst.mockResolvedValue({
       id: "org-admin-grant",
-      role: "SCOPED_ADMINISTRATOR",
+      role: "RTRDA_ADMIN",
       organizationId: "org-1",
       departmentId: null,
       userId: "admin-2",
@@ -378,7 +366,7 @@ describe("scoped access administration", () => {
       departmentId: "dept-1",
       active: true,
       email: "admin-2@rtrda.or.th",
-      roles: [{ role: "SCOPED_ADMINISTRATOR", departmentId: "dept-1" }],
+      roles: [{ role: "RTRDA_ADMIN", departmentId: "dept-1" }],
     });
     await expect(
       toggleUserActive(scopedAdministrator, "admin-2", "remove access"),
@@ -393,7 +381,7 @@ describe("scoped access administration", () => {
       departmentId: "dept-1",
       active: true,
       email: "admin@apprtrda.onmicrosoft.com",
-      roles: [{ role: "SCOPED_ADMINISTRATOR", departmentId: null }],
+      roles: [{ role: "RTRDA_ADMIN", departmentId: null }],
     });
     await expect(
       toggleUserActive(organizationAdministrator, "root-admin", "remove access"),
@@ -404,7 +392,7 @@ describe("scoped access administration", () => {
   it("maps a serializable transaction conflict to a safe stale-write error", async () => {
     mockPrisma.prUserRole.findFirst.mockResolvedValue({
       id: "role-1",
-      role: "PR_OPERATIONS",
+      role: "RTRDA_PR",
       organizationId: "org-1",
       departmentId: "dept-1",
       userId: "user-1",

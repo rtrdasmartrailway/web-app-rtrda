@@ -37,7 +37,7 @@ const actor = {
   organizationId: "org-1",
   departmentId: "dept-home",
   scopeDepartmentId: "dept-1",
-  role: "PR_OPERATIONS" as const,
+  role: "RTRDA_PR" as const,
 };
 
 describe("idea reviewer scope", () => {
@@ -98,7 +98,7 @@ describe("idea reviewer scope", () => {
 
       await expect(
         transitionIdea(
-          to === "ACCEPTED" ? { ...actor, role: "APPROVER" as const } : actor,
+          to === "ACCEPTED" ? { ...actor, role: "RTRDA_PR" as const } : actor,
           "idea-1",
           3,
           to,
@@ -120,7 +120,7 @@ describe("idea reviewer scope", () => {
     });
 
     await transitionIdea(
-      { ...actor, role: "APPROVER" },
+      { ...actor, role: "RTRDA_PR" },
       "idea-1",
       3,
       "REJECTED",
@@ -169,7 +169,7 @@ describe("idea reviewer scope", () => {
     });
 
     await transitionIdea(
-      { ...actor, role: "APPROVER" },
+      { ...actor, role: "RTRDA_PR" },
       "idea-1",
       3,
       "ACCEPTED",
@@ -211,7 +211,7 @@ describe("idea reviewer scope", () => {
     mocks.transactionClient.prUserRole.findMany.mockResolvedValue([
       { userId: "pr-recipient" },
     ]);
-    const author = { ...actor, id: "author-1", role: "REQUESTER" as const };
+    const author = { ...actor, id: "author-1", role: "RTRDA_ALL_USER" as const };
 
     await reviseIdea(
       author,
@@ -272,7 +272,7 @@ describe("idea reviewer scope", () => {
 
   it("denies conversion to non-reviewers before reading the idea", async () => {
     await expect(
-      convertIdea({ ...actor, role: "REQUESTER" }, "idea-1", 3, "corr-3"),
+      convertIdea({ ...actor, role: "RTRDA_ALL_USER" }, "idea-1", 3, "corr-3"),
     ).rejects.toMatchObject({ statusCode: 403, code: "FORBIDDEN" });
     expect(mocks.findFirst).not.toHaveBeenCalled();
     expect(mocks.transaction).not.toHaveBeenCalled();

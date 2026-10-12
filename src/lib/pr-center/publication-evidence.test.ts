@@ -27,7 +27,7 @@ const actor = {
   id: "actor",
   organizationId: "org",
   departmentId: null,
-  role: "PR_OPERATIONS" as const,
+  role: "RTRDA_PR" as const,
 };
 const channelSchedule = (id: string, channel: string) => ({
   id,

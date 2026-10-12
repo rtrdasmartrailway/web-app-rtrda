@@ -5,7 +5,7 @@ const mockActor = {
   id: "user-1",
   organizationId: "org-1",
   departmentId: "dept-1",
-  role: "PR_OPERATIONS" as const,
+  role: "RTRDA_PR" as const,
 };
 
 describe("OIDC callback failures", () => {
@@ -134,7 +134,7 @@ describe("Release evidence route guards", () => {
 describe("Access administration route guards", () => {
   const adminActor = {
     ...mockActor,
-    role: "SCOPED_ADMINISTRATOR" as const,
+    role: "RTRDA_ADMIN" as const,
   };
 
   it("rejects unauthenticated admin user list", async () => {
@@ -178,7 +178,7 @@ describe("Access administration route guards", () => {
   });
 
   it.each([
-    ["POST", "/admin/users/some-id/roles", { role: "REQUESTER" }],
+    ["POST", "/admin/users/some-id/roles", { role: "RTRDA_ALL_USER" }],
     ["DELETE", "/admin/roles/some-role-id", {}],
     ["PATCH", "/admin/users/some-id/active", {}],
   ] as const)(
@@ -271,7 +271,7 @@ describe("Notification policy route guards", () => {
 describe("Quarantine management route guards", () => {
   const adminActor = {
     ...mockActor,
-    role: "SCOPED_ADMINISTRATOR" as const,
+    role: "RTRDA_ADMIN" as const,
   };
 
   it("rejects unauthenticated quarantine list", async () => {
@@ -282,7 +282,7 @@ describe("Quarantine management route guards", () => {
   });
 
   it("rejects non-admin/operations role from listing quarantined files", async () => {
-    const requesterActor = { ...mockActor, role: "REQUESTER" as const };
+    const requesterActor = { ...mockActor, role: "RTRDA_ALL_USER" as const };
     const app = buildPrCenterApi(async () => requesterActor);
     const response = await app.inject({ method: "GET", url: "/admin/quarantine" });
     expect(response.statusCode).toBe(403);
@@ -325,8 +325,8 @@ describe("Quarantine management route guards", () => {
     await app.close();
   });
 
-  it("allows PR_OPERATIONS to list quarantined files", async () => {
-    const opsActor = { ...mockActor, role: "PR_OPERATIONS" as const };
+  it("allows RTRDA_PR to list quarantined files", async () => {
+    const opsActor = { ...mockActor, role: "RTRDA_PR" as const };
     const app = buildPrCenterApi(async () => opsActor);
     const response = await app.inject({ method: "GET", url: "/admin/quarantine" });
     // Should not be 403 - will be 200 (even if empty result from DB)
@@ -338,7 +338,7 @@ describe("Quarantine management route guards", () => {
 describe("Audit export route guards", () => {
   const adminActor = {
     ...mockActor,
-    role: "SCOPED_ADMINISTRATOR" as const,
+    role: "RTRDA_ADMIN" as const,
   };
 
   it("rejects unauthenticated audit export", async () => {
@@ -381,7 +381,7 @@ describe("Audit export route guards", () => {
 describe("Restore request route guards", () => {
   const adminActor = {
     ...mockActor,
-    role: "SCOPED_ADMINISTRATOR" as const,
+    role: "RTRDA_ADMIN" as const,
   };
 
   it("rejects unauthenticated restore", async () => {
@@ -486,7 +486,7 @@ describe("Message House current route", () => {
   });
 
   it("denies current and historical content to roles without page access", async () => {
-    const requesterActor = { ...mockActor, role: "REQUESTER" as const };
+    const requesterActor = { ...mockActor, role: "RTRDA_ALL_USER" as const };
     const app = buildPrCenterApi(async () => requesterActor);
     const [currentResponse, historyResponse] = await Promise.all([
       app.inject({ method: "GET", url: "/message-house/current" }),
@@ -508,7 +508,7 @@ describe("Content Library route access", () => {
   });
 
   it("denies users who do not have a PR or administrator role", async () => {
-    const requesterActor = { ...mockActor, role: "REQUESTER" as const };
+    const requesterActor = { ...mockActor, role: "RTRDA_ALL_USER" as const };
     const app = buildPrCenterApi(async () => requesterActor);
     const response = await app.inject({ method: "GET", url: "/content-library" });
     expect(response.statusCode).toBe(403);

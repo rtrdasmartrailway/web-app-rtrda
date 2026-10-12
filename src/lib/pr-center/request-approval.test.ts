@@ -42,13 +42,13 @@ const prActor: PrCenterActor = {
   id: "pr-user",
   organizationId: "org-1",
   departmentId: "dept-1",
-  role: "PR_OPERATIONS",
+  role: "RTRDA_PR",
 };
 const requesterActor: PrCenterActor = {
   id: "requester-1",
   organizationId: "org-1",
   departmentId: "dept-1",
-  role: "REQUESTER",
+  role: "RTRDA_ALL_USER",
 };
 const requestRecord = {
   id: "request-1",
@@ -60,6 +60,7 @@ const requestRecord = {
   status: "SUBMITTED",
   version: 2,
   tasks: [],
+  requester: { roles: [{ id: "all-user-grant" }] },
 };
 
 beforeEach(() => {
@@ -76,28 +77,39 @@ beforeEach(() => {
 });
 
 describe("request intake approval", () => {
-  it("exposes the task approval queue to scoped APPROVER grants", async () => {
-    const approver: PrCenterActor = {
+  it("gives RTRDA_BORD the same scoped task-approval access as RTRDA_PR", async () => {
+    const boardActor: PrCenterActor = {
       ...requesterActor,
-      role: "APPROVER",
+      id: "board-user",
+      role: "RTRDA_BORD",
     };
+
     mockPrisma.prTask.findMany.mockResolvedValue([]);
+    await expect(listApprovalQueue(boardActor)).resolves.toEqual([]);
+    expect(mockPrisma.prTask.findMany).toHaveBeenCalled();
+  });
 
-    await listApprovalQueue(approver);
+  it("gives RTRDA_BORD the same cross-user request scope as RTRDA_PR", async () => {
+    const boardActor: PrCenterActor = {
+      ...requesterActor,
+      id: "board-user",
+      role: "RTRDA_BORD",
+    };
+    mockPrisma.prRequest.findMany.mockResolvedValue([]);
 
-    expect(mockPrisma.prTask.findMany).toHaveBeenCalledWith(
+    await listRequests(boardActor);
+
+    expect(mockPrisma.prRequest.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: expect.objectContaining({
-          request: expect.objectContaining({
-            organizationId: approver.organizationId,
-            OR: [{ departmentId: "dept-1" }],
-          }),
-        }),
+        where: {
+          organizationId: "org-1",
+          OR: [{ requesterId: "board-user" }, { departmentId: "dept-1" }],
+        },
       }),
     );
   });
 
-  it("shows owners their requests and PR/admin users requests in their granted scope", async () => {
+  it("shows owners their requests and PR/BORD/admin requests in their granted scope", async () => {
     mockPrisma.prRequest.findMany.mockResolvedValue([]);
 
     await listRequests(requesterActor);
@@ -108,6 +120,7 @@ describe("request intake approval", () => {
           OR: [{ requesterId: requesterActor.id }],
         }),
         include: expect.objectContaining({
+          requester: { select: { displayName: true } },
           statusHistory: expect.objectContaining({
             where: { toState: { in: ["REJECTED", "APPROVED"] } },
             select: expect.objectContaining({ reason: true, toState: true }),
@@ -129,7 +142,7 @@ describe("request intake approval", () => {
     const adminActor: PrCenterActor = {
       ...prActor,
       id: "admin-user",
-      role: "SCOPED_ADMINISTRATOR",
+      role: "RTRDA_ADMIN",
     };
     await listRequests(adminActor);
     expect(mockPrisma.prRequest.findMany).toHaveBeenLastCalledWith(
@@ -146,7 +159,7 @@ describe("request intake approval", () => {
 
     const departmentAdmin: PrCenterActor = {
       ...adminActor,
-      roleGrants: [{ role: "SCOPED_ADMINISTRATOR", departmentId: "dept-2" }],
+      roleGrants: [{ role: "RTRDA_ADMIN", departmentId: "dept-2" }],
     };
     await listRequests(departmentAdmin);
     expect(mockPrisma.prRequest.findMany).toHaveBeenLastCalledWith(
@@ -159,24 +172,23 @@ describe("request intake approval", () => {
     );
   });
 
-  it("does not let an unrelated non-owner role open another user's request", async () => {
+  it("lets BORD open another user's request within its grant scope", async () => {
     const unrelatedActor: PrCenterActor = {
       ...prActor,
       id: "unrelated-user",
-      role: "APPROVER",
+      role: "RTRDA_BORD",
     };
-    mockPrisma.prRequest.findFirst.mockResolvedValueOnce(null);
+    mockPrisma.prRequest.findFirst.mockResolvedValueOnce(requestRecord);
 
-    await expect(requestDetail(unrelatedActor, requestRecord.id)).rejects.toMatchObject({
-      statusCode: 404,
-      code: "NOT_FOUND",
-    });
+    await expect(requestDetail(unrelatedActor, requestRecord.id)).resolves.toEqual(
+      requestRecord,
+    );
     expect(mockPrisma.prRequest.findFirst).toHaveBeenCalledWith(
       expect.objectContaining({
         where: expect.objectContaining({
           id: requestRecord.id,
           organizationId: unrelatedActor.organizationId,
-          OR: [{ requesterId: unrelatedActor.id }],
+          OR: [{ requesterId: unrelatedActor.id }, { departmentId: "dept-1" }],
         }),
       }),
     );
@@ -328,21 +340,33 @@ describe("request intake approval", () => {
     },
   );
 
-  it("only lists pending requests for PR Operations; requesters and administrators are denied", async () => {
+  it("allows RTRDA_PR, RTRDA_BORD, and RTRDA_ADMIN to list pending requests", async () => {
     await expect(listRequestApprovalQueue(requesterActor)).rejects.toMatchObject({
       statusCode: 403,
       code: "FORBIDDEN",
     });
+    const boardActor: PrCenterActor = {
+      ...requesterActor,
+      id: "board-user",
+      role: "RTRDA_BORD",
+    };
+    mockPrisma.prRequest.findMany.mockResolvedValue([]);
+    await expect(listRequestApprovalQueue(boardActor)).resolves.toEqual([]);
     const adminActor: PrCenterActor = {
       ...prActor,
       id: "admin-user",
-      role: "SCOPED_ADMINISTRATOR",
+      role: "RTRDA_ADMIN",
     };
-    await expect(listRequestApprovalQueue(adminActor)).rejects.toMatchObject({
-      statusCode: 403,
-      code: "FORBIDDEN",
-    });
-    expect(mockPrisma.prRequest.findMany).not.toHaveBeenCalled();
+    mockPrisma.prRequest.findMany.mockResolvedValue([]);
+    await expect(listRequestApprovalQueue(adminActor)).resolves.toEqual([]);
+    expect(mockPrisma.prRequest.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          organizationId: "org-1",
+          status: "SUBMITTED",
+        }),
+      }),
+    );
   });
 
   it("uses the assigned role scope instead of the user's home department", async () => {
@@ -359,7 +383,7 @@ describe("request intake approval", () => {
     expect(mockPrisma.prRequest.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
         where: expect.objectContaining({
-          OR: [{ departmentId: "dept-2" }],
+          OR: [{ requesterId: prActor.id }, { departmentId: "dept-2" }],
           status: "SUBMITTED",
         }),
       }),
@@ -391,7 +415,7 @@ describe("request intake approval", () => {
       expect.objectContaining({
         where: expect.objectContaining({
           status: "SUBMITTED",
-          OR: [{ departmentId: "dept-1" }],
+          OR: [{ requesterId: prActor.id }, { departmentId: "dept-1" }],
         }),
         include: expect.objectContaining({
           revisions: expect.objectContaining({ take: 1 }),
@@ -432,15 +456,28 @@ describe("request intake approval", () => {
       status: "SUBMITTED",
       version: 2,
     });
-    mockPrisma.prUserRole.findMany.mockResolvedValue([{ userId: "pr-recipient" }]);
+    mockPrisma.prUserRole.findMany
+      .mockResolvedValueOnce([{ userId: "pr-recipient" }])
+      .mockResolvedValueOnce([{ userId: "pr-recipient" }, { userId: "bord-recipient" }]);
 
     await transitionRequest(requesterActor, requestRecord.id, 1, "SUBMITTED");
 
-    expect(mockPrisma.prUserRole.findMany).toHaveBeenCalledWith(
+    expect(mockPrisma.prUserRole.findMany).toHaveBeenNthCalledWith(
+      1,
       expect.objectContaining({
         where: expect.objectContaining({
           organizationId: requestRecord.organizationId,
-          role: "PR_OPERATIONS",
+          role: { in: ["RTRDA_PR", "RTRDA_BORD"] },
+          OR: [{ departmentId: requestRecord.departmentId }, { departmentId: null }],
+        }),
+      }),
+    );
+    expect(mockPrisma.prUserRole.findMany).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({
+        where: expect.objectContaining({
+          organizationId: requestRecord.organizationId,
+          role: { in: ["RTRDA_PR", "RTRDA_BORD", "RTRDA_ADMIN"] },
           OR: [{ departmentId: requestRecord.departmentId }, { departmentId: null }],
         }),
       }),
@@ -449,6 +486,10 @@ describe("request intake approval", () => {
       data: expect.arrayContaining([
         expect.objectContaining({ userId: "requester-1", target: "request:request-1" }),
         expect.objectContaining({ userId: "pr-recipient", target: "request:request-1" }),
+        expect.objectContaining({
+          userId: "bord-recipient",
+          target: "request:request-1",
+        }),
       ]),
     });
   });
@@ -493,7 +534,10 @@ describe("request intake approval", () => {
     });
   });
 
-  it("records approval and routes the accepted request to PR Operations and requester", async () => {
+  it("records approval, notifies scoped BORD users, and routes the accepted request to PR Operations and requester", async () => {
+    mockPrisma.prUserRole.findMany
+      .mockResolvedValueOnce([{ userId: "pr-recipient" }])
+      .mockResolvedValueOnce([{ userId: "pr-recipient" }, { userId: "bord-recipient" }]);
     await recordRequestDecision(prActor, requestRecord.id, 2, {
       decision: "APPROVED",
     });
@@ -513,6 +557,11 @@ describe("request intake approval", () => {
           userId: "pr-recipient",
           target: "request:request-1",
           title: "Approved request ready for PR assignment",
+        }),
+        expect.objectContaining({
+          userId: "bord-recipient",
+          target: "request:request-1",
+          title: "Request approved",
         }),
       ]),
     });
@@ -557,16 +606,21 @@ describe("request intake approval", () => {
     );
   });
 
-  it("denies administrators the request-intake decision endpoint", async () => {
+  it("allows RTRDA_ADMIN to decide request intake", async () => {
     const adminActor: PrCenterActor = {
       ...prActor,
       id: "admin-user",
-      role: "SCOPED_ADMINISTRATOR",
+      role: "RTRDA_ADMIN",
     };
-    await expect(
-      recordRequestDecision(adminActor, requestRecord.id, 2, { decision: "APPROVED" }),
-    ).rejects.toMatchObject({ statusCode: 403, code: "FORBIDDEN" });
-    expect(mockPrisma.prRequest.findFirst).not.toHaveBeenCalled();
+
+    await recordRequestDecision(adminActor, requestRecord.id, 2, {
+      decision: "APPROVED",
+    });
+
+    expect(mockPrisma.prRequest.updateMany).toHaveBeenCalledWith({
+      where: { id: requestRecord.id, version: 2, status: "SUBMITTED" },
+      data: { status: "APPROVED", version: { increment: 1 } },
+    });
   });
 
   it("requires a reason before rejecting a submitted request", async () => {

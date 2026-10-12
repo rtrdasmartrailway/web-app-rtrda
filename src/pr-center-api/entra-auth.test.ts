@@ -28,13 +28,13 @@ describe("organization-domain access and administrator role grants", () => {
     expect(isAllowedOrganizationEmail("other@apprtrda.onmicrosoft.com")).toBe(false);
     expect(
       resolvePrCenterLoginRole("admin@apprtrda.onmicrosoft.com", [
-        { role: "SCOPED_ADMINISTRATOR", departmentId: null },
+        { role: "RTRDA_ADMIN", departmentId: null },
       ]),
     ).toEqual({
-      role: "SCOPED_ADMINISTRATOR",
+      role: "RTRDA_ADMIN",
       roleGrants: [
-        { role: "SCOPED_ADMINISTRATOR", departmentId: null },
-        { role: "REQUESTER", departmentId: null },
+        { role: "RTRDA_ADMIN", departmentId: null },
+        { role: "RTRDA_ALL_USER", departmentId: null },
       ],
       autoProvisionRequester: true,
     });
@@ -42,8 +42,8 @@ describe("organization-domain access and administrator role grants", () => {
 
   it("gives a domain-approved user without a role the least-privilege requester role", () => {
     expect(resolvePrCenterLoginRole("staff@rtrda.or.th", [])).toEqual({
-      role: "REQUESTER",
-      roleGrants: [{ role: "REQUESTER", departmentId: null }],
+      role: "RTRDA_ALL_USER",
+      roleGrants: [{ role: "RTRDA_ALL_USER", departmentId: null }],
       autoProvisionRequester: true,
     });
   });
@@ -51,13 +51,13 @@ describe("organization-domain access and administrator role grants", () => {
   it("uses an administrator-granted database role instead of auto-provisioning", () => {
     expect(
       resolvePrCenterLoginRole("staff@rtrda.or.th", [
-        { role: "PR_OPERATIONS", departmentId: null },
+        { role: "RTRDA_PR", departmentId: null },
       ]),
     ).toEqual({
-      role: "PR_OPERATIONS",
+      role: "RTRDA_PR",
       roleGrants: [
-        { role: "PR_OPERATIONS", departmentId: null },
-        { role: "REQUESTER", departmentId: null },
+        { role: "RTRDA_PR", departmentId: null },
+        { role: "RTRDA_ALL_USER", departmentId: null },
       ],
       autoProvisionRequester: true,
     });
@@ -66,7 +66,7 @@ describe("organization-domain access and administrator role grants", () => {
   it("blocks non-domain accounts even when a database role was granted", () => {
     expect(() =>
       resolvePrCenterLoginRole("staff@outside.example", [
-        { role: "SCOPED_ADMINISTRATOR", departmentId: null },
+        { role: "RTRDA_ADMIN", departmentId: null },
       ]),
     ).toThrow(
       expect.objectContaining({ code: "OIDC_ACCESS_NOT_ALLOWED", statusCode: 403 }),
@@ -111,7 +111,7 @@ describe("isSessionAuthorityCurrent", () => {
     id: "user-1",
     organizationId: "org-1",
     departmentId: "dept-1",
-    role: "REQUESTER" as const,
+    role: "RTRDA_ALL_USER" as const,
   };
 
   it("allows an active user while the same scoped role is assigned", () => {
@@ -121,7 +121,9 @@ describe("isSessionAuthorityCurrent", () => {
         email: "staff@rtrda.or.th",
         organizationId: "org-1",
         departmentId: "dept-1",
-        roles: [{ role: "REQUESTER", organizationId: "org-1", departmentId: "dept-1" }],
+        roles: [
+          { role: "RTRDA_ALL_USER", organizationId: "org-1", departmentId: "dept-1" },
+        ],
       }),
     ).toBe(true);
   });
@@ -129,9 +131,9 @@ describe("isSessionAuthorityCurrent", () => {
   it("binds root-admin grant authority to the designated root account email", () => {
     const rootActor = {
       ...actor,
-      role: "SCOPED_ADMINISTRATOR" as const,
+      role: "RTRDA_ADMIN" as const,
       isRootAdministrator: true,
-      roleGrants: [{ role: "SCOPED_ADMINISTRATOR" as const, departmentId: null }],
+      roleGrants: [{ role: "RTRDA_ADMIN" as const, departmentId: null }],
     };
     const rootAuthority = {
       active: true,
@@ -140,7 +142,7 @@ describe("isSessionAuthorityCurrent", () => {
       departmentId: "dept-1",
       roles: [
         {
-          role: "SCOPED_ADMINISTRATOR" as const,
+          role: "RTRDA_ADMIN" as const,
           organizationId: "org-1",
           departmentId: null,
         },
@@ -164,7 +166,7 @@ describe("isSessionAuthorityCurrent", () => {
   it("preserves organization-wide PR authority independently of the user's home department", () => {
     const organizationPrActor = {
       ...actor,
-      role: "PR_OPERATIONS" as const,
+      role: "RTRDA_PR" as const,
       scopeDepartmentId: null,
     };
     expect(
@@ -173,7 +175,7 @@ describe("isSessionAuthorityCurrent", () => {
         email: "staff@rtrda.or.th",
         organizationId: "org-1",
         departmentId: "dept-1",
-        roles: [{ role: "PR_OPERATIONS", organizationId: "org-1", departmentId: null }],
+        roles: [{ role: "RTRDA_PR", organizationId: "org-1", departmentId: null }],
       }),
     ).toBe(true);
     expect(
@@ -182,9 +184,7 @@ describe("isSessionAuthorityCurrent", () => {
         email: "staff@rtrda.or.th",
         organizationId: "org-1",
         departmentId: "dept-1",
-        roles: [
-          { role: "PR_OPERATIONS", organizationId: "org-1", departmentId: "dept-2" },
-        ],
+        roles: [{ role: "RTRDA_PR", organizationId: "org-1", departmentId: "dept-2" }],
       }),
     ).toBe(false);
     const departmentPrActor = {
@@ -197,7 +197,7 @@ describe("isSessionAuthorityCurrent", () => {
         email: "staff@rtrda.or.th",
         organizationId: "org-1",
         departmentId: "dept-1",
-        roles: [{ role: "PR_OPERATIONS", organizationId: "org-1", departmentId: null }],
+        roles: [{ role: "RTRDA_PR", organizationId: "org-1", departmentId: null }],
       }),
     ).toBe(false);
   });
@@ -209,7 +209,7 @@ describe("isSessionAuthorityCurrent", () => {
         email: "staff@rtrda.or.th",
         organizationId: "org-1",
         departmentId: "dept-1",
-        roles: [{ role: "REQUESTER", organizationId: "org-1", departmentId: null }],
+        roles: [{ role: "RTRDA_ALL_USER", organizationId: "org-1", departmentId: null }],
       }),
     ).toBe(false);
     expect(
@@ -218,7 +218,7 @@ describe("isSessionAuthorityCurrent", () => {
         email: "staff@rtrda.or.th",
         organizationId: "org-1",
         departmentId: "dept-2",
-        roles: [{ role: "REQUESTER", organizationId: "org-1", departmentId: null }],
+        roles: [{ role: "RTRDA_ALL_USER", organizationId: "org-1", departmentId: null }],
       }),
     ).toBe(false);
     expect(
@@ -234,13 +234,13 @@ describe("isSessionAuthorityCurrent", () => {
 
   it("preserves all assigned roles and scopes and invalidates the session when any grant changes", () => {
     const roleGrants = [
-      { role: "REQUESTER" as const, departmentId: null },
-      { role: "PR_OPERATIONS" as const, departmentId: "dept-2" },
-      { role: "APPROVER" as const, departmentId: "dept-3" },
+      { role: "RTRDA_ALL_USER" as const, departmentId: null },
+      { role: "RTRDA_PR" as const, departmentId: "dept-2" },
+      { role: "RTRDA_BORD" as const, departmentId: "dept-3" },
     ];
     const multiRoleActor = {
       ...actor,
-      role: "PR_OPERATIONS" as const,
+      role: "RTRDA_PR" as const,
       roleGrants,
     };
     const currentUser = {
@@ -254,14 +254,14 @@ describe("isSessionAuthorityCurrent", () => {
     expect(
       isSessionAuthorityCurrent(multiRoleActor, {
         ...currentUser,
-        roles: currentUser.roles.filter((grant) => grant.role !== "APPROVER"),
+        roles: currentUser.roles.filter((grant) => grant.role !== "RTRDA_BORD"),
       }),
     ).toBe(false);
     expect(
       isSessionAuthorityCurrent(multiRoleActor, {
         ...currentUser,
         roles: currentUser.roles.map((grant) =>
-          grant.role === "PR_OPERATIONS" ? { ...grant, departmentId: "dept-4" } : grant,
+          grant.role === "RTRDA_PR" ? { ...grant, departmentId: "dept-4" } : grant,
         ),
       }),
     ).toBe(false);

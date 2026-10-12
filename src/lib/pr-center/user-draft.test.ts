@@ -16,7 +16,7 @@ const requester = {
   id: "requester-1",
   organizationId: "org-1",
   departmentId: "dept-1",
-  role: "REQUESTER" as const,
+  role: "RTRDA_ALL_USER" as const,
 };
 
 describe("server-side autosaved drafts", () => {
@@ -66,13 +66,22 @@ describe("server-side autosaved drafts", () => {
     });
   });
 
-  it("allows an author to remove their draft and rejects unsupported roles", async () => {
+  it("allows an author to remove their draft", async () => {
     await deleteUserDraft(requester, "IDEA");
     expect(mocks.deleteMany).toHaveBeenCalledWith({
       where: { userId: "requester-1", organizationId: "org-1", kind: "IDEA" },
     });
+  });
+
+  it("allows RTRDA_BORD to save an idea draft", async () => {
     await expect(
-      saveUserDraft({ ...requester, role: "APPROVER" }, "IDEA", { title: "Idea" }),
-    ).rejects.toMatchObject({ code: "FORBIDDEN", statusCode: 403 });
+      saveUserDraft({ ...requester, role: "RTRDA_BORD" }, "IDEA", { title: "Idea" }),
+    ).resolves.toMatchObject({ updatedAt: new Date("2026-10-08T00:00:00.000Z") });
+    expect(mocks.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { userId_kind: { userId: "requester-1", kind: "IDEA" } },
+        create: expect.objectContaining({ kind: "IDEA", payload: { title: "Idea" } }),
+      }),
+    );
   });
 });

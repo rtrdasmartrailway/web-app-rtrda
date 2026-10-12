@@ -19,43 +19,50 @@ import {
 
 describe("PR Center workflow policy", () => {
   it("does not trust requester role to move a task", () => {
-    expect(canTransitionTask("REQUESTER", "DRAFT", "COMMUNICATION_PLANNING")).toBe(false);
-    expect(canTransitionTask("PR_OPERATIONS", "DRAFT", "COMMUNICATION_PLANNING")).toBe(
-      true,
+    expect(canTransitionTask("RTRDA_ALL_USER", "DRAFT", "COMMUNICATION_PLANNING")).toBe(
+      false,
     );
+    expect(canTransitionTask("RTRDA_PR", "DRAFT", "COMMUNICATION_PLANNING")).toBe(true);
+    expect(canTransitionTask("RTRDA_BORD", "DRAFT", "COMMUNICATION_PLANNING")).toBe(true);
   });
 
-  it("allows requesters to submit but does not grant submission authority to approval-only roles", () => {
-    expect(canCreateRequest("REQUESTER")).toBe(true);
-    expect(canCreateRequest("SCOPED_ADMINISTRATOR")).toBe(true);
-    expect(canCreateRequest("PR_OPERATIONS")).toBe(false);
-    expect(canCreateRequest("APPROVER")).toBe(false);
-    expect(canCreateRequest("EXECUTIVE_READ_ONLY")).toBe(false);
+  it("allows every new role to create requests", () => {
+    expect(canCreateRequest("RTRDA_ALL_USER")).toBe(true);
+    expect(canCreateRequest("RTRDA_PR")).toBe(true);
+    expect(canCreateRequest("RTRDA_BORD")).toBe(true);
+    expect(canCreateRequest("RTRDA_ADMIN")).toBe(true);
   });
 
-  it("limits approvals to PR operations and scoped administrators", () => {
-    expect(canApprove("PR_OPERATIONS")).toBe(true);
-    expect(canApprove("SCOPED_ADMINISTRATOR")).toBe(true);
-    expect(canApprove("APPROVER")).toBe(true);
-    expect(canApprove("EXECUTIVE_READ_ONLY")).toBe(false);
-    expect(canApprove("REQUESTER")).toBe(false);
+  it("allows PR, BORD, and ADMIN to approve", () => {
+    expect(canApprove("RTRDA_PR")).toBe(true);
+    expect(canApprove("RTRDA_ADMIN")).toBe(true);
+    expect(canApprove("RTRDA_BORD")).toBe(true);
+    expect(canApprove("RTRDA_ALL_USER")).toBe(false);
   });
 
-  it("restricts request visibility and intake decisions to PR Operations", () => {
-    expect(canReadAllRequests("PR_OPERATIONS")).toBe(true);
-    expect(canReadAllRequests("SCOPED_ADMINISTRATOR")).toBe(false);
-    expect(canReadAllRequests("REQUESTER")).toBe(false);
-    expect(canReadAllRequests("EXECUTIVE_READ_ONLY")).toBe(false);
-    expect(canDecideRequestIntake("PR_OPERATIONS")).toBe(true);
-    expect(canDecideRequestIntake("SCOPED_ADMINISTRATOR")).toBe(false);
-    expect(canDecideRequestIntake("REQUESTER")).toBe(false);
+  it("allows PR, BORD, and ADMIN to read and decide requests", () => {
+    expect(canReadAllRequests("RTRDA_PR")).toBe(true);
+    expect(canReadAllRequests("RTRDA_BORD")).toBe(true);
+    expect(canReadAllRequests("RTRDA_ADMIN")).toBe(true);
+    expect(canReadAllRequests("RTRDA_ALL_USER")).toBe(false);
+    expect(canDecideRequestIntake("RTRDA_PR")).toBe(true);
+    expect(canDecideRequestIntake("RTRDA_BORD")).toBe(true);
+    expect(canDecideRequestIntake("RTRDA_ADMIN")).toBe(true);
+    expect(canDecideRequestIntake("RTRDA_ALL_USER")).toBe(false);
   });
 
-  it("allows idea proposals but restricts review and conversion authority", () => {
-    expect(canCreateIdea("REQUESTER")).toBe(true);
-    expect(canCreateIdea("EXECUTIVE_READ_ONLY")).toBe(false);
-    expect(canReviewIdeas("PR_OPERATIONS")).toBe(true);
-    expect(canReviewIdeas("REQUESTER")).toBe(false);
+  it("allows every role to propose ideas and PR/BORD/ADMIN to review", () => {
+    for (const role of [
+      "RTRDA_ALL_USER",
+      "RTRDA_PR",
+      "RTRDA_BORD",
+      "RTRDA_ADMIN",
+    ] as const)
+      expect(canCreateIdea(role)).toBe(true);
+    expect(canReviewIdeas("RTRDA_PR")).toBe(true);
+    expect(canReviewIdeas("RTRDA_ADMIN")).toBe(true);
+    expect(canReviewIdeas("RTRDA_BORD")).toBe(true);
+    expect(canReviewIdeas("RTRDA_ALL_USER")).toBe(false);
   });
 
   it("blocks publishing until every Phase 1 gate is complete", () => {
@@ -81,63 +88,56 @@ describe("PR Center workflow policy", () => {
   });
 
   it("does not allow generic task transitions to schedule or publish", () => {
-    expect(canTransitionTask("PR_OPERATIONS", "APPROVED", "SCHEDULED")).toBe(false);
-    expect(canTransitionTask("PR_OPERATIONS", "SCHEDULED", "PUBLISHED")).toBe(false);
+    expect(canTransitionTask("RTRDA_PR", "APPROVED", "SCHEDULED")).toBe(false);
+    expect(canTransitionTask("RTRDA_PR", "SCHEDULED", "PUBLISHED")).toBe(false);
   });
 
-  it("allows all roles except EXECUTIVE_READ_ONLY to attach files", () => {
-    expect(canAttachFiles("REQUESTER")).toBe(true);
-    expect(canAttachFiles("PR_OPERATIONS")).toBe(true);
-    expect(canAttachFiles("APPROVER")).toBe(true);
-    expect(canAttachFiles("SCOPED_ADMINISTRATOR")).toBe(true);
-    expect(canAttachFiles("EXECUTIVE_READ_ONLY")).toBe(false);
+  it("allows all four roles to upload attachments", () => {
+    expect(canAttachFiles("RTRDA_ALL_USER")).toBe(true);
+    expect(canAttachFiles("RTRDA_PR")).toBe(true);
+    expect(canAttachFiles("RTRDA_BORD")).toBe(true);
+    expect(canAttachFiles("RTRDA_ADMIN")).toBe(true);
   });
 
-  it("restricts attachment removal to PR_OPERATIONS and SCOPED_ADMINISTRATOR", () => {
-    expect(canRemoveAttachment("PR_OPERATIONS")).toBe(true);
-    expect(canRemoveAttachment("SCOPED_ADMINISTRATOR")).toBe(true);
-    expect(canRemoveAttachment("REQUESTER")).toBe(false);
-    expect(canRemoveAttachment("APPROVER")).toBe(false);
-    expect(canRemoveAttachment("EXECUTIVE_READ_ONLY")).toBe(false);
+  it("allows PR, BORD, and ADMIN to remove attachments", () => {
+    expect(canRemoveAttachment("RTRDA_PR")).toBe(true);
+    expect(canRemoveAttachment("RTRDA_ADMIN")).toBe(true);
+    expect(canRemoveAttachment("RTRDA_ALL_USER")).toBe(false);
+    expect(canRemoveAttachment("RTRDA_BORD")).toBe(true);
   });
 
-  it("restricts final asset assignment to PR_OPERATIONS and SCOPED_ADMINISTRATOR", () => {
-    expect(canAssignFinalAsset("PR_OPERATIONS")).toBe(true);
-    expect(canAssignFinalAsset("SCOPED_ADMINISTRATOR")).toBe(true);
-    expect(canAssignFinalAsset("REQUESTER")).toBe(false);
-    expect(canAssignFinalAsset("APPROVER")).toBe(false);
-    expect(canAssignFinalAsset("EXECUTIVE_READ_ONLY")).toBe(false);
+  it("allows PR, BORD, and ADMIN to assign final assets", () => {
+    expect(canAssignFinalAsset("RTRDA_PR")).toBe(true);
+    expect(canAssignFinalAsset("RTRDA_ADMIN")).toBe(true);
+    expect(canAssignFinalAsset("RTRDA_ALL_USER")).toBe(false);
+    expect(canAssignFinalAsset("RTRDA_BORD")).toBe(true);
   });
 
-  it("restricts access administration to SCOPED_ADMINISTRATOR only", () => {
-    expect(canManageAccess("SCOPED_ADMINISTRATOR")).toBe(true);
-    expect(canManageAccess("PR_OPERATIONS")).toBe(false);
-    expect(canManageAccess("REQUESTER")).toBe(false);
-    expect(canManageAccess("APPROVER")).toBe(false);
-    expect(canManageAccess("EXECUTIVE_READ_ONLY")).toBe(false);
+  it("restricts access administration to RTRDA_ADMIN only", () => {
+    expect(canManageAccess("RTRDA_ADMIN")).toBe(true);
+    expect(canManageAccess("RTRDA_PR")).toBe(false);
+    expect(canManageAccess("RTRDA_ALL_USER")).toBe(false);
+    expect(canManageAccess("RTRDA_BORD")).toBe(false);
   });
 
-  it("allows SCOPED_ADMINISTRATOR and PR_OPERATIONS to manage quarantine", () => {
-    expect(canManageQuarantine("SCOPED_ADMINISTRATOR")).toBe(true);
-    expect(canManageQuarantine("PR_OPERATIONS")).toBe(true);
-    expect(canManageQuarantine("REQUESTER")).toBe(false);
-    expect(canManageQuarantine("APPROVER")).toBe(false);
-    expect(canManageQuarantine("EXECUTIVE_READ_ONLY")).toBe(false);
+  it("allows PR, BORD, and ADMIN to manage quarantine", () => {
+    expect(canManageQuarantine("RTRDA_ADMIN")).toBe(true);
+    expect(canManageQuarantine("RTRDA_PR")).toBe(true);
+    expect(canManageQuarantine("RTRDA_ALL_USER")).toBe(false);
+    expect(canManageQuarantine("RTRDA_BORD")).toBe(true);
   });
 
-  it("restricts audit export to SCOPED_ADMINISTRATOR only", () => {
-    expect(canExportAudit("SCOPED_ADMINISTRATOR")).toBe(true);
-    expect(canExportAudit("PR_OPERATIONS")).toBe(false);
-    expect(canExportAudit("REQUESTER")).toBe(false);
-    expect(canExportAudit("APPROVER")).toBe(false);
-    expect(canExportAudit("EXECUTIVE_READ_ONLY")).toBe(false);
+  it("restricts audit export to RTRDA_ADMIN only", () => {
+    expect(canExportAudit("RTRDA_ADMIN")).toBe(true);
+    expect(canExportAudit("RTRDA_PR")).toBe(false);
+    expect(canExportAudit("RTRDA_ALL_USER")).toBe(false);
+    expect(canExportAudit("RTRDA_BORD")).toBe(false);
   });
 
-  it("restricts request restore to SCOPED_ADMINISTRATOR only", () => {
-    expect(canRestoreRequests("SCOPED_ADMINISTRATOR")).toBe(true);
-    expect(canRestoreRequests("PR_OPERATIONS")).toBe(false);
-    expect(canRestoreRequests("REQUESTER")).toBe(false);
-    expect(canRestoreRequests("APPROVER")).toBe(false);
-    expect(canRestoreRequests("EXECUTIVE_READ_ONLY")).toBe(false);
+  it("restricts request restore to RTRDA_ADMIN only", () => {
+    expect(canRestoreRequests("RTRDA_ADMIN")).toBe(true);
+    expect(canRestoreRequests("RTRDA_PR")).toBe(false);
+    expect(canRestoreRequests("RTRDA_ALL_USER")).toBe(false);
+    expect(canRestoreRequests("RTRDA_BORD")).toBe(false);
   });
 });

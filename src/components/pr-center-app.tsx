@@ -69,12 +69,7 @@ type Role =
   | "designer"
   | "video"
   | "requester";
-type PrCenterRoleCode =
-  | "REQUESTER"
-  | "PR_OPERATIONS"
-  | "APPROVER"
-  | "EXECUTIVE_READ_ONLY"
-  | "SCOPED_ADMINISTRATOR";
+type PrCenterRoleCode = "RTRDA_ALL_USER" | "RTRDA_PR" | "RTRDA_BORD" | "RTRDA_ADMIN";
 type StatusId =
   | "draft"
   | "waiting_for_information"
@@ -725,7 +720,7 @@ const STATUS_TRANSITIONS: Record<StatusId, StatusId[]> = {
 
 const ROLE_PAGES: Record<Role, Page[]> = {
   admin: pages.map(({ id }) => id),
-  pr: pages.filter(({ id }) => id !== "new-request").map(({ id }) => id),
+  pr: pages.map(({ id }) => id),
   executive: [
     "executive",
     "home",
@@ -768,11 +763,10 @@ const ROLE_PAGES: Record<Role, Page[]> = {
 };
 
 const DISPLAY_ROLE_BY_PR_ROLE: Record<PrCenterRoleCode, Role> = {
-  REQUESTER: "requester",
-  PR_OPERATIONS: "pr",
-  APPROVER: "approver",
-  EXECUTIVE_READ_ONLY: "executive",
-  SCOPED_ADMINISTRATOR: "admin",
+  RTRDA_ALL_USER: "requester",
+  RTRDA_PR: "pr",
+  RTRDA_BORD: "pr",
+  RTRDA_ADMIN: "admin",
 };
 
 const defaultState: PrCenterState = {
@@ -1443,7 +1437,7 @@ export function PrCenterApp({
     const roleGrants = actor?.roles?.length ? actor.roles : actor ? [actor.role] : [];
     if (
       !roleGrants.some((role) =>
-        ["APPROVER", "PR_OPERATIONS", "SCOPED_ADMINISTRATOR"].includes(role),
+        ["RTRDA_PR", "RTRDA_BORD", "RTRDA_ADMIN"].includes(role),
       ) ||
       page !== "approvals"
     )
@@ -1459,7 +1453,10 @@ export function PrCenterApp({
   useEffect(() => {
     const roleGrants = actor?.roles?.length ? actor.roles : actor ? [actor.role] : [];
     if (page !== "approvals") return;
-    if (!roleGrants.includes("PR_OPERATIONS")) return;
+    if (
+      !roleGrants.some((role) => ["RTRDA_PR", "RTRDA_BORD", "RTRDA_ADMIN"].includes(role))
+    )
+      return;
     const controller = new AbortController();
     fetch("/api/pr-center/request-approvals", {
       credentials: "same-origin",
@@ -1640,7 +1637,16 @@ export function PrCenterApp({
         ),
       ]
     : [currentUser.role];
-  const visibleRolePages = [...new Set(actorUiRoles.flatMap((role) => ROLE_PAGES[role]))];
+  const actorRoleCodes = actor?.roles?.length ? actor.roles : actor ? [actor.role] : [];
+  const canReadOtherRequests = actorRoleCodes.some((role) =>
+    ["RTRDA_PR", "RTRDA_BORD", "RTRDA_ADMIN"].includes(role),
+  );
+  const visibleRolePages = [
+    ...new Set([
+      ...actorUiRoles.flatMap((role) => ROLE_PAGES[role]),
+      ...(canReadOtherRequests ? (["requests"] as Page[]) : []),
+    ]),
+  ];
   const hasUiRole = (...roles: Role[]) =>
     actorUiRoles.some((role) => roles.includes(role));
   const visiblePages = pages.filter(
@@ -3010,7 +3016,7 @@ export function PrCenterApp({
             <input placeholder={t.search} />
           </label>
           <div className={styles.topActions}>
-            {hasUiRole("requester", "admin") && (
+            {hasUiRole("requester", "pr", "admin") && (
               <button className={styles.topRequest} onClick={openRequest}>
                 + {t.newRequest}
               </button>
@@ -3059,7 +3065,7 @@ export function PrCenterApp({
               language={state.language}
               onNavigate={go}
               onOpenRequest={openRequest}
-              canCreateRequest={hasUiRole("requester", "admin")}
+              canCreateRequest={hasUiRole("requester", "pr", "admin")}
               currentUserName={currentUser.name}
               currentUserRole={currentUser.role}
               canManageReleaseEvidence={hasUiRole("admin")}
@@ -3078,7 +3084,7 @@ export function PrCenterApp({
               requests={state.requests}
             />
           )}
-          {page === "new-request" && hasUiRole("requester", "admin") && (
+          {page === "new-request" && hasUiRole("requester", "pr", "admin") && (
             <NewRequest t={t} onOpenRequest={openRequest} />
           )}
           {page === "my-requests" && (
@@ -3090,7 +3096,7 @@ export function PrCenterApp({
               onSubmitRequest={submitRequest}
               onWithdrawRequest={withdrawRequest}
               mode="mine"
-              canCreate={hasUiRole("requester", "admin")}
+              canCreate={hasUiRole("requester", "pr", "admin")}
               requests={state.requests}
               tasks={state.tasks}
               currentUserId={currentUser.id}
@@ -3149,10 +3155,10 @@ export function PrCenterApp({
               language={state.language}
               tasks={approvalTasks}
               requests={approvalRequests}
-              canDecideRequests={hasUiRole("pr")}
-              canDecideTasks={hasUiRole("approver", "pr", "admin")}
+              canDecideRequests={hasUiRole("pr", "admin")}
+              canDecideTasks={hasUiRole("pr", "admin")}
               requestQueueState={
-                hasUiRole("pr") ? requestApprovalQueueState : "not-authorized"
+                hasUiRole("pr", "admin") ? requestApprovalQueueState : "not-authorized"
               }
               onDecision={recordApproval}
               onRequestDecision={recordRequestDecision}
@@ -3166,7 +3172,7 @@ export function PrCenterApp({
               channels={state.masterData.channels}
               contentPillars={state.masterData.contentPillars}
               canReview={hasUiRole("pr", "admin")}
-              canApprove={hasUiRole("approver", "admin")}
+              canApprove={hasUiRole("pr", "admin")}
               onCreate={createIdea}
               onUpdate={updateIdea}
               onStatus={updateIdeaStatus}
@@ -7566,7 +7572,7 @@ function Directory({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [grantTarget, setGrantTarget] = useState<string | null>(null);
-  const [grantRole, setGrantRole] = useState<string>("REQUESTER");
+  const [grantRole, setGrantRole] = useState<string>("RTRDA_ALL_USER");
   const [grantDepartmentId, setGrantDepartmentId] = useState("");
   const [grantReason, setGrantReason] = useState("");
   const [grantConfirmation, setGrantConfirmation] = useState("");
@@ -7583,25 +7589,25 @@ function Directory({
   const [accessReason, setAccessReason] = useState("");
   const isOrganizationAdmin =
     actor.roleGrants?.some(
-      (grant) => grant.role === "SCOPED_ADMINISTRATOR" && grant.departmentId === null,
+      (grant) => grant.role === "RTRDA_ADMIN" && grant.departmentId === null,
     ) ?? false;
   const canGrantAdministratorRole = actor.isRootAdministrator === true;
   const isRootAccount = (user: { email: string }) =>
     isRootPrCenterAdministrator(user.email);
   const hasAdministratorRole = (user: (typeof users)[number]) =>
-    user.roles.some((grant) => grant.role === "SCOPED_ADMINISTRATOR");
+    user.roles.some((grant) => grant.role === "RTRDA_ADMIN");
   const activeOrganizationAdmins = users.filter(
     (user) =>
       user.active &&
       user.roles.some(
-        (grant) => grant.role === "SCOPED_ADMINISTRATOR" && grant.departmentId === null,
+        (grant) => grant.role === "RTRDA_ADMIN" && grant.departmentId === null,
       ),
   ).length;
   const isLastOrganizationAdmin = (user: (typeof users)[number]) =>
     user.active &&
     activeOrganizationAdmins <= 1 &&
     user.roles.some(
-      (grant) => grant.role === "SCOPED_ADMINISTRATOR" && grant.departmentId === null,
+      (grant) => grant.role === "RTRDA_ADMIN" && grant.departmentId === null,
     );
   const [notice, setNotice] = useState<string | null>(null);
 
@@ -7876,10 +7882,9 @@ function Directory({
                       }}
                       disabled={
                         isRootAccount(user) ||
-                        (r.role === "SCOPED_ADMINISTRATOR" &&
-                          !canGrantAdministratorRole) ||
+                        (r.role === "RTRDA_ADMIN" && !canGrantAdministratorRole) ||
                         (user.active &&
-                          r.role === "SCOPED_ADMINISTRATOR" &&
+                          r.role === "RTRDA_ADMIN" &&
                           r.departmentId === null &&
                           activeOrganizationAdmins <= 1)
                       }
@@ -7888,13 +7893,12 @@ function Directory({
                           ? language === "th"
                             ? "บัญชีผู้ดูแลหลักถูกป้องกัน"
                             : "The root administrator account is protected"
-                          : r.role === "SCOPED_ADMINISTRATOR" &&
-                              !canGrantAdministratorRole
+                          : r.role === "RTRDA_ADMIN" && !canGrantAdministratorRole
                             ? language === "th"
                               ? "เฉพาะผู้ดูแลหลักเท่านั้นที่ถอน role ผู้ดูแลได้"
                               : "Only the root administrator can revoke administrator roles"
                             : user.active &&
-                                r.role === "SCOPED_ADMINISTRATOR" &&
+                                r.role === "RTRDA_ADMIN" &&
                                 r.departmentId === null &&
                                 activeOrganizationAdmins <= 1
                               ? "At least one active organization-wide administrator must remain"
@@ -7960,15 +7964,11 @@ function Directory({
                       value={grantRole}
                       onChange={(event) => setGrantRole(event.target.value)}
                     >
-                      <option value="REQUESTER">REQUESTER</option>
-                      <option value="PR_OPERATIONS">PR_OPERATIONS</option>
-                      <option value="APPROVER">APPROVER</option>
-                      <option value="EXECUTIVE_READ_ONLY">EXECUTIVE_READ_ONLY</option>
-                      <option
-                        value="SCOPED_ADMINISTRATOR"
-                        disabled={!canGrantAdministratorRole}
-                      >
-                        SCOPED_ADMINISTRATOR
+                      <option value="RTRDA_ALL_USER">RTRDA_ALL_USER</option>
+                      <option value="RTRDA_PR">RTRDA_PR</option>
+                      <option value="RTRDA_BORD">RTRDA_BORD</option>
+                      <option value="RTRDA_ADMIN" disabled={!canGrantAdministratorRole}>
+                        RTRDA_ADMIN
                       </option>
                     </select>
                   </label>
@@ -7976,7 +7976,7 @@ function Directory({
                     <p role="note">
                       {language === "th"
                         ? "เฉพาะผู้ดูแลหลัก admin@apprtrda.onmicrosoft.com เท่านั้นที่มอบหมาย role ผู้ดูแลได้"
-                        : "Only the root administrator can grant SCOPED_ADMINISTRATOR."}
+                        : "Only the root administrator can grant RTRDA_ADMIN."}
                     </p>
                   )}
                   <label style={{ display: "grid", gap: 4 }}>

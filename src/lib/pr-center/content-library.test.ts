@@ -11,8 +11,8 @@ const scopedPr: PrCenterActor = {
   id: "pr-user",
   organizationId: "org-1",
   departmentId: "dept-home",
-  role: "PR_OPERATIONS",
-  roleGrants: [{ role: "PR_OPERATIONS", departmentId: "dept-1" }],
+  role: "RTRDA_PR",
+  roleGrants: [{ role: "RTRDA_PR", departmentId: "dept-1" }],
 };
 
 beforeEach(() => {
@@ -60,7 +60,7 @@ describe("Content Library request scope", () => {
   it("uses only the administrator grant scope, preserving organization-wide or department limits", async () => {
     const actor: PrCenterActor = {
       ...scopedPr,
-      roleGrants: [{ role: "SCOPED_ADMINISTRATOR", departmentId: "dept-2" }],
+      roleGrants: [{ role: "RTRDA_ADMIN", departmentId: "dept-2" }],
     };
     await listContentLibraryRequests(actor);
     expect(mockPrisma.prRequest.findMany).toHaveBeenCalledWith(
@@ -73,8 +73,8 @@ describe("Content Library request scope", () => {
   it("denies requester-only users before querying data", async () => {
     const requester: PrCenterActor = {
       ...scopedPr,
-      role: "REQUESTER",
-      roleGrants: [{ role: "REQUESTER", departmentId: null }],
+      role: "RTRDA_ALL_USER",
+      roleGrants: [{ role: "RTRDA_ALL_USER", departmentId: null }],
     };
     await expect(listContentLibraryRequests(requester)).rejects.toMatchObject({
       statusCode: 403,

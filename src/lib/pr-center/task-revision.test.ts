@@ -26,7 +26,7 @@ const actor = {
   id: "pr-user",
   organizationId: "org-1",
   departmentId: "dept-1",
-  role: "PR_OPERATIONS" as const,
+  role: "RTRDA_PR" as const,
 };
 
 beforeEach(() => {

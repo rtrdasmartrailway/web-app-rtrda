@@ -21,7 +21,7 @@ const requester = {
   id: "requester-1",
   organizationId: "org-1",
   departmentId: "dept-1",
-  role: "REQUESTER" as const,
+  role: "RTRDA_ALL_USER" as const,
 };
 
 beforeEach(() => {

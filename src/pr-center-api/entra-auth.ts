@@ -84,7 +84,7 @@ export function isSessionAuthorityCurrent(
       departmentId:
         actor.scopeDepartmentId !== undefined
           ? actor.scopeDepartmentId
-          : actor.role === "SCOPED_ADMINISTRATOR"
+          : actor.role === "RTRDA_ADMIN"
             ? null
             : actor.departmentId,
     },
@@ -165,10 +165,13 @@ export function resolvePrCenterLoginRole(
       "OIDC_ACCESS_NOT_ALLOWED",
     );
   const roleGrants = [...databaseRoleAssignments];
-  const autoProvisionRequester = !roleGrants.some((grant) => grant.role === "REQUESTER");
-  if (autoProvisionRequester) roleGrants.push({ role: "REQUESTER", departmentId: null });
+  const autoProvisionRequester = !roleGrants.some(
+    (grant) => grant.role === "RTRDA_ALL_USER",
+  );
+  if (autoProvisionRequester)
+    roleGrants.push({ role: "RTRDA_ALL_USER", departmentId: null });
   const role =
-    roleGrants.find((grant) => grant.role !== "REQUESTER")?.role ?? "REQUESTER";
+    roleGrants.find((grant) => grant.role !== "RTRDA_ALL_USER")?.role ?? "RTRDA_ALL_USER";
   return { role, roleGrants, autoProvisionRequester };
 }
 
@@ -311,32 +314,36 @@ export function createEntraAuth() {
         const existingRole = await tx.prUserRole.findFirst({
           where: {
             userId: user.id,
-            role: "REQUESTER",
+            role: "RTRDA_ALL_USER",
             organizationId: organization.id,
             departmentId: null,
           },
         });
         if (!existingRole)
           await tx.prUserRole.create({
-            data: { userId: user.id, role: "REQUESTER", organizationId: organization.id },
+            data: {
+              userId: user.id,
+              role: "RTRDA_ALL_USER",
+              organizationId: organization.id,
+            },
           });
       }
       if (isRootAdministrator) {
         const hasOrganizationAdmin = roleGrants.some(
-          (grant) => grant.role === "SCOPED_ADMINISTRATOR" && grant.departmentId === null,
+          (grant) => grant.role === "RTRDA_ADMIN" && grant.departmentId === null,
         );
         if (!hasOrganizationAdmin) {
           await tx.prUserRole.create({
             data: {
               userId: user.id,
-              role: "SCOPED_ADMINISTRATOR",
+              role: "RTRDA_ADMIN",
               organizationId: organization.id,
               departmentId: null,
             },
           });
-          roleGrants.push({ role: "SCOPED_ADMINISTRATOR", departmentId: null });
+          roleGrants.push({ role: "RTRDA_ADMIN", departmentId: null });
         }
-        role = "SCOPED_ADMINISTRATOR";
+        role = "RTRDA_ADMIN";
       }
       await tx.prAuditEvent.create({
         data: {
@@ -358,7 +365,7 @@ export function createEntraAuth() {
         isRootAdministrator,
         scopeDepartmentId: isRootAdministrator
           ? null
-          : (roleGrants.find((grant) => grant.role !== "REQUESTER")?.departmentId ??
+          : (roleGrants.find((grant) => grant.role !== "RTRDA_ALL_USER")?.departmentId ??
             null),
       };
     });

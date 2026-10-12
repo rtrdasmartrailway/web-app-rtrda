@@ -32,7 +32,7 @@ const administrator = {
   id: "admin",
   organizationId: "org-1",
   departmentId: null,
-  role: "SCOPED_ADMINISTRATOR" as const,
+  role: "RTRDA_ADMIN" as const,
 };
 
 function check(result: Awaited<ReturnType<typeof releaseReadinessCheck>>, name: string) {
@@ -108,7 +108,7 @@ describe("releaseReadinessCheck", () => {
 
   it("restricts readiness results to scoped administrators", async () => {
     await expect(
-      releaseReadinessCheck({ ...administrator, role: "REQUESTER" }),
+      releaseReadinessCheck({ ...administrator, role: "RTRDA_ALL_USER" }),
     ).rejects.toMatchObject({ code: "FORBIDDEN", statusCode: 403 });
   });
 
@@ -140,7 +140,7 @@ describe("releaseReadinessCheck", () => {
   it("rejects release evidence from non-organization administrators", async () => {
     await expect(
       recordReleaseEvidence(
-        { ...administrator, role: "PR_OPERATIONS" },
+        { ...administrator, role: "RTRDA_PR" },
         {
           gateKey: "BACKUP_RESTORE",
           result: "PASSED",

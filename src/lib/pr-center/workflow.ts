@@ -1,9 +1,8 @@
 export const PR_CENTER_ROLES = [
-  "REQUESTER",
-  "PR_OPERATIONS",
-  "APPROVER",
-  "EXECUTIVE_READ_ONLY",
-  "SCOPED_ADMINISTRATOR",
+  "RTRDA_ALL_USER",
+  "RTRDA_PR",
+  "RTRDA_BORD",
+  "RTRDA_ADMIN",
 ] as const;
 
 export type PrCenterRole = (typeof PR_CENTER_ROLES)[number];
@@ -60,7 +59,7 @@ function includesAnyRole(
   return roles.some((role) => allowed.includes(role));
 }
 
-const WRITE_ROLES: PrCenterRole[] = ["PR_OPERATIONS", "SCOPED_ADMINISTRATOR"];
+const WRITE_ROLES: PrCenterRole[] = ["RTRDA_PR", "RTRDA_BORD", "RTRDA_ADMIN"];
 
 export function canManageTasks(role: PrCenterRoleInput): boolean {
   return includesAnyRole(role, WRITE_ROLES);
@@ -77,62 +76,73 @@ export function canTransitionTask(
 }
 
 export function canApprove(role: PrCenterRoleInput): boolean {
-  return includesAnyRole(role, ["APPROVER", "PR_OPERATIONS", "SCOPED_ADMINISTRATOR"]);
+  return includesAnyRole(role, ["RTRDA_PR", "RTRDA_BORD", "RTRDA_ADMIN"]);
 }
 
 export function canDecideRequestIntake(role: PrCenterRoleInput): boolean {
-  return includesAnyRole(role, ["PR_OPERATIONS"]);
+  return includesAnyRole(role, ["RTRDA_PR", "RTRDA_BORD", "RTRDA_ADMIN"]);
 }
 
 export function canReadAllRequests(role: PrCenterRoleInput): boolean {
-  return includesAnyRole(role, ["PR_OPERATIONS"]);
+  // PR, BORD, and ADMIN share cross-user request access within grant scope.
+  return includesAnyRole(role, ["RTRDA_PR", "RTRDA_BORD", "RTRDA_ADMIN"]);
 }
 
 export function canCreateRequest(role: PrCenterRoleInput): boolean {
-  return includesAnyRole(role, ["REQUESTER", "SCOPED_ADMINISTRATOR"]);
+  return includesAnyRole(role, [
+    "RTRDA_ALL_USER",
+    "RTRDA_PR",
+    "RTRDA_BORD",
+    "RTRDA_ADMIN",
+  ]);
 }
 
 export function canCreateIdea(role: PrCenterRoleInput): boolean {
-  return includesAnyRole(role, ["REQUESTER", "PR_OPERATIONS", "SCOPED_ADMINISTRATOR"]);
+  return includesAnyRole(role, [
+    "RTRDA_ALL_USER",
+    "RTRDA_PR",
+    "RTRDA_BORD",
+    "RTRDA_ADMIN",
+  ]);
 }
 
 export function canReviewIdeas(role: PrCenterRoleInput): boolean {
-  return includesAnyRole(role, ["PR_OPERATIONS", "SCOPED_ADMINISTRATOR"]);
+  return includesAnyRole(role, ["RTRDA_PR", "RTRDA_BORD", "RTRDA_ADMIN"]);
 }
 
 export function canAttachFiles(role: PrCenterRoleInput): boolean {
-  // Requesters can attach to their own requests; PR_OPERATIONS and admins
+  // Requesters can attach to their own requests; RTRDA_PR and admins
   // can attach to any request/task in scope.
   return includesAnyRole(role, [
-    "REQUESTER",
-    "PR_OPERATIONS",
-    "APPROVER",
-    "SCOPED_ADMINISTRATOR",
+    "RTRDA_ALL_USER",
+    "RTRDA_PR",
+    "RTRDA_BORD",
+    "RTRDA_ADMIN",
   ]);
 }
 
 export function canRemoveAttachment(role: PrCenterRoleInput): boolean {
-  return includesAnyRole(role, ["PR_OPERATIONS", "SCOPED_ADMINISTRATOR"]);
+  return includesAnyRole(role, ["RTRDA_PR", "RTRDA_BORD", "RTRDA_ADMIN"]);
 }
 
 export function canAssignFinalAsset(role: PrCenterRoleInput): boolean {
-  return includesAnyRole(role, ["PR_OPERATIONS", "SCOPED_ADMINISTRATOR"]);
+  return includesAnyRole(role, ["RTRDA_PR", "RTRDA_BORD", "RTRDA_ADMIN"]);
 }
 
 export function canManageAccess(role: PrCenterRoleInput): boolean {
-  return includesAnyRole(role, ["SCOPED_ADMINISTRATOR"]);
+  return includesAnyRole(role, ["RTRDA_ADMIN"]);
 }
 
 export function canManageQuarantine(role: PrCenterRoleInput): boolean {
-  return includesAnyRole(role, ["SCOPED_ADMINISTRATOR", "PR_OPERATIONS"]);
+  return includesAnyRole(role, ["RTRDA_ADMIN", "RTRDA_PR", "RTRDA_BORD"]);
 }
 
 export function canExportAudit(role: PrCenterRoleInput): boolean {
-  return includesAnyRole(role, ["SCOPED_ADMINISTRATOR"]);
+  return includesAnyRole(role, ["RTRDA_ADMIN"]);
 }
 
 export function canRestoreRequests(role: PrCenterRoleInput): boolean {
-  return includesAnyRole(role, ["SCOPED_ADMINISTRATOR"]);
+  return includesAnyRole(role, ["RTRDA_ADMIN"]);
 }
 
 export function publicationGate(input: {

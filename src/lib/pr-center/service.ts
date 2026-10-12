@@ -67,7 +67,7 @@ export type PrCenterActor = {
   roleGrants?: PrCenterRoleGrant[];
   /** Legacy single-grant scope for service tests and older internal callers. */
   scopeDepartmentId?: string | null;
-  /** Root identity can grant/revoke SCOPED_ADMINISTRATOR assignments. */
+  /** Root identity can grant/revoke RTRDA_ADMIN assignments. */
   isRootAdministrator?: boolean;
 };
 
@@ -85,7 +85,7 @@ function actorRoleGrants(actor: PrCenterActor): PrCenterRoleGrant[] {
       departmentId:
         actor.scopeDepartmentId !== undefined
           ? actor.scopeDepartmentId
-          : actor.role === "SCOPED_ADMINISTRATOR"
+          : actor.role === "RTRDA_ADMIN"
             ? null
             : actor.departmentId,
     },
@@ -101,7 +101,7 @@ function actorHasRole(actor: PrCenterActor, role: PrCenterRole): boolean {
 }
 
 function canAccessIdeaReview(actor: PrCenterActor): boolean {
-  return ["PR_OPERATIONS", "APPROVER", "SCOPED_ADMINISTRATOR"].some((role) =>
+  return ["RTRDA_PR", "RTRDA_BORD", "RTRDA_ADMIN"].some((role) =>
     actorHasRole(actor, role as PrCenterRole),
   );
 }
@@ -120,7 +120,7 @@ function canManageDepartmentScope(
   departmentId: string | null,
 ): boolean {
   const administratorGrants = actorRoleGrants(actor).filter(
-    (grant) => grant.role === "SCOPED_ADMINISTRATOR",
+    (grant) => grant.role === "RTRDA_ADMIN",
   );
   return administratorGrants.some(
     (grant) =>
@@ -153,7 +153,7 @@ function roleDepartmentScopes(
   roles: readonly PrCenterRole[],
 ): { organizationWide: boolean; departmentIds: string[] } {
   const grants = actorRoleGrants(actor).filter(
-    (grant) => roles.includes(grant.role) && grant.role !== "REQUESTER",
+    (grant) => roles.includes(grant.role) && grant.role !== "RTRDA_ALL_USER",
   );
   const organizationWide = grants.some((grant) => grant.departmentId === null);
   const departmentIds = [
@@ -174,37 +174,38 @@ function roleDepartmentClauses(
 }
 
 function requestScopeWhere(actor: PrCenterActor): Prisma.PrRequestWhereInput {
-  const clauses: Prisma.PrRequestWhereInput[] = [];
-  if (actorHasRole(actor, "REQUESTER")) clauses.push({ requesterId: actor.id });
+  const clauses: Prisma.PrRequestWhereInput[] = [{ requesterId: actor.id }];
   clauses.push(
-    ...roleDepartmentClauses(actor, [
-      "PR_OPERATIONS",
-      "APPROVER",
-      "SCOPED_ADMINISTRATOR",
-    ]),
+    ...roleDepartmentClauses(actor, ["RTRDA_PR", "RTRDA_BORD", "RTRDA_ADMIN"]),
   );
   return { organizationId: actor.organizationId, OR: clauses };
 }
 
 function requestReadWhere(actor: PrCenterActor): Prisma.PrRequestWhereInput {
-  const roleScopes = roleDepartmentClauses(actor, [
-    "PR_OPERATIONS",
-    "SCOPED_ADMINISTRATOR",
+  const roleScopes: Prisma.PrRequestWhereInput[] = roleDepartmentClauses(actor, [
+    "RTRDA_PR",
+    "RTRDA_BORD",
+    "RTRDA_ADMIN",
   ]);
   if (roleScopes.some((scope) => Object.keys(scope).length === 0))
     return { organizationId: actor.organizationId };
-  const clauses: Prisma.PrRequestWhereInput[] = [{ requesterId: actor.id }];
-  clauses.push(...roleScopes);
-  return { organizationId: actor.organizationId, OR: clauses };
+  return {
+    organizationId: actor.organizationId,
+    OR: [{ requesterId: actor.id }, ...roleScopes],
+  };
 }
 
 function canReadRequestRecord(
   actor: PrCenterActor,
-  request: { organizationId: string; departmentId: string; requesterId: string },
+  request: {
+    organizationId: string;
+    departmentId: string;
+    requesterId: string;
+  },
 ): boolean {
   if (request.organizationId !== actor.organizationId) return false;
   if (request.requesterId === actor.id) return true;
-  const scope = roleDepartmentScopes(actor, ["PR_OPERATIONS"]);
+  const scope = roleDepartmentScopes(actor, ["RTRDA_PR", "RTRDA_BORD", "RTRDA_ADMIN"]);
   return scope.organizationWide || scope.departmentIds.includes(request.departmentId);
 }
 
@@ -212,7 +213,7 @@ function quarantinedFileScope(actor: PrCenterActor): {
   fileWhere: Prisma.PrFileObjectWhereInput;
   attachmentWhere?: Prisma.PrAttachmentWhereInput;
 } {
-  const scope = roleDepartmentScopes(actor, ["PR_OPERATIONS", "SCOPED_ADMINISTRATOR"]);
+  const scope = roleDepartmentScopes(actor, ["RTRDA_PR", "RTRDA_BORD", "RTRDA_ADMIN"]);
   if (scope.organizationWide) return { fileWhere: {} };
   if (scope.departmentIds.length === 0) return { fileWhere: { id: "__out_of_scope__" } };
   const requestScope: Prisma.PrRequestWhereInput = {
@@ -236,9 +237,9 @@ function ideaScopeWhere(
   ideaId: string,
 ): Prisma.PrContentIdeaWhereInput {
   const reviewerScopes = roleDepartmentClauses(actor, [
-    "PR_OPERATIONS",
-    "APPROVER",
-    "SCOPED_ADMINISTRATOR",
+    "RTRDA_PR",
+    "RTRDA_BORD",
+    "RTRDA_ADMIN",
   ]);
   const clauses: Prisma.PrContentIdeaWhereInput[] = canAccessIdeaReview(actor)
     ? reviewerScopes.map((scope) => scope)
@@ -257,11 +258,7 @@ function ideaCommentScopeWhere(
   const scopes: Prisma.PrContentIdeaWhereInput[] = [{ proposerId: actor.id }];
   if (canAccessIdeaReview(actor))
     scopes.push(
-      ...roleDepartmentClauses(actor, [
-        "PR_OPERATIONS",
-        "APPROVER",
-        "SCOPED_ADMINISTRATOR",
-      ]),
+      ...roleDepartmentClauses(actor, ["RTRDA_PR", "RTRDA_BORD", "RTRDA_ADMIN"]),
     );
   return { id: ideaId, organizationId: actor.organizationId, OR: scopes };
 }
@@ -551,7 +548,7 @@ export async function savePrMasterData(
   input: unknown,
   correlationId: string = randomUUID(),
 ) {
-  if (!actorHasOrganizationWideRole(actor, ["SCOPED_ADMINISTRATOR"]))
+  if (!actorHasOrganizationWideRole(actor, ["RTRDA_ADMIN"]))
     throw new PrCenterError(
       "Organization-wide administrator role is required",
       403,
@@ -854,7 +851,7 @@ export async function createRequest(
     const operationsRoles = await tx.prUserRole.findMany({
       where: {
         organizationId: actor.organizationId,
-        role: "PR_OPERATIONS",
+        role: { in: ["RTRDA_PR", "RTRDA_BORD"] },
         OR: [{ departmentId: departmentId }, { departmentId: null }],
         user: { active: true },
       },
@@ -944,7 +941,7 @@ export async function listContentLibraryRequests(
   take = 25,
   cursor?: string,
 ) {
-  const allowedRoles = ["PR_OPERATIONS", "SCOPED_ADMINISTRATOR"] as const;
+  const allowedRoles = ["RTRDA_PR", "RTRDA_BORD", "RTRDA_ADMIN"] as const;
   if (!allowedRoles.some((role) => actorHasRole(actor, role)))
     throw new PrCenterError("You cannot view the Content Library", 403, "FORBIDDEN");
   const limit = Math.min(Math.max(take, 1), 100);
@@ -1042,7 +1039,7 @@ export async function updateRequestDraft(
   correlationId: string = randomUUID(),
 ) {
   const request = await requestInScope(actor, requestId);
-  if (request.requesterId !== actor.id && !actorHasRole(actor, "SCOPED_ADMINISTRATOR"))
+  if (request.requesterId !== actor.id && !actorHasRole(actor, "RTRDA_ADMIN"))
     throw new PrCenterError("You cannot amend this request", 403, "FORBIDDEN");
   if (
     !(["DRAFT", "SUBMITTED", "REJECTED", "WITHDRAWN"] as string[]).includes(
@@ -1169,7 +1166,7 @@ export async function updateRequestDraft(
       const operations = await tx.prUserRole.findMany({
         where: {
           organizationId: request.organizationId,
-          role: "PR_OPERATIONS",
+          role: { in: ["RTRDA_PR", "RTRDA_BORD", "RTRDA_ADMIN"] },
           OR: [{ departmentId: request.departmentId }, { departmentId: null }],
           user: { active: true },
         },
@@ -1216,7 +1213,7 @@ export async function transitionRequest(
   correlationId: string = randomUUID(),
 ) {
   const request = await requestInScope(actor, requestId);
-  if (request.requesterId !== actor.id && !actorHasRole(actor, "SCOPED_ADMINISTRATOR"))
+  if (request.requesterId !== actor.id && !actorHasRole(actor, "RTRDA_ADMIN"))
     throw new PrCenterError("You cannot update this request", 403, "FORBIDDEN");
   const allowed =
     (status === "SUBMITTED" && request.status === "DRAFT") ||
@@ -1277,24 +1274,33 @@ export async function transitionRequest(
       }
     }
     if (status === "SUBMITTED") {
-      const approverRoles = await tx.prUserRole.findMany({
+      const intakeReviewers = await tx.prUserRole.findMany({
         where: {
           organizationId: request.organizationId,
-          role: "PR_OPERATIONS",
+          role: { in: ["RTRDA_PR", "RTRDA_BORD"] },
           OR: [{ departmentId: request.departmentId }, { departmentId: null }],
           user: { active: true },
         },
         select: { userId: true },
       });
-      if (approverRoles.length === 0)
+      if (intakeReviewers.length === 0)
         throw new PrCenterError(
           "No active PR Operations reviewer is assigned to this request department",
           409,
           "NO_INTAKE_REVIEWER",
         );
+      const observers = await tx.prUserRole.findMany({
+        where: {
+          organizationId: request.organizationId,
+          role: { in: ["RTRDA_PR", "RTRDA_BORD", "RTRDA_ADMIN"] },
+          OR: [{ departmentId: request.departmentId }, { departmentId: null }],
+          user: { active: true },
+        },
+        select: { userId: true },
+      });
       const recipients = new Set([
         request.requesterId,
-        ...approverRoles.map((role) => role.userId),
+        ...observers.map((role) => role.userId),
       ]);
       await tx.prNotification.createMany({
         data: [...recipients].map((userId) => ({
@@ -1359,13 +1365,10 @@ export async function listIdeas(
     );
   }
   const ideaClauses: Prisma.PrContentIdeaWhereInput[] = [{ proposerId: actor.id }];
-  ideaClauses.push(
-    ...roleDepartmentClauses(actor, [
-      "PR_OPERATIONS",
-      "APPROVER",
-      "SCOPED_ADMINISTRATOR",
-    ]),
-  );
+  if (canAccessIdeaReview(actor))
+    ideaClauses.push(
+      ...roleDepartmentClauses(actor, ["RTRDA_PR", "RTRDA_BORD", "RTRDA_ADMIN"]),
+    );
   const searchClauses: Prisma.PrContentIdeaWhereInput[] = search
     ? [
         { title: { contains: search, mode: "insensitive" } },
@@ -1520,7 +1523,7 @@ export async function createIdea(
     const reviewers = await tx.prUserRole.findMany({
       where: {
         organizationId: actor.organizationId,
-        role: "PR_OPERATIONS",
+        role: { in: ["RTRDA_PR", "RTRDA_BORD"] },
         OR: [{ departmentId: actor.departmentId }, { departmentId: null }],
         user: { active: true },
       },
@@ -1577,9 +1580,8 @@ export async function transitionIdea(
       422,
       "INVALID_TRANSITION",
     );
-  const admin = actorHasRole(actor, "SCOPED_ADMINISTRATOR");
-  const prReviewer = actorHasRole(actor, "PR_OPERATIONS");
-  const approver = actorHasRole(actor, "APPROVER");
+  const admin = actorHasRole(actor, "RTRDA_ADMIN");
+  const prReviewer = actorHasRole(actor, "RTRDA_PR") || actorHasRole(actor, "RTRDA_BORD");
   const prReviewTransition =
     (idea.status === "PROPOSED" && to === "UNDER_REVIEW") ||
     (idea.status === "UNDER_REVIEW" &&
@@ -1589,7 +1591,7 @@ export async function transitionIdea(
   const approvalDecision =
     idea.status === "PENDING_APPROVAL" &&
     ["ACCEPTED", "REVISION_REQUIRED", "REJECTED"].includes(to);
-  if (!admin && !((prReviewer && prReviewTransition) || (approver && approvalDecision)))
+  if (!admin && !(prReviewer && (prReviewTransition || approvalDecision)))
     throw new PrCenterError(
       "This idea transition requires another workflow role",
       403,
@@ -1628,7 +1630,7 @@ export async function transitionIdea(
       ? await tx.prUserRole.findMany({
           where: {
             organizationId: idea.organizationId,
-            role: "APPROVER",
+            role: { in: ["RTRDA_PR", "RTRDA_BORD", "RTRDA_ADMIN"] },
             OR: [{ departmentId: idea.departmentId }, { departmentId: null }],
             user: { active: true },
           },
@@ -1739,7 +1741,7 @@ export async function reviseIdea(
     const reviewers = await tx.prUserRole.findMany({
       where: {
         organizationId: actor.organizationId,
-        role: "PR_OPERATIONS",
+        role: { in: ["RTRDA_PR", "RTRDA_BORD"] },
         OR: [{ departmentId: idea.departmentId }, { departmentId: null }],
         user: { active: true },
       },
@@ -1850,7 +1852,7 @@ export async function convertIdea(
 }
 
 function assertCanReadMessageHouse(actor: PrCenterActor) {
-  if (!canManageTasks(actorRoles(actor)) && !actorHasRole(actor, "EXECUTIVE_READ_ONLY"))
+  if (!canManageTasks(actorRoles(actor)) && !actorHasRole(actor, "RTRDA_BORD"))
     throw new PrCenterError("You cannot view Message House", 403, "FORBIDDEN");
 }
 
@@ -2040,8 +2042,9 @@ export async function updateTaskAssignment(
     );
   if (input.ownerId) {
     const ownerScope = roleDepartmentScopes(actor, [
-      "PR_OPERATIONS",
-      "SCOPED_ADMINISTRATOR",
+      "RTRDA_PR",
+      "RTRDA_BORD",
+      "RTRDA_ADMIN",
     ]);
     const owner = await prisma.prCenterUser.findFirst({
       where: {
@@ -2604,7 +2607,20 @@ export async function recordRequestDecision(
     throw new PrCenterError("You cannot decide this request", 403, "FORBIDDEN");
   const request = await prisma.prRequest.findFirst({
     where: { id: requestId, ...requestScopeWhere(actor) },
-    include: { tasks: { select: { id: true, status: true, version: true } } },
+    include: {
+      tasks: { select: { id: true, status: true, version: true } },
+      requester: {
+        select: {
+          roles: {
+            where: {
+              organizationId: actor.organizationId,
+              role: "RTRDA_ALL_USER",
+            },
+            select: { id: true },
+          },
+        },
+      },
+    },
   });
   if (!request) throw new PrCenterError("Request not found", 404, "NOT_FOUND");
   if (request.requesterId === actor.id)
@@ -2709,7 +2725,7 @@ export async function recordRequestDecision(
       const operationsRoles = await tx.prUserRole.findMany({
         where: {
           organizationId: request.organizationId,
-          role: "PR_OPERATIONS",
+          role: { in: ["RTRDA_PR", "RTRDA_BORD"] },
           OR: [{ departmentId: request.departmentId }, { departmentId: null }],
           user: { active: true },
         },
@@ -2721,6 +2737,27 @@ export async function recordRequestDecision(
           userId,
           title: "Approved request ready for PR assignment",
           body: `${request.title} was approved. Assign an owner and begin planning.`,
+          target: `request:${request.id}`,
+        });
+      }
+    }
+    if (request.requester.roles.length > 0) {
+      const observers = await tx.prUserRole.findMany({
+        where: {
+          organizationId: request.organizationId,
+          role: { in: ["RTRDA_PR", "RTRDA_BORD", "RTRDA_ADMIN"] },
+          OR: [{ departmentId: request.departmentId }, { departmentId: null }],
+          user: { active: true },
+        },
+        select: { userId: true },
+      });
+      const alreadyNotified = new Set(notifications.map(({ userId }) => userId));
+      for (const userId of new Set(observers.map(({ userId }) => userId))) {
+        if (alreadyNotified.has(userId)) continue;
+        notifications.push({
+          userId,
+          title: `Request ${input.decision.toLowerCase()}`,
+          body: `${request.title} was ${input.decision.toLowerCase()}.${reason ? ` Reason: ${reason}` : ""}`,
           target: `request:${request.id}`,
         });
       }
@@ -2887,8 +2924,9 @@ export async function listAssignableUsers(actor: PrCenterActor) {
   if (!canManageTasks(actorRoles(actor)))
     throw new PrCenterError("You cannot view assignable users", 403, "FORBIDDEN");
   const ownerScope = roleDepartmentScopes(actor, [
-    "PR_OPERATIONS",
-    "SCOPED_ADMINISTRATOR",
+    "RTRDA_PR",
+    "RTRDA_BORD",
+    "RTRDA_ADMIN",
   ]);
   return prisma.prCenterUser.findMany({
     where: {
@@ -2922,7 +2960,7 @@ export async function listCalendarEntries(actor: PrCenterActor, from: Date, to: 
     );
   }
 
-  const requestScope = requestScopeWhere(actor);
+  const requestScope = requestReadWhere(actor);
   const [schedules, drafts] = await Promise.all([
     prisma.prSchedule.findMany({
       where: {
@@ -3017,7 +3055,7 @@ export async function listCalendarRequestDecisions(
       requestId: { not: null },
       toState: { in: ["APPROVED", "REJECTED"] },
       createdAt: { gte: from, lt: to },
-      request: { is: requestScopeWhere(actor) },
+      request: { is: requestReadWhere(actor) },
     },
     select: {
       id: true,
@@ -3440,12 +3478,20 @@ export async function downloadFile(
     where: { fileId },
     include: {
       request: {
-        select: { organizationId: true, departmentId: true, requesterId: true },
+        select: {
+          organizationId: true,
+          departmentId: true,
+          requesterId: true,
+        },
       },
       task: {
         select: {
           request: {
-            select: { organizationId: true, departmentId: true, requesterId: true },
+            select: {
+              organizationId: true,
+              departmentId: true,
+              requesterId: true,
+            },
           },
         },
       },
@@ -3748,7 +3794,7 @@ export async function evaluateNotificationReminders(
 ): Promise<
   PolicyEvaluationResult & { channelResults: Array<{ channel: string; status: string }> }
 > {
-  if (!actorHasOrganizationWideRole(actor, ["SCOPED_ADMINISTRATOR"]))
+  if (!actorHasOrganizationWideRole(actor, ["RTRDA_ADMIN"]))
     throw new PrCenterError(
       "Only administrators can trigger reminder evaluation",
       403,
@@ -3780,7 +3826,7 @@ export async function evaluateNotificationReminders(
   return { ...result, channelResults };
 }
 
-// ── Access Administration (SCOPED_ADMINISTRATOR only) ────────────────────
+// ── Access Administration (RTRDA_ADMIN only) ────────────────────
 
 async function assertActiveOrganizationAdministratorRemains(
   tx: Prisma.TransactionClient,
@@ -3790,7 +3836,7 @@ async function assertActiveOrganizationAdministratorRemains(
   const remaining = await tx.prUserRole.count({
     where: {
       organizationId,
-      role: "SCOPED_ADMINISTRATOR",
+      role: "RTRDA_ADMIN",
       departmentId: null,
       user: { active: true },
       ...(excluded.roleId ? { id: { not: excluded.roleId } } : {}),
@@ -3831,7 +3877,7 @@ async function runSerializableAccessTransaction<T>(
 export async function listAdminUsers(actor: PrCenterActor) {
   if (!canManageAccess(actorRoles(actor)))
     throw new PrCenterError("You cannot view user directory", 403, "FORBIDDEN");
-  const adminScope = roleDepartmentScopes(actor, ["SCOPED_ADMINISTRATOR"]);
+  const adminScope = roleDepartmentScopes(actor, ["RTRDA_ADMIN"]);
   return prisma.prCenterUser.findMany({
     where: {
       organizationId: actor.organizationId,
@@ -3888,7 +3934,7 @@ export async function grantRole(
     throw new PrCenterError("You cannot grant roles", 403, "FORBIDDEN");
   if (!PR_CENTER_ROLES.includes(role))
     throw new PrCenterError("Invalid role code", 422, "INVALID_ROLE");
-  if (role === "SCOPED_ADMINISTRATOR" && !actor.isRootAdministrator)
+  if (role === "RTRDA_ADMIN" && !actor.isRootAdministrator)
     throw new PrCenterError(
       "Only the root PR Center administrator can grant administrator roles",
       403,
@@ -3982,7 +4028,7 @@ export async function revokeRole(
     },
   });
   if (!roleRecord) throw new PrCenterError("Role assignment not found", 404, "NOT_FOUND");
-  if (roleRecord.role === "SCOPED_ADMINISTRATOR" && !actor.isRootAdministrator)
+  if (roleRecord.role === "RTRDA_ADMIN" && !actor.isRootAdministrator)
     throw new PrCenterError(
       "Only the root PR Center administrator can revoke administrator roles",
       403,
@@ -3998,7 +4044,7 @@ export async function revokeRole(
   assertCanManageUserScope(actor, roleRecord.user);
   return runSerializableAccessTransaction(async (tx) => {
     if (
-      roleRecord.role === "SCOPED_ADMINISTRATOR" &&
+      roleRecord.role === "RTRDA_ADMIN" &&
       roleRecord.departmentId === null &&
       roleRecord.user.active
     )
@@ -4050,7 +4096,7 @@ export async function toggleUserActive(
     );
   if (
     !actor.isRootAdministrator &&
-    user.roles?.some((grant) => grant.role === "SCOPED_ADMINISTRATOR")
+    user.roles?.some((grant) => grant.role === "RTRDA_ADMIN")
   )
     throw new PrCenterError(
       "Only the root PR Center administrator can change another administrator's active status",
@@ -4070,7 +4116,7 @@ export async function toggleUserActive(
         where: {
           userId,
           organizationId: actor.organizationId,
-          role: "SCOPED_ADMINISTRATOR",
+          role: "RTRDA_ADMIN",
           departmentId: null,
         },
         select: { id: true },
@@ -4108,7 +4154,7 @@ export async function listAccessAuditEvents(actor: PrCenterActor, take = 100) {
   if (!canManageAccess(actorRoles(actor)))
     throw new PrCenterError("You cannot view access audit events", 403, "FORBIDDEN");
   const limit = Math.min(Math.max(take, 1), 500);
-  const organizationWide = actorHasOrganizationWideRole(actor, ["SCOPED_ADMINISTRATOR"]);
+  const organizationWide = actorHasOrganizationWideRole(actor, ["RTRDA_ADMIN"]);
   return prisma.prAuditEvent.findMany({
     where: {
       organizationId: actor.organizationId,
@@ -4129,7 +4175,7 @@ export async function listAccessAuditEvents(actor: PrCenterActor, take = 100) {
   });
 }
 
-// ── Quarantine management (SCOPED_ADMINISTRATOR + PR_OPERATIONS) ───────────
+// ── Quarantine management (RTRDA_ADMIN + RTRDA_PR) ───────────
 
 export async function listQuarantinedFiles(actor: PrCenterActor, take = 50) {
   if (!canManageQuarantine(actorRoles(actor)))
@@ -4266,7 +4312,7 @@ export async function rescanFile(
   });
 }
 
-// ── Audit export (SCOPED_ADMINISTRATOR only) ──────────────────────────
+// ── Audit export (RTRDA_ADMIN only) ──────────────────────────
 
 export async function exportAuditEvents(
   actor: PrCenterActor,
@@ -4278,7 +4324,7 @@ export async function exportAuditEvents(
   },
   correlationId: string = randomUUID(),
 ) {
-  if (!actorHasOrganizationWideRole(actor, ["SCOPED_ADMINISTRATOR"]))
+  if (!actorHasOrganizationWideRole(actor, ["RTRDA_ADMIN"]))
     throw new PrCenterError("You cannot export audit events", 403, "FORBIDDEN");
   const where: Prisma.PrAuditEventWhereInput = {
     organizationId: actor.organizationId,
@@ -4342,7 +4388,7 @@ export async function restoreRequest(
 ) {
   if (!canRestoreRequests(actorRoles(actor)))
     throw new PrCenterError("You cannot restore requests", 403, "FORBIDDEN");
-  const roleScope = roleDepartmentClauses(actor, ["SCOPED_ADMINISTRATOR"]);
+  const roleScope = roleDepartmentClauses(actor, ["RTRDA_ADMIN"]);
   const restoreScope = { organizationId: actor.organizationId, OR: roleScope };
   const request = await prisma.prRequest.findFirst({
     where: { id: requestId, ...restoreScope },
@@ -4401,7 +4447,7 @@ export async function restoreRequest(
 // ── UAT / release readiness check ────────────────────────────────────
 
 function assertCanManageReleaseEvidence(actor: PrCenterActor) {
-  if (!actorHasOrganizationWideRole(actor, ["SCOPED_ADMINISTRATOR"]))
+  if (!actorHasOrganizationWideRole(actor, ["RTRDA_ADMIN"]))
     throw new PrCenterError("You cannot manage release evidence", 403, "FORBIDDEN");
 }
 
@@ -4494,7 +4540,7 @@ export async function recordReleaseEvidence(
 }
 
 export async function releaseReadinessCheck(actor: PrCenterActor) {
-  if (!actorHasOrganizationWideRole(actor, ["SCOPED_ADMINISTRATOR"]))
+  if (!actorHasOrganizationWideRole(actor, ["RTRDA_ADMIN"]))
     throw new PrCenterError("You cannot view release readiness", 403, "FORBIDDEN");
   const org = { organizationId: actor.organizationId };
   const checks: { name: string; passed: boolean; detail: string }[] = [];

@@ -20,17 +20,34 @@ const scopedPr: PrCenterActor = {
   id: "pr-1",
   organizationId: "org-1",
   departmentId: "dept-home",
-  role: "PR_OPERATIONS",
+  role: "RTRDA_PR",
   roleGrants: [
-    { role: "REQUESTER", departmentId: null },
-    { role: "PR_OPERATIONS", departmentId: "dept-1" },
+    { role: "RTRDA_ALL_USER", departmentId: null },
+    { role: "RTRDA_PR", departmentId: "dept-1" },
   ],
 };
 
-const attachmentFor = (departmentId: string, requesterId = "owner-1") => ({
-  request: { organizationId: "org-1", departmentId, requesterId },
+const attachmentFor = (
+  departmentId: string,
+  requesterId = "owner-1",
+  hasAllUserRole = true,
+) => ({
+  request: {
+    organizationId: "org-1",
+    departmentId,
+    requesterId,
+    requester: { roles: hasAllUserRole ? [{ id: "all-user-role" }] : [] },
+  },
   task: null,
 });
+
+const board: PrCenterActor = {
+  id: "board-1",
+  organizationId: "org-1",
+  departmentId: "dept-1",
+  role: "RTRDA_BORD",
+  roleGrants: [{ role: "RTRDA_BORD", departmentId: "dept-1" }],
+};
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -73,6 +90,7 @@ describe("file download request scope", () => {
         organizationId: "org-2",
         departmentId: "dept-2",
         requesterId: "owner-2",
+        requester: { roles: [{ id: "all-user-role" }] },
       },
       task: null,
     });
@@ -88,6 +106,26 @@ describe("file download request scope", () => {
     mockPrisma.prAttachment.findFirst.mockResolvedValue(attachmentFor("dept-2", "pr-1"));
 
     await expect(downloadFile(scopedPr, "file-1")).resolves.toMatchObject({
+      fileName: "brief.pdf",
+    });
+    expect(readFromStorage).toHaveBeenCalledOnce();
+  });
+
+  it("allows BORD to download an ALL_USER request attachment in its scoped department", async () => {
+    mockPrisma.prAttachment.findFirst.mockResolvedValue(attachmentFor("dept-1"));
+
+    await expect(downloadFile(board, "file-1")).resolves.toMatchObject({
+      fileName: "brief.pdf",
+    });
+    expect(readFromStorage).toHaveBeenCalledOnce();
+  });
+
+  it("allows BORD to download any in-scope request attachment like PR", async () => {
+    mockPrisma.prAttachment.findFirst.mockResolvedValue(
+      attachmentFor("dept-1", "owner-2", false),
+    );
+
+    await expect(downloadFile(board, "file-1")).resolves.toMatchObject({
       fileName: "brief.pdf",
     });
     expect(readFromStorage).toHaveBeenCalledOnce();

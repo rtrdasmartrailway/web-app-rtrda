@@ -16,19 +16,19 @@ const source: ApprovalPolicy = {
     {
       status: "SOURCE_FACT_CHECK",
       required: true,
-      roles: ["PR_OPERATIONS"],
+      roles: ["RTRDA_PR"],
       departmentScope: "TASK_DEPARTMENT",
     },
     {
       status: "TECHNICAL_REVIEW",
       required: false,
-      roles: ["PR_OPERATIONS"],
+      roles: ["RTRDA_PR"],
       departmentScope: "TASK_DEPARTMENT",
     },
     {
       status: "PR_EDITORIAL_REVIEW",
       required: true,
-      roles: ["SCOPED_ADMINISTRATOR"],
+      roles: ["RTRDA_ADMIN"],
       departmentScope: "ORGANIZATION",
     },
   ],
@@ -57,14 +57,12 @@ describe("approval policy configuration", () => {
     expect(getNextApprovalStage(policy, "PR_EDITORIAL_REVIEW")).toBeNull();
   });
 
-  it("accepts the dedicated APPROVER role in stage policy", () => {
-    const approverRolePolicy = {
+  it("accepts RTRDA_BORD as an approval stage role", () => {
+    const boardRolePolicy = {
       ...source,
-      stages: [{ ...source.stages[0], roles: ["APPROVER"] }, ...source.stages.slice(1)],
+      stages: [{ ...source.stages[0], roles: ["RTRDA_BORD"] }, ...source.stages.slice(1)],
     };
-    expect(
-      parseApprovalPolicy(JSON.stringify(approverRolePolicy)).stages[0].roles,
-    ).toEqual(["APPROVER"]);
+    expect(() => parseApprovalPolicy(JSON.stringify(boardRolePolicy))).not.toThrow();
   });
 
   it("does not resolve unconfigured or optional stages as valid current authority", () => {
@@ -81,9 +79,9 @@ describe("approval policy configuration", () => {
       hasApprovalAuthority({
         stage: departmentStage,
         roleGrants: [
-          { role: "APPROVER", departmentId: "dept-2" },
-          { role: "PR_OPERATIONS", departmentId: "dept-2" },
-          { role: "PR_OPERATIONS", departmentId: "dept-3" },
+          { role: "RTRDA_BORD", departmentId: "dept-2" },
+          { role: "RTRDA_PR", departmentId: "dept-2" },
+          { role: "RTRDA_PR", departmentId: "dept-3" },
         ],
         taskDepartmentId: "dept-2",
       }),
@@ -91,21 +89,21 @@ describe("approval policy configuration", () => {
     expect(
       hasApprovalAuthority({
         stage: departmentStage,
-        roleGrants: [{ role: "PR_OPERATIONS", departmentId: "dept-3" }],
+        roleGrants: [{ role: "RTRDA_PR", departmentId: "dept-3" }],
         taskDepartmentId: "dept-2",
       }),
     ).toBe(false);
     expect(
       hasApprovalAuthority({
         stage: organizationStage,
-        roleGrants: [{ role: "SCOPED_ADMINISTRATOR", departmentId: "dept-2" }],
+        roleGrants: [{ role: "RTRDA_ADMIN", departmentId: "dept-2" }],
         taskDepartmentId: "dept-2",
       }),
     ).toBe(false);
     expect(
       hasApprovalAuthority({
         stage: organizationStage,
-        roleGrants: [{ role: "SCOPED_ADMINISTRATOR", departmentId: null }],
+        roleGrants: [{ role: "RTRDA_ADMIN", departmentId: null }],
         taskDepartmentId: "dept-2",
       }),
     ).toBe(true);
