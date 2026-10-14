@@ -8,6 +8,8 @@ import {
   convertIdea,
   currentMessageHouse,
   messageHouseDraft,
+  messageHouseReview,
+  transitionMessageHouse,
   saveMessageHouseDraft,
   reviseIdea,
   getPrMasterData,
@@ -64,6 +66,7 @@ import {
   recordReleaseEvidence,
   PrCenterError,
   type PrCenterActor,
+  type RequestListFilters,
 } from "@/lib/pr-center/service";
 import { parseAbsoluteScheduleDate } from "@/lib/pr-center/schedule-time";
 import {
@@ -138,6 +141,34 @@ function taskId(value: string): `${string}-${string}-${string}-${string}-${strin
   return value as `${string}-${string}-${string}-${string}-${string}`;
 }
 
+function listQuery(request: FastifyRequest) {
+  const query = request.query as Record<string, unknown>;
+  for (const key of ["take", "cursor", "q", "status", "mine"]) {
+    if (query[key] !== undefined && typeof query[key] !== "string")
+      throw new PrCenterError(`Invalid ${key} filter`, 422, "INVALID_LIST_FILTER");
+  }
+  const rawTake = query.take as string | undefined;
+  if (rawTake !== undefined && !/^[1-9]\d*$/.test(rawTake))
+    throw new PrCenterError("Invalid take filter", 422, "INVALID_LIST_FILTER");
+  return {
+    take: rawTake === undefined ? undefined : Number(rawTake),
+    cursor: query.cursor as string | undefined,
+    q: query.q as string | undefined,
+    status: query.status as string | undefined,
+    mine: query.mine as string | undefined,
+  };
+}
+
+function requestListFilters(query: ReturnType<typeof listQuery>): RequestListFilters {
+  if (query.mine !== undefined && query.mine !== "true" && query.mine !== "false")
+    throw new PrCenterError("mine must be true or false", 422, "INVALID_LIST_FILTER");
+  return {
+    q: query.q,
+    status: query.status as RequestListFilters["status"],
+    mine: query.mine === undefined ? undefined : query.mine === "true",
+  };
+}
+
 export function buildPrCenterApi(
   resolveActor: ActorResolver,
   entraAuth?: EntraAuth | null,
@@ -173,8 +204,13 @@ export function buildPrCenterApi(
   });
 
   app.get("/requests", async (request) => {
-    const query = request.query as { take?: string; cursor?: string };
-    return listRequests(request.prCenterActor!, Number(query.take || 25), query.cursor);
+    const query = listQuery(request);
+    return listRequests(
+      request.prCenterActor!,
+      query.take ?? 25,
+      query.cursor,
+      requestListFilters(query),
+    );
   });
   app.get("/content-library", async (request) => {
     const query = request.query as { take?: string; cursor?: string };
@@ -301,13 +337,35 @@ export function buildPrCenterApi(
   app.get("/message-house/draft", async (request) =>
     messageHouseDraft(request.prCenterActor!),
   );
+  app.get("/message-house/review", async (request) =>
+    messageHouseReview(request.prCenterActor!),
+  );
+  app.post("/message-house/:versionId/transitions", async (request) => {
+    const input = await body(request);
+    if (input.to !== "IN_REVIEW" && input.to !== "APPROVED" && input.to !== "REJECTED")
+      throw new PrCenterError("Unknown Message House transition", 422, "INVALID_STATUS");
+    return transitionMessageHouse(
+      request.prCenterActor!,
+      taskId((request.params as { versionId: string }).versionId),
+      expectedVersion(request),
+      {
+        to: input.to,
+        reason: typeof input.reason === "string" ? input.reason : undefined,
+        effectiveAt:
+          typeof input.effectiveAt === "string" ? input.effectiveAt : undefined,
+      },
+      correlationId(request),
+    );
+  });
   app.post("/message-house/draft", async (request) => {
     const input = await body(request);
+    const id = typeof input.id === "string" ? taskId(input.id) : undefined;
     return saveMessageHouseDraft(
       request.prCenterActor!,
       input,
-      typeof input.id === "string" ? taskId(input.id) : undefined,
+      id,
       correlationId(request),
+      id ? expectedVersion(request) : undefined,
     );
   });
   app.get("/calendar", async (request) => {
@@ -341,8 +399,12 @@ export function buildPrCenterApi(
     evaluateNotificationReminders(request.prCenterActor!),
   );
   app.get("/audit", async (request) => {
-    const query = request.query as { take?: string };
-    return listAuditEvents(request.prCenterActor!, Number(query.take || 100));
+    const query = listQuery(request);
+    if (query.status !== undefined || query.mine !== undefined)
+      throw new PrCenterError("Unknown history filter", 422, "INVALID_LIST_FILTER");
+    return listAuditEvents(request.prCenterActor!, query.take ?? 100, query.cursor, {
+      q: query.q,
+    });
   });
   app.get("/session", async (request) => sessionProfile(request.prCenterActor!));
   app.get("/auth/login", async (request, reply) => {

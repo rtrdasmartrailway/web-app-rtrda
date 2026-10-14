@@ -898,14 +898,102 @@ export async function createRequest(
   });
 }
 
-export async function listRequests(actor: PrCenterActor, take = 25, cursor?: string) {
-  const limit = Math.min(Math.max(take, 1), 100);
-  const where = assignedRequestReadWhere(actor);
+export type RequestListFilters = {
+  q?: string;
+  status?: PrRequestStatus;
+  mine?: boolean;
+};
+
+export type AuditListFilters = { q?: string };
+
+function listLimit(take: number): number {
+  if (!Number.isInteger(take) || take < 1 || take > 100)
+    throw new PrCenterError("take must be between 1 and 100", 422, "INVALID_LIST_FILTER");
+  return take;
+}
+
+function listSearch(q: string | undefined): string | undefined {
+  if (q === undefined) return undefined;
+  if (typeof q !== "string" || q.length > 120)
+    throw new PrCenterError(
+      "Search must be at most 120 characters",
+      422,
+      "INVALID_LIST_FILTER",
+    );
+  const text = q.trim();
+  // Prisma `contains` uses SQL LIKE; escape pattern characters so search is literal.
+  return text ? text.replace(/[\\%_]/g, "\\$&") : undefined;
+}
+
+function listCursor(cursor: string | undefined): void {
+  if (
+    cursor !== undefined &&
+    (typeof cursor !== "string" ||
+      !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+        cursor,
+      ))
+  )
+    throw new PrCenterError("Invalid cursor", 422, "INVALID_CURSOR");
+}
+
+function afterCursor(createdAt: Date, id: string) {
+  return { OR: [{ createdAt: { lt: createdAt } }, { createdAt, id: { lt: id } }] };
+}
+
+export async function listRequests(
+  actor: PrCenterActor,
+  take = 25,
+  cursor?: string,
+  filters: RequestListFilters = {},
+) {
+  const limit = listLimit(take);
+  listCursor(cursor);
+  const q = listSearch(filters.q);
+  if (
+    filters.status !== undefined &&
+    !(
+      [
+        "DRAFT",
+        "SUBMITTED",
+        "WITHDRAWN",
+        "CANCELLED",
+        "CLOSED",
+        "APPROVED",
+        "REJECTED",
+      ] as string[]
+    ).includes(filters.status)
+  )
+    throw new PrCenterError("Invalid request status", 422, "INVALID_LIST_FILTER");
+  if (filters.mine !== undefined && typeof filters.mine !== "boolean")
+    throw new PrCenterError("Invalid mine filter", 422, "INVALID_LIST_FILTER");
+  const clauses: Prisma.PrRequestWhereInput[] = [assignedRequestReadWhere(actor)];
+  if (filters.mine) clauses.push({ requesterId: actor.id });
+  if (filters.status) clauses.push({ status: filters.status });
+  // Assigned-task-only rows intentionally redact the request title/number.
+  // Do not let search matching become an oracle for those hidden fields.
+  if (q) clauses.push(requestReadWhere(actor));
+  if (q)
+    clauses.push({
+      OR: [
+        { title: { contains: q, mode: "insensitive" } },
+        { requestNumber: { contains: q, mode: "insensitive" } },
+      ],
+    });
+  const where: Prisma.PrRequestWhereInput =
+    clauses.length === 1 ? clauses[0] : { AND: clauses };
+  if (cursor) {
+    const anchor = await prisma.prRequest.findFirst({
+      where: { AND: [...clauses, { id: cursor }] },
+      select: { id: true, createdAt: true },
+    });
+    if (!anchor)
+      throw new PrCenterError("Cursor not found in this list", 422, "INVALID_CURSOR");
+    clauses.push(afterCursor(anchor.createdAt, anchor.id));
+  }
   const requests = await prisma.prRequest.findMany({
-    where,
+    where: clauses.length === 1 ? where : { AND: clauses },
     take: limit + 1,
-    ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
-    orderBy: { createdAt: "desc" },
+    orderBy: [{ createdAt: "desc" }, { id: "desc" }],
     include: {
       department: { select: { name: true } },
       requester: { select: { displayName: true } },
@@ -960,10 +1048,10 @@ export async function listRequests(actor: PrCenterActor, take = 25, cursor?: str
       revisions: { orderBy: { revisionNumber: "desc" }, take: 1 },
     },
   });
-  const roles = actorRoles(actor);
-  const canReadRequest = canReadAllRequests(roles);
+  // Preserve the extra row as a has-more sentinel for existing array clients.
+  // Consumers render at most `limit` rows and use length > limit for pagination.
   return requests.map((request) => {
-    if (request.requesterId === actor.id || canReadRequest) return request;
+    if (canReadRequestRecord(actor, request)) return request;
     return {
       id: request.id,
       status: request.status,
@@ -1068,6 +1156,94 @@ async function requestInScope(actor: PrCenterActor, requestId: string) {
 
 export async function requestDetail(actor: PrCenterActor, requestId: string) {
   return requestInScope(actor, requestId);
+}
+
+function requestTaskContentTypes(type: CreateRequestInput["type"], details: unknown) {
+  const raw =
+    details && typeof details === "object" && !Array.isArray(details)
+      ? (details as Record<string, unknown>).contentTypes
+      : undefined;
+  return Array.isArray(raw) &&
+    raw.length > 0 &&
+    raw.every((item) => typeof item === "string" && item.trim())
+    ? [...new Set(raw.map((item) => (item as string).trim()))]
+    : [type === "PR" ? "PR Content" : "Off-site Support"];
+}
+
+async function reconcileRequestTasks(
+  tx: Prisma.TransactionClient,
+  actor: PrCenterActor,
+  request: {
+    id: string;
+    tasks: {
+      id: string;
+      status: PrTaskStatus;
+      version: number;
+      contentType: string;
+      title: string;
+      dueAt: Date | null;
+    }[];
+  },
+  contentTypes: string[],
+  title: string,
+  dueAt: Date | null,
+  reopenCancelled: boolean,
+) {
+  const remaining = new Set(contentTypes);
+  for (const task of [...request.tasks].sort(
+    (a, b) => Number(a.status === "CANCELLED") - Number(b.status === "CANCELLED"),
+  )) {
+    // A cancelled task is historical evidence, not an active package member, unless
+    // the requester is explicitly reopening that content type during amendment.
+    if (task.status === "CANCELLED" && !reopenCancelled) continue;
+    const keep = remaining.has(task.contentType);
+    if (keep) remaining.delete(task.contentType);
+    const nextStatus = keep ? "DRAFT" : "CANCELLED";
+    if (!keep && task.status === "CANCELLED") continue;
+    const nextTitle = `${task.contentType}: ${title}`;
+    const metadataChanged =
+      task.title !== nextTitle ||
+      (task.dueAt?.getTime() ?? null) !== (dueAt?.getTime() ?? null);
+    if (task.status === nextStatus && (!keep || !metadataChanged)) continue;
+    const changed = await tx.prTask.updateMany({
+      where: {
+        id: task.id,
+        requestId: request.id,
+        status: task.status,
+        version: task.version,
+      },
+      data: {
+        status: nextStatus,
+        ...(keep ? { title: nextTitle, dueAt } : {}),
+        version: { increment: 1 },
+      },
+    });
+    if (changed.count !== 1)
+      throw new PrCenterError(
+        "A related task changed. Refresh and try again.",
+        409,
+        "STALE_UPDATE",
+      );
+    if (task.status !== nextStatus)
+      await tx.prStatusHistory.create({
+        data: {
+          taskId: task.id,
+          fromState: task.status,
+          toState: nextStatus,
+          reason: keep ? "Parent request amended" : "Content type removed from request",
+          actorId: actor.id,
+        },
+      });
+  }
+  for (const contentType of remaining)
+    await tx.prTask.create({
+      data: {
+        requestId: request.id,
+        contentType,
+        title: `${contentType}: ${title}`,
+        dueAt,
+      },
+    });
 }
 
 export async function updateRequestDraft(
@@ -1178,29 +1354,19 @@ export async function updateRequestDraft(
           actorId: actor.id,
         },
       });
-      for (const task of request.tasks) {
-        if (task.status === "DRAFT") continue;
-        const reopened = await tx.prTask.updateMany({
-          where: { id: task.id, status: "CANCELLED", version: task.version },
-          data: { status: "DRAFT", version: { increment: 1 } },
-        });
-        if (reopened.count !== 1)
-          throw new PrCenterError(
-            "A related task changed while reopening the request. Refresh and try again.",
-            409,
-            "STALE_UPDATE",
-          );
-        await tx.prStatusHistory.create({
-          data: {
-            taskId: task.id,
-            fromState: "CANCELLED",
-            toState: "DRAFT",
-            reason: `Parent request amended as revision ${revisionNumber}`,
-            actorId: actor.id,
-          },
-        });
-      }
     }
+    // Keep first-time drafts task-free until submission, but reconcile an existing
+    // package as part of the same amendment transaction before it can be resubmitted.
+    if (request.tasks.length)
+      await reconcileRequestTasks(
+        tx,
+        actor,
+        request,
+        requestTaskContentTypes(input.type, revisionDetails),
+        title,
+        input.requestedFor ?? null,
+        true,
+      );
     if (request.status === "SUBMITTED") {
       const operations = await tx.prUserRole.findMany({
         where: {
@@ -1288,32 +1454,16 @@ export async function transitionRequest(
         actorId: actor.id,
       },
     });
-    const tasksNeedCreation =
-      request.tasks.length === 0 ||
-      request.tasks.every((task) => task.status === "CANCELLED");
-    if (status === "SUBMITTED" && tasksNeedCreation) {
-      const details = request.revisions?.[0]?.offsiteDetails;
-      const rawContentTypes =
-        details && typeof details === "object" && !Array.isArray(details)
-          ? (details as Record<string, unknown>).contentTypes
-          : undefined;
-      const contentTypes =
-        Array.isArray(rawContentTypes) &&
-        rawContentTypes.length > 0 &&
-        rawContentTypes.every((item) => typeof item === "string" && item.trim())
-          ? [...new Set(rawContentTypes.map((item) => (item as string).trim()))]
-          : [request.type === "PR" ? "PR Content" : "Off-site Support"];
-      for (const contentType of contentTypes) {
-        await tx.prTask.create({
-          data: {
-            requestId: request.id,
-            title: `${contentType}: ${request.title}`,
-            contentType,
-            dueAt: request.requestedFor,
-          },
-        });
-      }
-    }
+    if (status === "SUBMITTED")
+      await reconcileRequestTasks(
+        tx,
+        actor,
+        request,
+        requestTaskContentTypes(request.type, request.revisions?.[0]?.offsiteDetails),
+        request.title,
+        request.requestedFor,
+        false,
+      );
     if (status === "WITHDRAWN") {
       for (const task of request.tasks) {
         if (task.status !== "DRAFT") continue;
@@ -1934,8 +2084,14 @@ function assertCanReadMessageHouse() {
 }
 
 function assertCanManageMessageHouse(actor: PrCenterActor) {
-  if (!actorHasRole(actor, "RTRDA_PR") && !actorHasRole(actor, "RTRDA_ADMIN"))
-    throw new PrCenterError("You cannot edit Message House", 403, "FORBIDDEN");
+  // This resource has no department: only the PR organization-wide grant applies.
+  if (!actorHasOrganizationWideRole(actor, ["RTRDA_PR"]))
+    throw new PrCenterError("Organization-wide PR grant required", 403, "FORBIDDEN");
+}
+
+function assertCanDecideMessageHouse(actor: PrCenterActor) {
+  if (!actorHasOrganizationWideRole(actor, ["RTRDA_BORD"]))
+    throw new PrCenterError("Organization-wide BORD grant required", 403, "FORBIDDEN");
 }
 
 export async function messageHouseDraft(actor: PrCenterActor) {
@@ -1944,7 +2100,7 @@ export async function messageHouseDraft(actor: PrCenterActor) {
     where: {
       organizationId: actor.organizationId,
       ownerId: actor.id,
-      status: "DRAFT",
+      status: { in: ["DRAFT", "IN_REVIEW", "REJECTED"] },
     },
     orderBy: { versionNumber: "desc" },
   });
@@ -1955,8 +2111,11 @@ export async function saveMessageHouseDraft(
   input: unknown,
   draftId?: string,
   correlationId: string = randomUUID(),
+  fromVersion?: number,
 ) {
   assertCanManageMessageHouse(actor);
+  if (draftId && (!Number.isInteger(fromVersion) || fromVersion! < 1))
+    throw new PrCenterError("If-Match is required", 428, "PRECONDITION_REQUIRED");
   if (!input || typeof input !== "object" || Array.isArray(input))
     throw new PrCenterError(
       "Message House data is required",
@@ -1997,53 +2156,244 @@ export async function saveMessageHouseDraft(
       "INVALID_MESSAGE_HOUSE",
     );
 
-  return prisma.$transaction(async (tx) => {
-    let saved;
-    if (draftId) {
-      const existing = await tx.prMessageHouseVersion.findFirst({
-        where: {
-          id: draftId,
-          organizationId: actor.organizationId,
-          ownerId: actor.id,
-          status: "DRAFT",
-        },
-      });
-      if (!existing)
-        throw new PrCenterError("Message House draft not found", 404, "NOT_FOUND");
-      saved = await tx.prMessageHouseVersion.update({
-        where: { id: existing.id },
-        data: { vision, positioning, pillars, foundation, sourceRationale },
-      });
-    } else {
-      const latest = await tx.prMessageHouseVersion.findFirst({
-        where: { organizationId: actor.organizationId },
-        orderBy: { versionNumber: "desc" },
-        select: { versionNumber: true },
-      });
-      saved = await tx.prMessageHouseVersion.create({
-        data: {
-          organizationId: actor.organizationId,
-          versionNumber: (latest?.versionNumber ?? 0) + 1,
-          status: "DRAFT",
-          vision,
-          positioning,
-          pillars,
-          foundation,
-          sourceRationale: sourceRationale || null,
-          ownerId: actor.id,
-        },
-      });
-    }
-    await auditAndOutbox(tx, {
-      actor,
-      action: "message_house.draft_saved",
-      entityType: "message_house_version",
-      entityId: saved.id,
-      after: { versionNumber: saved.versionNumber, status: saved.status },
-      eventType: "pr.message_house.draft_saved",
-      correlationId,
-    });
-    return saved;
+  try {
+    return await prisma.$transaction(
+      async (tx) => {
+        let saved;
+        if (draftId) {
+          const existing = await tx.prMessageHouseVersion.findFirst({
+            where: {
+              id: draftId,
+              organizationId: actor.organizationId,
+              ownerId: actor.id,
+              status: "DRAFT",
+            },
+          });
+          if (!existing)
+            throw new PrCenterError("Message House draft not found", 404, "NOT_FOUND");
+          const changed = await tx.prMessageHouseVersion.updateMany({
+            where: {
+              id: existing.id,
+              organizationId: actor.organizationId,
+              ownerId: actor.id,
+              status: "DRAFT",
+              rowVersion: fromVersion,
+            },
+            data: {
+              vision,
+              positioning,
+              pillars,
+              foundation,
+              sourceRationale: sourceRationale || null,
+              rowVersion: { increment: 1 },
+            },
+          });
+          if (changed.count !== 1)
+            throw new PrCenterError(
+              "Message House draft changed",
+              409,
+              "VERSION_CONFLICT",
+            );
+          saved = await tx.prMessageHouseVersion.findUniqueOrThrow({
+            where: { id: existing.id },
+          });
+        } else {
+          const latest = await tx.prMessageHouseVersion.findFirst({
+            where: { organizationId: actor.organizationId },
+            orderBy: { versionNumber: "desc" },
+            select: { versionNumber: true },
+          });
+          saved = await tx.prMessageHouseVersion.create({
+            data: {
+              organizationId: actor.organizationId,
+              versionNumber: (latest?.versionNumber ?? 0) + 1,
+              status: "DRAFT",
+              vision,
+              positioning,
+              pillars,
+              foundation,
+              sourceRationale: sourceRationale || null,
+              ownerId: actor.id,
+            },
+          });
+        }
+        await auditAndOutbox(tx, {
+          actor,
+          action: "message_house.draft_saved",
+          entityType: "message_house_version",
+          entityId: saved.id,
+          after: { versionNumber: saved.versionNumber, status: saved.status },
+          eventType: "pr.message_house.draft_saved",
+          correlationId,
+        });
+        return saved;
+      },
+      { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+    );
+  } catch (error) {
+    if (messageHouseConcurrentWrite(error))
+      throw new PrCenterError("Message House changed; retry", 409, "VERSION_CONFLICT");
+    throw error;
+  }
+}
+
+function messageHouseConcurrentWrite(error: unknown): boolean {
+  return (
+    !!error &&
+    typeof error === "object" &&
+    "code" in error &&
+    (error.code === "P2002" || error.code === "P2034")
+  );
+}
+
+export async function transitionMessageHouse(
+  actor: PrCenterActor,
+  id: string,
+  fromVersion: number,
+  input: {
+    to: "IN_REVIEW" | "APPROVED" | "REJECTED";
+    reason?: string;
+    effectiveAt?: string;
+  },
+  correlationId: string = randomUUID(),
+) {
+  const submit = input.to === "IN_REVIEW";
+  if (submit) assertCanManageMessageHouse(actor);
+  else assertCanDecideMessageHouse(actor);
+  if (!Number.isInteger(fromVersion) || fromVersion < 1)
+    throw new PrCenterError("If-Match is required", 428, "PRECONDITION_REQUIRED");
+  const reason = input.reason?.trim();
+  if (!submit && (!reason || reason.length > 2000))
+    throw new PrCenterError(
+      "Decision reason required (max 2000 characters)",
+      422,
+      "REASON_REQUIRED",
+    );
+  if (submit && reason && reason.length > 2000)
+    throw new PrCenterError("Reason is too long", 422, "INVALID_REASON");
+  if (input.to !== "APPROVED" && input.effectiveAt !== undefined)
+    throw new PrCenterError(
+      "Effective date only applies to approval",
+      422,
+      "INVALID_EFFECTIVE_DATE",
+    );
+  const effectiveAt = input.to === "APPROVED" ? new Date(input.effectiveAt ?? "") : null;
+  if (
+    input.to === "APPROVED" &&
+    (typeof input.effectiveAt !== "string" ||
+      !/^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(?:\.\d{1,3})?Z$/.test(input.effectiveAt) ||
+      Number.isNaN(effectiveAt!.getTime()) ||
+      effectiveAt!.toISOString().slice(0, 19) !== input.effectiveAt.slice(0, 19) ||
+      effectiveAt!.getTime() < Date.now())
+  )
+    throw new PrCenterError(
+      "A future absolute UTC effective date is required",
+      422,
+      "INVALID_EFFECTIVE_DATE",
+    );
+  try {
+    return await prisma.$transaction(
+      async (tx) => {
+        const existing = await tx.prMessageHouseVersion.findFirst({
+          where: { id, organizationId: actor.organizationId },
+        });
+        if (!existing)
+          throw new PrCenterError("Message House version not found", 404, "NOT_FOUND");
+        if (existing.rowVersion !== fromVersion)
+          throw new PrCenterError(
+            "Message House version changed",
+            409,
+            "VERSION_CONFLICT",
+          );
+        if (existing.status !== (submit ? "DRAFT" : "IN_REVIEW"))
+          throw new PrCenterError(
+            "Invalid Message House transition",
+            409,
+            "INVALID_TRANSITION",
+          );
+        if (submit && existing.ownerId !== actor.id)
+          throw new PrCenterError("Only the draft owner may submit", 403, "FORBIDDEN");
+        if (!submit && (!existing.ownerId || existing.ownerId === actor.id))
+          throw new PrCenterError(
+            "Draft owner cannot decide their own version",
+            403,
+            "SEPARATION_OF_DUTIES",
+          );
+        if (effectiveAt) {
+          const latest = await tx.prMessageHouseVersion.findFirst({
+            where: { organizationId: actor.organizationId, status: "APPROVED" },
+            orderBy: { effectiveAt: "desc" },
+          });
+          if (latest?.effectiveAt && effectiveAt <= latest.effectiveAt)
+            throw new PrCenterError(
+              "Effective date must follow existing approvals",
+              409,
+              "EFFECTIVE_DATE_CONFLICT",
+            );
+        }
+        const changed = await tx.prMessageHouseVersion.updateMany({
+          where: {
+            id,
+            organizationId: actor.organizationId,
+            rowVersion: fromVersion,
+            status: submit ? "DRAFT" : "IN_REVIEW",
+            ...(submit ? { ownerId: actor.id } : { ownerId: { not: actor.id } }),
+          },
+          data: {
+            status: input.to,
+            rowVersion: { increment: 1 },
+            ...(submit
+              ? { reviewerId: null, approverId: null, decisionReason: null }
+              : {
+                  reviewerId: actor.id,
+                  approverId: input.to === "APPROVED" ? actor.id : null,
+                  decisionReason: reason,
+                  effectiveAt,
+                }),
+          },
+        });
+        if (changed.count !== 1)
+          throw new PrCenterError(
+            "Message House version changed",
+            409,
+            "VERSION_CONFLICT",
+          );
+        const saved = await tx.prMessageHouseVersion.findUniqueOrThrow({ where: { id } });
+        await auditAndOutbox(tx, {
+          actor,
+          action: `message_house.${input.to.toLowerCase()}`,
+          entityType: "message_house_version",
+          entityId: id,
+          after: {
+            versionNumber: saved.versionNumber,
+            rowVersion: saved.rowVersion,
+            status: saved.status,
+            reason: reason ?? null,
+            effectiveAt: saved.effectiveAt?.toISOString() ?? null,
+          },
+          eventType: `pr.message_house.${input.to.toLowerCase()}`,
+          correlationId,
+        });
+        return saved;
+      },
+      { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+    );
+  } catch (error) {
+    if (messageHouseConcurrentWrite(error))
+      throw new PrCenterError("Message House changed; retry", 409, "VERSION_CONFLICT");
+    throw error;
+  }
+}
+
+export async function messageHouseReview(actor: PrCenterActor) {
+  assertCanDecideMessageHouse(actor);
+  return prisma.prMessageHouseVersion.findMany({
+    where: {
+      organizationId: actor.organizationId,
+      status: "IN_REVIEW",
+      ownerId: { not: actor.id },
+    },
+    orderBy: { versionNumber: "desc" },
   });
 }
 
@@ -2069,7 +2419,7 @@ export async function currentMessageHouse(actor: PrCenterActor) {
 
 export async function messageHouseHistory(actor: PrCenterActor) {
   assertCanReadMessageHouse();
-  return prisma.prMessageHouseVersion.findMany({
+  const versions = await prisma.prMessageHouseVersion.findMany({
     where: {
       organizationId: actor.organizationId,
       status: { in: ["APPROVED", "SUPERSEDED"] },
@@ -2085,6 +2435,11 @@ export async function messageHouseHistory(actor: PrCenterActor) {
       effectiveAt: true,
     },
   });
+  // Supersession is derived from effective dates, not a cron-dependent write.
+  return versions.map((version, index) => ({
+    ...version,
+    status: index === 0 ? ("APPROVED" as const) : ("SUPERSEDED" as const),
+  }));
 }
 
 export async function updateTaskAssignment(
@@ -2274,7 +2629,7 @@ export async function submitTaskFactCheck(
   const task = await prisma.prTask.findFirst({
     where: { id, request: assignedRequestReadWhere(actor) },
     include: {
-      request: { select: { status: true } },
+      request: { select: { status: true, departmentId: true } },
       revisions: {
         orderBy: { revisionNumber: "desc" },
         take: 1,
@@ -2283,7 +2638,10 @@ export async function submitTaskFactCheck(
     },
   });
   if (!task) throw new PrCenterError("Task not found", 404, "NOT_FOUND");
-  if (task.ownerId !== actor.id && !actorHasRole(actor, "RTRDA_PR"))
+  if (
+    task.ownerId !== actor.id &&
+    !actorHasRoleInDepartment(actor, "RTRDA_PR", task.request.departmentId)
+  )
     throw new PrCenterError(
       "Only the assigned owner or PR may fact-check this task",
       403,
@@ -2468,16 +2826,50 @@ export async function markNotificationsRead(
   });
 }
 
-export async function listAuditEvents(actor: PrCenterActor, take = 100) {
-  const limit = Math.min(Math.max(take, 1), 100);
-  return prisma.prAuditEvent.findMany({
-    where: canReadAllRequests(actorRoles(actor))
-      ? { organizationId: actor.organizationId }
-      : { organizationId: actor.organizationId, actorId: actor.id },
+export async function listAuditEvents(
+  actor: PrCenterActor,
+  take = 100,
+  cursor?: string,
+  filters: AuditListFilters = {},
+) {
+  const limit = listLimit(take);
+  listCursor(cursor);
+  const q = listSearch(filters.q);
+  // Audit payloads can contain sensitive cross-department data. Only an
+  // organization-wide eligible grant can read another user's events.
+  const scope: Prisma.PrAuditEventWhereInput = actorHasOrganizationWideRole(actor, [
+    "RTRDA_PR",
+    "RTRDA_BORD",
+    "RTRDA_ADMIN",
+  ])
+    ? { organizationId: actor.organizationId }
+    : { organizationId: actor.organizationId, actorId: actor.id };
+  const clauses: Prisma.PrAuditEventWhereInput[] = [scope];
+  if (q)
+    clauses.push({
+      OR: [
+        { action: { contains: q, mode: "insensitive" } },
+        { entityType: { contains: q, mode: "insensitive" } },
+        { entityId: { contains: q, mode: "insensitive" } },
+      ],
+    });
+  if (cursor) {
+    const anchor = await prisma.prAuditEvent.findFirst({
+      where: { AND: [...clauses, { id: cursor }] },
+      select: { id: true, createdAt: true },
+    });
+    if (!anchor)
+      throw new PrCenterError("Cursor not found in this history", 422, "INVALID_CURSOR");
+    clauses.push(afterCursor(anchor.createdAt, anchor.id));
+  }
+  const events = await prisma.prAuditEvent.findMany({
+    where: clauses.length === 1 ? scope : { AND: clauses },
     include: { actor: { select: { displayName: true } } },
-    orderBy: { createdAt: "desc" },
-    take: limit,
+    orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+    take: limit + 1,
   });
+  // Keep the extra row so the caller can detect whether a next page exists.
+  return events;
 }
 
 export async function transitionTask(

@@ -1,0 +1,192 @@
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+const { prismaMock } = vi.hoisted(() => ({
+  prismaMock: {
+    prRequest: { findMany: vi.fn(), findFirst: vi.fn() },
+    prAuditEvent: { findMany: vi.fn(), findFirst: vi.fn() },
+  },
+}));
+vi.mock("@/lib/db/client", () => ({ prisma: prismaMock }));
+import { listRequests, listAuditEvents, type PrCenterActor } from "./service";
+
+const actor: PrCenterActor = {
+  id: "mine",
+  organizationId: "org",
+  departmentId: "dept",
+  role: "RTRDA_ALL_USER",
+};
+const cursor = "00000000-0000-4000-8000-000000000001";
+const date = new Date("2026-01-01T00:00:00Z");
+
+beforeEach(() => {
+  vi.clearAllMocks();
+  prismaMock.prRequest.findMany.mockResolvedValue([]);
+  prismaMock.prAuditEvent.findMany.mockResolvedValue([]);
+});
+
+describe("request list filtering and pagination", () => {
+  it("conjoins scoped access with title/number search, status and mine", async () => {
+    await listRequests(actor, 2, undefined, {
+      q: "Budget",
+      status: "APPROVED",
+      mine: true,
+    });
+    expect(prismaMock.prRequest.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          AND: [
+            {
+              organizationId: "org",
+              OR: [{ requesterId: "mine" }, { tasks: { some: { ownerId: "mine" } } }],
+            },
+            { requesterId: "mine" },
+            { status: "APPROVED" },
+            { organizationId: "org", OR: [{ requesterId: "mine" }] },
+            {
+              OR: [
+                { title: { contains: "Budget", mode: "insensitive" } },
+                { requestNumber: { contains: "Budget", mode: "insensitive" } },
+              ],
+            },
+          ],
+        },
+        take: 3,
+        orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+      }),
+    );
+  });
+
+  it("escapes LIKE metacharacters instead of treating them as a search wildcard", async () => {
+    await listRequests(actor, 5, undefined, { q: "%_\\" });
+    const query = prismaMock.prRequest.findMany.mock.calls[0][0].where.AND.at(-1);
+    expect(query.OR[0].title.contains).toBe("\\%\\_\\\\");
+  });
+
+  it("restricts title search to fully readable requests, not assigned-only metadata", async () => {
+    await listRequests(actor, 5, undefined, { q: "private" });
+    expect(prismaMock.prRequest.findMany.mock.calls[0][0].where.AND).toContainEqual({
+      organizationId: "org",
+      OR: [{ requesterId: "mine" }],
+    });
+  });
+
+  it("keeps the scope and filters on cursor lookup and uses timestamp/id keyset", async () => {
+    prismaMock.prRequest.findFirst.mockResolvedValue({ id: cursor, createdAt: date });
+    await listRequests(actor, 2, cursor, { status: "DRAFT" });
+    expect(prismaMock.prRequest.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          AND: [
+            {
+              organizationId: "org",
+              OR: [{ requesterId: "mine" }, { tasks: { some: { ownerId: "mine" } } }],
+            },
+            { status: "DRAFT" },
+            { id: cursor },
+          ],
+        },
+      }),
+    );
+    expect(prismaMock.prRequest.findMany.mock.calls[0][0].where.AND).toContainEqual({
+      OR: [{ createdAt: { lt: date } }, { createdAt: date, id: { lt: cursor } }],
+    });
+  });
+
+  it("rejects an out-of-scope cursor without listing records", async () => {
+    prismaMock.prRequest.findFirst.mockResolvedValue(null);
+    await expect(listRequests(actor, 2, cursor)).rejects.toMatchObject({
+      statusCode: 422,
+    });
+    expect(prismaMock.prRequest.findMany).not.toHaveBeenCalled();
+  });
+
+  it("returns a scoped lookahead row and redacts assigned-only records", async () => {
+    prismaMock.prRequest.findMany.mockResolvedValue(
+      Array.from({ length: 3 }, (_, i) => ({
+        id: String(i),
+        requesterId: "other",
+        organizationId: "org",
+        departmentId: "elsewhere",
+        status: "DRAFT",
+        tasks: [{ ownerId: "mine" }, { ownerId: "other" }],
+      })),
+    );
+    const result = await listRequests(actor, 2);
+    expect(result).toHaveLength(3);
+    expect(result[0]).toEqual({
+      id: "0",
+      status: "DRAFT",
+      requesterId: "",
+      tasks: [{ ownerId: "mine" }],
+      sources: [],
+      assignedTaskOnly: true,
+    });
+  });
+});
+
+describe("audit history pagination", () => {
+  it("limits department-scoped grants to own events and applies search", async () => {
+    await listAuditEvents(
+      {
+        ...actor,
+        role: "RTRDA_PR",
+        roleGrants: [{ role: "RTRDA_PR", departmentId: "dept" }],
+      },
+      2,
+      undefined,
+      { q: "request" },
+    );
+    expect(prismaMock.prAuditEvent.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          AND: [
+            { organizationId: "org", actorId: "mine" },
+            {
+              OR: [
+                { action: { contains: "request", mode: "insensitive" } },
+                { entityType: { contains: "request", mode: "insensitive" } },
+                { entityId: { contains: "request", mode: "insensitive" } },
+              ],
+            },
+          ],
+        },
+        take: 3,
+      }),
+    );
+  });
+  it("allows organization-wide eligible grants but not unrelated grants", async () => {
+    await listAuditEvents({
+      ...actor,
+      roleGrants: [
+        { role: "RTRDA_ALL_USER", departmentId: null },
+        { role: "RTRDA_BORD", departmentId: null },
+      ],
+    });
+    expect(prismaMock.prAuditEvent.findMany.mock.calls[0][0].where).toEqual({
+      organizationId: "org",
+    });
+  });
+  it("rejects a cursor outside filtered history", async () => {
+    prismaMock.prAuditEvent.findFirst.mockResolvedValue(null);
+    await expect(listAuditEvents(actor, 10, cursor)).rejects.toMatchObject({
+      statusCode: 422,
+    });
+    expect(prismaMock.prAuditEvent.findMany).not.toHaveBeenCalled();
+  });
+  it("uses stable keyset and returns lookahead", async () => {
+    prismaMock.prAuditEvent.findFirst.mockResolvedValue({ id: cursor, createdAt: date });
+    prismaMock.prAuditEvent.findMany.mockResolvedValue([
+      { id: "a" },
+      { id: "b" },
+      { id: "c" },
+    ]);
+    expect(await listAuditEvents(actor, 2, cursor)).toEqual([
+      { id: "a" },
+      { id: "b" },
+      { id: "c" },
+    ]);
+    expect(prismaMock.prAuditEvent.findMany.mock.calls[0][0].where.AND).toContainEqual({
+      OR: [{ createdAt: { lt: date } }, { createdAt: date, id: { lt: cursor } }],
+    });
+  });
+});

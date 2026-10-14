@@ -154,6 +154,7 @@ enum PrMessageHouseStatus {
   DRAFT
   IN_REVIEW
   APPROVED
+  REJECTED
   SUPERSEDED
 }
 
@@ -321,6 +322,7 @@ model PrMessageHouseVersion {
   id              String               @id @default(uuid()) @db.Uuid
   organizationId  String               @db.Uuid
   versionNumber   Int
+  rowVersion      Int                  @default(1)
   status          PrMessageHouseStatus @default(DRAFT)
   vision          String
   positioning     String
@@ -330,6 +332,7 @@ model PrMessageHouseVersion {
   ownerId         String?              @db.Uuid
   reviewerId      String?              @db.Uuid
   approverId      String?              @db.Uuid
+  decisionReason  String?
   effectiveAt     DateTime?
   createdAt       DateTime             @default(now())
   updatedAt       DateTime             @updatedAt

@@ -504,6 +504,56 @@ describe("Content Ideas create route", () => {
   });
 });
 
+describe("Message House lifecycle route guards", () => {
+  const versionId = "00000000-0000-4000-8000-000000000001";
+  it("requires authentication before transition body validation", async () => {
+    const app = buildPrCenterApi(async () => null);
+    const response = await app.inject({
+      method: "POST",
+      url: `/message-house/${versionId}/transitions`,
+      payload: {},
+    });
+    expect(response.statusCode).toBe(401);
+    await app.close();
+  });
+  it("requires If-Match for draft edits", async () => {
+    const app = buildPrCenterApi(async () => mockActor);
+    const response = await app.inject({
+      method: "POST",
+      url: "/message-house/draft",
+      payload: {
+        id: versionId,
+        vision: "x",
+        positioning: "x",
+        pillars: ["x"],
+        foundation: "x",
+      },
+    });
+    expect(response.statusCode).toBe(428);
+    await app.close();
+  });
+  it("denies department-scoped BORD review without a database call", async () => {
+    const app = buildPrCenterApi(async () => ({
+      ...mockActor,
+      role: "RTRDA_BORD" as const,
+    }));
+    const response = await app.inject({ method: "GET", url: "/message-house/review" });
+    expect(response.statusCode).toBe(403);
+    await app.close();
+  });
+  it("rejects an invalid transition without a database call", async () => {
+    const app = buildPrCenterApi(async () => mockActor);
+    const response = await app.inject({
+      method: "POST",
+      url: `/message-house/${versionId}/transitions`,
+      headers: { "if-match": "1" },
+      payload: { to: "SUPERSEDED" },
+    });
+    expect(response.statusCode).toBe(422);
+    await app.close();
+  });
+});
+
 describe("Message House current route", () => {
   it("requires an authenticated actor", async () => {
     const app = buildPrCenterApi(async () => null);

@@ -392,7 +392,16 @@ describe("request intake approval", () => {
         status,
         version: 4,
         revisions: [{ revisionNumber: 2 }],
-        tasks: [{ id: "task-1", status: "CANCELLED", version: 3 }],
+        tasks: [
+          {
+            id: "task-1",
+            contentType: "PR Content",
+            title: "PR Content: Test request",
+            dueAt: null,
+            status: "CANCELLED",
+            version: 3,
+          },
+        ],
       });
       mockPrisma.prTask.updateMany.mockResolvedValueOnce({ count: 1 });
       mockPrisma.prRequest.findUniqueOrThrow.mockResolvedValueOnce({
@@ -422,8 +431,17 @@ describe("request intake approval", () => {
         data: expect.objectContaining({ status: "DRAFT", version: { increment: 1 } }),
       });
       expect(mockPrisma.prTask.updateMany).toHaveBeenCalledWith({
-        where: { id: "task-1", status: "CANCELLED", version: 3 },
-        data: { status: "DRAFT", version: { increment: 1 } },
+        where: {
+          id: "task-1",
+          requestId: requestRecord.id,
+          status: "CANCELLED",
+          version: 3,
+        },
+        data: expect.objectContaining({
+          status: "DRAFT",
+          title: "PR Content: Updated after decision",
+          version: { increment: 1 },
+        }),
       });
       expect(mockPrisma.prStatusHistory.create).toHaveBeenCalledWith({
         data: expect.objectContaining({
@@ -432,6 +450,98 @@ describe("request intake approval", () => {
           toState: "DRAFT",
           actorId: requesterActor.id,
         }),
+      });
+    },
+  );
+
+  it.each(["SUBMITTED", "REJECTED"] as const)(
+    "reconciles changed title, date and content types on a %s intake amendment",
+    async (status) => {
+      const oldDate = new Date("2026-10-20T00:00:00Z");
+      const newDate = new Date("2026-11-20T00:00:00Z");
+      mockPrisma.prRequest.findFirst.mockResolvedValueOnce({
+        ...requestRecord,
+        status,
+        requestedFor: oldDate,
+        revisions: [
+          {
+            revisionNumber: 1,
+            offsiteDetails: { contentTypes: ["Website News", "Facebook Post"] },
+          },
+        ],
+        tasks: [
+          {
+            id: "keep",
+            contentType: "Website News",
+            title: "Website News: Old title",
+            dueAt: oldDate,
+            status: status === "REJECTED" ? "CANCELLED" : "DRAFT",
+            version: 2,
+          },
+          {
+            id: "remove",
+            contentType: "Facebook Post",
+            title: "Facebook Post: Old title",
+            dueAt: oldDate,
+            status: status === "REJECTED" ? "CANCELLED" : "DRAFT",
+            version: 3,
+          },
+        ],
+      });
+      mockPrisma.prTask.updateMany.mockResolvedValue({ count: 1 });
+      mockPrisma.prTask.create.mockResolvedValue({ id: "new-task" });
+
+      await updateRequestDraft(requesterActor, requestRecord.id, 2, {
+        type: "PR",
+        title: "New title",
+        requestedFor: newDate,
+        sourceUrls: ["https://example.test/source"],
+        requestDetails: {
+          projectOwner: "Owner",
+          assigner: "Assigner",
+          whyNow: "Timely",
+          contentTypes: ["Website News", "Short Video"],
+          priorityReason: "",
+          projectDetails: "Details",
+          confirmed: true,
+        },
+      });
+
+      expect(mockPrisma.prTask.updateMany).toHaveBeenCalledWith({
+        where: {
+          id: "keep",
+          requestId: requestRecord.id,
+          status: status === "REJECTED" ? "CANCELLED" : "DRAFT",
+          version: 2,
+        },
+        data: expect.objectContaining({
+          title: "Website News: New title",
+          dueAt: newDate,
+          status: "DRAFT",
+          version: { increment: 1 },
+        }),
+      });
+      if (status === "SUBMITTED")
+        expect(mockPrisma.prTask.updateMany).toHaveBeenCalledWith({
+          where: {
+            id: "remove",
+            requestId: requestRecord.id,
+            status: "DRAFT",
+            version: 3,
+          },
+          data: expect.objectContaining({ status: "CANCELLED" }),
+        });
+      else
+        expect(mockPrisma.prTask.updateMany).not.toHaveBeenCalledWith(
+          expect.objectContaining({ where: expect.objectContaining({ id: "remove" }) }),
+        );
+      expect(mockPrisma.prTask.create).toHaveBeenCalledWith({
+        data: {
+          requestId: requestRecord.id,
+          contentType: "Short Video",
+          title: "Short Video: New title",
+          dueAt: newDate,
+        },
       });
     },
   );
@@ -588,6 +698,48 @@ describe("request intake approval", () => {
         }),
       ]),
     });
+  });
+
+  it("resubmits a revised draft without duplicating matching tasks or reviving obsolete ones", async () => {
+    const dueAt = new Date("2026-11-20T00:00:00Z");
+    mockPrisma.prRequest.findFirst.mockResolvedValueOnce({
+      ...requestRecord,
+      type: "PR",
+      title: "New title",
+      requestedFor: dueAt,
+      status: "DRAFT",
+      version: 3,
+      revisions: [{ offsiteDetails: { contentTypes: ["Website News", "Short Video"] } }],
+      tasks: [
+        {
+          id: "keep",
+          contentType: "Website News",
+          title: "Website News: New title",
+          dueAt,
+          status: "DRAFT",
+          version: 3,
+        },
+        {
+          id: "new",
+          contentType: "Short Video",
+          title: "Short Video: New title",
+          dueAt,
+          status: "DRAFT",
+          version: 1,
+        },
+        {
+          id: "obsolete",
+          contentType: "Facebook Post",
+          title: "Facebook Post: Old title",
+          dueAt,
+          status: "CANCELLED",
+          version: 4,
+        },
+      ],
+    });
+    await transitionRequest(requesterActor, requestRecord.id, 3, "SUBMITTED");
+    expect(mockPrisma.prTask.create).not.toHaveBeenCalled();
+    expect(mockPrisma.prTask.updateMany).not.toHaveBeenCalled();
   });
 
   it("creates one unassigned draft task per selected content type when the request is submitted", async () => {

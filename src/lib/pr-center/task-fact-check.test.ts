@@ -39,7 +39,7 @@ beforeEach(() => {
     id: "task-1",
     ownerId: owner.id,
     status: "IN_PRODUCTION",
-    request: { status: "APPROVED" },
+    request: { status: "APPROVED", departmentId: "dept-1" },
     revisions: [{ revisionNumber: 4 }],
   });
   tx.prTaskFactCheck.create.mockResolvedValue({
@@ -110,7 +110,7 @@ describe("task fact-check records", () => {
       id: "task-1",
       ownerId: "other-owner",
       status: "SOURCE_FACT_CHECK",
-      request: { status: "APPROVED" },
+      request: { status: "APPROVED", departmentId: "dept-1" },
       revisions: [{ revisionNumber: 4 }],
     });
     const prActor: PrCenterActor = { ...owner, id: "pr-1", role: "RTRDA_PR" };
@@ -119,6 +119,60 @@ describe("task fact-check records", () => {
       id: "fact-check-1",
     });
     expect(tx.prTaskFactCheck.create).toHaveBeenCalledTimes(1);
+  });
+
+  it("rejects a requester whose PR grant belongs to another department", async () => {
+    const actor: PrCenterActor = {
+      ...owner,
+      role: "RTRDA_PR",
+      roleGrants: [{ role: "RTRDA_PR", departmentId: "dept-2" }],
+    };
+    prisma.prTask.findFirst.mockResolvedValueOnce({
+      id: "task-1",
+      ownerId: "other-owner",
+      status: "SOURCE_FACT_CHECK",
+      request: { status: "APPROVED", departmentId: "dept-1" },
+      revisions: [{ revisionNumber: 4 }],
+    });
+
+    await expect(submitTaskFactCheck(actor, "task-1", [claim])).rejects.toMatchObject({
+      code: "FORBIDDEN",
+      statusCode: 403,
+    });
+    expect(tx.prTaskFactCheck.create).not.toHaveBeenCalled();
+  });
+
+  it("preserves task-owner access despite an unrelated scoped PR grant", async () => {
+    const actor: PrCenterActor = {
+      ...owner,
+      role: "RTRDA_PR",
+      roleGrants: [{ role: "RTRDA_PR", departmentId: "dept-2" }],
+    };
+    await expect(submitTaskFactCheck(actor, "task-1", [claim])).resolves.toMatchObject({
+      id: "fact-check-1",
+    });
+  });
+
+  it("allows an organization-wide PR grant for a task in another department", async () => {
+    const actor: PrCenterActor = {
+      ...owner,
+      id: "pr-global",
+      role: "RTRDA_ALL_USER",
+      roleGrants: [
+        { role: "RTRDA_ALL_USER", departmentId: "dept-1" },
+        { role: "RTRDA_PR", departmentId: null },
+      ],
+    };
+    prisma.prTask.findFirst.mockResolvedValueOnce({
+      id: "task-1",
+      ownerId: "other-owner",
+      status: "SOURCE_FACT_CHECK",
+      request: { status: "APPROVED", departmentId: "dept-2" },
+      revisions: [{ revisionNumber: 4 }],
+    });
+    await expect(submitTaskFactCheck(actor, "task-1", [claim])).resolves.toMatchObject({
+      id: "fact-check-1",
+    });
   });
 
   it("denies a non-owner without the PR role", async () => {

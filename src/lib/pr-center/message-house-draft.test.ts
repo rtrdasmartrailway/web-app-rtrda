@@ -5,7 +5,8 @@ const mocks = vi.hoisted(() => {
     prMessageHouseVersion: {
       findFirst: vi.fn(),
       create: vi.fn(),
-      update: vi.fn(),
+      updateMany: vi.fn(),
+      findUniqueOrThrow: vi.fn(),
     },
     prAuditEvent: { create: vi.fn() },
     prOutboxEvent: { create: vi.fn() },
@@ -27,6 +28,7 @@ const actor = {
   organizationId: "org-1",
   departmentId: "dept-1",
   role: "RTRDA_PR" as const,
+  scopeDepartmentId: null,
 };
 
 const input = {
@@ -79,14 +81,11 @@ describe("Message House draft editing", () => {
     expect(mocks.tx.prMessageHouseVersion.create).not.toHaveBeenCalled();
   });
 
-  it("allows RTRDA_ADMIN to create a versioned draft", async () => {
-    await saveMessageHouseDraft(
-      { ...actor, role: "RTRDA_ADMIN" },
-      input,
-      undefined,
-      "corr-1",
-    );
-    expect(mocks.tx.prMessageHouseVersion.create).toHaveBeenCalledOnce();
+  it("does not let unrelated ADMIN grants create drafts", async () => {
+    await expect(
+      saveMessageHouseDraft({ ...actor, role: "RTRDA_ADMIN" }, input),
+    ).rejects.toMatchObject({ code: "FORBIDDEN" });
+    expect(mocks.tx.prMessageHouseVersion.create).not.toHaveBeenCalled();
   });
 
   it("updates only the actor's existing draft", async () => {
@@ -94,18 +93,26 @@ describe("Message House draft editing", () => {
       id: "draft-1",
       versionNumber: 5,
       status: "DRAFT",
+      rowVersion: 2,
     });
-    mocks.tx.prMessageHouseVersion.update.mockResolvedValue({
+    mocks.tx.prMessageHouseVersion.updateMany.mockResolvedValue({ count: 1 });
+    mocks.tx.prMessageHouseVersion.findUniqueOrThrow.mockResolvedValue({
       id: "draft-1",
       versionNumber: 5,
       status: "DRAFT",
       ...input,
     });
 
-    await saveMessageHouseDraft(actor, input, "draft-1", "corr-2");
+    await saveMessageHouseDraft(actor, input, "draft-1", "corr-2", 2);
 
-    expect(mocks.tx.prMessageHouseVersion.update).toHaveBeenCalledWith({
-      where: { id: "draft-1" },
+    expect(mocks.tx.prMessageHouseVersion.updateMany).toHaveBeenCalledWith({
+      where: {
+        id: "draft-1",
+        organizationId: "org-1",
+        ownerId: "pr-lead",
+        status: "DRAFT",
+        rowVersion: 2,
+      },
       data: expect.objectContaining({
         vision: "Vision",
         pillars: ["Safety", "Research"],

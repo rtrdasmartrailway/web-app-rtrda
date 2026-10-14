@@ -25,6 +25,7 @@ import {
   type CalendarRequestDecision,
 } from "@/lib/pr-center/calendar-view";
 import { canEditOwnRequest } from "@/lib/pr-center/request-edit";
+import { collectCursorPages } from "@/lib/pr-center/collect-cursor-pages";
 import { bangkokLocalDateTimeToISOString } from "@/lib/pr-center/schedule-time";
 import {
   requestTableStatusLabel,
@@ -639,6 +640,25 @@ function mapRequestTasks(records: ApiRequestRecord[]): Task[] {
   );
 }
 
+// Operations and dashboard counts depend on every scoped task, not only the
+// first page used by the request tables. Continue until the API's extra-row
+// sentinel disappears; keep the request-list filters/pagination separate.
+async function fetchScopedRequestRecords(
+  signal?: AbortSignal,
+): Promise<ApiRequestRecord[]> {
+  return collectCursorPages(async (cursor) => {
+    const query = new URLSearchParams({ take: "100" });
+    if (cursor) query.set("cursor", cursor);
+    const response = await fetch(`/api/pr-center/requests?${query}`, {
+      credentials: "same-origin",
+      cache: "no-store",
+      signal,
+    });
+    if (!response.ok) throw new Error("Request list unavailable");
+    return (await response.json()) as ApiRequestRecord[];
+  });
+}
+
 type PrCenterState = {
   version: 1;
   language: Language;
@@ -669,7 +689,7 @@ const pages: { id: Page; th: string; en: string; icon: string }[] = [
   { id: "help", th: "วิธีใช้งาน", en: "How to Use", icon: "❓" },
   { id: "history", th: "ประวัติ", en: "History", icon: "🕘" },
   { id: "directory", th: "User Directory", en: "User Directory", icon: "👥" },
-  { id: "settings", th: "Permission Settings", en: "Permission Settings", icon: "⚙️" },
+  { id: "settings", th: "บันทึกการเข้าถึง", en: "Access Audit", icon: "⚙️" },
   { id: "system-data", th: "System Data", en: "System Data", icon: "🗄️" },
 ];
 const PHASE_1_PAGES = new Set<Page>([
@@ -1467,15 +1487,35 @@ export function PrCenterApp({
   const requestDraftRevision = useRef(0);
   const [requestDraftHydrated, setRequestDraftHydrated] = useState(false);
   const [requestDraftSaving, setRequestDraftSaving] = useState(false);
+  const [requestSubmitting, setRequestSubmitting] = useState(false);
+  const requestSaveInFlight = useRef(false);
+  const [profileOpen, setProfileOpen] = useState(false);
+  const [requestSearch, setRequestSearch] = useState("");
+  const [requestStatusFilter, setRequestStatusFilter] = useState("");
+  const [requestList, setRequestList] = useState<ApiRequestRecord[]>([]);
+  const [requestListCursor, setRequestListCursor] = useState<string | null>(null);
+  const [requestListHasMore, setRequestListHasMore] = useState(false);
+  const [requestListLoading, setRequestListLoading] = useState(false);
+  const [requestListLoadingMore, setRequestListLoadingMore] = useState(false);
+  const [requestListError, setRequestListError] = useState(false);
+  const [requestListContext, setRequestListContext] = useState("");
+  const [requestListReload, setRequestListReload] = useState(0);
+  const requestListGeneration = useRef(0);
+  const requestListBusy = useRef(false);
+  const [auditCursor, setAuditCursor] = useState<string | null>(null);
+  const [auditHasMore, setAuditHasMore] = useState(false);
+  const [auditLoading, setAuditLoading] = useState(false);
+  const [auditLoadingMore, setAuditLoadingMore] = useState(false);
+  const [auditError, setAuditError] = useState(false);
+  const [auditReload, setAuditReload] = useState(0);
+  const auditGeneration = useRef(0);
+  const auditBusy = useRef(false);
   const [approvalTasks, setApprovalTasks] = useState<Task[]>([]);
   const [approvalRequests, setApprovalRequests] = useState<RequestApprovalItem[]>([]);
   const [requestApprovalQueueState, setRequestApprovalQueueState] = useState<
     "loading" | "loaded" | "error"
   >("loading");
   const [notice, setNotice] = useState<string | null>(null);
-  const [requestCursor, setRequestCursor] = useState<string | null>(null);
-  const [hasMoreRequests, setHasMoreRequests] = useState(false);
-  const [loadingMoreRequests, setLoadingMoreRequests] = useState(false);
   const [loadingRequests, setLoadingRequests] = useState(true);
   const [requestsUnavailable, setRequestsUnavailable] = useState(false);
   const [ideaNextOffset, setIdeaNextOffset] = useState<number | null>(null);
@@ -1504,31 +1544,162 @@ export function PrCenterApp({
   const [messageHouseHistoryStatus, setMessageHouseHistoryStatus] = useState<
     "loading" | "loaded" | "error"
   >("loading");
+  const canonicalRefreshGeneration = useRef(0);
   useEffect(() => {
-    fetch("/api/pr-center/requests?take=100", { credentials: "same-origin" })
-      .then(async (response) => {
-        if (!response.ok) throw new Error("Request list unavailable");
-        const records = (await response.json()) as ApiRequestRecord[];
+    if (!actor?.userId) return;
+    const generation = canonicalRefreshGeneration.current;
+    const controller = new AbortController();
+    fetchScopedRequestRecords(controller.signal)
+      .then((records) => {
+        if (
+          controller.signal.aborted ||
+          generation !== canonicalRefreshGeneration.current
+        )
+          return;
         setRequestsUnavailable(false);
-        const pageRecords = records.slice(0, 100);
-        setHasMoreRequests(records.length > pageRecords.length);
-        setRequestCursor(pageRecords.at(-1)?.id || null);
-        startTransition(() =>
-          setState((previous) => ({
-            ...previous,
-            requests: pageRecords
-              .filter((record) => !record.assignedTaskOnly)
-              .map(mapRequestRecord),
-            tasks: mapRequestTasks(pageRecords),
-          })),
-        );
+        startTransition(() => {
+          if (!controller.signal.aborted)
+            setState((previous) => ({
+              ...previous,
+              requests: records
+                .filter((record) => !record.assignedTaskOnly)
+                .map(mapRequestRecord),
+              tasks: mapRequestTasks(records),
+            }));
+        });
       })
       .catch(() => {
+        if (controller.signal.aborted) return;
         setRequestsUnavailable(true);
         setNotice("Unable to load server requests");
       })
-      .finally(() => setLoadingRequests(false));
-  }, []);
+      .finally(() => {
+        if (!controller.signal.aborted) setLoadingRequests(false);
+      });
+    return () => controller.abort();
+  }, [actor?.userId]);
+  const requestMode =
+    page === "my-requests" ? "mine" : page === "requests" ? "all" : null;
+  const requestAuthorityKey = JSON.stringify({
+    userId: actor?.userId,
+    grants: actor?.roleGrants
+      ?.map((grant) => `${grant.role}:${grant.departmentId ?? "org"}`)
+      .sort(),
+    role: actor?.role,
+  });
+  const requestContextKey = JSON.stringify({
+    authority: requestAuthorityKey,
+    mode: requestMode,
+    search: requestSearch.trim(),
+    status: requestStatusFilter,
+  });
+  const visibleRequestList = requestListContext === requestContextKey ? requestList : [];
+  useEffect(() => {
+    if (!actor?.userId || !requestMode) return;
+    const generation = ++requestListGeneration.current;
+    const generationRef = requestListGeneration;
+    const controller = new AbortController();
+    const timer = window.setTimeout(() => {
+      const query = new URLSearchParams({ take: "100" });
+      if (requestMode === "mine") query.set("mine", "true");
+      if (requestSearch.trim()) query.set("q", requestSearch.trim());
+      if (requestStatusFilter) query.set("status", requestStatusFilter);
+      setRequestListLoading(true);
+      setRequestListError(false);
+      void fetch(`/api/pr-center/requests?${query}`, {
+        credentials: "same-origin",
+        cache: "no-store",
+        signal: controller.signal,
+      })
+        .then(async (response) => {
+          if (!response.ok) throw new Error("Request list unavailable");
+          const records = (await response.json()) as ApiRequestRecord[];
+          if (generation !== requestListGeneration.current || controller.signal.aborted)
+            return;
+          const pageRecords = records.slice(0, 100);
+          setRequestListContext(requestContextKey);
+          setRequestList(pageRecords);
+          setRequestListCursor(pageRecords.at(-1)?.id ?? null);
+          setRequestListHasMore(records.length > 100);
+        })
+        .catch(() => {
+          if (generation === requestListGeneration.current && !controller.signal.aborted)
+            setRequestListError(true);
+        })
+        .finally(() => {
+          if (generation === requestListGeneration.current && !controller.signal.aborted)
+            setRequestListLoading(false);
+        });
+    }, 250);
+    return () => {
+      ++generationRef.current;
+      controller.abort();
+      window.clearTimeout(timer);
+    };
+  }, [
+    actor?.userId,
+    requestMode,
+    requestSearch,
+    requestStatusFilter,
+    requestListReload,
+    requestContextKey,
+  ]);
+  const changeRequestFilters = (search: string, status: string) => {
+    ++requestListGeneration.current;
+    setRequestList([]);
+    setRequestListCursor(null);
+    setRequestListHasMore(false);
+    setRequestListLoading(true);
+    setRequestSearch(search.slice(0, 120));
+    setRequestStatusFilter(status);
+  };
+  const refreshRequestList = async () => {
+    ++requestListGeneration.current;
+    setRequestList([]);
+    setRequestListCursor(null);
+    setRequestListHasMore(false);
+    setRequestListLoading(true);
+    await refreshRequests();
+  };
+  const loadMoreRequestList = async () => {
+    if (
+      !requestListCursor ||
+      !requestListHasMore ||
+      requestListBusy.current ||
+      requestListLoading
+    )
+      return;
+    requestListBusy.current = true;
+    setRequestListLoadingMore(true);
+    const generation = requestListGeneration.current;
+    const query = new URLSearchParams({ take: "100", cursor: requestListCursor });
+    if (requestMode === "mine") query.set("mine", "true");
+    if (requestSearch.trim()) query.set("q", requestSearch.trim());
+    if (requestStatusFilter) query.set("status", requestStatusFilter);
+    try {
+      const response = await fetch(`/api/pr-center/requests?${query}`, {
+        credentials: "same-origin",
+        cache: "no-store",
+      });
+      if (!response.ok) throw new Error("Unable to load more requests");
+      const records = (await response.json()) as ApiRequestRecord[];
+      if (generation !== requestListGeneration.current) return;
+      const pageRecords = records.slice(0, 100);
+      setRequestList((previous) => [
+        ...previous,
+        ...pageRecords.filter(
+          (item) => !previous.some((existing) => existing.id === item.id),
+        ),
+      ]);
+      setRequestListCursor(pageRecords.at(-1)?.id ?? null);
+      setRequestListHasMore(records.length > 100);
+    } catch {
+      if (generation === requestListGeneration.current) setRequestListError(true);
+    } finally {
+      requestListBusy.current = false;
+      if (generation === requestListGeneration.current) setRequestListLoadingMore(false);
+    }
+  };
   useEffect(() => {
     const roleGrants = actor?.roles?.length ? actor.roles : actor ? [actor.role] : [];
     if (
@@ -1684,36 +1855,103 @@ export function PrCenterApp({
       cancelled = true;
     };
   }, [actor?.userId]);
+  const mapAuditRecord = (entry: {
+    id: string;
+    actorId: string | null;
+    entityType: string;
+    entityId: string;
+    action: string;
+    createdAt: string;
+  }): AuditEntry => ({
+    id: entry.id,
+    actorId: entry.actorId || "system",
+    entity: ["request", "task", "notification"].includes(entry.entityType)
+      ? (entry.entityType as AuditEntry["entity"])
+      : "system",
+    entityId: entry.entityId,
+    action: entry.action,
+    before: "",
+    after: "",
+    createdAt: entry.createdAt,
+  });
   useEffect(() => {
-    fetch("/api/pr-center/audit?take=100", { credentials: "same-origin" })
+    if (!actor?.userId || page !== "history") return;
+    const generation = ++auditGeneration.current;
+    const generationRef = auditGeneration;
+    const controller = new AbortController();
+    queueMicrotask(() => {
+      if (!controller.signal.aborted) {
+        setAuditLoading(true);
+        setAuditError(false);
+      }
+    });
+    fetch("/api/pr-center/audit?take=100", {
+      credentials: "same-origin",
+      cache: "no-store",
+      signal: controller.signal,
+    })
       .then(async (response) => {
         if (!response.ok) throw new Error("Audit history unavailable");
-        const audit = (await response.json()) as Array<{
-          id: string;
-          actorId: string | null;
-          entityType: string;
-          entityId: string;
-          action: string;
-          createdAt: string;
-        }>;
-        setState((previous) => ({
-          ...previous,
-          audit: audit.map((entry) => ({
-            id: entry.id,
-            actorId: entry.actorId || "system",
-            entity: ["request", "task", "notification"].includes(entry.entityType)
-              ? (entry.entityType as AuditEntry["entity"])
-              : "system",
-            entityId: entry.entityId,
-            action: entry.action,
-            before: "",
-            after: "",
-            createdAt: entry.createdAt,
-          })),
-        }));
+        const records = (await response.json()) as Array<
+          Parameters<typeof mapAuditRecord>[0]
+        >;
+        if (controller.signal.aborted || generation !== auditGeneration.current) return;
+        const pageRecords = records.slice(0, 100);
+        setState((previous) => ({ ...previous, audit: pageRecords.map(mapAuditRecord) }));
+        setAuditCursor(pageRecords.at(-1)?.id ?? null);
+        setAuditHasMore(records.length > 100);
       })
-      .catch(() => setNotice("Unable to load audit history"));
-  }, []);
+      .catch(() => {
+        if (!controller.signal.aborted && generation === auditGeneration.current)
+          setAuditError(true);
+      })
+      .finally(() => {
+        if (!controller.signal.aborted && generation === auditGeneration.current)
+          setAuditLoading(false);
+      });
+    return () => {
+      ++generationRef.current;
+      controller.abort();
+    };
+  }, [actor?.userId, page, auditReload]);
+  const loadMoreAudit = async () => {
+    if (!auditCursor || !auditHasMore || auditBusy.current || auditLoading) return;
+    auditBusy.current = true;
+    setAuditLoadingMore(true);
+    const generation = auditGeneration.current;
+    try {
+      const query = new URLSearchParams({ take: "100", cursor: auditCursor });
+      const response = await fetch(`/api/pr-center/audit?${query}`, {
+        credentials: "same-origin",
+        cache: "no-store",
+      });
+      if (!response.ok) throw new Error("Audit history unavailable");
+      const records = (await response.json()) as Array<
+        Parameters<typeof mapAuditRecord>[0]
+      >;
+      if (generation !== auditGeneration.current) return;
+      const pageRecords = records.slice(0, 100);
+      setState((previous) => ({
+        ...previous,
+        audit: [
+          ...previous.audit,
+          ...pageRecords
+            .map(mapAuditRecord)
+            .filter(
+              (item) => !previous.audit.some((existing) => existing.id === item.id),
+            ),
+        ],
+      }));
+      setAuditCursor(pageRecords.at(-1)?.id ?? null);
+      setAuditHasMore(records.length > 100);
+      setAuditError(false);
+    } catch {
+      if (generation === auditGeneration.current) setAuditError(true);
+    } finally {
+      auditBusy.current = false;
+      if (generation === auditGeneration.current) setAuditLoadingMore(false);
+    }
+  };
 
   const currentUser: User = actor
     ? {
@@ -1840,69 +2078,25 @@ export function PrCenterApp({
     requestOpen,
     state.language,
   ]);
-  const loadMoreRequests = async () => {
-    if (!requestCursor || loadingMoreRequests || loadingRequests) return;
-    setLoadingMoreRequests(true);
-    try {
-      const response = await fetch(
-        `/api/pr-center/requests?take=100&cursor=${encodeURIComponent(requestCursor)}`,
-        { credentials: "same-origin" },
-      );
-      if (!response.ok) throw new Error("Unable to load more requests");
-      const records = (await response.json()) as ApiRequestRecord[];
-      const pageRecords = records.slice(0, 100);
-      setRequestCursor(pageRecords.at(-1)?.id || requestCursor);
-      setHasMoreRequests(records.length > pageRecords.length);
-      setState((previous) => ({
-        ...previous,
-        requests: [
-          ...previous.requests,
-          ...pageRecords
-            .filter((record) => !record.assignedTaskOnly)
-            .map(mapRequestRecord)
-            .filter(
-              (item) => !previous.requests.some((existing) => existing.id === item.id),
-            ),
-        ],
-        tasks: [
-          ...previous.tasks,
-          ...mapRequestTasks(pageRecords).filter(
-            (item) => !previous.tasks.some((existing) => existing.id === item.id),
-          ),
-        ],
-      }));
-    } catch {
-      setNotice(
-        state.language === "th"
-          ? "โหลดคำขอเพิ่มเติมไม่สำเร็จ"
-          : "Unable to load more requests",
-      );
-    } finally {
-      setLoadingMoreRequests(false);
-    }
-  };
   const refreshRequests = async () => {
-    if (loadingRequests || loadingMoreRequests) return;
+    const generation = ++canonicalRefreshGeneration.current;
+    ++requestListGeneration.current;
+    setRequestListContext("");
+    setRequestListReload((value) => value + 1);
     setLoadingRequests(true);
     try {
-      const response = await fetch("/api/pr-center/requests?take=100", {
-        credentials: "same-origin",
-        cache: "no-store",
-      });
-      if (!response.ok) throw new Error("Unable to refresh requests");
-      const records = (await response.json()) as ApiRequestRecord[];
+      const records = await fetchScopedRequestRecords();
+      if (generation !== canonicalRefreshGeneration.current) return;
       setRequestsUnavailable(false);
-      const pageRecords = records.slice(0, 100);
-      setRequestCursor(pageRecords.at(-1)?.id || null);
-      setHasMoreRequests(records.length > pageRecords.length);
       setState((previous) => ({
         ...previous,
-        requests: pageRecords
+        requests: records
           .filter((record) => !record.assignedTaskOnly)
           .map(mapRequestRecord),
-        tasks: mapRequestTasks(pageRecords),
+        tasks: mapRequestTasks(records),
       }));
     } catch {
+      if (generation !== canonicalRefreshGeneration.current) return;
       setRequestsUnavailable(true);
       setNotice(
         state.language === "th"
@@ -1910,7 +2104,7 @@ export function PrCenterApp({
           : "Unable to refresh request status",
       );
     } finally {
-      setLoadingRequests(false);
+      if (generation === canonicalRefreshGeneration.current) setLoadingRequests(false);
     }
   };
   const t = copy[state.language];
@@ -2076,7 +2270,12 @@ export function PrCenterApp({
       })),
     }));
   };
-  const createRequest = async (draft: RequestDraft, editId = requestEditId) => {
+  const createRequest = async (
+    draft: RequestDraft,
+    editId = requestEditId,
+    submitAfterSave = false,
+  ) => {
+    if (requestSaveInFlight.current) return;
     if (
       !draft.confirmed ||
       (draft.type === "pr" &&
@@ -2098,6 +2297,8 @@ export function PrCenterApp({
     const priorStatus = editId
       ? state.requests.find((request) => request.id === editId)?.status
       : undefined;
+    requestSaveInFlight.current = true;
+    setRequestSubmitting(true);
     try {
       const response = await fetch(
         editId ? `/api/pr-center/requests/${editId}` : "/api/pr-center/requests",
@@ -2182,6 +2383,7 @@ export function PrCenterApp({
         }>;
       };
       let samplesUploaded = true;
+      const failedSamples: File[] = [];
       const uploadedSamples: NonNullable<Request["attachments"]> = [];
       for (const file of draft.samples) {
         try {
@@ -2215,6 +2417,38 @@ export function PrCenterApp({
           uploadedSamples.push(await attachResponse.json());
         } catch {
           samplesUploaded = false;
+          failedSamples.push(file);
+        }
+      }
+      let submitError: string | null = null;
+      if (submitAfterSave && samplesUploaded) {
+        try {
+          const submitResponse = await fetch(
+            `/api/pr-center/requests/${updated.id}/transitions`,
+            {
+              method: "POST",
+              credentials: "same-origin",
+              headers: {
+                "Content-Type": "application/json",
+                "If-Match": String(updated.version),
+              },
+              body: JSON.stringify({ to: "SUBMITTED" }),
+            },
+          );
+          if (!submitResponse.ok) {
+            const result = (await submitResponse.json().catch(() => null)) as {
+              message?: string;
+            } | null;
+            throw new Error(result?.message || "Submission rejected");
+          }
+          const submitted = (await submitResponse.json()) as {
+            status: Request["status"];
+            version: number;
+          };
+          updated.status = submitted.status;
+          updated.version = submitted.version;
+        } catch (error) {
+          submitError = error instanceof Error ? error.message : "Submission rejected";
         }
       }
       const mappedRequest: Request = {
@@ -2288,6 +2522,22 @@ export function PrCenterApp({
           ),
         ],
       }));
+      void refreshRequests();
+      if (!samplesUploaded || submitError) {
+        // The request is durable, but the requested workflow did not finish.
+        // Keep the form open as an edit of that draft so a retry does not
+        // create another request or upload files that already attached.
+        setRequestEditId(updated.id);
+        setRequestDraft((previous) => ({ ...previous, samples: failedSamples }));
+        announce(
+          !samplesUploaded
+            ? state.language === "th"
+              ? "บันทึกฉบับร่างแล้ว แต่แนบไฟล์ไม่ครบ จึงยังไม่ได้ส่งคำขอ กรุณาลองแนบไฟล์ที่เหลืออีกครั้ง"
+              : "Draft saved but some attachments failed. The request was not submitted; retry the remaining files."
+            : `${state.language === "th" ? "บันทึกฉบับร่างแล้ว แต่ส่งไม่สำเร็จ" : "Draft saved but submission failed"}: ${submitError}`,
+        );
+        return;
+      }
       if (!editId) {
         await fetch("/api/pr-center/drafts/REQUEST", {
           method: "DELETE",
@@ -2301,23 +2551,32 @@ export function PrCenterApp({
       announce(
         !samplesUploaded
           ? state.language === "th"
-            ? "บันทึกคำขอแล้ว แต่แนบไฟล์ตัวอย่างไม่สำเร็จ กรุณาแนบไฟล์จากรายละเอียดคำขออีกครั้ง"
-            : "Request saved, but sample files could not be attached. Add them from the request details."
-          : state.language === "th"
-            ? editId
-              ? priorStatus && priorStatus !== "DRAFT"
-                ? "บันทึก revision ใหม่เป็นฉบับร่างแล้ว กรุณาตรวจรายละเอียดและส่งคำขออีกครั้ง"
-                : "บันทึกการแก้ไขคำขอแล้ว"
-              : "บันทึกคำขอเป็นฉบับร่างแล้ว"
-            : editId
-              ? priorStatus && priorStatus !== "DRAFT"
-                ? "Revision saved as a draft. Review the details and submit the request again."
-                : "Request changes saved"
-              : "Request saved as draft",
+            ? "บันทึกฉบับร่างแล้ว แต่แนบไฟล์ไม่ครบ จึงยังไม่ได้ส่งคำขอ กรุณาตรวจไฟล์แนบและส่งจากรายละเอียดคำขอ"
+            : "Draft saved, but some files could not be attached. Not submitted; check attachments and submit from request details."
+          : submitError
+            ? `${state.language === "th" ? "บันทึกฉบับร่างแล้ว แต่ส่งไม่สำเร็จ" : "Draft saved, but submission failed"}: ${submitError}`
+            : submitAfterSave
+              ? state.language === "th"
+                ? "บันทึกไฟล์แนบและส่งคำขอเข้าคิวอนุมัติแล้ว"
+                : "Attachments saved and request submitted for approval"
+              : state.language === "th"
+                ? editId
+                  ? priorStatus && priorStatus !== "DRAFT"
+                    ? "บันทึก revision ใหม่เป็นฉบับร่างแล้ว กรุณาตรวจรายละเอียดและส่งคำขออีกครั้ง"
+                    : "บันทึกการแก้ไขคำขอแล้ว"
+                  : "บันทึกคำขอเป็นฉบับร่างแล้ว"
+                : editId
+                  ? priorStatus && priorStatus !== "DRAFT"
+                    ? "Revision saved as a draft. Review the details and submit the request again."
+                    : "Request changes saved"
+                  : "Request saved as draft",
       );
       setPage("my-requests");
     } catch (error) {
       announce(error instanceof Error ? error.message : "Request could not be saved");
+    } finally {
+      requestSaveInFlight.current = false;
+      setRequestSubmitting(false);
     }
   };
 
@@ -2405,6 +2664,7 @@ export function PrCenterApp({
             : item,
         ),
       }));
+      void refreshRequests();
       await refreshNotifications().catch(() => undefined);
       announce(
         state.language === "th"
@@ -3170,10 +3430,21 @@ export function PrCenterApp({
               {page !== "ideas" && <p>Corporate communications workspace</p>}
             </div>
           </div>
-          {page !== "ideas" && (
+          {(page === "my-requests" || page === "requests") && (
             <label className={styles.search}>
-              <span>Search</span>
-              <input placeholder={t.search} />
+              <span>
+                {state.language === "th"
+                  ? "ค้นหาคำขอจากชื่อหรือเลขคำขอ"
+                  : "Search requests by title or number"}
+              </span>
+              <input
+                maxLength={120}
+                value={requestSearch}
+                onChange={(event) =>
+                  changeRequestFilters(event.target.value, requestStatusFilter)
+                }
+                placeholder={t.search}
+              />
             </label>
           )}
           <div
@@ -3207,11 +3478,29 @@ export function PrCenterApp({
             <button
               className={styles.profile}
               type="button"
-              aria-label="Current PR Center role"
+              aria-label={
+                state.language === "th" ? "ข้อมูลบัญชีของฉัน" : "My account information"
+              }
+              aria-expanded={profileOpen}
+              onClick={() => setProfileOpen((open) => !open)}
             >
               <span>{currentUser.name.slice(0, 2)}</span>
               <i>{currentUser.role}</i>
             </button>
+            {profileOpen && (
+              <aside className={styles.card} role="status">
+                <strong>{currentUser.name}</strong>
+                <p>{currentUser.department}</p>
+                <p>
+                  {actorRoleCodes.length ? actorRoleCodes.join(", ") : currentUser.role}
+                </p>
+                <small>
+                  {state.language === "th"
+                    ? "ข้อมูลบัญชีแบบอ่านอย่างเดียว"
+                    : "Read-only account information"}
+                </small>
+              </aside>
+            )}
             {onSignOut && (
               <button className={styles.signOut} type="button" onClick={onSignOut}>
                 {state.language === "th" ? "ออกจากระบบ" : "Sign out"}
@@ -3260,14 +3549,20 @@ export function PrCenterApp({
               onWithdrawRequest={withdrawRequest}
               mode="mine"
               canCreate={hasUiRole("requester", "pr", "admin")}
-              requests={state.requests}
-              tasks={state.tasks}
+              requests={visibleRequestList
+                .filter((record) => !record.assignedTaskOnly)
+                .map(mapRequestRecord)}
+              tasks={mapRequestTasks(visibleRequestList)}
               currentUserId={currentUser.id}
-              hasMore={hasMoreRequests}
-              onRefresh={refreshRequests}
-              loadingMore={loadingMoreRequests}
-              loading={loadingRequests}
-              onLoadMore={loadMoreRequests}
+              hasMore={requestListContext === requestContextKey && requestListHasMore}
+              onRefresh={refreshRequestList}
+              loadingMore={requestListLoadingMore}
+              loading={requestListLoading}
+              error={requestListError}
+              onLoadMore={loadMoreRequestList}
+              query={requestSearch}
+              status={requestStatusFilter}
+              onFiltersChange={changeRequestFilters}
             />
           )}
           {page === "requests" && (
@@ -3280,14 +3575,20 @@ export function PrCenterApp({
               onWithdrawRequest={withdrawRequest}
               mode="all"
               canCreate={false}
-              requests={state.requests}
-              tasks={state.tasks}
+              requests={visibleRequestList
+                .filter((record) => !record.assignedTaskOnly)
+                .map(mapRequestRecord)}
+              tasks={mapRequestTasks(visibleRequestList)}
               currentUserId={currentUser.id}
-              hasMore={hasMoreRequests}
-              onRefresh={refreshRequests}
-              loadingMore={loadingMoreRequests}
-              loading={loadingRequests}
-              onLoadMore={loadMoreRequests}
+              hasMore={requestListContext === requestContextKey && requestListHasMore}
+              onRefresh={refreshRequestList}
+              loadingMore={requestListLoadingMore}
+              loading={requestListLoading}
+              error={requestListError}
+              onLoadMore={loadMoreRequestList}
+              query={requestSearch}
+              status={requestStatusFilter}
+              onFiltersChange={changeRequestFilters}
             />
           )}
           {page === "operations" && (
@@ -3356,11 +3657,14 @@ export function PrCenterApp({
             <MessageHouse
               data={state.messageHouse}
               canEdit={
-                actor
-                  ? actorRoleCodes.some(
-                      (role) => role === "RTRDA_PR" || role === "RTRDA_ADMIN",
-                    )
-                  : hasUiRole("pr", "admin")
+                !!actor?.roleGrants?.some(
+                  (grant) => grant.role === "RTRDA_PR" && grant.departmentId === null,
+                )
+              }
+              canReview={
+                !!actor?.roleGrants?.some(
+                  (grant) => grant.role === "RTRDA_BORD" && grant.departmentId === null,
+                )
               }
               status={messageHouseStatus}
               history={messageHouseHistory}
@@ -3378,7 +3682,19 @@ export function PrCenterApp({
             />
           )}
           {page === "history" && (
-            <History audit={state.audit} language={state.language} />
+            <History
+              audit={auditLoading ? [] : state.audit}
+              language={state.language}
+              loading={auditLoading}
+              loadingMore={auditLoadingMore}
+              hasMore={auditHasMore}
+              error={auditError}
+              onRefresh={() => {
+                setAuditLoading(true);
+                setAuditReload((value) => value + 1);
+              }}
+              onLoadMore={loadMoreAudit}
+            />
           )}
           {page === "directory" && actor && (
             <Directory actor={actor} language={state.language} />
@@ -3405,6 +3721,7 @@ export function PrCenterApp({
           contentTypes={state.masterData.contentTypes}
           draftLoading={!requestDraftHydrated}
           draftSaving={requestDraftSaving}
+          submitting={requestSubmitting}
           isEditing={requestEditId !== null}
           draft={requestDraft}
           onChange={(draft) => {
@@ -3421,7 +3738,13 @@ export function PrCenterApp({
           }}
           onSubmit={(event) => {
             event.preventDefault();
-            createRequest(requestDraft, requestEditId);
+            const submitter = (event.nativeEvent as SubmitEvent)
+              .submitter as HTMLButtonElement | null;
+            void createRequest(
+              requestDraft,
+              requestEditId,
+              submitter?.value === "submit",
+            );
           }}
         />
       )}
@@ -4271,6 +4594,10 @@ function Requests({
   loadingMore,
   loading,
   onLoadMore,
+  query,
+  status,
+  error,
+  onFiltersChange,
 }: {
   t: (typeof copy)[Language];
   language: Language;
@@ -4288,37 +4615,17 @@ function Requests({
   loadingMore: boolean;
   loading: boolean;
   onLoadMore: () => void;
+  query: string;
+  status: string;
+  error: boolean;
+  onFiltersChange: (query: string, status: string) => void;
 }) {
   const title = mode === "mine" ? "My Requests" : "All Requests";
-  const [query, setQuery] = useState("");
-  const [status, setStatus] = useState<"all" | StatusId>("all");
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const listStatus = (request: Request): StatusId => {
-    switch (request.status) {
-      case "DRAFT":
-        return "draft";
-      case "SUBMITTED":
-        return "management_approval";
-      case "REJECTED":
-        return "rejected";
-      case "WITHDRAWN":
-      case "CANCELLED":
-        return "cancelled";
-      default:
-        return requestStatus(request, taskItems);
-    }
-  };
-  const visibleRequests = (
+  const visibleRequests =
     mode === "mine"
       ? requestItems.filter((request) => request.requesterId === currentUserId)
-      : requestItems
-  ).filter(
-    (request) =>
-      (status === "all" || listStatus(request) === status) &&
-      `${request.id} ${request.title} ${request.department}`
-        .toLowerCase()
-        .includes(query.toLowerCase()),
-  );
+      : requestItems;
   const selected = visibleRequests.find((request) => request.id === selectedId);
   return (
     <>
@@ -4345,29 +4652,46 @@ function Requests({
       <section className={styles.filterBar}>
         <input
           value={query}
-          onChange={(event) => setQuery(event.target.value)}
+          maxLength={120}
+          onChange={(event) => onFiltersChange(event.target.value, status)}
           placeholder={t.search}
+          aria-label={
+            language === "th"
+              ? "ค้นหาคำขอจากชื่อหรือเลขคำขอ"
+              : "Search request title or number"
+          }
         />
         <select
+          aria-label={language === "th" ? "สถานะคำขอ" : "Request status"}
           value={status}
-          onChange={(event) => setStatus(event.target.value as "all" | StatusId)}
+          onChange={(event) => onFiltersChange(query, event.target.value)}
         >
-          <option value="all">All status</option>
-          {Object.entries(STATUS_LABELS).map(([id, name]) => (
-            <option key={id} value={id}>
-              {name}
+          <option value="">All request statuses</option>
+          {(
+            [
+              "DRAFT",
+              "SUBMITTED",
+              "APPROVED",
+              "REJECTED",
+              "WITHDRAWN",
+              "CANCELLED",
+              "CLOSED",
+            ] as const
+          ).map((item) => (
+            <option key={item} value={item}>
+              {item}
             </option>
           ))}
         </select>
-        <button
-          onClick={() => {
-            setQuery("");
-            setStatus("all");
-          }}
-        >
+        <button type="button" onClick={() => onFiltersChange("", "")}>
           Clear
         </button>
       </section>
+      <p role="note">
+        {language === "th"
+          ? "ค้นหาชื่อหรือเลขคำขอและกรองสถานะจากระบบในขอบเขตสิทธิ์ของคุณ"
+          : "Search request titles or numbers and filter status across your authorized scope."}
+      </p>
       <article className={styles.card}>
         <div className={styles.tableWrap}>
           <table>
@@ -4461,8 +4785,17 @@ function Requests({
             </tbody>
           </table>
         </div>
-        {loading && visibleRequests.length === 0 && <p>Loading requests…</p>}
-        {!loading && visibleRequests.length === 0 && <p>No requests found.</p>}
+        {error && (
+          <p role="alert">
+            {language === "th"
+              ? "โหลดคำขอไม่สำเร็จ ลองรีเฟรชอีกครั้ง"
+              : "Unable to load requests. Refresh to retry."}
+          </p>
+        )}
+        {loading && visibleRequests.length === 0 && (
+          <p role="status">Loading requests…</p>
+        )}
+        {!loading && !error && visibleRequests.length === 0 && <p>No requests found.</p>}
         {hasMore && (
           <button disabled={loadingMore || loading} onClick={onLoadMore}>
             {loadingMore ? "Loading…" : "Load more requests"}
@@ -5518,44 +5851,51 @@ function TaskFactCheckPanel({ task, language }: { task: Task; language: Language
 }
 
 function PublishingOperations({ language }: { language: Language }) {
-  const [range] = useState(() => {
+  const [range, setRange] = useState(() => {
     const from = new Date();
     from.setUTCHours(0, 0, 0, 0);
     from.setUTCDate(from.getUTCDate() - 14);
     const to = new Date(from);
     to.setUTCDate(to.getUTCDate() + 44);
-    return { from: from.toISOString(), to: to.toISOString() };
+    return { from: from.toISOString().slice(0, 10), to: to.toISOString().slice(0, 10) };
   });
+  const [draftRange, setDraftRange] = useState(range);
+  const fromDate = new Date(`${draftRange.from}T00:00:00Z`);
+  const toDate = new Date(`${draftRange.to}T00:00:00Z`);
+  const rangeDays = (toDate.getTime() - fromDate.getTime()) / 86_400_000 + 1;
+  const rangeValid = Number.isFinite(rangeDays) && rangeDays >= 1 && rangeDays <= 45;
+  const rangeKey = `${range.from}:${range.to}`;
   const [status, setStatus] = useState<"ALL" | "SCHEDULED" | "PUBLISHED">("ALL");
   const [reload, setReload] = useState(0);
   const [result, setResult] = useState<{
-    key: number;
+    key: string;
     entries: CalendarEntry[];
     failed: boolean;
   } | null>(null);
 
   useEffect(() => {
     const controller = new AbortController();
+    const toExclusive = new Date(`${range.to}T00:00:00Z`);
+    toExclusive.setUTCDate(toExclusive.getUTCDate() + 1);
+    const key = `${rangeKey}:${reload}`;
     fetch(
-      `/api/pr-center/calendar?from=${encodeURIComponent(range.from)}&to=${encodeURIComponent(range.to)}`,
-      { credentials: "same-origin", signal: controller.signal },
+      `/api/pr-center/calendar?from=${encodeURIComponent(`${range.from}T00:00:00.000Z`)}&to=${encodeURIComponent(toExclusive.toISOString())}`,
+      { credentials: "same-origin", cache: "no-store", signal: controller.signal },
     )
       .then(async (response) => {
         if (!response.ok) throw new Error("Publishing records unavailable");
         return parseCalendarEntries(await response.json());
       })
       .then((entries) => {
-        if (!controller.signal.aborted)
-          setResult({ key: reload, entries, failed: false });
+        if (!controller.signal.aborted) setResult({ key, entries, failed: false });
       })
       .catch(() => {
-        if (!controller.signal.aborted)
-          setResult({ key: reload, entries: [], failed: true });
+        if (!controller.signal.aborted) setResult({ key, entries: [], failed: true });
       });
     return () => controller.abort();
-  }, [range.from, range.to, reload]);
+  }, [range.from, range.to, rangeKey, reload]);
 
-  const current = result?.key === reload ? result : null;
+  const current = result?.key === `${rangeKey}:${reload}` ? result : null;
   const entries = (current?.entries ?? []).filter(
     (entry) => entry.status !== "DRAFT" && (status === "ALL" || entry.status === status),
   );
@@ -5584,6 +5924,42 @@ function PublishingOperations({ language }: { language: Language }) {
           ? "ข้อมูลจากกำหนดการและหลักฐานที่บันทึกในระบบเท่านั้น หน้านี้ไม่เผยแพร่ ไม่ retry และไม่เชื่อมต่อช่องทางภายนอก · เวลา UTC"
           : "Read-only schedule and evidence records only. This view does not publish, retry, or connect to external channels · Times in UTC."}
       </p>
+      <div className={styles.filterBar}>
+        <label>
+          {text ? "ตั้งแต่ (UTC)" : "From (UTC)"}
+          <input
+            type="date"
+            value={draftRange.from}
+            onChange={(event) =>
+              setDraftRange((previous) => ({ ...previous, from: event.target.value }))
+            }
+          />
+        </label>
+        <label>
+          {text ? "ถึง (UTC)" : "Through (UTC)"}
+          <input
+            type="date"
+            value={draftRange.to}
+            onChange={(event) =>
+              setDraftRange((previous) => ({ ...previous, to: event.target.value }))
+            }
+          />
+        </label>
+        <button
+          type="button"
+          disabled={!rangeValid}
+          onClick={() => setRange({ ...draftRange })}
+        >
+          {text ? "แสดงช่วงวันที่" : "Apply date range"}
+        </button>
+      </div>
+      {!rangeValid && (
+        <p role="alert">
+          {text
+            ? "เลือกช่วงวันที่ 1–45 วัน โดยวันสิ้นสุดต้องไม่ก่อนวันเริ่มต้น"
+            : "Choose 1–45 days, with the end on or after the start."}
+        </p>
+      )}
       <label>
         {text ? "สถานะ" : "Status"}{" "}
         <select
@@ -7496,7 +7872,7 @@ function Ideas({
                 language === "th" ? "ไฟล์ CSV เปิดด้วย Excel ได้" : "Excel-compatible CSV"
               }
             >
-              ↓ Export Excel
+              ↓ Export CSV
             </button>
             <button
               className={styles.primary}
@@ -8150,9 +8526,23 @@ function Ideas({
     </>
   );
 }
+type MessageHouseWorkingVersion = {
+  id: string;
+  rowVersion: number;
+  versionNumber: number;
+  status: "DRAFT" | "IN_REVIEW" | "REJECTED";
+  vision: string;
+  positioning: string;
+  pillars: string[];
+  foundation: string;
+  sourceRationale: string | null;
+  decisionReason?: string | null;
+};
+
 function MessageHouse({
   data,
   canEdit,
+  canReview,
   status,
   history,
   historyStatus,
@@ -8161,6 +8551,7 @@ function MessageHouse({
 }: {
   data: MessageHouseData;
   canEdit: boolean;
+  canReview: boolean;
   status: "loading" | "empty" | "loaded" | "error";
   history: CurrentMessageHouse[];
   historyStatus: "loading" | "loaded" | "error";
@@ -8176,33 +8567,54 @@ function MessageHouse({
     foundation: "",
     sourceRationale: "",
   });
-  const [draftLoading, setDraftLoading] = useState(true);
+  const [working, setWorking] = useState<MessageHouseWorkingVersion | null>(null);
+  const [savedContent, setSavedContent] = useState<string | null>(null);
+  const draftContent = JSON.stringify({ ...draft, id: "" });
+  const [draftLoading, setDraftLoading] = useState(canEdit);
+  const [draftLoadFailed, setDraftLoadFailed] = useState(false);
   const [draftSaving, setDraftSaving] = useState(false);
   const [draftNotice, setDraftNotice] = useState("");
   const [draftNoticeTone, setDraftNoticeTone] = useState<"success" | "error" | "">("");
+  const [reviews, setReviews] = useState<MessageHouseWorkingVersion[]>([]);
+  const [reviewStatus, setReviewStatus] = useState<"loading" | "loaded" | "error">(
+    "loading",
+  );
+  const [reviewReason, setReviewReason] = useState<Record<string, string>>({});
+  const [reviewEffectiveAt, setReviewEffectiveAt] = useState<Record<string, string>>({});
+  const [reviewBusyId, setReviewBusyId] = useState<string | null>(null);
+  const [reviewNotice, setReviewNotice] = useState("");
+  const [reload, setReload] = useState(0);
+  const [reviewReload, setReviewReload] = useState(0);
 
   useEffect(() => {
     if (!canEdit) return;
     let cancelled = false;
-    fetch("/api/pr-center/message-house/draft", { credentials: "same-origin" })
+    fetch("/api/pr-center/message-house/draft", {
+      credentials: "same-origin",
+      cache: "no-store",
+    })
       .then(async (response) => {
         if (!response.ok) throw new Error("Draft unavailable");
-        return response.json();
+        return (await response.json()) as MessageHouseWorkingVersion | null;
       })
       .then((value) => {
-        if (cancelled || !value) return;
-        setDraft({
-          id: typeof value.id === "string" ? value.id : "",
-          vision: typeof value.vision === "string" ? value.vision : "",
-          positioning: typeof value.positioning === "string" ? value.positioning : "",
-          pillars: Array.isArray(value.pillars) ? value.pillars.join("\n") : "",
-          foundation: typeof value.foundation === "string" ? value.foundation : "",
-          sourceRationale:
-            typeof value.sourceRationale === "string" ? value.sourceRationale : "",
-        });
+        if (cancelled) return;
+        setWorking(value);
+        setDraftLoadFailed(false);
+        const loadedDraft = {
+          id: value?.id ?? "",
+          vision: value?.vision ?? "",
+          positioning: value?.positioning ?? "",
+          pillars: value?.pillars?.join("\n") ?? "",
+          foundation: value?.foundation ?? "",
+          sourceRationale: value?.sourceRationale ?? "",
+        };
+        setDraft(loadedDraft);
+        setSavedContent(value ? JSON.stringify({ ...loadedDraft, id: "" }) : null);
       })
       .catch(() => {
         if (!cancelled) {
+          setDraftLoadFailed(true);
           setDraftNotice(
             thai
               ? "โหลดฉบับร่าง Message House ไม่สำเร็จ"
@@ -8217,10 +8629,52 @@ function MessageHouse({
     return () => {
       cancelled = true;
     };
-  }, [canEdit, thai]);
+  }, [canEdit, reload, thai]);
+
+  useEffect(() => {
+    if (!canReview) return;
+    let cancelled = false;
+    fetch("/api/pr-center/message-house/review", {
+      credentials: "same-origin",
+      cache: "no-store",
+    })
+      .then(async (response) => {
+        if (!response.ok) throw new Error("Review queue unavailable");
+        return (await response.json()) as MessageHouseWorkingVersion[];
+      })
+      .then((items) => {
+        if (!cancelled) {
+          setReviews(items);
+          setReviewStatus("loaded");
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setReviewStatus("error");
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [canReview, reviewReload]);
+
+  const refreshWorking = () => {
+    if (canEdit) setDraftLoading(true);
+    if (canReview) setReviewStatus("loading");
+    setReload((previous) => previous + 1);
+    setReviewReload((previous) => previous + 1);
+    onRefresh();
+  };
 
   const saveDraft = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    if (
+      !canEdit ||
+      draftSaving ||
+      draftLoading ||
+      draftLoadFailed ||
+      working?.status === "IN_REVIEW" ||
+      working?.status === "REJECTED"
+    )
+      return;
     setDraftSaving(true);
     setDraftNotice("");
     setDraftNoticeTone("");
@@ -8228,7 +8682,10 @@ function MessageHouse({
       const response = await fetch("/api/pr-center/message-house/draft", {
         method: "POST",
         credentials: "same-origin",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...(draft.id && working ? { "If-Match": String(working.rowVersion) } : {}),
+        },
         body: JSON.stringify({
           id: draft.id || undefined,
           vision: draft.vision,
@@ -8244,14 +8701,96 @@ function MessageHouse({
       const value = await response.json().catch(() => null);
       if (!response.ok)
         throw new Error(value?.message || "Message House draft could not be saved");
+      setWorking(value as MessageHouseWorkingVersion);
+      setSavedContent(draftContent);
       setDraft((previous) => ({ ...previous, id: value.id }));
       setDraftNotice(thai ? "บันทึกฉบับร่างแล้ว" : "Draft saved.");
       setDraftNoticeTone("success");
+      onRefresh();
     } catch (error) {
       setDraftNotice(error instanceof Error ? error.message : "Save failed");
       setDraftNoticeTone("error");
     } finally {
       setDraftSaving(false);
+    }
+  };
+
+  const transition = async (
+    version: MessageHouseWorkingVersion,
+    to: "IN_REVIEW" | "APPROVED" | "REJECTED",
+  ) => {
+    if (draftSaving || reviewBusyId) return;
+    if (
+      to === "IN_REVIEW" &&
+      (!canEdit || version.status !== "DRAFT" || draftContent !== savedContent)
+    )
+      return;
+    if (to !== "IN_REVIEW" && (!canReview || version.status !== "IN_REVIEW")) return;
+    const reason = reviewReason[version.id]?.trim();
+    const effectiveAt =
+      to === "APPROVED"
+        ? bangkokLocalDateTimeToISOString(reviewEffectiveAt[version.id] ?? "")
+        : null;
+    if (to !== "IN_REVIEW" && (!reason || reason.length > 2000)) {
+      setReviewNotice(
+        thai
+          ? "ระบุเหตุผลการตัดสินใจ (ไม่เกิน 2000 ตัวอักษร)"
+          : "Enter a decision reason (up to 2000 characters).",
+      );
+      return;
+    }
+    if (
+      to === "APPROVED" &&
+      (!effectiveAt || new Date(effectiveAt).getTime() < Date.now())
+    ) {
+      setReviewNotice(
+        thai
+          ? "ระบุวันเวลาที่มีผลในอนาคต (เวลาไทย)"
+          : "Choose a future effective date and time (Bangkok time).",
+      );
+      return;
+    }
+    setReviewBusyId(version.id);
+    setReviewNotice("");
+    setDraftNotice("");
+    try {
+      const response = await fetch(
+        `/api/pr-center/message-house/${encodeURIComponent(version.id)}/transitions`,
+        {
+          method: "POST",
+          credentials: "same-origin",
+          headers: {
+            "Content-Type": "application/json",
+            "If-Match": String(version.rowVersion),
+          },
+          body: JSON.stringify({
+            to,
+            ...(reason && to !== "IN_REVIEW" ? { reason } : {}),
+            ...(effectiveAt && to === "APPROVED" ? { effectiveAt } : {}),
+          }),
+        },
+      );
+      const result = await response.json().catch(() => null);
+      if (!response.ok)
+        throw new Error(result?.message || "Message House transition failed");
+      if (to === "IN_REVIEW") {
+        setWorking(result as MessageHouseWorkingVersion);
+        setDraftNotice(thai ? "ส่งให้พิจารณาแล้ว" : "Submitted for review.");
+        setDraftNoticeTone("success");
+      } else {
+        setReviews((previous) => previous.filter((item) => item.id !== version.id));
+        setReviewNotice(thai ? "บันทึกผลการพิจารณาแล้ว" : "Decision recorded.");
+        setReviewReload((previous) => previous + 1);
+      }
+      onRefresh();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Transition failed";
+      if (to === "IN_REVIEW") {
+        setDraftNotice(message);
+        setDraftNoticeTone("error");
+      } else setReviewNotice(message);
+    } finally {
+      setReviewBusyId(null);
     }
   };
   return (
@@ -8264,271 +8803,463 @@ function MessageHouse({
             <span>
               {canEdit
                 ? thai
-                  ? "แก้ไขฉบับร่างได้"
-                  : "Draft editing enabled"
-                : thai
-                  ? "อ่านอย่างเดียว"
-                  : "Read only"}
+                  ? "ผู้เขียนฉบับร่าง"
+                  : "PR author"
+                : canReview
+                  ? thai
+                    ? "ผู้พิจารณา"
+                    : "BORD reviewer"
+                  : thai
+                    ? "อ่านอย่างเดียว"
+                    : "Read only"}
             </span>
             <button
               type="button"
-              onClick={onRefresh}
-              disabled={status === "loading" || historyStatus === "loading"}
+              onClick={refreshWorking}
+              disabled={
+                status === "loading" ||
+                historyStatus === "loading" ||
+                draftSaving ||
+                !!reviewBusyId
+              }
             >
               {thai ? "รีเฟรช" : "Refresh"}
             </button>
           </div>
         }
       />
-      {canEdit && (
-        <form
-          className={`${styles.card} ${styles.messageHouseForm}`}
-          onSubmit={saveDraft}
-        >
-          <header className={styles.messageHouseFormHeader}>
-            <div>
-              <span className={styles.messageHouseDraftBadge}>
-                {thai ? "ฉบับร่าง" : "WORKING DRAFT"}
+      {canEdit && !draftLoading && working?.status === "IN_REVIEW" && (
+        <section className={styles.card} role="status">
+          <h2>{thai ? "กำลังรอพิจารณา" : "Awaiting review"}</h2>
+          <p>
+            {thai
+              ? "ส่งฉบับนี้ให้ BORD แล้ว ไม่สามารถแก้ไขระหว่างพิจารณา"
+              : "This version has been submitted to BORD and cannot be edited during review."}
+          </p>
+        </section>
+      )}
+      {canEdit && !draftLoading && working?.status === "REJECTED" && (
+        <section className={styles.card}>
+          <h2>{thai ? "ฉบับนี้ถูกส่งกลับ" : "Version rejected"}</h2>
+          <p>
+            {working.decisionReason ||
+              (thai ? "เริ่มฉบับร่างใหม่เพื่อแก้ไข" : "Start a new draft to revise it.")}
+          </p>
+          <button
+            type="button"
+            className={styles.primary}
+            onClick={() => {
+              setDraft((previous) => ({ ...previous, id: "" }));
+              setWorking(null);
+              setSavedContent(null);
+              setDraftNotice("");
+            }}
+          >
+            {thai ? "เริ่มร่างใหม่จากเนื้อหานี้" : "Start new draft from this content"}
+          </button>
+        </section>
+      )}
+      {canEdit &&
+        (draftLoading ||
+          (!draftLoadFailed && (!working || working.status === "DRAFT"))) && (
+          <form
+            className={`${styles.card} ${styles.messageHouseForm}`}
+            onSubmit={saveDraft}
+          >
+            <header className={styles.messageHouseFormHeader}>
+              <div>
+                <span className={styles.messageHouseDraftBadge}>
+                  {thai ? "ฉบับร่าง" : "WORKING DRAFT"}
+                </span>
+                <h2>{thai ? "แก้ไขกรอบสารหลัก" : "Edit Message House"}</h2>
+                <p>
+                  {thai
+                    ? "กรอกข้อมูลจากภาพรวมไปสู่รายละเอียด ระบบจะบันทึกเป็นฉบับร่างเท่านั้น"
+                    : "Work from the core message to supporting detail. Changes are saved as a draft only."}
+                </p>
+              </div>
+              <span className={styles.messageHouseFieldCount}>
+                {thai ? "5 ช่องกรอก" : "5 fields"}
               </span>
-              <h2>{thai ? "แก้ไขกรอบสารหลัก" : "Edit Message House"}</h2>
-              <p>
-                {thai
-                  ? "กรอกข้อมูลจากภาพรวมไปสู่รายละเอียด ระบบจะบันทึกเป็นฉบับร่างเท่านั้น"
-                  : "Work from the core message to supporting detail. Changes are saved as a draft only."}
+            </header>
+            {draftLoading && (
+              <p className={styles.messageHouseLoading} role="status" aria-live="polite">
+                {thai ? "กำลังโหลดฉบับร่าง…" : "Loading draft…"}
               </p>
-            </div>
-            <span className={styles.messageHouseFieldCount}>
-              {thai ? "5 ช่องกรอก" : "5 fields"}
-            </span>
-          </header>
-          {draftLoading && (
-            <p className={styles.messageHouseLoading} role="status" aria-live="polite">
-              {thai ? "กำลังโหลดฉบับร่าง…" : "Loading draft…"}
+            )}
+            <fieldset
+              className={styles.messageHouseFieldset}
+              disabled={draftLoading || draftSaving}
+              aria-busy={draftLoading || draftSaving}
+            >
+              <section className={styles.messageHouseSection}>
+                <div className={styles.messageHouseSectionHeader}>
+                  <span className={styles.messageHouseStep}>01</span>
+                  <div>
+                    <h3>{thai ? "แกนหลักขององค์กร" : "Core identity"}</h3>
+                    <p>
+                      {thai
+                        ? "กำหนดภาพที่องค์กรต้องการสื่อและจุดยืนที่ต้องการให้คนจดจำ"
+                        : "Set the organization’s purpose and the position it wants people to remember."}
+                    </p>
+                  </div>
+                </div>
+                <div className={styles.messageHouseGrid}>
+                  <label className={styles.messageHouseField} htmlFor="mh-vision">
+                    <span className={styles.messageHouseLabelRow}>
+                      <span>{thai ? "วิสัยทัศน์ / พันธกิจ" : "Vision / Mission"}</span>
+                      <span className={styles.messageHouseRequired}>
+                        {thai ? "จำเป็น" : "Required"}
+                      </span>
+                    </span>
+                    <span className={styles.messageHouseHelp} id="mh-vision-help">
+                      {thai
+                        ? "องค์กรต้องการมุ่งไปทางใด และมีหน้าที่สำคัญอะไร"
+                        : "Where is the organization headed, and what is its core purpose?"}
+                    </span>
+                    <textarea
+                      id="mh-vision"
+                      aria-describedby="mh-vision-help mh-vision-count"
+                      required
+                      maxLength={5000}
+                      rows={5}
+                      value={draft.vision}
+                      onChange={(event) =>
+                        setDraft({ ...draft, vision: event.target.value })
+                      }
+                    />
+                    <span className={styles.messageHouseCounter} id="mh-vision-count">
+                      {draft.vision.length}/5000
+                    </span>
+                  </label>
+                  <label className={styles.messageHouseField} htmlFor="mh-positioning">
+                    <span className={styles.messageHouseLabelRow}>
+                      <span>{thai ? "จุดยืนขององค์กร" : "Brand positioning"}</span>
+                      <span className={styles.messageHouseRequired}>
+                        {thai ? "จำเป็น" : "Required"}
+                      </span>
+                    </span>
+                    <span className={styles.messageHouseHelp} id="mh-positioning-help">
+                      {thai
+                        ? "อยากให้ประชาชนเข้าใจหรือจดจำองค์กรในฐานะใด"
+                        : "How should people understand and remember the organization?"}
+                    </span>
+                    <textarea
+                      id="mh-positioning"
+                      aria-describedby="mh-positioning-help mh-positioning-count"
+                      required
+                      maxLength={5000}
+                      rows={5}
+                      value={draft.positioning}
+                      onChange={(event) =>
+                        setDraft({ ...draft, positioning: event.target.value })
+                      }
+                    />
+                    <span
+                      className={styles.messageHouseCounter}
+                      id="mh-positioning-count"
+                    >
+                      {draft.positioning.length}/5000
+                    </span>
+                  </label>
+                </div>
+              </section>
+
+              <section className={styles.messageHouseSection}>
+                <div className={styles.messageHouseSectionHeader}>
+                  <span className={styles.messageHouseStep}>02</span>
+                  <div>
+                    <h3>{thai ? "เสาหลักการสื่อสาร" : "Communication pillars"}</h3>
+                    <p>
+                      {thai
+                        ? "แยกประเด็นสำคัญเป็นข้อ ๆ เพื่อให้ทีมสื่อสารนำไปใช้ได้ชัดเจน"
+                        : "List the key themes separately so the communications team can use them consistently."}
+                    </p>
+                  </div>
+                </div>
+                <label
+                  className={`${styles.messageHouseField} ${styles.messageHouseFieldWide}`}
+                  htmlFor="mh-pillars"
+                >
+                  <span className={styles.messageHouseLabelRow}>
+                    <span>{thai ? "รายการเสาหลัก" : "Pillar list"}</span>
+                    <span className={styles.messageHouseRequired}>
+                      {thai ? "จำเป็น" : "Required"}
+                    </span>
+                  </span>
+                  <span className={styles.messageHouseHelp} id="mh-pillars-help">
+                    {thai
+                      ? "ใส่หนึ่งเสาหลักต่อหนึ่งบรรทัด ระบบจะแยกแต่ละบรรทัดเป็นรายการ"
+                      : "Enter one pillar per line. Each line is saved as a separate item."}
+                  </span>
+                  <textarea
+                    id="mh-pillars"
+                    aria-describedby="mh-pillars-help mh-pillars-count"
+                    required
+                    maxLength={5000}
+                    rows={5}
+                    value={draft.pillars}
+                    onChange={(event) =>
+                      setDraft({ ...draft, pillars: event.target.value })
+                    }
+                  />
+                  <span className={styles.messageHouseCounter} id="mh-pillars-count">
+                    {draft.pillars.length}/5000
+                  </span>
+                </label>
+              </section>
+
+              <section className={styles.messageHouseSection}>
+                <div className={styles.messageHouseSectionHeader}>
+                  <span className={styles.messageHouseStep}>03</span>
+                  <div>
+                    <h3>{thai ? "หลักการและที่มา" : "Supporting rationale"}</h3>
+                    <p>
+                      {thai
+                        ? "ระบุหลักที่รองรับกรอบสาร และเพิ่มที่มาเพื่อให้ตรวจสอบย้อนหลังได้"
+                        : "Ground the message in clear principles and provide a source when available."}
+                    </p>
+                  </div>
+                </div>
+                <div className={styles.messageHouseGrid}>
+                  <label className={styles.messageHouseField} htmlFor="mh-foundation">
+                    <span className={styles.messageHouseLabelRow}>
+                      <span>{thai ? "หลักการสนับสนุน" : "Foundation"}</span>
+                      <span className={styles.messageHouseRequired}>
+                        {thai ? "จำเป็น" : "Required"}
+                      </span>
+                    </span>
+                    <span className={styles.messageHouseHelp} id="mh-foundation-help">
+                      {thai
+                        ? "หลักฐาน ค่านิยม หรือนโยบายที่เป็นฐานของข้อความ"
+                        : "Evidence, values, or policy that supports the message."}
+                    </span>
+                    <textarea
+                      id="mh-foundation"
+                      aria-describedby="mh-foundation-help mh-foundation-count"
+                      required
+                      maxLength={5000}
+                      rows={4}
+                      value={draft.foundation}
+                      onChange={(event) =>
+                        setDraft({ ...draft, foundation: event.target.value })
+                      }
+                    />
+                    <span className={styles.messageHouseCounter} id="mh-foundation-count">
+                      {draft.foundation.length}/5000
+                    </span>
+                  </label>
+                  <label className={styles.messageHouseField} htmlFor="mh-source">
+                    <span className={styles.messageHouseLabelRow}>
+                      <span>{thai ? "ที่มา / เหตุผลประกอบ" : "Source rationale"}</span>
+                      <span className={styles.messageHouseOptional}>
+                        {thai ? "ไม่บังคับ" : "Optional"}
+                      </span>
+                    </span>
+                    <span className={styles.messageHouseHelp} id="mh-source-help">
+                      {thai
+                        ? "อ้างอิงเอกสาร แหล่งข้อมูล หรือเหตุผลที่ใช้ประกอบการกำหนดกรอบสาร"
+                        : "Reference the document, source, or reasoning behind this framework."}
+                    </span>
+                    <textarea
+                      id="mh-source"
+                      aria-describedby="mh-source-help mh-source-count"
+                      maxLength={5000}
+                      rows={4}
+                      value={draft.sourceRationale}
+                      onChange={(event) =>
+                        setDraft({ ...draft, sourceRationale: event.target.value })
+                      }
+                    />
+                    <span className={styles.messageHouseCounter} id="mh-source-count">
+                      {draft.sourceRationale.length}/5000
+                    </span>
+                  </label>
+                </div>
+              </section>
+            </fieldset>
+            <footer className={styles.messageHouseFormFooter}>
+              <div>
+                <strong>{thai ? "บันทึกเป็นฉบับร่าง" : "Draft only"}</strong>
+                <p>
+                  {thai
+                    ? "การบันทึกที่นี่จะยังไม่เผยแพร่หรือเปลี่ยนเวอร์ชันที่มีผลใช้งาน"
+                    : "Saving here will not publish changes or replace the effective version."}
+                </p>
+                {draftNotice && (
+                  <p
+                    className={`${styles.messageHouseNotice} ${
+                      draftNoticeTone === "error" ? styles.messageHouseNoticeError : ""
+                    }`}
+                    role={draftNoticeTone === "error" ? "alert" : "status"}
+                    aria-live={draftNoticeTone === "error" ? "assertive" : "polite"}
+                  >
+                    {draftNotice}
+                  </p>
+                )}
+              </div>
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                <button
+                  className={styles.primary}
+                  type="submit"
+                  disabled={
+                    draftSaving || draftLoading || draftLoadFailed || !!reviewBusyId
+                  }
+                >
+                  {draftSaving
+                    ? thai
+                      ? "กำลังบันทึก…"
+                      : "Saving…"
+                    : thai
+                      ? "บันทึกฉบับร่าง"
+                      : "Save draft"}
+                </button>
+                {working?.status === "DRAFT" && (
+                  <button
+                    type="button"
+                    disabled={
+                      draftSaving ||
+                      draftLoading ||
+                      !!reviewBusyId ||
+                      draftContent !== savedContent
+                    }
+                    onClick={() => void transition(working, "IN_REVIEW")}
+                  >
+                    {thai ? "ส่งให้ BORD พิจารณา" : "Submit to BORD"}
+                  </button>
+                )}
+                {working?.status === "DRAFT" && draftContent !== savedContent && (
+                  <span role="status">
+                    {thai
+                      ? "บันทึกการเปลี่ยนแปลงก่อนส่ง"
+                      : "Save changes before submitting."}
+                  </span>
+                )}
+              </div>
+            </footer>
+          </form>
+        )}
+      {canEdit && draftNotice && (draftLoadFailed || working?.status === "IN_REVIEW") && (
+        <p
+          className={styles.card}
+          role={draftNoticeTone === "error" ? "alert" : "status"}
+        >
+          {draftNotice}
+        </p>
+      )}
+      {canReview && (
+        <section
+          className={styles.card}
+          aria-label={thai ? "คิวพิจารณา Message House" : "Message House review queue"}
+        >
+          <h2>{thai ? "คิวพิจารณา Message House" : "Message House review queue"}</h2>
+          {reviewStatus === "loading" && (
+            <p role="status">{thai ? "กำลังโหลดคิว…" : "Loading review queue…"}</p>
+          )}
+          {reviewStatus === "error" && (
+            <p role="alert">
+              {thai
+                ? "โหลดคิวไม่สำเร็จ โปรดรีเฟรช"
+                : "Review queue unavailable. Refresh to retry."}
             </p>
           )}
-          <fieldset
-            className={styles.messageHouseFieldset}
-            disabled={draftLoading || draftSaving}
-            aria-busy={draftLoading || draftSaving}
-          >
-            <section className={styles.messageHouseSection}>
-              <div className={styles.messageHouseSectionHeader}>
-                <span className={styles.messageHouseStep}>01</span>
-                <div>
-                  <h3>{thai ? "แกนหลักขององค์กร" : "Core identity"}</h3>
-                  <p>
-                    {thai
-                      ? "กำหนดภาพที่องค์กรต้องการสื่อและจุดยืนที่ต้องการให้คนจดจำ"
-                      : "Set the organization’s purpose and the position it wants people to remember."}
-                  </p>
-                </div>
-              </div>
-              <div className={styles.messageHouseGrid}>
-                <label className={styles.messageHouseField} htmlFor="mh-vision">
-                  <span className={styles.messageHouseLabelRow}>
-                    <span>{thai ? "วิสัยทัศน์ / พันธกิจ" : "Vision / Mission"}</span>
-                    <span className={styles.messageHouseRequired}>
-                      {thai ? "จำเป็น" : "Required"}
-                    </span>
-                  </span>
-                  <span className={styles.messageHouseHelp} id="mh-vision-help">
-                    {thai
-                      ? "องค์กรต้องการมุ่งไปทางใด และมีหน้าที่สำคัญอะไร"
-                      : "Where is the organization headed, and what is its core purpose?"}
-                  </span>
-                  <textarea
-                    id="mh-vision"
-                    aria-describedby="mh-vision-help mh-vision-count"
-                    required
-                    maxLength={5000}
-                    rows={5}
-                    value={draft.vision}
-                    onChange={(event) =>
-                      setDraft({ ...draft, vision: event.target.value })
-                    }
-                  />
-                  <span className={styles.messageHouseCounter} id="mh-vision-count">
-                    {draft.vision.length}/5000
-                  </span>
-                </label>
-                <label className={styles.messageHouseField} htmlFor="mh-positioning">
-                  <span className={styles.messageHouseLabelRow}>
-                    <span>{thai ? "จุดยืนขององค์กร" : "Brand positioning"}</span>
-                    <span className={styles.messageHouseRequired}>
-                      {thai ? "จำเป็น" : "Required"}
-                    </span>
-                  </span>
-                  <span className={styles.messageHouseHelp} id="mh-positioning-help">
-                    {thai
-                      ? "อยากให้ประชาชนเข้าใจหรือจดจำองค์กรในฐานะใด"
-                      : "How should people understand and remember the organization?"}
-                  </span>
-                  <textarea
-                    id="mh-positioning"
-                    aria-describedby="mh-positioning-help mh-positioning-count"
-                    required
-                    maxLength={5000}
-                    rows={5}
-                    value={draft.positioning}
-                    onChange={(event) =>
-                      setDraft({ ...draft, positioning: event.target.value })
-                    }
-                  />
-                  <span className={styles.messageHouseCounter} id="mh-positioning-count">
-                    {draft.positioning.length}/5000
-                  </span>
-                </label>
-              </div>
-            </section>
-
-            <section className={styles.messageHouseSection}>
-              <div className={styles.messageHouseSectionHeader}>
-                <span className={styles.messageHouseStep}>02</span>
-                <div>
-                  <h3>{thai ? "เสาหลักการสื่อสาร" : "Communication pillars"}</h3>
-                  <p>
-                    {thai
-                      ? "แยกประเด็นสำคัญเป็นข้อ ๆ เพื่อให้ทีมสื่อสารนำไปใช้ได้ชัดเจน"
-                      : "List the key themes separately so the communications team can use them consistently."}
-                  </p>
-                </div>
-              </div>
-              <label
-                className={`${styles.messageHouseField} ${styles.messageHouseFieldWide}`}
-                htmlFor="mh-pillars"
-              >
-                <span className={styles.messageHouseLabelRow}>
-                  <span>{thai ? "รายการเสาหลัก" : "Pillar list"}</span>
-                  <span className={styles.messageHouseRequired}>
-                    {thai ? "จำเป็น" : "Required"}
-                  </span>
-                </span>
-                <span className={styles.messageHouseHelp} id="mh-pillars-help">
-                  {thai
-                    ? "ใส่หนึ่งเสาหลักต่อหนึ่งบรรทัด ระบบจะแยกแต่ละบรรทัดเป็นรายการ"
-                    : "Enter one pillar per line. Each line is saved as a separate item."}
-                </span>
-                <textarea
-                  id="mh-pillars"
-                  aria-describedby="mh-pillars-help mh-pillars-count"
-                  required
-                  maxLength={5000}
-                  rows={5}
-                  value={draft.pillars}
-                  onChange={(event) =>
-                    setDraft({ ...draft, pillars: event.target.value })
-                  }
-                />
-                <span className={styles.messageHouseCounter} id="mh-pillars-count">
-                  {draft.pillars.length}/5000
-                </span>
-              </label>
-            </section>
-
-            <section className={styles.messageHouseSection}>
-              <div className={styles.messageHouseSectionHeader}>
-                <span className={styles.messageHouseStep}>03</span>
-                <div>
-                  <h3>{thai ? "หลักการและที่มา" : "Supporting rationale"}</h3>
-                  <p>
-                    {thai
-                      ? "ระบุหลักที่รองรับกรอบสาร และเพิ่มที่มาเพื่อให้ตรวจสอบย้อนหลังได้"
-                      : "Ground the message in clear principles and provide a source when available."}
-                  </p>
-                </div>
-              </div>
-              <div className={styles.messageHouseGrid}>
-                <label className={styles.messageHouseField} htmlFor="mh-foundation">
-                  <span className={styles.messageHouseLabelRow}>
-                    <span>{thai ? "หลักการสนับสนุน" : "Foundation"}</span>
-                    <span className={styles.messageHouseRequired}>
-                      {thai ? "จำเป็น" : "Required"}
-                    </span>
-                  </span>
-                  <span className={styles.messageHouseHelp} id="mh-foundation-help">
-                    {thai
-                      ? "หลักฐาน ค่านิยม หรือนโยบายที่เป็นฐานของข้อความ"
-                      : "Evidence, values, or policy that supports the message."}
-                  </span>
-                  <textarea
-                    id="mh-foundation"
-                    aria-describedby="mh-foundation-help mh-foundation-count"
-                    required
-                    maxLength={5000}
-                    rows={4}
-                    value={draft.foundation}
-                    onChange={(event) =>
-                      setDraft({ ...draft, foundation: event.target.value })
-                    }
-                  />
-                  <span className={styles.messageHouseCounter} id="mh-foundation-count">
-                    {draft.foundation.length}/5000
-                  </span>
-                </label>
-                <label className={styles.messageHouseField} htmlFor="mh-source">
-                  <span className={styles.messageHouseLabelRow}>
-                    <span>{thai ? "ที่มา / เหตุผลประกอบ" : "Source rationale"}</span>
-                    <span className={styles.messageHouseOptional}>
-                      {thai ? "ไม่บังคับ" : "Optional"}
-                    </span>
-                  </span>
-                  <span className={styles.messageHouseHelp} id="mh-source-help">
-                    {thai
-                      ? "อ้างอิงเอกสาร แหล่งข้อมูล หรือเหตุผลที่ใช้ประกอบการกำหนดกรอบสาร"
-                      : "Reference the document, source, or reasoning behind this framework."}
-                  </span>
-                  <textarea
-                    id="mh-source"
-                    aria-describedby="mh-source-help mh-source-count"
-                    maxLength={5000}
-                    rows={4}
-                    value={draft.sourceRationale}
-                    onChange={(event) =>
-                      setDraft({ ...draft, sourceRationale: event.target.value })
-                    }
-                  />
-                  <span className={styles.messageHouseCounter} id="mh-source-count">
-                    {draft.sourceRationale.length}/5000
-                  </span>
-                </label>
-              </div>
-            </section>
-          </fieldset>
-          <footer className={styles.messageHouseFormFooter}>
-            <div>
-              <strong>{thai ? "บันทึกเป็นฉบับร่าง" : "Draft only"}</strong>
-              <p>
-                {thai
-                  ? "การบันทึกที่นี่จะยังไม่เผยแพร่หรือเปลี่ยนเวอร์ชันที่มีผลใช้งาน"
-                  : "Saving here will not publish changes or replace the effective version."}
-              </p>
-              {draftNotice && (
-                <p
-                  className={`${styles.messageHouseNotice} ${
-                    draftNoticeTone === "error" ? styles.messageHouseNoticeError : ""
-                  }`}
-                  role={draftNoticeTone === "error" ? "alert" : "status"}
-                  aria-live={draftNoticeTone === "error" ? "assertive" : "polite"}
-                >
-                  {draftNotice}
-                </p>
-              )}
-            </div>
-            <button
-              className={styles.primary}
-              type="submit"
-              disabled={draftSaving || draftLoading}
+          {reviewNotice && (
+            <p
+              role={
+                reviewNotice.includes("recorded") || reviewNotice.includes("บันทึกผล")
+                  ? "status"
+                  : "alert"
+              }
             >
-              {draftSaving
-                ? thai
-                  ? "กำลังบันทึก…"
-                  : "Saving…"
-                : thai
-                  ? "บันทึกฉบับร่าง"
-                  : "Save draft"}
-            </button>
-          </footer>
-        </form>
+              {reviewNotice}
+            </p>
+          )}
+          {reviewStatus === "loaded" && reviews.length === 0 && (
+            <p>{thai ? "ไม่มีรายการรอพิจารณา" : "No versions awaiting review."}</p>
+          )}
+          {reviewStatus === "loaded" &&
+            reviews.map((version) => (
+              <article key={version.id} className={styles.messageHouse}>
+                <h3>
+                  {thai ? "เวอร์ชัน" : "Version"} {version.versionNumber}
+                </h3>
+                <h4>{thai ? "วิสัยทัศน์ / พันธกิจ" : "Vision / Mission"}</h4>
+                <p>{version.vision}</p>
+                <h4>{thai ? "จุดยืนขององค์กร" : "Brand positioning"}</h4>
+                <p>{version.positioning}</p>
+                <h4>{thai ? "เสาหลักการสื่อสาร" : "Communication pillars"}</h4>
+                <ul>
+                  {version.pillars.map((pillar, index) => (
+                    <li key={`${version.id}-${index}`}>{pillar}</li>
+                  ))}
+                </ul>
+                <h4>{thai ? "หลักการสนับสนุน" : "Foundation"}</h4>
+                <p>{version.foundation}</p>
+                <h4>{thai ? "ที่มา / เหตุผลประกอบ" : "Source rationale"}</h4>
+                <p>{version.sourceRationale || "—"}</p>
+                <label htmlFor={`mh-reason-${version.id}`}>
+                  {thai ? "เหตุผลการตัดสินใจ (จำเป็น)" : "Decision reason (required)"}
+                </label>
+                <textarea
+                  id={`mh-reason-${version.id}`}
+                  maxLength={2000}
+                  rows={3}
+                  value={reviewReason[version.id] ?? ""}
+                  onChange={(event) =>
+                    setReviewReason((previous) => ({
+                      ...previous,
+                      [version.id]: event.target.value,
+                    }))
+                  }
+                  disabled={!!reviewBusyId}
+                />
+                <label htmlFor={`mh-effective-${version.id}`}>
+                  {thai
+                    ? "วันเวลาที่มีผล (เวลาไทย; จำเป็นเมื่ออนุมัติ)"
+                    : "Effective date and time (Bangkok; required to approve)"}
+                </label>
+                <input
+                  id={`mh-effective-${version.id}`}
+                  type="datetime-local"
+                  value={reviewEffectiveAt[version.id] ?? ""}
+                  onChange={(event) =>
+                    setReviewEffectiveAt((previous) => ({
+                      ...previous,
+                      [version.id]: event.target.value,
+                    }))
+                  }
+                  disabled={!!reviewBusyId}
+                />
+                <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
+                  <button
+                    type="button"
+                    className={styles.primary}
+                    disabled={
+                      !!reviewBusyId ||
+                      !reviewReason[version.id]?.trim() ||
+                      !reviewEffectiveAt[version.id]
+                    }
+                    onClick={() => void transition(version, "APPROVED")}
+                  >
+                    {reviewBusyId === version.id
+                      ? thai
+                        ? "กำลังบันทึก…"
+                        : "Saving…"
+                      : thai
+                        ? "อนุมัติ"
+                        : "Approve"}
+                  </button>
+                  <button
+                    type="button"
+                    disabled={!!reviewBusyId || !reviewReason[version.id]?.trim()}
+                    onClick={() => void transition(version, "REJECTED")}
+                  >
+                    {thai ? "ส่งกลับ" : "Reject"}
+                  </button>
+                </div>
+              </article>
+            ))}
+        </section>
       )}
       {status === "loading" && (
         <section className={styles.card} role="status" aria-live="polite">
@@ -8716,28 +9447,77 @@ function Notifications({
     </>
   );
 }
-function History({ audit, language }: { audit: AuditEntry[]; language: Language }) {
+function History({
+  audit,
+  language,
+  loading,
+  loadingMore,
+  hasMore,
+  error,
+  onRefresh,
+  onLoadMore,
+}: {
+  audit: AuditEntry[];
+  language: Language;
+  loading: boolean;
+  loadingMore: boolean;
+  hasMore: boolean;
+  error: boolean;
+  onRefresh: () => void;
+  onLoadMore: () => void;
+}) {
   return (
     <>
       <SectionHeading
         eyebrow="AUDIT"
         title={language === "th" ? "ประวัติกิจกรรม" : "Activity History"}
+        action={
+          <button type="button" onClick={onRefresh} disabled={loading}>
+            {language === "th" ? "รีเฟรช" : "Refresh"}
+          </button>
+        }
       />
       <article className={styles.card}>
+        <p role="note">
+          {language === "th"
+            ? "แสดงกิจกรรมในขอบเขตสิทธิ์ของคุณ เรียงจากใหม่ไปเก่า"
+            : "Activity in your authorized scope, newest first."}
+        </p>
+        {loading && (
+          <p role="status">
+            {language === "th" ? "กำลังโหลดประวัติ…" : "Loading history…"}
+          </p>
+        )}
+        {error && (
+          <p role="alert">
+            {language === "th"
+              ? "โหลดประวัติไม่สำเร็จ ลองอีกครั้ง"
+              : "Unable to load history. Retry or refresh."}
+          </p>
+        )}
         <Table
           headers={["Time", "Actor", "Action", "Entity"]}
-          rows={audit
-            .slice()
-            .reverse()
-            .map((entry) => [
-              new Date(entry.createdAt).toLocaleString(
-                language === "th" ? "th-TH-u-ca-buddhist" : "en-GB",
-              ),
-              getUser(entry.actorId)?.name ?? entry.actorId,
-              entry.action,
-              entry.entityId,
-            ])}
+          rows={audit.map((entry) => [
+            new Date(entry.createdAt).toLocaleString(
+              language === "th" ? "th-TH-u-ca-buddhist" : "en-GB",
+              { timeZone: "Asia/Bangkok" },
+            ),
+            getUser(entry.actorId)?.name ?? entry.actorId,
+            entry.action,
+            entry.entityId,
+          ])}
         />
+        {hasMore && (
+          <button type="button" onClick={onLoadMore} disabled={loading || loadingMore}>
+            {loadingMore
+              ? language === "th"
+                ? "กำลังโหลด…"
+                : "Loading…"
+              : language === "th"
+                ? "โหลดประวัติเพิ่ม"
+                : "Load more history"}
+          </button>
+        )}
       </article>
     </>
   );
@@ -9705,6 +10485,7 @@ function RequestModal({
   contentTypes,
   draftLoading,
   draftSaving,
+  submitting,
   isEditing,
   draft,
   onChange,
@@ -9716,6 +10497,7 @@ function RequestModal({
   contentTypes: string[];
   draftLoading: boolean;
   draftSaving: boolean;
+  submitting: boolean;
   isEditing: boolean;
   draft: RequestDraft;
   onChange: (draft: RequestDraft) => void;
@@ -10071,17 +10853,29 @@ function RequestModal({
           </div>
         </div>
         <footer className={styles.requestModalFooter}>
-          <button type="button" onClick={onClose}>
+          <button type="button" onClick={onClose} disabled={submitting}>
             {thai ? "ยกเลิก" : "Cancel"}
           </button>
-          <button className={styles.primary} type="submit" disabled={draftLoading}>
-            {isEditing
+          <button type="submit" value="draft" disabled={draftLoading || submitting}>
+            {thai ? "บันทึกฉบับร่าง" : "Save draft"}
+          </button>
+          <button
+            className={styles.primary}
+            type="submit"
+            value="submit"
+            disabled={draftLoading || submitting}
+          >
+            {submitting
               ? thai
-                ? "บันทึกการแก้ไข"
-                : "Save changes"
-              : thai
-                ? "ส่งคำขอ"
-                : "Submit request"}
+                ? "กำลังบันทึก…"
+                : "Saving…"
+              : isEditing
+                ? thai
+                  ? "บันทึกและส่งคำขอ"
+                  : "Save and submit request"
+                : thai
+                  ? "ส่งคำขอ"
+                  : "Submit request"}
           </button>
         </footer>
       </form>

@@ -126,7 +126,10 @@ describe("currentMessageHouse", () => {
   it("returns every approved effective version with its original content and date", async () => {
     mocks.findMany.mockResolvedValue(messageHouseVersions);
 
-    await expect(messageHouseHistory(actor)).resolves.toEqual(messageHouseVersions);
+    await expect(messageHouseHistory(actor)).resolves.toEqual([
+      { ...messageHouseVersions[0], status: "APPROVED" },
+      { ...messageHouseVersions[1], status: "SUPERSEDED" },
+    ]);
   });
 
   it("allows RTRDA_ALL_USER read-only access to Message House history", async () => {
