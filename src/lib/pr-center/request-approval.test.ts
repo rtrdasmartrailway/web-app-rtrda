@@ -12,6 +12,7 @@ const { mockPrisma } = vi.hoisted(() => {
     prRequestSource: { deleteMany: vi.fn(), createMany: vi.fn() },
     prUserRole: { findMany: vi.fn() },
     prTask: {
+      create: vi.fn(),
       findFirst: vi.fn(),
       findMany: vi.fn(),
       updateMany: vi.fn(),
@@ -587,6 +588,47 @@ describe("request intake approval", () => {
         }),
       ]),
     });
+  });
+
+  it("creates one unassigned draft task per selected content type when the request is submitted", async () => {
+    mockPrisma.prRequest.findFirst.mockResolvedValue({
+      ...requestRecord,
+      type: "PR",
+      title: "Rail research update",
+      requestedFor: null,
+      status: "DRAFT",
+      version: 1,
+      revisions: [
+        { offsiteDetails: { contentTypes: ["Website News", "Facebook Post"] } },
+      ],
+      tasks: [],
+    });
+    mockPrisma.prRequest.updateMany.mockResolvedValue({ count: 1 });
+    mockPrisma.prTask.create.mockResolvedValue({ id: "task-new" });
+    mockPrisma.prUserRole.findMany.mockResolvedValue([{ userId: "pr-recipient" }]);
+
+    await transitionRequest(requesterActor, requestRecord.id, 1, "SUBMITTED");
+
+    expect(mockPrisma.prTask.create).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({
+        data: expect.objectContaining({
+          requestId: requestRecord.id,
+          title: "Website News: Rail research update",
+          contentType: "Website News",
+        }),
+      }),
+    );
+    expect(mockPrisma.prTask.create).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({
+        data: expect.objectContaining({
+          requestId: requestRecord.id,
+          title: "Facebook Post: Rail research update",
+          contentType: "Facebook Post",
+        }),
+      }),
+    );
   });
 
   it("does not submit a request when no active scoped PR Operations reviewer can be notified", async () => {

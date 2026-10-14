@@ -97,7 +97,7 @@ describe("off-site request creation", () => {
 });
 
 describe("complete PR request details", () => {
-  it("stores request details and creates one content task per selected type", async () => {
+  it("stores selected content types for task creation after request submission", async () => {
     await createRequest(requester, {
       type: "PR",
       title: "Rail research update",
@@ -131,15 +131,11 @@ describe("complete PR request details", () => {
               }),
             }),
           },
-          tasks: {
-            create: [
-              expect.objectContaining({ contentType: "Website News" }),
-              expect.objectContaining({ contentType: "Facebook Post" }),
-            ],
-          },
         }),
       }),
     );
+    const createArgs = prisma.prRequest.create.mock.calls[0]?.[0];
+    expect(createArgs.data).not.toHaveProperty("tasks");
   });
 
   it("rejects PR details without source confirmation", async () => {

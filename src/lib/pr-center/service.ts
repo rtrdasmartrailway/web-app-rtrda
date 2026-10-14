@@ -842,11 +842,6 @@ export async function createRequest(
   const revisionDetails = requestDetails
     ? { ...requestDetails, ...(offsiteDetails || {}) }
     : offsiteDetails;
-  const contentTypes =
-    input.type === "PR" && requestDetails?.contentTypes.length
-      ? requestDetails.contentTypes
-      : [input.type === "PR" ? "PR Content" : "Off-site Support"];
-
   return prisma.$transaction(async (tx) => {
     const request = await tx.prRequest.create({
       data: {
@@ -869,14 +864,6 @@ export async function createRequest(
           },
         },
         sources: { create: sourceUrls.map((url) => ({ url })) },
-        tasks: {
-          create: contentTypes.map((contentType) => ({
-            title: `${contentType}: ${title}`,
-            contentType,
-            ownerId: actor.id,
-            dueAt: input.requestedFor,
-          })),
-        },
       },
       include: { revisions: true, sources: true, tasks: true },
     });
@@ -1301,6 +1288,32 @@ export async function transitionRequest(
         actorId: actor.id,
       },
     });
+    const tasksNeedCreation =
+      request.tasks.length === 0 ||
+      request.tasks.every((task) => task.status === "CANCELLED");
+    if (status === "SUBMITTED" && tasksNeedCreation) {
+      const details = request.revisions?.[0]?.offsiteDetails;
+      const rawContentTypes =
+        details && typeof details === "object" && !Array.isArray(details)
+          ? (details as Record<string, unknown>).contentTypes
+          : undefined;
+      const contentTypes =
+        Array.isArray(rawContentTypes) &&
+        rawContentTypes.length > 0 &&
+        rawContentTypes.every((item) => typeof item === "string" && item.trim())
+          ? [...new Set(rawContentTypes.map((item) => (item as string).trim()))]
+          : [request.type === "PR" ? "PR Content" : "Off-site Support"];
+      for (const contentType of contentTypes) {
+        await tx.prTask.create({
+          data: {
+            requestId: request.id,
+            title: `${contentType}: ${request.title}`,
+            contentType,
+            dueAt: request.requestedFor,
+          },
+        });
+      }
+    }
     if (status === "WITHDRAWN") {
       for (const task of request.tasks) {
         if (task.status !== "DRAFT") continue;
@@ -1844,6 +1857,25 @@ export async function convertIdea(
       422,
       "INVALID_TRANSITION",
     );
+  const ideaEvidenceUrls: string[] = [];
+  if (idea.evidenceUrls != null) {
+    if (!Array.isArray(idea.evidenceUrls))
+      throw new PrCenterError(
+        "Idea evidence must be a list of source URLs",
+        422,
+        "INVALID_SOURCE_URL",
+      );
+    for (const value of idea.evidenceUrls) {
+      if (typeof value !== "string")
+        throw new PrCenterError(
+          "Idea evidence must contain only URL strings",
+          422,
+          "INVALID_SOURCE_URL",
+        );
+      const url = assertUrl(value);
+      if (!ideaEvidenceUrls.includes(url)) ideaEvidenceUrls.push(url);
+    }
+  }
   return prisma.$transaction(async (tx) => {
     const request = await tx.prRequest.create({
       data: {
@@ -1861,13 +1893,7 @@ export async function convertIdea(
             audience: idea.audience,
           },
         },
-        tasks: {
-          create: {
-            title: idea.title,
-            contentType: "PR Content",
-            ownerId: actor.id,
-          },
-        },
+        sources: { create: ideaEvidenceUrls.map((url) => ({ url })) },
       },
       include: { tasks: true },
     });
@@ -1893,13 +1919,12 @@ export async function convertIdea(
       entityId: idea.id,
       after: {
         requestId: request.id,
-        taskId: request.tasks[0]?.id,
         version: fromVersion + 1,
       },
       eventType: "pr.idea.converted",
       correlationId,
     });
-    return { ideaId: idea.id, request, task: request.tasks[0] };
+    return { ideaId: idea.id, request, task: null };
   });
 }
 
@@ -4277,29 +4302,52 @@ async function runSerializableAccessTransaction<T>(
 }
 
 export async function listAdminUsers(actor: PrCenterActor) {
-  if (!canManageAccess(actorRoles(actor)))
+  const isAdministrator = canManageAccess(actorRoles(actor));
+  const directoryRoles: PrCenterRole[] = isAdministrator
+    ? ["RTRDA_ADMIN"]
+    : actorHasRole(actor, "RTRDA_PR")
+      ? ["RTRDA_PR"]
+      : actorHasRole(actor, "RTRDA_BORD")
+        ? ["RTRDA_BORD"]
+        : [];
+  if (!isAdministrator && directoryRoles.length === 0)
     throw new PrCenterError("You cannot view user directory", 403, "FORBIDDEN");
-  const adminScope = roleDepartmentScopes(actor, ["RTRDA_ADMIN"]);
+  const directoryScope = roleDepartmentScopes(actor, directoryRoles);
   return prisma.prCenterUser.findMany({
     where: {
       organizationId: actor.organizationId,
-      ...(!adminScope.organizationWide
-        ? { departmentId: { in: adminScope.departmentIds } }
+      ...(!directoryScope.organizationWide
+        ? { departmentId: { in: directoryScope.departmentIds } }
         : {}),
+      ...(!isAdministrator ? { active: true } : {}),
     },
     include: {
       department: { select: { id: true, name: true } },
       roles: {
-        ...(!adminScope.organizationWide
+        ...(!isAdministrator
           ? {
               where: {
-                OR: [
-                  { departmentId: { in: adminScope.departmentIds } },
-                  { departmentId: null },
-                ],
+                role: "RTRDA_BORD",
+                ...(directoryScope.organizationWide
+                  ? {}
+                  : {
+                      OR: [
+                        { departmentId: { in: directoryScope.departmentIds } },
+                        { departmentId: null },
+                      ],
+                    }),
               },
             }
-          : {}),
+          : !directoryScope.organizationWide
+            ? {
+                where: {
+                  OR: [
+                    { departmentId: { in: directoryScope.departmentIds } },
+                    { departmentId: null },
+                  ],
+                },
+              }
+            : {}),
         select: { id: true, role: true, departmentId: true },
       },
     },
@@ -4332,7 +4380,9 @@ export async function grantRole(
   reason: unknown,
   correlationId: string = randomUUID(),
 ) {
-  if (!canManageAccess(actorRoles(actor)))
+  const isAdministrator = canManageAccess(actorRoles(actor));
+  const mayGrantBoardRole = role === "RTRDA_BORD" && actorHasRole(actor, "RTRDA_PR");
+  if (!isAdministrator && !mayGrantBoardRole)
     throw new PrCenterError("You cannot grant roles", 403, "FORBIDDEN");
   if (!PR_CENTER_ROLES.includes(role))
     throw new PrCenterError("Invalid role code", 422, "INVALID_ROLE");
@@ -4349,12 +4399,27 @@ export async function grantRole(
       "SELF_GRANT_BLOCKED",
     );
   const accessReason = normalizeAccessAdminReason(reason);
-  assertCanManageDepartmentScope(actor, departmentId ?? null);
+  if (isAdministrator) assertCanManageDepartmentScope(actor, departmentId ?? null);
+  else if (
+    departmentId === null ||
+    !actorHasRoleInDepartment(actor, "RTRDA_PR", departmentId)
+  )
+    throw new PrCenterError(
+      "RTRDA_PR may grant RTRDA_BORD only within its department scope",
+      403,
+      "FORBIDDEN",
+    );
   const user = await prisma.prCenterUser.findFirst({
     where: { id: userId, organizationId: actor.organizationId },
   });
   if (!user) throw new PrCenterError("User not found", 404, "NOT_FOUND");
-  assertCanManageUserScope(actor, user);
+  if (isAdministrator) assertCanManageUserScope(actor, user);
+  else if (user.departmentId !== departmentId || !user.active)
+    throw new PrCenterError(
+      "RTRDA_PR may grant RTRDA_BORD only to an active user in the granted department",
+      403,
+      "FORBIDDEN",
+    );
   if (departmentId) {
     const dept = await prisma.prDepartment.findFirst({
       where: { id: departmentId, organizationId: actor.organizationId },
@@ -4790,7 +4855,7 @@ export async function restoreRequest(
 ) {
   if (!canRestoreRequests(actorRoles(actor)))
     throw new PrCenterError("You cannot restore requests", 403, "FORBIDDEN");
-  const roleScope = roleDepartmentClauses(actor, ["RTRDA_ADMIN"]);
+  const roleScope = roleDepartmentClauses(actor, ["RTRDA_ADMIN", "RTRDA_BORD"]);
   const restoreScope = { organizationId: actor.organizationId, OR: roleScope };
   const request = await prisma.prRequest.findFirst({
     where: { id: requestId, ...restoreScope },

@@ -333,11 +333,24 @@ describe("idea reviewer scope", () => {
       title: "Idea",
       rationale: "Rationale",
       audience: "Public",
+      evidenceUrls: ["https://example.org/source"],
       status: "ACCEPTED",
       version: 3,
     });
 
-    await convertIdea(actor, "idea-1", 3, "corr-2");
+    const result = await convertIdea(actor, "idea-1", 3, "corr-2");
+
+    expect(result.task).toBeNull();
+    expect(mocks.transactionClient.prRequest.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          sources: { create: [{ url: "https://example.org/source" }] },
+        }),
+      }),
+    );
+    expect(
+      mocks.transactionClient.prRequest.create.mock.calls[0]?.[0].data,
+    ).not.toHaveProperty("tasks");
 
     expect(mocks.findFirst).toHaveBeenCalledWith({
       where: { id: "idea-1", organizationId: "org-1", OR: [{ departmentId: "dept-1" }] },

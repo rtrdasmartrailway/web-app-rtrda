@@ -50,6 +50,13 @@ const scopedAdmin: PrCenterActor = {
   role: "RTRDA_ADMIN",
   roleGrants: [{ role: "RTRDA_ADMIN", departmentId: "dept-1" }],
 };
+const scopedBoard: PrCenterActor = {
+  id: "bord-1",
+  organizationId: "org-1",
+  departmentId: "dept-1",
+  role: "RTRDA_BORD",
+  roleGrants: [{ role: "RTRDA_BORD", departmentId: "dept-1" }],
+};
 const organizationAdmin: PrCenterActor = {
   id: "org-admin-1",
   organizationId: "org-1",
@@ -159,6 +166,41 @@ describe("scope-sensitive file and audit operations", () => {
       4,
       "Restore after review",
       "corr-restore",
+    );
+
+    expect(mockPrisma.prRequest.findFirst).toHaveBeenCalledWith({
+      where: {
+        id: "request-1",
+        organizationId: "org-1",
+        OR: [{ departmentId: "dept-1" }],
+      },
+    });
+    expect(mockPrisma.prRequest.updateMany).toHaveBeenCalledWith({
+      where: {
+        id: "request-1",
+        version: 4,
+        organizationId: "org-1",
+        OR: [{ departmentId: "dept-1" }],
+      },
+      data: { status: "DRAFT", version: { increment: 1 } },
+    });
+  });
+
+  it("lets BORD restore requests only within its BORD grant department", async () => {
+    mockPrisma.prRequest.findFirst.mockResolvedValue({
+      id: "request-1",
+      organizationId: "org-1",
+      departmentId: "dept-1",
+      status: "WITHDRAWN",
+      version: 4,
+    });
+
+    await restoreRequest(
+      scopedBoard,
+      "request-1",
+      4,
+      "Restore after review",
+      "corr-bord-restore",
     );
 
     expect(mockPrisma.prRequest.findFirst).toHaveBeenCalledWith({

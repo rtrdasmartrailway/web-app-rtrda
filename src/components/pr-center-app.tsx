@@ -8755,6 +8755,13 @@ function Directory({
   };
   language: Language;
 }) {
+  const effectiveRoleCodes = new Set(
+    actor.roleGrants?.length ? actor.roleGrants.map((grant) => grant.role) : [actor.role],
+  );
+  const isAdministrator = effectiveRoleCodes.has("RTRDA_ADMIN");
+  const isPrOperations = effectiveRoleCodes.has("RTRDA_PR");
+  const isBoardRole = effectiveRoleCodes.has("RTRDA_BORD");
+  const canGrantBoardOnly = !isAdministrator && isPrOperations;
   const [users, setUsers] = useState<
     Array<{
       id: string;
@@ -8768,7 +8775,9 @@ function Directory({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [grantTarget, setGrantTarget] = useState<string | null>(null);
-  const [grantRole, setGrantRole] = useState<string>("RTRDA_ALL_USER");
+  const [grantRole, setGrantRole] = useState<string>(
+    canGrantBoardOnly ? "RTRDA_BORD" : "RTRDA_ALL_USER",
+  );
   const [grantDepartmentId, setGrantDepartmentId] = useState("");
   const [grantReason, setGrantReason] = useState("");
   const [grantConfirmation, setGrantConfirmation] = useState("");
@@ -8784,10 +8793,12 @@ function Directory({
   const [revokeSubmitting, setRevokeSubmitting] = useState(false);
   const [accessReason, setAccessReason] = useState("");
   const isOrganizationAdmin =
-    actor.roleGrants?.some(
+    isAdministrator &&
+    (actor.roleGrants?.some(
       (grant) => grant.role === "RTRDA_ADMIN" && grant.departmentId === null,
-    ) ?? false;
-  const canGrantAdministratorRole = actor.isRootAdministrator === true;
+    ) ??
+      false);
+  const canGrantAdministratorRole = isAdministrator && actor.isRootAdministrator === true;
   const isRootAccount = (user: { email: string }) =>
     isRootPrCenterAdministrator(user.email);
   const hasAdministratorRole = (user: (typeof users)[number]) =>
@@ -8853,7 +8864,7 @@ function Directory({
         credentials: "same-origin",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          role: grantRole,
+          role: canGrantBoardOnly ? "RTRDA_BORD" : grantRole,
           departmentId: grantDepartmentId || null,
           reason,
         }),
@@ -8941,32 +8952,48 @@ function Directory({
   return (
     <>
       <SectionHeading eyebrow="ACCESS ADMINISTRATION" title="User Directory" />
-      {!canGrantAdministratorRole && (
+      {isAdministrator && !canGrantAdministratorRole && (
         <p role="note" className={styles.libraryNotice}>
           {language === "th"
-            ? "คุณจัดการ role ทั่วไปได้ตาม scope แต่การมอบหมาย/ถอน role ผู้ดูแลและการปิดบัญชีผู้ดูแลทำได้โดยผู้ดูแลหลักเท่านั้น"
-            : "You can manage regular roles within your scope. Only the root administrator can grant or revoke administrator roles or deactivate administrator accounts."}
+            ? "การมอบหมาย/ถอน role ผู้ดูแลและการปิดบัญชีผู้ดูแลทำได้โดยผู้ดูแลหลักเท่านั้น"
+            : "Only the root administrator can grant or revoke administrator roles or deactivate administrator accounts."}
         </p>
       )}
-      <label style={{ display: "grid", gap: 4, margin: "8px 0 16px" }}>
-        <span>
+      {canGrantBoardOnly && (
+        <p role="note" className={styles.libraryNotice}>
           {language === "th"
-            ? "เหตุผลในการเปลี่ยนสิทธิ์ (จำเป็น)"
-            : "Reason for access change (required)"}
-        </span>
-        <textarea
-          value={accessReason}
-          maxLength={1000}
-          onChange={(event) => setAccessReason(event.target.value)}
-          aria-required="true"
-          rows={2}
-        />
-        <small>
+            ? "RTRDA_PR มอบหมายได้เฉพาะ role RTRDA_BORD ให้ผู้ใช้ในแผนกเดียวกัน โดยมีเหตุผลประกอบ"
+            : "RTRDA_PR may grant only RTRDA_BORD to users in its department, with a required reason."}
+        </p>
+      )}
+      {isBoardRole && !isAdministrator && !isPrOperations && (
+        <p role="note" className={styles.libraryNotice}>
           {language === "th"
-            ? "ไม่ใส่รหัสผ่านหรือข้อมูลส่วนบุคคลที่อ่อนไหว"
-            : "Do not include passwords or sensitive personal information."}
-        </small>
-      </label>
+            ? "คุณดูรายชื่อผู้ใช้และ role ภายในขอบเขตของ RTRDA_BORD ได้ แต่การจัดการ role ทำได้โดยผู้ดูแลหรือ RTRDA_PR ตามสิทธิ์"
+            : "You can view users and roles within your RTRDA_BORD scope. Role management is reserved for administrators and authorized RTRDA_PR users."}
+        </p>
+      )}
+      {isAdministrator && (
+        <label style={{ display: "grid", gap: 4, margin: "8px 0 16px" }}>
+          <span>
+            {language === "th"
+              ? "เหตุผลในการเปลี่ยนสิทธิ์ (จำเป็น)"
+              : "Reason for access change (required)"}
+          </span>
+          <textarea
+            value={accessReason}
+            maxLength={1000}
+            onChange={(event) => setAccessReason(event.target.value)}
+            aria-required="true"
+            rows={2}
+          />
+          <small>
+            {language === "th"
+              ? "ไม่ใส่รหัสผ่านหรือข้อมูลส่วนบุคคลที่อ่อนไหว"
+              : "Do not include passwords or sensitive personal information."}
+          </small>
+        </label>
+      )}
       {notice && (
         <p style={{ color: "#16a34a", fontSize: 13, margin: "4px 0" }}>{notice}</p>
       )}
@@ -8988,54 +9015,58 @@ function Directory({
                   </p>
                 </div>
                 <div style={{ display: "flex", gap: 8 }}>
-                  <button
-                    onClick={() => handleToggleActive(user.id)}
-                    disabled={
-                      user.id === actor.userId ||
-                      isRootAccount(user) ||
-                      (hasAdministratorRole(user) && !canGrantAdministratorRole) ||
-                      isLastOrganizationAdmin(user) ||
-                      !accessReason.trim()
-                    }
-                    title={
-                      isRootAccount(user)
-                        ? language === "th"
-                          ? "บัญชีผู้ดูแลหลักถูกป้องกันจากการปิดใช้งาน"
-                          : "The root administrator account is protected"
-                        : hasAdministratorRole(user) && !canGrantAdministratorRole
+                  {isAdministrator && (
+                    <button
+                      onClick={() => handleToggleActive(user.id)}
+                      disabled={
+                        user.id === actor.userId ||
+                        isRootAccount(user) ||
+                        (hasAdministratorRole(user) && !canGrantAdministratorRole) ||
+                        isLastOrganizationAdmin(user) ||
+                        !accessReason.trim()
+                      }
+                      title={
+                        isRootAccount(user)
                           ? language === "th"
-                            ? "เฉพาะผู้ดูแลหลักเท่านั้นที่เปลี่ยนสถานะผู้ดูแลได้"
-                            : "Only the root administrator can deactivate administrators"
-                          : isLastOrganizationAdmin(user)
-                            ? "At least one active organization-wide administrator must remain"
-                            : undefined
-                    }
-                    style={{ fontSize: 12, color: user.active ? "#dc2626" : "#16a34a" }}
-                  >
-                    {user.active ? "Deactivate" : "Activate"}
-                  </button>
-                  <button
-                    onClick={() => {
-                      const nextTarget = grantTarget === user.id ? null : user.id;
-                      setGrantTarget(nextTarget);
-                      setError(null);
-                      setGrantReason("");
-                      setGrantConfirmation("");
-                      if (nextTarget)
-                        setGrantDepartmentId(
-                          isOrganizationAdmin ? "" : (user.department?.id ?? ""),
-                        );
-                    }}
-                    disabled={user.id === actor.userId}
-                    title={
-                      user.id === actor.userId
-                        ? "You cannot grant roles to your own account"
-                        : undefined
-                    }
-                    style={{ fontSize: 12 }}
-                  >
-                    + Grant role
-                  </button>
+                            ? "บัญชีผู้ดูแลหลักถูกป้องกันจากการปิดใช้งาน"
+                            : "The root administrator account is protected"
+                          : hasAdministratorRole(user) && !canGrantAdministratorRole
+                            ? language === "th"
+                              ? "เฉพาะผู้ดูแลหลักเท่านั้นที่เปลี่ยนสถานะผู้ดูแลได้"
+                              : "Only the root administrator can deactivate administrators"
+                            : isLastOrganizationAdmin(user)
+                              ? "At least one active organization-wide administrator must remain"
+                              : undefined
+                      }
+                      style={{ fontSize: 12, color: user.active ? "#dc2626" : "#16a34a" }}
+                    >
+                      {user.active ? "Deactivate" : "Activate"}
+                    </button>
+                  )}
+                  {(isAdministrator || isPrOperations) && (
+                    <button
+                      onClick={() => {
+                        const nextTarget = grantTarget === user.id ? null : user.id;
+                        setGrantTarget(nextTarget);
+                        setError(null);
+                        setGrantReason("");
+                        setGrantConfirmation("");
+                        if (nextTarget)
+                          setGrantDepartmentId(
+                            isOrganizationAdmin ? "" : (user.department?.id ?? ""),
+                          );
+                      }}
+                      disabled={user.id === actor.userId}
+                      title={
+                        user.id === actor.userId
+                          ? "You cannot grant roles to your own account"
+                          : undefined
+                      }
+                      style={{ fontSize: 12 }}
+                    >
+                      + Grant role
+                    </button>
+                  )}
                 </div>
               </header>
               <div style={{ marginTop: 8 }}>
@@ -9061,58 +9092,60 @@ function Directory({
                     }}
                   >
                     {r.role} · {r.departmentId ? `dept ${r.departmentId}` : "org-wide"}
-                    <button
-                      type="button"
-                      aria-label={`${language === "th" ? "ถอน role" : "Revoke role"}: ${r.role}`}
-                      onClick={() => {
-                        setError(null);
-                        setGrantTarget(null);
-                        setRevokeReason("");
-                        setRevokeTarget({
-                          userId: user.id,
-                          displayName: user.displayName,
-                          roleId: r.id,
-                          role: r.role,
-                          departmentId: r.departmentId,
-                        });
-                      }}
-                      disabled={
-                        isRootAccount(user) ||
-                        (r.role === "RTRDA_ADMIN" && !canGrantAdministratorRole) ||
-                        (user.active &&
-                          r.role === "RTRDA_ADMIN" &&
-                          r.departmentId === null &&
-                          activeOrganizationAdmins <= 1)
-                      }
-                      title={
-                        isRootAccount(user)
-                          ? language === "th"
-                            ? "บัญชีผู้ดูแลหลักถูกป้องกัน"
-                            : "The root administrator account is protected"
-                          : r.role === "RTRDA_ADMIN" && !canGrantAdministratorRole
+                    {isAdministrator && (
+                      <button
+                        type="button"
+                        aria-label={`${language === "th" ? "ถอน role" : "Revoke role"}: ${r.role}`}
+                        onClick={() => {
+                          setError(null);
+                          setGrantTarget(null);
+                          setRevokeReason("");
+                          setRevokeTarget({
+                            userId: user.id,
+                            displayName: user.displayName,
+                            roleId: r.id,
+                            role: r.role,
+                            departmentId: r.departmentId,
+                          });
+                        }}
+                        disabled={
+                          isRootAccount(user) ||
+                          (r.role === "RTRDA_ADMIN" && !canGrantAdministratorRole) ||
+                          (user.active &&
+                            r.role === "RTRDA_ADMIN" &&
+                            r.departmentId === null &&
+                            activeOrganizationAdmins <= 1)
+                        }
+                        title={
+                          isRootAccount(user)
                             ? language === "th"
-                              ? "เฉพาะผู้ดูแลหลักเท่านั้นที่ถอน role ผู้ดูแลได้"
-                              : "Only the root administrator can revoke administrator roles"
-                            : user.active &&
-                                r.role === "RTRDA_ADMIN" &&
-                                r.departmentId === null &&
-                                activeOrganizationAdmins <= 1
-                              ? "At least one active organization-wide administrator must remain"
-                              : language === "th"
-                                ? "ถอน role"
-                                : "Revoke role"
-                      }
-                      style={{
-                        fontSize: 11,
-                        color: "#dc2626",
-                        background: "none",
-                        border: "none",
-                        cursor: "pointer",
-                        padding: 0,
-                      }}
-                    >
-                      ✕
-                    </button>
+                              ? "บัญชีผู้ดูแลหลักถูกป้องกัน"
+                              : "The root administrator account is protected"
+                            : r.role === "RTRDA_ADMIN" && !canGrantAdministratorRole
+                              ? language === "th"
+                                ? "เฉพาะผู้ดูแลหลักเท่านั้นที่ถอน role ผู้ดูแลได้"
+                                : "Only the root administrator can revoke administrator roles"
+                              : user.active &&
+                                  r.role === "RTRDA_ADMIN" &&
+                                  r.departmentId === null &&
+                                  activeOrganizationAdmins <= 1
+                                ? "At least one active organization-wide administrator must remain"
+                                : language === "th"
+                                  ? "ถอน role"
+                                  : "Revoke role"
+                        }
+                        style={{
+                          fontSize: 11,
+                          color: "#dc2626",
+                          background: "none",
+                          border: "none",
+                          cursor: "pointer",
+                          padding: 0,
+                        }}
+                      >
+                        ✕
+                      </button>
+                    )}
                   </span>
                 ))}
               </div>
@@ -9155,20 +9188,24 @@ function Directory({
                   <p style={{ margin: 0, color: "#4b5563" }}>{user.displayName}</p>
                   <label style={{ display: "grid", gap: 4 }}>
                     <span>{language === "th" ? "Role" : "Role"}</span>
-                    <select
-                      aria-label="Role"
-                      value={grantRole}
-                      onChange={(event) => setGrantRole(event.target.value)}
-                    >
-                      <option value="RTRDA_ALL_USER">RTRDA_ALL_USER</option>
-                      <option value="RTRDA_PR">RTRDA_PR</option>
-                      <option value="RTRDA_BORD">RTRDA_BORD</option>
-                      <option value="RTRDA_ADMIN" disabled={!canGrantAdministratorRole}>
-                        RTRDA_ADMIN
-                      </option>
-                    </select>
+                    {canGrantBoardOnly ? (
+                      <span>RTRDA_BORD</span>
+                    ) : (
+                      <select
+                        aria-label="Role"
+                        value={grantRole}
+                        onChange={(event) => setGrantRole(event.target.value)}
+                      >
+                        <option value="RTRDA_ALL_USER">RTRDA_ALL_USER</option>
+                        <option value="RTRDA_PR">RTRDA_PR</option>
+                        <option value="RTRDA_BORD">RTRDA_BORD</option>
+                        <option value="RTRDA_ADMIN" disabled={!canGrantAdministratorRole}>
+                          RTRDA_ADMIN
+                        </option>
+                      </select>
+                    )}
                   </label>
-                  {!canGrantAdministratorRole && (
+                  {isAdministrator && !canGrantAdministratorRole && (
                     <p role="note">
                       {language === "th"
                         ? "เฉพาะผู้ดูแลหลัก admin@apprtrda.onmicrosoft.com เท่านั้นที่มอบหมาย role ผู้ดูแลได้"

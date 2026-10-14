@@ -134,10 +134,10 @@ describe("PR Center workflow policy", () => {
     expect(canExportAudit("RTRDA_BORD")).toBe(false);
   });
 
-  it("restricts request restore to RTRDA_ADMIN only", () => {
+  it("allows BORD and ADMIN to restore requests", () => {
     expect(canRestoreRequests("RTRDA_ADMIN")).toBe(true);
+    expect(canRestoreRequests("RTRDA_BORD")).toBe(true);
     expect(canRestoreRequests("RTRDA_PR")).toBe(false);
     expect(canRestoreRequests("RTRDA_ALL_USER")).toBe(false);
-    expect(canRestoreRequests("RTRDA_BORD")).toBe(false);
   });
 });

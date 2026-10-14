@@ -37,6 +37,20 @@ const organizationAdministrator: PrCenterActor = {
   roleGrants: [{ role: "RTRDA_ADMIN", departmentId: null }],
   isRootAdministrator: true,
 };
+const scopedPr: PrCenterActor = {
+  id: "pr-1",
+  organizationId: "org-1",
+  departmentId: "dept-1",
+  role: "RTRDA_PR",
+  roleGrants: [{ role: "RTRDA_PR", departmentId: "dept-1" }],
+};
+const scopedBoard: PrCenterActor = {
+  id: "bord-1",
+  organizationId: "org-1",
+  departmentId: "dept-1",
+  role: "RTRDA_BORD",
+  roleGrants: [{ role: "RTRDA_BORD", departmentId: "dept-1" }],
+};
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -45,6 +59,7 @@ beforeEach(() => {
     id: "user-1",
     organizationId: "org-1",
     departmentId: "dept-1",
+    active: true,
   });
   mockPrisma.prDepartment.findFirst.mockResolvedValue({ id: "dept-1" });
   mockPrisma.prUserRole.findFirst.mockResolvedValue(null);
@@ -82,6 +97,29 @@ describe("scoped access administration", () => {
         include: expect.objectContaining({
           roles: {
             where: {
+              OR: [{ departmentId: { in: ["dept-1"] } }, { departmentId: null }],
+            },
+            select: { id: true, role: true, departmentId: true },
+          },
+        }),
+      }),
+    );
+  });
+
+  it("lets PR list active users only within its PR scope and exposes only BORD assignments", async () => {
+    await listAdminUsers(scopedPr);
+
+    expect(mockPrisma.prCenterUser.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          organizationId: "org-1",
+          departmentId: { in: ["dept-1"] },
+          active: true,
+        },
+        include: expect.objectContaining({
+          roles: {
+            where: {
+              role: "RTRDA_BORD",
               OR: [{ departmentId: { in: ["dept-1"] } }, { departmentId: null }],
             },
             select: { id: true, role: true, departmentId: true },
@@ -139,6 +177,63 @@ describe("scoped access administration", () => {
         }),
       }),
     );
+  });
+
+  it("allows PR to grant only a department-scoped BORD role and audits the PR authority", async () => {
+    await grantRole(scopedPr, "user-1", "RTRDA_BORD", "dept-1", "Board appointment");
+
+    expect(mockPrisma.prUserRole.create).toHaveBeenCalledWith({
+      data: {
+        userId: "user-1",
+        role: "RTRDA_BORD",
+        organizationId: "org-1",
+        departmentId: "dept-1",
+      },
+    });
+    expect(mockPrisma.prAuditEvent.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          action: "access.role_granted",
+          after: expect.objectContaining({
+            role: "RTRDA_BORD",
+            departmentId: "dept-1",
+            authorityRoles: [{ role: "RTRDA_PR", departmentId: "dept-1" }],
+          }),
+        }),
+      }),
+    );
+  });
+
+  it.each([
+    ["RTRDA_PR", "dept-1"],
+    ["RTRDA_BORD", null],
+    ["RTRDA_BORD", "dept-2"],
+  ] as const)("denies PR from granting %s in scope %s", async (role, departmentId) => {
+    await expect(
+      grantRole(scopedPr, "user-1", role, departmentId, "role grant"),
+    ).rejects.toMatchObject({ statusCode: 403, code: "FORBIDDEN" });
+    expect(mockPrisma.prUserRole.create).not.toHaveBeenCalled();
+  });
+
+  it("denies BORD from granting or revoking roles or changing user status", async () => {
+    await expect(
+      grantRole(scopedBoard, "user-1", "RTRDA_BORD", "dept-1", "role grant"),
+    ).rejects.toMatchObject({ statusCode: 403, code: "FORBIDDEN" });
+    await expect(revokeRole(scopedBoard, "grant-1", "role change")).rejects.toMatchObject(
+      {
+        statusCode: 403,
+        code: "FORBIDDEN",
+      },
+    );
+    await expect(
+      toggleUserActive(scopedBoard, "user-1", "account change"),
+    ).rejects.toMatchObject({
+      statusCode: 403,
+      code: "FORBIDDEN",
+    });
+    expect(mockPrisma.prUserRole.create).not.toHaveBeenCalled();
+    expect(mockPrisma.prUserRole.delete).not.toHaveBeenCalled();
+    expect(mockPrisma.prCenterUser.update).not.toHaveBeenCalled();
   });
 
   it("allows only the root administrator to grant a delegated administrator role", async () => {

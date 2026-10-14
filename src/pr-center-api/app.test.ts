@@ -156,6 +156,10 @@ describe("Access administration route guards", () => {
     ...mockActor,
     role: "RTRDA_ADMIN" as const,
   };
+  const requesterActor = {
+    ...mockActor,
+    role: "RTRDA_ALL_USER" as const,
+  };
 
   it("rejects unauthenticated admin user list", async () => {
     const app = buildPrCenterApi(async () => null);
@@ -164,8 +168,8 @@ describe("Access administration route guards", () => {
     await app.close();
   });
 
-  it("rejects non-admin role from listing users", async () => {
-    const app = buildPrCenterApi(async () => mockActor);
+  it("rejects an ordinary requester from listing users", async () => {
+    const app = buildPrCenterApi(async () => requesterActor);
     const response = await app.inject({ method: "GET", url: "/admin/users" });
     expect(response.statusCode).toBe(403);
     const body = response.json();
@@ -173,14 +177,26 @@ describe("Access administration route guards", () => {
     await app.close();
   });
 
-  it("rejects non-admin role from granting roles", async () => {
+  it("rejects PR from granting a role other than BORD", async () => {
     const app = buildPrCenterApi(async () => mockActor);
     const response = await app.inject({
       method: "POST",
       url: "/admin/users/some-id/roles",
-      payload: {},
+      payload: { role: "RTRDA_PR", departmentId: "dept-1", reason: "not allowed" },
     });
     expect(response.statusCode).toBe(403);
+    await app.close();
+  });
+
+  it("allows PR to reach the BORD-grant validation path", async () => {
+    const app = buildPrCenterApi(async () => mockActor);
+    const response = await app.inject({
+      method: "POST",
+      url: "/admin/users/some-id/roles",
+      payload: { role: "RTRDA_BORD", departmentId: "dept-1" },
+    });
+    expect(response.statusCode).toBe(422);
+    expect(response.json().error).toBe("REASON_REQUIRED");
     await app.close();
   });
 

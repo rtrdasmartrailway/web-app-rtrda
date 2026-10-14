@@ -142,7 +142,7 @@ export function canExportAudit(role: PrCenterRoleInput): boolean {
 }
 
 export function canRestoreRequests(role: PrCenterRoleInput): boolean {
-  return includesAnyRole(role, ["RTRDA_ADMIN"]);
+  return includesAnyRole(role, ["RTRDA_ADMIN", "RTRDA_BORD"]);
 }
 
 export function publicationGate(input: {
