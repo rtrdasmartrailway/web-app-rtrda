@@ -28,6 +28,7 @@ import { canEditOwnRequest } from "@/lib/pr-center/request-edit";
 import { collectCursorPages } from "@/lib/pr-center/collect-cursor-pages";
 import { bangkokLocalDateTimeToISOString } from "@/lib/pr-center/schedule-time";
 import {
+  requestIntakeStatusLabel,
   requestTableStatusLabel,
   summarizeRequestTableTasks,
 } from "@/lib/pr-center/request-table";
@@ -1160,14 +1161,6 @@ function createAuthenticatedState(): PrCenterState {
 }
 function getUser(userId: string) {
   return users.find((user) => user.id === userId);
-}
-function taskRows(items: Task[]) {
-  return items.map((task) => [
-    task.type,
-    task.title,
-    STATUS_LABELS[task.status],
-    getUser(task.ownerId)?.name ?? task.ownerName ?? "Unassigned",
-  ]);
 }
 function requestStatus(request: Request, allTasks: Task[]): StatusId {
   return allTasks.find((task) => request.taskIds.includes(task.id))?.status ?? "draft";
@@ -3376,6 +3369,7 @@ export function PrCenterApp({
             <button
               key={item.id}
               className={page === item.id ? styles.navActive : ""}
+              aria-current={page === item.id ? "page" : undefined}
               onClick={() => {
                 if (item.id === "new-request") {
                   openRequest();
@@ -3430,23 +3424,6 @@ export function PrCenterApp({
               {page !== "ideas" && <p>Corporate communications workspace</p>}
             </div>
           </div>
-          {(page === "my-requests" || page === "requests") && (
-            <label className={styles.search}>
-              <span>
-                {state.language === "th"
-                  ? "ค้นหาคำขอจากชื่อหรือเลขคำขอ"
-                  : "Search requests by title or number"}
-              </span>
-              <input
-                maxLength={120}
-                value={requestSearch}
-                onChange={(event) =>
-                  changeRequestFilters(event.target.value, requestStatusFilter)
-                }
-                placeholder={t.search}
-              />
-            </label>
-          )}
           <div
             className={`${styles.topActions} ${page === "ideas" ? styles.ideasTopActions : ""}`}
           >
@@ -4666,7 +4643,9 @@ function Requests({
           value={status}
           onChange={(event) => onFiltersChange(query, event.target.value)}
         >
-          <option value="">All request statuses</option>
+          <option value="">
+            {language === "th" ? "ทุกสถานะคำขอ" : "All request statuses"}
+          </option>
           {(
             [
               "DRAFT",
@@ -4679,12 +4658,12 @@ function Requests({
             ] as const
           ).map((item) => (
             <option key={item} value={item}>
-              {item}
+              {requestIntakeStatusLabel(item, language)}
             </option>
           ))}
         </select>
         <button type="button" onClick={() => onFiltersChange("", "")}>
-          Clear
+          {language === "th" ? "ล้างตัวกรอง" : "Clear filters"}
         </button>
       </section>
       <p role="note">
@@ -4697,14 +4676,18 @@ function Requests({
           <table>
             <thead>
               <tr>
-                <th scope="col">โครงการ</th>
-                <th scope="col">ประเภทคำขอ</th>
-                <th scope="col">ฝ่าย / ผู้ส่งคำขอ</th>
-                <th scope="col">วันที่และเวลาที่สั่ง</th>
-                <th scope="col">วันที่ต้องการเผยแพร่</th>
+                <th scope="col">{language === "th" ? "โครงการ" : "Project"}</th>
+                <th scope="col">{language === "th" ? "ประเภทคำขอ" : "Request type"}</th>
+                <th scope="col">
+                  {language === "th" ? "ฝ่าย / ผู้ส่งคำขอ" : "Department / requester"}
+                </th>
+                <th scope="col">{language === "th" ? "วันที่สร้าง" : "Created"}</th>
+                <th scope="col">
+                  {language === "th" ? "วันที่ต้องการเผยแพร่" : "Requested date"}
+                </th>
                 <th scope="col">Content Package</th>
-                <th scope="col">สถานะ</th>
-                <th scope="col">จัดการ</th>
+                <th scope="col">{language === "th" ? "สถานะคำขอ" : "Request status"}</th>
+                <th scope="col">{language === "th" ? "จัดการ" : "Actions"}</th>
               </tr>
             </thead>
             <tbody>
@@ -4771,8 +4754,14 @@ function Requests({
                     </td>
                     <td>
                       <Status>
-                        {requestTableStatusLabel(contentPackage.status, language)}
+                        {requestIntakeStatusLabel(request.status, language)}
                       </Status>
+                      {contentPackage.count > 0 && (
+                        <small>
+                          {language === "th" ? "ความคืบหน้างาน: " : "Content progress: "}
+                          {requestTableStatusLabel(contentPackage.status, language)}
+                        </small>
+                      )}
                     </td>
                     <td>
                       <button onClick={() => setSelectedId(request.id)}>
@@ -5228,11 +5217,71 @@ function Operations({
       )}
       {view === "table" && (
         <article className={styles.card}>
-          <h2>Table view</h2>
-          <Table
-            headers={["Type", "Content", "Status", "Owner"]}
-            rows={taskRows(visibleTasks)}
-          />
+          <h2>{language === "th" ? "มุมมองตาราง" : "Table view"}</h2>
+          <div className={styles.tableWrap}>
+            <table>
+              <thead>
+                <tr>
+                  {[
+                    language === "th" ? "ประเภท" : "Type",
+                    language === "th" ? "เนื้อหา" : "Content",
+                    language === "th" ? "สถานะ" : "Status",
+                    language === "th" ? "ผู้รับผิดชอบ" : "Owner",
+                    language === "th" ? "รายละเอียด" : "Details",
+                  ].map((header) => (
+                    <th key={header}>{header}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {visibleTasks.map((task) => (
+                  <tr key={task.id}>
+                    <td>{task.type}</td>
+                    <td>{task.title}</td>
+                    <td>
+                      <Status>{STATUS_LABELS[task.status]}</Status>
+                    </td>
+                    <td>
+                      {getUser(task.ownerId)?.name ??
+                        task.ownerName ??
+                        (language === "th" ? "ยังไม่มอบหมาย" : "Unassigned")}
+                    </td>
+                    <td>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSelectedId(task.id);
+                          setDueDate(task.dueDate);
+                          setAssigneeId(task.ownerId);
+                          setPlanningKeyMessage(task.planningKeyMessage || "");
+                          setTechnicalReviewRequired(
+                            task.technicalReviewRequired === true,
+                          );
+                          setManagementApprovalRequired(
+                            task.managementApprovalRequired === true,
+                          );
+                          setRevisionBody(task.contentBody || "");
+                          setRevisionKeyMessage(task.keyMessage || "");
+                          setRevisionSummary("");
+                        }}
+                      >
+                        {language === "th" ? "เปิดรายละเอียด" : "Open details"}
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+                {visibleTasks.length === 0 && (
+                  <tr>
+                    <td colSpan={5}>
+                      {language === "th"
+                        ? "ไม่พบงานตามตัวกรอง"
+                        : "No tasks match these filters."}
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
         </article>
       )}
       {selected && view !== "publishing" && (
@@ -8585,6 +8634,11 @@ function MessageHouse({
   const [reviewNotice, setReviewNotice] = useState("");
   const [reload, setReload] = useState(0);
   const [reviewReload, setReviewReload] = useState(0);
+  const dirtyRef = useRef(false);
+  const dirty = draftContent !== savedContent;
+  useEffect(() => {
+    dirtyRef.current = dirty;
+  }, [dirty]);
 
   useEffect(() => {
     if (!canEdit) return;
@@ -8599,8 +8653,17 @@ function MessageHouse({
       })
       .then((value) => {
         if (cancelled) return;
-        setWorking(value);
         setDraftLoadFailed(false);
+        if (dirtyRef.current) {
+          setDraftNotice(
+            thai
+              ? "มีการแก้ไขที่ยังไม่บันทึก จึงคงข้อมูลบนหน้าจอไว้"
+              : "Unsaved changes were kept; the server draft was not loaded over them.",
+          );
+          setDraftNoticeTone("");
+          return;
+        }
+        setWorking(value);
         const loadedDraft = {
           id: value?.id ?? "",
           vision: value?.vision ?? "",
@@ -8657,6 +8720,19 @@ function MessageHouse({
   }, [canReview, reviewReload]);
 
   const refreshWorking = () => {
+    if (
+      dirtyRef.current &&
+      !window.confirm(
+        thai
+          ? "มีการแก้ไขที่ยังไม่บันทึก ต้องการทิ้งการแก้ไขและโหลดฉบับร่างใหม่หรือไม่?"
+          : "Discard unsaved changes and reload the latest draft?",
+      )
+    )
+      return;
+    if (dirtyRef.current) {
+      dirtyRef.current = false;
+      setSavedContent(draftContent);
+    }
     if (canEdit) setDraftLoading(true);
     if (canReview) setReviewStatus("loading");
     setReload((previous) => previous + 1);

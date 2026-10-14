@@ -2927,3 +2927,130 @@
     flex-direction: column;
   }
 }
+
+/* Interaction and responsive polish for the authenticated workspace. */
+.app :is(button, input, select, textarea, a, [tabindex]):focus-visible {
+  outline: 3px solid #60a5fa;
+  outline-offset: 2px;
+}
+.search:focus-within {
+  background: #fff;
+  border-color: #5594e8;
+  box-shadow: 0 0 0 3px rgb(25 118 210 / 15%);
+}
+.search input:focus-visible {
+  outline: none;
+}
+.requestModal {
+  max-width: min(1180px, calc(100vw - 32px));
+}
+.requestModal > header button {
+  background: #f5f8fc;
+  border: 1px solid var(--pc-line);
+  border-radius: 9px;
+  color: #26415e;
+  min-height: 40px;
+  min-width: 40px;
+}
+@media (max-width: 1050px) and (min-width: 761px) {
+  .sidebar {
+    flex-basis: 220px;
+    padding: 18px 12px;
+  }
+  .brand > span:last-child,
+  .workspace {
+    font-size: inherit;
+  }
+  .brand b {
+    font-size: 14px;
+  }
+  .brand small {
+    font-size: 8px;
+  }
+  .nav button {
+    justify-content: flex-start;
+  }
+  .navLabel {
+    display: inline;
+  }
+  .topbar {
+    gap: 10px;
+    padding: 0 16px;
+  }
+  .search {
+    max-width: 280px;
+    min-width: 140px;
+    width: 30vw;
+  }
+  .topActions {
+    gap: 7px;
+  }
+}
+@media (max-width: 760px) {
+  .sidebar,
+  .sidebarOpen {
+    bottom: 0;
+    max-height: 100dvh;
+    overflow-y: auto;
+    top: 58px;
+    z-index: 40;
+  }
+  .topbar {
+    gap: 7px;
+    padding: 0 10px;
+  }
+  .menuButton,
+  .bell,
+  .profile,
+  .topActions select {
+    flex: 0 0 auto;
+    min-height: 42px;
+    min-width: 42px;
+  }
+  .topActions {
+    gap: 6px;
+    min-width: 0;
+  }
+  .topRequest {
+    font-size: 0;
+    min-width: 42px;
+  }
+  .topRequest::after {
+    content: "+";
+    font-size: 20px;
+  }
+  .calendar > div {
+    min-height: 88px;
+    padding: 6px;
+  }
+  .event {
+    font-size: 11px;
+    line-height: 1.3;
+    padding: 5px 6px;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+  .calendarWeek b {
+    font-size: 11px;
+  }
+  .calendar button {
+    min-height: 44px;
+  }
+  .tableWrap {
+    scrollbar-color: #8da8c6 #edf2f7;
+    scrollbar-width: auto;
+  }
+  .tableWrap:focus-within {
+    outline: 2px solid #5594e8;
+    outline-offset: 2px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sidebar,
+  .workflowCell,
+  .primaryAction {
+    scroll-behavior: auto;
+    transition-duration: 0.01ms !important;
+  }
+}

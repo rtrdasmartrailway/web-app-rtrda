@@ -1,3 +1,29 @@
+export type RequestIntakeStatus =
+  | "DRAFT"
+  | "SUBMITTED"
+  | "APPROVED"
+  | "REJECTED"
+  | "WITHDRAWN"
+  | "CANCELLED"
+  | "CLOSED";
+
+const INTAKE_LABELS: Record<RequestIntakeStatus, { th: string; en: string }> = {
+  DRAFT: { th: "ร่าง", en: "Draft" },
+  SUBMITTED: { th: "ส่งแล้ว · รอพิจารณา", en: "Submitted · awaiting review" },
+  APPROVED: { th: "อนุมัติคำขอ", en: "Request approved" },
+  REJECTED: { th: "ไม่อนุมัติคำขอ", en: "Request rejected" },
+  WITHDRAWN: { th: "ถอนคำขอ", en: "Withdrawn" },
+  CANCELLED: { th: "ยกเลิก", en: "Cancelled" },
+  CLOSED: { th: "ปิดคำขอ", en: "Closed" },
+};
+
+export function requestIntakeStatusLabel(
+  status: RequestIntakeStatus | undefined,
+  language: "th" | "en",
+): string {
+  return status ? INTAKE_LABELS[status][language] : "—";
+}
+
 const REQUEST_STATUS_PRIORITY = [
   "rejected",
   "revision_required",

@@ -30,17 +30,6 @@ type RequestRow = {
   tasks: { id: string; status: string }[];
 };
 
-const navigation: Page[] = [
-  "Home",
-  "Submit Request",
-  "My Requests",
-  "All Requests",
-  "Content Operations",
-  "Calendar",
-  "Approval Queue",
-  "Notifications",
-  "History",
-];
 const MICROSOFT_LOGIN_URL = "/api/pr-center/auth/login";
 
 function requestDate(value: string) {
@@ -100,11 +89,6 @@ export function PrCenterWorkspace() {
         setRequestsError(error instanceof Error ? error.message : "ไม่สามารถโหลดคำขอได้"),
       );
   }, [page, sessionState]);
-
-  function navigate(nextPage: Page) {
-    setRequestsError(null);
-    setPage(nextPage);
-  }
 
   async function submitRequest(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -179,44 +163,55 @@ export function PrCenterWorkspace() {
 
   return (
     <main className={styles.shell}>
-      <aside className={styles.sidebar} aria-label="PR Center navigation">
+      <aside className={styles.sidebar} aria-label="PR Center information">
         <p className={styles.brand}>RTRDA PR CENTER</p>
-        <nav>
-          {navigation.map((item) => (
-            <button
-              className={page === item ? styles.activeNav : undefined}
-              key={item}
-              type="button"
-              onClick={() => navigate(item)}
-              disabled={!signedIn}
-            >
-              {item}
-            </button>
-          ))}
-        </nav>
+        <div className={styles.sidebarIntro}>
+          <span className={styles.sidebarBadge}>INTERNAL WORKSPACE</span>
+          <h2>
+            งานสื่อสาร
+            <br />
+            ในที่เดียว
+          </h2>
+          <p>ติดตามคำขอ การอนุมัติ และการเผยแพร่ในพื้นที่ทำงานของทีม</p>
+        </div>
+        <ol className={styles.sidebarSteps}>
+          <li>ส่งและติดตามคำขอ</li>
+          <li>จัดการงานและอนุมัติ</li>
+          <li>ดูแผนและหลักฐานเผยแพร่</li>
+        </ol>
+        <p className={styles.sidebarFootnote}>
+          เฉพาะบุคลากรที่ได้รับสิทธิ์ · ลงชื่อเข้าใช้เพื่อดูเมนูตามบทบาทของคุณ
+        </p>
       </aside>
       <section className={styles.content} aria-busy={sessionState === "loading"}>
-        <p className={styles.eyebrow}>INTERNAL WORKSPACE</p>
-        <h1>{page}</h1>
-        {sessionState === "loading" && (
-          <p className={styles.lead}>กำลังตรวจสอบ session...</p>
-        )}
-        {sessionState === "unavailable" && (
-          <p className={styles.lead}>PR Center ไม่พร้อมใช้งานในขณะนี้</p>
-        )}
-        {sessionState === "sign-in-required" && (
-          <section className={styles.loginForm}>
-            <p className={styles.lead}>เข้าสู่ระบบ PR Center ด้วยบัญชี Microsoft RTRDA</p>
-            <a className={styles.primaryAction} href={MICROSOFT_LOGIN_URL}>
-              Sign in with Microsoft
-            </a>
-            {signInFailed && (
-              <p className={styles.loginError}>
-                Microsoft sign-in ไม่สำเร็จ กรุณาลองใหม่ หรือติดต่อผู้ดูแลระบบ
+        <div className={styles.welcomePanel}>
+          <p className={styles.eyebrow}>RTRDA · PR CENTER</p>
+          <h1>พื้นที่ทำงานสื่อสารองค์กร</h1>
+          <p className={styles.welcomeDescription}>
+            เริ่มจากบัญชี Microsoft RTRDA เพื่อเข้าถึงคำขอ งาน และข้อมูลตามสิทธิ์ของคุณ
+          </p>
+          {sessionState === "loading" && (
+            <p className={styles.lead}>กำลังตรวจสอบ session...</p>
+          )}
+          {sessionState === "unavailable" && (
+            <p className={styles.lead}>PR Center ไม่พร้อมใช้งานในขณะนี้</p>
+          )}
+          {sessionState === "sign-in-required" && (
+            <section className={styles.loginForm}>
+              <a className={styles.primaryAction} href={MICROSOFT_LOGIN_URL}>
+                เข้าสู่ระบบด้วย Microsoft <span aria-hidden="true">→</span>
+              </a>
+              <p className={styles.loginHint}>
+                ใช้บัญชีองค์กรของคุณ · ระบบจะแสดงเมนูตามสิทธิ์หลังเข้าสู่ระบบ
               </p>
-            )}
-          </section>
-        )}
+              {signInFailed && (
+                <p className={styles.loginError} role="alert">
+                  Microsoft sign-in ไม่สำเร็จ กรุณาลองใหม่ หรือติดต่อผู้ดูแลระบบ
+                </p>
+              )}
+            </section>
+          )}
+        </div>
         {signedIn && page === "Submit Request" && (
           <form className={styles.requestForm} onSubmit={submitRequest}>
             <p className={styles.lead}>สร้างคำขอ PR หรือ Off-site ใหม่</p>
@@ -287,7 +282,6 @@ export function PrCenterWorkspace() {
             </p>
           </section>
         )}
-        <p className={styles.note}>PR Center uses Microsoft Entra sign-in.</p>
       </section>
     </main>
   );

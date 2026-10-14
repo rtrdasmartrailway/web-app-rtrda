@@ -1,5 +1,19 @@
 import { describe, expect, it } from "vitest";
-import { requestTableStatusLabel, summarizeRequestTableTasks } from "./request-table";
+import {
+  requestIntakeStatusLabel,
+  requestTableStatusLabel,
+  summarizeRequestTableTasks,
+} from "./request-table";
+
+describe("requestIntakeStatusLabel", () => {
+  it("uses parent request status, not the aggregate task status", () => {
+    expect(requestIntakeStatusLabel("SUBMITTED", "th")).toBe("ส่งแล้ว · รอพิจารณา");
+    expect(requestIntakeStatusLabel("SUBMITTED", "en")).toBe(
+      "Submitted · awaiting review",
+    );
+    expect(requestIntakeStatusLabel(undefined, "th")).toBe("—");
+  });
+});
 
 describe("summarizeRequestTableTasks", () => {
   it("localizes the status for the selected table language", () => {
