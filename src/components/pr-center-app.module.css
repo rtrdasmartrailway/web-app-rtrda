@@ -1755,13 +1755,22 @@
 @media (max-width: 760px) {
   .sidebar {
     box-shadow: 8px 0 30px rgba(0, 0, 0, 0.25);
-    left: -280px;
+    left: 0;
+    width: min(280px, calc(100vw - 48px));
+    transform: translateX(-100%);
+    visibility: hidden;
+    pointer-events: none;
     position: fixed;
-    transition: left 0.2s ease;
+    transition:
+      transform 0.2s ease,
+      visibility 0.2s;
     z-index: 10;
   }
   .sidebarOpen {
     left: 0;
+    transform: translateX(0);
+    visibility: visible;
+    pointer-events: auto;
   }
   .menuButton {
     display: block;
