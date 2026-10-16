@@ -81,7 +81,7 @@ export type PrCenterActor = {
   roleGrants?: PrCenterRoleGrant[];
   /** Legacy single-grant scope for service tests and older internal callers. */
   scopeDepartmentId?: string | null;
-  /** Root identity can grant/revoke RTRDA_ADMIN assignments. */
+  /** Trusted middleware-derived root identity; never a substitute for role/scope grants. */
   isRootAdministrator?: boolean;
 };
 
@@ -92,7 +92,8 @@ export type PrCenterRoleGrant = {
 };
 
 function actorRoleGrants(actor: PrCenterActor): PrCenterRoleGrant[] {
-  if (actor.roleGrants?.length) return actor.roleGrants;
+  // An explicitly empty authoritative grant set must not revive a display role.
+  if (actor.roleGrants !== undefined) return actor.roleGrants;
   return [
     {
       role: actor.role,
@@ -1373,7 +1374,10 @@ export async function updateRequestDraft(
   correlationId: string = randomUUID(),
 ) {
   const request = await requestInScope(actor, requestId);
-  if (request.requesterId !== actor.id && !actorHasRole(actor, "RTRDA_ADMIN"))
+  if (
+    request.requesterId !== actor.id &&
+    !actorHasRoleInDepartment(actor, "RTRDA_ADMIN", request.departmentId)
+  )
     throw new PrCenterError("You cannot amend this request", 403, "FORBIDDEN");
   if (
     !(["DRAFT", "SUBMITTED", "REJECTED", "WITHDRAWN"] as string[]).includes(
@@ -1431,7 +1435,15 @@ export async function updateRequestDraft(
     const revisionNumber = (request.revisions[0]?.revisionNumber || 0) + 1;
     const returnToDraft = request.status !== "DRAFT";
     const updated = await tx.prRequest.updateMany({
-      where: { id: request.id, version: fromVersion, status: request.status },
+      where: {
+        id: request.id,
+        organizationId: actor.organizationId,
+        requesterId: request.requesterId,
+        departmentId: request.departmentId,
+        OR: [{ requesterId: actor.id }, ...roleDepartmentClauses(actor, ["RTRDA_ADMIN"])],
+        version: fromVersion,
+        status: request.status,
+      },
       data: {
         title,
         type: input.type,
@@ -1456,7 +1468,10 @@ export async function updateRequestDraft(
         objective: input.objective?.trim() || null,
         audience: input.audience?.trim() || null,
         offsiteDetails: revisionDetails,
-        changeSummary: "Requester amendment",
+        changeSummary:
+          request.requesterId === actor.id
+            ? "Requester amendment"
+            : "Administrator amendment",
       },
     });
     await tx.prRequestSource.deleteMany({ where: { requestId: request.id } });
@@ -1470,7 +1485,7 @@ export async function updateRequestDraft(
           requestId: request.id,
           fromState: request.status,
           toState: "DRAFT",
-          reason: `Requester amended revision ${revisionNumber}; resubmission required`,
+          reason: `${request.requesterId === actor.id ? "Requester" : "Administrator"} amended revision ${revisionNumber}; resubmission required`,
           actorId: actor.id,
         },
       });
@@ -1497,13 +1512,18 @@ export async function updateRequestDraft(
         },
         select: { userId: true },
       });
-      const recipients = [...new Set(operations.map(({ userId }) => userId))];
+      const recipients = [
+        ...new Set([
+          ...operations.map(({ userId }) => userId),
+          ...(request.requesterId !== actor.id ? [request.requesterId] : []),
+        ]),
+      ];
       if (recipients.length)
         await tx.prNotification.createMany({
           data: recipients.map((userId) => ({
             userId,
             title: "Request amended; resubmission required",
-            body: `${title} was amended and returned to draft by its requester. It will re-enter the approval queue after resubmission.`,
+            body: `${title} was amended and returned to draft by ${request.requesterId === actor.id ? "its requester" : "an administrator"}. It will re-enter the approval queue after resubmission by its requester.`,
             target: `request:${request.id}`,
           })),
         });
@@ -1542,7 +1562,7 @@ export async function transitionRequest(
   correlationId: string = randomUUID(),
 ) {
   const request = await requestInScope(actor, requestId);
-  if (request.requesterId !== actor.id && !actorHasRole(actor, "RTRDA_ADMIN"))
+  if (request.requesterId !== actor.id)
     throw new PrCenterError("You cannot update this request", 403, "FORBIDDEN");
   const allowed =
     (status === "SUBMITTED" && request.status === "DRAFT") ||
@@ -1580,7 +1600,14 @@ export async function transitionRequest(
   }
   return prisma.$transaction(async (tx) => {
     const updated = await tx.prRequest.updateMany({
-      where: { id: request.id, version: fromVersion },
+      where: {
+        id: request.id,
+        organizationId: actor.organizationId,
+        requesterId: actor.id,
+        departmentId: request.departmentId,
+        version: fromVersion,
+        status: request.status,
+      },
       data: { status: status as PrRequestStatus, version: { increment: 1 } },
     });
     if (updated.count !== 1)
@@ -5323,7 +5350,9 @@ async function assertActiveOrganizationAdministratorRemains(
       organizationId,
       role: "RTRDA_ADMIN",
       departmentId: null,
-      user: { active: true },
+      // A role row in this organization is not a usable administrator when
+      // its related account belongs to a different organization.
+      user: { active: true, organizationId },
       ...(excluded.roleId ? { id: { not: excluded.roleId } } : {}),
       ...(excluded.userId ? { userId: { not: excluded.userId } } : {}),
     },
@@ -5652,10 +5681,17 @@ export async function toggleUserActive(
   userId: string,
   reason: unknown,
   correlationId: string = randomUUID(),
+  desiredActive?: unknown,
 ) {
   if (!canManageAccess(actorRoles(actor)))
     throw new PrCenterError("You cannot modify user status", 403, "FORBIDDEN");
   const accessReason = normalizeAccessAdminReason(reason);
+  if (desiredActive !== undefined && typeof desiredActive !== "boolean")
+    throw new PrCenterError(
+      "Active status must be boolean",
+      422,
+      "INVALID_ACTIVE_STATUS",
+    );
   const loadAuthorizedUser = async (db: Prisma.TransactionClient) => {
     const user = await db.prCenterUser.findFirst({
       where: { id: userId, organizationId: actor.organizationId },
@@ -5689,7 +5725,9 @@ export async function toggleUserActive(
   await loadAuthorizedUser(prisma);
   return runSerializableAccessTransaction(async (tx) => {
     const user = await loadAuthorizedUser(tx);
-    const nextActive = !user.active;
+    // Explicit intent is safe to retry after a lost response; legacy callers may toggle.
+    const nextActive = typeof desiredActive === "boolean" ? desiredActive : !user.active;
+    if (nextActive === user.active) return { id: userId, active: user.active };
     if (!nextActive) {
       const orgAdminGrant = await tx.prUserRole.findFirst({
         where: {
@@ -5978,15 +6016,29 @@ export async function exportAuditEvents(
 ) {
   if (!actorHasOrganizationWideRole(actor, ["RTRDA_ADMIN"]))
     throw new PrCenterError("You cannot export audit events", 403, "FORBIDDEN");
+  if (!filters || typeof filters !== "object" || Array.isArray(filters))
+    throw new PrCenterError("Audit filters are invalid", 422, "INVALID_FILTER");
+  for (const key of ["from", "to", "entityType", "actorId"] as const) {
+    if (filters[key] !== undefined && typeof filters[key] !== "string")
+      throw new PrCenterError("Audit filters must be strings", 422, "INVALID_FILTER");
+  }
+  const from = filters.from ? new Date(filters.from) : undefined;
+  const to = filters.to ? new Date(filters.to) : undefined;
+  if (
+    (from && !Number.isFinite(from.getTime())) ||
+    (to && !Number.isFinite(to.getTime())) ||
+    (from && to && from > to)
+  )
+    throw new PrCenterError("Audit date range is invalid", 422, "INVALID_FILTER");
   const where: Prisma.PrAuditEventWhereInput = {
     organizationId: actor.organizationId,
     ...(filters.entityType ? { entityType: filters.entityType } : {}),
     ...(filters.actorId ? { actorId: filters.actorId } : {}),
-    ...(filters.from || filters.to
+    ...(from || to
       ? {
           createdAt: {
-            ...(filters.from ? { gte: new Date(filters.from) } : {}),
-            ...(filters.to ? { lte: new Date(filters.to) } : {}),
+            ...(from ? { gte: from } : {}),
+            ...(to ? { lte: to } : {}),
           },
         }
       : {}),
@@ -6005,7 +6057,13 @@ export async function exportAuditEvents(
       entityType: "audit_export",
       entityId: correlationId,
       correlationId,
-      after: { filters, count: events.length, authorityRoles: actorRoleGrants(actor) },
+      after: {
+        filters,
+        count: events.length,
+        authorityRoles: actorRoleGrants(actor).filter(
+          (grant) => grant.role === "RTRDA_ADMIN" && grant.departmentId === null,
+        ),
+      },
     },
   });
   return {
@@ -6305,7 +6363,16 @@ export async function releaseReadinessCheck(actor: PrCenterActor) {
     detail: `${notificationCount} in-app notification(s)`,
   });
   // 7. Outbox event processing
-  const emailOutboxScope = { eventType: "notification.email.queued" };
+  // Email outbox aggregates identify the recipient user, not an organization.
+  const recipients = await prisma.prCenterUser.findMany({
+    where: org,
+    select: { id: true },
+  });
+  const emailOutboxScope = {
+    aggregateType: "notification",
+    aggregateId: { in: recipients.map((recipient) => recipient.id) },
+    eventType: "notification.email.queued",
+  };
   const pendingOutbox = await prisma.prOutboxEvent.count({
     where: { ...emailOutboxScope, status: "PENDING" },
   });

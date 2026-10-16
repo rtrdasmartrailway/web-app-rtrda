@@ -9,6 +9,7 @@ import {
   useState,
 } from "react";
 import Image from "next/image";
+import { PrCenterAuditExport } from "./pr-center-audit-export";
 import { PrCenterDialog } from "./pr-center-dialog";
 import { useBoardHoldDrag } from "./pr-center-board-drag";
 import { PrCenterRequestRestore } from "./pr-center-request-restore";
@@ -18,6 +19,7 @@ import { grantCoversDepartment } from "@/lib/pr-center/client-grant-scope";
 import { BOARD_COLUMNS, boardMove, type BoardColumn } from "@/lib/pr-center/board-moves";
 import {
   getFirstApprovalStage,
+  parseApprovalPolicy,
   type ApprovalPolicy,
 } from "@/lib/pr-center/approval-policy";
 import type { PrTaskStatus as WorkflowTaskStatus } from "@/lib/pr-center/workflow";
@@ -57,7 +59,8 @@ import {
   type CalendarEntry,
   type CalendarRequestDecision,
 } from "@/lib/pr-center/calendar-view";
-import { canEditOwnRequest } from "@/lib/pr-center/request-edit";
+import { canAdminEditRequest, canEditOwnRequest } from "@/lib/pr-center/request-edit";
+import { canDecideTaskStage } from "@/lib/pr-center/client-stage-authority";
 import { collectCursorPages } from "@/lib/pr-center/collect-cursor-pages";
 import { bangkokLocalDateTimeToISOString } from "@/lib/pr-center/schedule-time";
 import {
@@ -564,12 +567,17 @@ type TaskApprovalRecord = {
     keyMessage: string | null;
     finalAssetId: string | null;
   }>;
-  request: { status?: Request["status"]; sources: Array<{ url: string }> };
+  request: {
+    status?: Request["status"];
+    departmentId?: string;
+    sources: Array<{ url: string }>;
+  };
 };
 
 function mapTaskApprovalRecord(task: TaskApprovalRecord): Task {
   return {
     id: task.id,
+    departmentId: task.request.departmentId,
     requestId: task.requestId,
     title: task.title,
     type: task.contentType,
@@ -2053,6 +2061,16 @@ export function PrCenterApp({
       ]
     : [currentUser.role];
   const actorRoleCodes = actor?.roles?.length ? actor.roles : actor ? [actor.role] : [];
+  const editingRecord = state.requests.find((item) => item.id === requestEditId);
+  const editingApiRecord = visibleRequestList.find((item) => item.id === requestEditId);
+  const canSubmitRequestForm =
+    !requestEditId ||
+    (editingRecord?.requesterId ?? editingApiRecord?.requesterId) === currentUser.id;
+  const canManageGlobalAdmin = grantCoversDepartment(
+    actor?.roleGrants,
+    ["RTRDA_ADMIN"],
+    undefined,
+  );
   const canReadOtherRequests = actorRoleCodes.some((role) =>
     ["RTRDA_PR", "RTRDA_BORD", "RTRDA_ADMIN"].includes(role),
   );
@@ -2381,6 +2399,11 @@ export function PrCenterApp({
   };
   const editRequest = (request: Request) => {
     if (requestSaveInFlight.current) return;
+    if (
+      !canEditOwnRequest(request, currentUser.id) &&
+      !canAdminEditRequest(request, actor?.roleGrants)
+    )
+      return;
     requestCreatedFromPartial.current = false;
     requestUploadCache.current = createUploadCache<File>();
     setRequestEditId(request.id);
@@ -2388,13 +2411,16 @@ export function PrCenterApp({
     requestDraftDirty.current = false;
     setRequestDraft({
       ...emptyRequestDraft(currentUser),
+      department: request.department,
       type: request.type,
       title: request.title,
       requestedDate: request.requestedDate,
       source: request.sources?.join("\n") || request.source || "",
       objective: request.objective || "",
       audience: request.audience || "",
-      owner: request.projectOwner || currentUser.name,
+      owner:
+        request.projectOwner ||
+        (request.requesterId === currentUser.id ? currentUser.name : ""),
       assigner: request.assigner || "",
       whyNow: request.whyNow || "",
       contentTypes: request.contentTypes || ["Website News"],
@@ -2468,8 +2494,17 @@ export function PrCenterApp({
     submitAfterSave = false,
   ) => {
     if (requestSaveInFlight.current) return;
+    if (submitAfterSave && !canSubmitRequestForm) {
+      setNotice(
+        state.language === "th"
+          ? "เจ้าของคำขอเท่านั้นที่ส่งคำขอได้"
+          : "Only the requester may submit this request.",
+      );
+      return;
+    }
     const issue = getRequestFormIssue(draft, state.masterData.contentTypes);
-    if (issue) {
+    // Existing drafts/amendments may remain incomplete; only submission requires completeness.
+    if (issue && (submitAfterSave || !editId)) {
       if (!submitAfterSave && !editId) {
         requestDraftDirty.current = true;
         if (await closeRequest(draft))
@@ -3553,43 +3588,57 @@ export function PrCenterApp({
       setLoadingMoreIdeas(false);
     }
   };
+  const masterSaveInFlight = useRef(false);
   const updateMasterData = async (masterData: MasterData): Promise<boolean> => {
-    const response = await fetch("/api/pr-center/admin/master-data", {
-      method: "POST",
-      credentials: "same-origin",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        channels: masterData.channels,
-        contentTypes: masterData.contentTypes,
-        contentPillars: masterData.contentPillars,
-      }),
-    });
-    if (!response.ok) {
-      const result = (await response.json().catch(() => null)) as {
-        message?: string;
-      } | null;
-      announce(result?.message || "Master data could not be saved");
+    if (!canManageGlobalAdmin || masterSaveInFlight.current) return false;
+    masterSaveInFlight.current = true;
+    try {
+      const response = await fetch("/api/pr-center/admin/master-data", {
+        method: "POST",
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          channels: masterData.channels,
+          contentTypes: masterData.contentTypes,
+          contentPillars: masterData.contentPillars,
+        }),
+      });
+      if (!response.ok) {
+        const result = (await response.json().catch(() => null)) as {
+          message?: string;
+        } | null;
+        announce(result?.message || "Master data could not be saved");
+        return false;
+      }
+      const saved = (await response.json()) as Pick<
+        MasterData,
+        "channels" | "contentTypes" | "contentPillars"
+      >;
+      updateState((previous) =>
+        addAudit(
+          {
+            ...previous,
+            masterData: { ...previous.masterData, ...saved },
+          },
+          "system",
+          "master-data",
+          "master_data_updated",
+          "",
+          "Master data updated",
+        ),
+      );
+      announce(state.language === "th" ? "บันทึกข้อมูลหลักแล้ว" : "Master data saved");
+      return true;
+    } catch {
+      announce(
+        state.language === "th"
+          ? "บันทึกข้อมูลหลักไม่สำเร็จ กรุณาลองอีกครั้ง"
+          : "Master data save failed. Please retry.",
+      );
       return false;
+    } finally {
+      masterSaveInFlight.current = false;
     }
-    const saved = (await response.json()) as Pick<
-      MasterData,
-      "channels" | "contentTypes" | "contentPillars"
-    >;
-    updateState((previous) =>
-      addAudit(
-        {
-          ...previous,
-          masterData: { ...previous.masterData, ...saved },
-        },
-        "system",
-        "master-data",
-        "master_data_updated",
-        "",
-        "Master data updated",
-      ),
-    );
-    announce(state.language === "th" ? "บันทึกข้อมูลหลักแล้ว" : "Master data saved");
-    return true;
   };
   const readNotifications = async (ids: string[]) => {
     if (ids.length === 0) return;
@@ -3788,7 +3837,7 @@ export function PrCenterApp({
               canCreateRequest={hasUiRole("requester", "pr", "admin")}
               currentUserName={currentUser.name}
               currentUserRole={currentUser.role}
-              canManageReleaseEvidence={hasUiRole("admin")}
+              canManageReleaseEvidence={canManageGlobalAdmin}
               requestsUnavailable={requestsUnavailable}
               requests={state.requests}
               tasks={state.tasks}
@@ -3943,6 +3992,7 @@ export function PrCenterApp({
               requests={approvalRequests}
               canDecideRequests={hasUiRole("pr", "admin")}
               canDecideTasks={hasUiRole("pr", "admin")}
+              approvalGrants={actor?.roleGrants}
               requestQueueState={
                 hasUiRole("pr", "admin") ? requestApprovalQueueState : "not-authorized"
               }
@@ -4075,7 +4125,7 @@ export function PrCenterApp({
           )}
           {page === "system-data" && (
             <SystemData
-              state={state}
+              canManage={canManageGlobalAdmin}
               data={state.masterData}
               onSave={updateMasterData}
               language={state.language}
@@ -4095,7 +4145,14 @@ export function PrCenterApp({
       {requestOpen && (
         <RequestModal
           language={state.language}
-          requesterName={currentUser.name}
+          requesterName={
+            requestEditId
+              ? (editingRecord?.requesterName ??
+                editingApiRecord?.requester.displayName ??
+                (state.language === "th" ? "เจ้าของคำขอเดิม" : "Original requester"))
+              : currentUser.name
+          }
+          canSubmit={canSubmitRequestForm}
           contentTypes={state.masterData.contentTypes}
           draftLoading={!requestDraftHydrated}
           draftSaving={requestDraftSaving}
@@ -4891,7 +4948,7 @@ function ExecutiveDashboard({
   const scheduled = tasks.filter((task) =>
     ["approved", "scheduled"].includes(task.status),
   ).length;
-  const onTime = tasks.filter((task) => task.dueDate >= "2026-09-07").length;
+
   const metricsUnavailable = unavailableMetricDisplay(language);
   return (
     <>
@@ -4918,7 +4975,11 @@ function ExecutiveDashboard({
         <Metric
           value={String(pending)}
           label={t.pending}
-          trend={`${onTime}/${tasks.length} on schedule`}
+          trend={
+            language === "th"
+              ? "ยังไม่มีข้อมูลยืนยันการตรงเวลา"
+              : "On-time performance not verified"
+          }
           tone="gold"
         />
       </section>
@@ -5433,7 +5494,8 @@ function Requests({
               language={language}
               onRestored={onRestored}
             />
-            {canEditOwnRequest(selected, currentUserId) && (
+            {(canEditOwnRequest(selected, currentUserId) ||
+              canAdminEditRequest(selected, restoreGrants)) && (
               <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                 <button onClick={() => onEditRequest(selected)}>
                   {selected.status === "WITHDRAWN" || selected.status === "REJECTED"
@@ -5444,19 +5506,21 @@ function Requests({
                       ? "แก้ไขคำขอ"
                       : "Edit request"}
                 </button>
-                {selected.status === "DRAFT" && (
-                  <button
-                    className={styles.primary}
-                    onClick={() => onSubmitRequest(selected)}
-                  >
-                    Submit request
-                  </button>
-                )}
-                {(selected.status === "DRAFT" || selected.status === "SUBMITTED") && (
-                  <button onClick={() => onWithdrawRequest(selected)}>
-                    Withdraw request
-                  </button>
-                )}
+                {selected.requesterId === currentUserId &&
+                  selected.status === "DRAFT" && (
+                    <button
+                      className={styles.primary}
+                      onClick={() => onSubmitRequest(selected)}
+                    >
+                      Submit request
+                    </button>
+                  )}
+                {selected.requesterId === currentUserId &&
+                  (selected.status === "DRAFT" || selected.status === "SUBMITTED") && (
+                    <button onClick={() => onWithdrawRequest(selected)}>
+                      Withdraw request
+                    </button>
+                  )}
               </div>
             )}
           </section>
@@ -7566,6 +7630,7 @@ function Approvals({
   requests,
   canDecideRequests,
   canDecideTasks,
+  approvalGrants,
   requestQueueState,
   onDecision,
   onRequestDecision,
@@ -7575,6 +7640,7 @@ function Approvals({
   requests: RequestApprovalItem[];
   canDecideRequests: boolean;
   canDecideTasks: boolean;
+  approvalGrants?: Array<{ role: string; departmentId: string | null }>;
   requestQueueState: "loading" | "loaded" | "error" | "not-authorized";
   onDecision: (
     taskId: string,
@@ -7595,6 +7661,30 @@ function Approvals({
   const [decidingRequestId, setDecidingRequestId] = useState<string | null>(null);
   const requestDecisionBusy = useRef(false);
   const taskDecisionBusy = useRef(false);
+  const [stagePolicy, setStagePolicy] = useState<ApprovalPolicy | null>(null);
+  const [policyError, setPolicyError] = useState(false);
+  const [policyAttempt, setPolicyAttempt] = useState(0);
+  useEffect(() => {
+    const controller = new AbortController();
+    fetch("/api/pr-center/workflow/approval-policy", {
+      credentials: "same-origin",
+      cache: "no-store",
+      signal: controller.signal,
+    })
+      .then(async (response) => {
+        if (!response.ok) throw new Error("Approval policy unavailable");
+        return parseApprovalPolicy(JSON.stringify(await response.json()));
+      })
+      .then((policy) => {
+        if (!controller.signal.aborted) setStagePolicy(policy);
+      })
+      .catch(() => {
+        if (!controller.signal.aborted) setPolicyError(true);
+      });
+    return () => controller.abort();
+  }, [policyAttempt]);
+  const canDecideTask = (task: Task) =>
+    canDecideTasks && canDecideTaskStage(task, stagePolicy, approvalGrants);
   const [taskComments, setTaskComments] = useState<Record<string, string>>({});
   const [taskErrors, setTaskErrors] = useState<Record<string, string>>({});
   const [decidingTaskId, setDecidingTaskId] = useState<string | null>(null);
@@ -7654,7 +7744,7 @@ function Approvals({
     task: Task,
     decision: "APPROVED" | "REVISION_REQUIRED" | "REJECTED",
   ) => {
-    if (taskDecisionBusy.current) return;
+    if (taskDecisionBusy.current || !canDecideTask(task)) return;
     const comment = taskComments[task.id]?.trim() || "";
     if (decision !== "APPROVED" && !comment) {
       setTaskErrors((previous) => ({
@@ -7966,6 +8056,27 @@ function Approvals({
         {language === "th" ? "คิวตรวจและอนุมัติงาน" : "Task stage approvals"}
         <span>{taskItems.length}</span>
       </h2>
+      {!stagePolicy &&
+        (policyError ? (
+          <p role="alert">
+            {language === "th"
+              ? "โหลดนโยบายอนุมัติไม่สำเร็จ ปิดการตัดสินงานไว้จนกว่าจะตรวจสอบสิทธิ์ได้"
+              : "Task approval policy unavailable. Decisions are disabled."}
+            <button
+              type="button"
+              onClick={() => {
+                setPolicyError(false);
+                setPolicyAttempt((attempt) => attempt + 1);
+              }}
+            >
+              {language === "th" ? "ลองโหลดนโยบายอีกครั้ง" : "Retry approval policy"}
+            </button>
+          </p>
+        ) : (
+          <p role="status">
+            {language === "th" ? "กำลังโหลดนโยบายอนุมัติ…" : "Loading approval policy…"}
+          </p>
+        ))}
       <section className={styles.list}>
         {taskItems.map((task) => (
           <article key={task.id} id={`task-${task.id}`} className={styles.approvalCard}>
@@ -8020,7 +8131,7 @@ function Approvals({
               <Status>
                 {language === "th" ? "รอการตรวจและอนุมัติ" : "Awaiting approval"}
               </Status>
-              {canDecideTasks && task.status === "pr_editorial_review" && (
+              {canDecideTask(task) && task.status === "pr_editorial_review" && (
                 <fieldset>
                   <legend>
                     {language === "th"
@@ -8048,7 +8159,7 @@ function Approvals({
                   ))}
                 </fieldset>
               )}
-              {canDecideTasks ? (
+              {canDecideTask(task) ? (
                 <>
                   <label htmlFor={`stage-task-comment-${task.id}`}>
                     {language === "th" ? "ความคิดเห็น / เหตุผล" : "Comment / reason"}
@@ -10687,6 +10798,18 @@ function Directory({
   const [revokeReason, setRevokeReason] = useState("");
   const [revokeSubmitting, setRevokeSubmitting] = useState(false);
   const [accessReason, setAccessReason] = useState("");
+  const directoryMutation = useRef(false);
+  const [directorySaving, setDirectorySaving] = useState(false);
+  const beginDirectoryMutation = () => {
+    if (directoryMutation.current) return false;
+    directoryMutation.current = true;
+    setDirectorySaving(true);
+    return true;
+  };
+  const finishDirectoryMutation = () => {
+    directoryMutation.current = false;
+    setDirectorySaving(false);
+  };
   const isOrganizationAdmin =
     isAdministrator &&
     (actor.roleGrants?.some(
@@ -10752,6 +10875,7 @@ function Directory({
       return setError(
         language === "th" ? 'กรุณาพิมพ์ "ตกลง" เพื่อยืนยัน' : 'Type "ตกลง" to confirm',
       );
+    if (!beginDirectoryMutation()) return;
     setGrantSubmitting(true);
     try {
       const res = await fetch(`/api/pr-center/admin/users/${userId}/roles`, {
@@ -10782,6 +10906,7 @@ function Directory({
       );
     } finally {
       setGrantSubmitting(false);
+      finishDirectoryMutation();
     }
   };
 
@@ -10792,6 +10917,7 @@ function Directory({
     const reason = revokeReason.trim();
     if (!reason)
       return setError(language === "th" ? "กรุณาระบุเหตุผล" : "A reason is required");
+    if (!beginDirectoryMutation()) return;
     setRevokeSubmitting(true);
     try {
       const res = await fetch(`/api/pr-center/admin/roles/${revokeTarget.roleId}`, {
@@ -10819,29 +10945,41 @@ function Directory({
       );
     } finally {
       setRevokeSubmitting(false);
+      finishDirectoryMutation();
     }
   };
 
-  const handleToggleActive = async (userId: string) => {
+  const handleToggleActive = async (userId: string, desiredActive: boolean) => {
     setNotice(null);
     setError(null);
     const reason = accessReason.trim();
     if (!reason)
       return setError(language === "th" ? "กรุณาระบุเหตุผล" : "A reason is required");
-    const res = await fetch(`/api/pr-center/admin/users/${userId}/active`, {
-      method: "PATCH",
-      credentials: "same-origin",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ reason }),
-    });
-    if (!res.ok) {
-      const err = await res.json().catch(() => null);
-      setError(err?.message || "Status toggle failed");
-      return;
+    if (!beginDirectoryMutation()) return;
+    try {
+      const res = await fetch(`/api/pr-center/admin/users/${userId}/active`, {
+        method: "PATCH",
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ reason, active: desiredActive }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => null);
+        setError(err?.message || "Status toggle failed");
+        return;
+      }
+      setNotice("User status updated");
+      setAccessReason("");
+      reload();
+    } catch {
+      setError(
+        language === "th"
+          ? "เชื่อมต่อระบบไม่ได้ กรุณาลองอีกครั้ง"
+          : "Could not connect. Please try again.",
+      );
+    } finally {
+      finishDirectoryMutation();
     }
-    setNotice("User status updated");
-    setAccessReason("");
-    reload();
   };
 
   return (
@@ -10877,6 +11015,7 @@ function Directory({
           </span>
           <textarea
             value={accessReason}
+            disabled={directorySaving}
             maxLength={1000}
             onChange={(event) => setAccessReason(event.target.value)}
             aria-required="true"
@@ -10912,8 +11051,9 @@ function Directory({
                 <div style={{ display: "flex", gap: 8 }}>
                   {directoryUserAuthority(actor, user).administer && (
                     <button
-                      onClick={() => handleToggleActive(user.id)}
+                      onClick={() => void handleToggleActive(user.id, !user.active)}
                       disabled={
+                        directorySaving ||
                         user.id === actor.userId ||
                         isRootAccount(user) ||
                         (hasAdministratorRole(user) && !canGrantAdministratorRole) ||
@@ -10957,6 +11097,7 @@ function Directory({
                           );
                       }}
                       disabled={
+                        directorySaving ||
                         user.id === actor.userId ||
                         !directoryUserAuthority(actor, user).canGrant
                       }
@@ -11022,6 +11163,7 @@ function Directory({
                           });
                         }}
                         disabled={
+                          directorySaving ||
                           isRootAccount(user) ||
                           (r.role === "RTRDA_ADMIN" && !canGrantAdministratorRole) ||
                           (user.active &&
@@ -11066,7 +11208,9 @@ function Directory({
             {grantTarget === user.id && (
               <div
                 role="presentation"
-                onClick={() => setGrantTarget(null)}
+                onClick={() => {
+                  if (!grantSubmitting) setGrantTarget(null);
+                }}
                 style={{
                   position: "fixed",
                   inset: 0,
@@ -11302,10 +11446,12 @@ function Directory({
 }
 function MasterDataEditor({
   label: itemLabel,
+  canEdit = true,
   values,
   onSave,
 }: {
   label: string;
+  canEdit?: boolean;
   values: string[];
   onSave: (values: string[]) => Promise<boolean>;
 }) {
@@ -11317,18 +11463,22 @@ function MasterDataEditor({
     <article className={styles.card}>
       <header>
         <h2>{itemLabel}</h2>
-        <button
-          onClick={() => {
-            setDraft(values.join("\n"));
-            setEditing(!editing);
-          }}
-        >
-          {editing ? "Cancel" : "Edit"}
-        </button>
+        {canEdit && (
+          <button
+            disabled={saving}
+            onClick={() => {
+              setDraft(values.join("\n"));
+              setEditing(!editing);
+            }}
+          >
+            {editing ? "Cancel" : "Edit"}
+          </button>
+        )}
       </header>
-      {editing ? (
+      {editing && canEdit ? (
         <>
           <textarea
+            disabled={saving}
             value={draft}
             onChange={(event) => setDraft(event.target.value)}
             aria-label={itemLabel}
@@ -11511,48 +11661,45 @@ function Settings({ language }: { language: Language }) {
   );
 }
 function SystemData({
-  state,
+  canManage,
   data,
   onSave,
   language,
 }: {
-  state: PrCenterState;
+  canManage: boolean;
   data: MasterData;
   onSave: (data: MasterData) => Promise<boolean>;
   language: Language;
 }) {
-  const exportData = () => {
-    const link = document.createElement("a");
-    link.href = URL.createObjectURL(
-      new Blob([JSON.stringify(state, null, 2)], { type: "application/json" }),
-    );
-    link.download = "rtrda-pr-center-data.json";
-    link.click();
-    URL.revokeObjectURL(link.href);
-  };
   return (
     <>
       <SectionHeading
         eyebrow="ADMINISTRATION"
         title="System Data"
-        action={
-          <button className={styles.primary} onClick={exportData}>
-            Export data
-          </button>
-        }
+        action={canManage ? <PrCenterAuditExport language={language} /> : undefined}
       />
+      {!canManage && (
+        <p role="note">
+          {language === "th"
+            ? "อ่านอย่างเดียว การแก้ข้อมูลหลักและส่งออก Audit ต้องใช้ ADMIN ระดับองค์กร"
+            : "Read only. Master-data editing and audit export require an organization-wide ADMIN grant."}
+        </p>
+      )}
       <section className={styles.settings}>
         <MasterDataEditor
+          canEdit={canManage}
           label={language === "th" ? "ประเภทเนื้อหา" : "Content types"}
           values={data.contentTypes}
           onSave={(contentTypes) => onSave({ ...data, contentTypes })}
         />
         <MasterDataEditor
+          canEdit={canManage}
           label={language === "th" ? "ช่องทางเผยแพร่" : "Publishing channels"}
           values={data.channels}
           onSave={(channels) => onSave({ ...data, channels })}
         />
         <MasterDataEditor
+          canEdit={canManage}
           label={language === "th" ? "เสาหลักเนื้อหา" : "Content pillars"}
           values={data.contentPillars}
           onSave={(contentPillars) => onSave({ ...data, contentPillars })}
@@ -11693,6 +11840,7 @@ function RequestModal({
   draftSaving,
   submitting,
   isEditing,
+  canSubmit,
   draft,
   onChange,
   onClose,
@@ -11705,6 +11853,7 @@ function RequestModal({
   draftSaving: boolean;
   submitting: boolean;
   isEditing: boolean;
+  canSubmit: boolean;
   draft: RequestDraft;
   onChange: (draft: RequestDraft) => void;
   onClose: () => void;
@@ -12083,7 +12232,7 @@ function RequestModal({
             className={styles.primary}
             type="submit"
             value="submit"
-            disabled={draftLoading || submitting}
+            disabled={draftLoading || submitting || !canSubmit}
           >
             {submitting
               ? thai

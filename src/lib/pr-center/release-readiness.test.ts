@@ -18,6 +18,7 @@ const { counts, findEvidence, createEvidence } = vi.hoisted(() => ({
 vi.mock("@/lib/db/client", () => ({
   prisma: {
     ...counts,
+    prCenterUser: { findMany: vi.fn().mockResolvedValue([]) },
     prAuditEvent: {
       ...counts.prAuditEvent,
       findMany: findEvidence,

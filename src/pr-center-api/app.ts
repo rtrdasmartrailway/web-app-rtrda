@@ -903,6 +903,7 @@ export function buildPrCenterApi(
       (request.params as { userId: string }).userId,
       input.reason,
       correlationId(request),
+      input.active,
     );
   });
   app.get("/admin/access-audit", async (request) => {

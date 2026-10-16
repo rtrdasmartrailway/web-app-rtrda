@@ -359,7 +359,15 @@ describe("request intake approval", () => {
 
       expect(mockPrisma.prRequest.updateMany).toHaveBeenCalledWith(
         expect.objectContaining({
-          where: { id: requestRecord.id, version: 2, status },
+          where: {
+            id: requestRecord.id,
+            organizationId: requesterActor.organizationId,
+            requesterId: requesterActor.id,
+            departmentId: requestRecord.departmentId,
+            OR: [{ requesterId: requesterActor.id }],
+            version: 2,
+            status,
+          },
           data: expect.objectContaining({
             ...(status === "DRAFT" ? {} : { status: "DRAFT" }),
             version: { increment: 1 },
@@ -442,7 +450,15 @@ describe("request intake approval", () => {
         version: 5,
       });
       expect(mockPrisma.prRequest.updateMany).toHaveBeenCalledWith({
-        where: { id: requestRecord.id, version: 4, status },
+        where: {
+          id: requestRecord.id,
+          organizationId: requesterActor.organizationId,
+          requesterId: requesterActor.id,
+          departmentId: requestRecord.departmentId,
+          OR: [{ requesterId: requesterActor.id }],
+          version: 4,
+          status,
+        },
         data: expect.objectContaining({ status: "DRAFT", version: { increment: 1 } }),
       });
       expect(mockPrisma.prTask.updateMany).toHaveBeenCalledWith({

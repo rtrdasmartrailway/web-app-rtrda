@@ -1,6 +1,8 @@
 import type { PrCenterRole } from "./workflow";
 
 const CORE_PAGES = new Set([
+  "system-data",
+  "executive",
   "home",
   "new-request",
   "my-requests",
@@ -42,6 +44,8 @@ export function canOpenPrCenterPage(
   phase2Pages = "",
 ): boolean {
   if (!isPrCenterPageEnabled(page, phase2Pages)) return false;
+  if (page === "system-data" || page === "executive")
+    return roles.includes("RTRDA_ADMIN");
   return roles.some((role) =>
     role === "RTRDA_ALL_USER"
       ? REQUESTER_PAGES.has(page)
