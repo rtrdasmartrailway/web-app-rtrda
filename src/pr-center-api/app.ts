@@ -143,7 +143,7 @@ function taskId(value: string): `${string}-${string}-${string}-${string}-${strin
 
 function listQuery(request: FastifyRequest) {
   const query = request.query as Record<string, unknown>;
-  for (const key of ["take", "cursor", "q", "status", "mine"]) {
+  for (const key of ["take", "cursor", "q", "status", "mine", "sort"]) {
     if (query[key] !== undefined && typeof query[key] !== "string")
       throw new PrCenterError(`Invalid ${key} filter`, 422, "INVALID_LIST_FILTER");
   }
@@ -153,6 +153,7 @@ function listQuery(request: FastifyRequest) {
   return {
     take: rawTake === undefined ? undefined : Number(rawTake),
     cursor: query.cursor as string | undefined,
+    sort: query.sort as string | undefined,
     q: query.q as string | undefined,
     status: query.status as string | undefined,
     mine: query.mine as string | undefined,
@@ -164,6 +165,7 @@ function requestListFilters(query: ReturnType<typeof listQuery>): RequestListFil
     throw new PrCenterError("mine must be true or false", 422, "INVALID_LIST_FILTER");
   return {
     q: query.q,
+    sort: query.sort,
     status: query.status as RequestListFilters["status"],
     mine: query.mine === undefined ? undefined : query.mine === "true",
   };
@@ -248,12 +250,14 @@ export function buildPrCenterApi(
       offset?: string;
       search?: string;
       status?: string;
+      sort?: string;
     };
     return listIdeas(request.prCenterActor!, {
       take: query.take === undefined ? 50 : Number(query.take),
       offset: query.offset === undefined ? 0 : Number(query.offset),
       search: query.search,
       status: query.status,
+      sort: query.sort,
     });
   });
   app.post("/ideas", async (request, reply) => {
@@ -404,6 +408,7 @@ export function buildPrCenterApi(
       throw new PrCenterError("Unknown history filter", 422, "INVALID_LIST_FILTER");
     return listAuditEvents(request.prCenterActor!, query.take ?? 100, query.cursor, {
       q: query.q,
+      sort: query.sort,
     });
   });
   app.get("/session", async (request) => sessionProfile(request.prCenterActor!));
@@ -860,8 +865,13 @@ export function buildPrCenterApi(
     );
   });
   app.get("/admin/access-audit", async (request) => {
-    const query = request.query as { take?: string };
-    return listAccessAuditEvents(request.prCenterActor!, Number(query.take || 100));
+    const query = request.query as { take?: string; sort?: string; offset?: string };
+    return listAccessAuditEvents(
+      request.prCenterActor!,
+      Number(query.take || 100),
+      query.sort,
+      Number(query.offset || 0),
+    );
   });
   // ── Quarantine management routes ─────────────────────────────────────
   app.get("/admin/quarantine", async (request) => {

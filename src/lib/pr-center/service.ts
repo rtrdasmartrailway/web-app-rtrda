@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { DEFAULT_LIST_SORT, listOrderBy, type ListSortKind } from "./list-sorting";
 import {
   Prisma,
   type PrContentIdeaStatus,
@@ -899,12 +900,21 @@ export async function createRequest(
 }
 
 export type RequestListFilters = {
+  sort?: string;
   q?: string;
   status?: PrRequestStatus;
   mine?: boolean;
 };
 
-export type AuditListFilters = { q?: string };
+export type AuditListFilters = { q?: string; sort?: string };
+
+function checkedListOrder(kind: ListSortKind, sort?: string) {
+  try {
+    return listOrderBy(kind, sort);
+  } catch {
+    throw new PrCenterError("Invalid sort", 422, "INVALID_LIST_FILTER");
+  }
+}
 
 function listLimit(take: number): number {
   if (!Number.isInteger(take) || take < 1 || take > 100)
@@ -949,6 +959,11 @@ export async function listRequests(
   const limit = listLimit(take);
   listCursor(cursor);
   const q = listSearch(filters.q);
+  const orderBy = checkedListOrder(
+    "requests",
+    filters.sort,
+  ) as Prisma.PrRequestOrderByWithRelationInput[];
+  const customSort = filters.sort && filters.sort !== DEFAULT_LIST_SORT;
   if (
     filters.status !== undefined &&
     !(
@@ -971,7 +986,7 @@ export async function listRequests(
   if (filters.status) clauses.push({ status: filters.status });
   // Assigned-task-only rows intentionally redact the request title/number.
   // Do not let search matching become an oracle for those hidden fields.
-  if (q) clauses.push(requestReadWhere(actor));
+  if (q || customSort) clauses.push(requestReadWhere(actor));
   if (q)
     clauses.push({
       OR: [
@@ -988,12 +1003,13 @@ export async function listRequests(
     });
     if (!anchor)
       throw new PrCenterError("Cursor not found in this list", 422, "INVALID_CURSOR");
-    clauses.push(afterCursor(anchor.createdAt, anchor.id));
+    if (!customSort) clauses.push(afterCursor(anchor.createdAt, anchor.id));
   }
   const requests = await prisma.prRequest.findMany({
     where: clauses.length === 1 ? where : { AND: clauses },
     take: limit + 1,
-    orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+    orderBy,
+    ...(customSort && cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
     include: {
       department: { select: { name: true } },
       requester: { select: { displayName: true } },
@@ -1544,9 +1560,19 @@ export async function transitionRequest(
 
 export async function listIdeas(
   actor: PrCenterActor,
-  pagination: { take?: number; offset?: number; search?: string; status?: string } = {},
+  pagination: {
+    take?: number;
+    offset?: number;
+    search?: string;
+    status?: string;
+    sort?: string;
+  } = {},
 ) {
   const take = pagination.take ?? 50;
+  const orderBy = checkedListOrder(
+    "ideas",
+    pagination.sort,
+  ) as Prisma.PrContentIdeaOrderByWithRelationInput[];
   const offset = pagination.offset ?? 0;
   const rawSearch: unknown = pagination.search;
   const search = typeof rawSearch === "string" ? rawSearch.trim() : "";
@@ -1605,7 +1631,7 @@ export async function listIdeas(
   };
   const rows = await prisma.prContentIdea.findMany({
     where,
-    orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+    orderBy,
     skip: offset,
     take: take + 1,
     select: {
@@ -2835,6 +2861,11 @@ export async function listAuditEvents(
   const limit = listLimit(take);
   listCursor(cursor);
   const q = listSearch(filters.q);
+  const orderBy = checkedListOrder(
+    "audit",
+    filters.sort,
+  ) as Prisma.PrAuditEventOrderByWithRelationInput[];
+  const customSort = filters.sort && filters.sort !== DEFAULT_LIST_SORT;
   // Audit payloads can contain sensitive cross-department data. Only an
   // organization-wide eligible grant can read another user's events.
   const scope: Prisma.PrAuditEventWhereInput = actorHasOrganizationWideRole(actor, [
@@ -2860,12 +2891,13 @@ export async function listAuditEvents(
     });
     if (!anchor)
       throw new PrCenterError("Cursor not found in this history", 422, "INVALID_CURSOR");
-    clauses.push(afterCursor(anchor.createdAt, anchor.id));
+    if (!customSort) clauses.push(afterCursor(anchor.createdAt, anchor.id));
   }
   const events = await prisma.prAuditEvent.findMany({
     where: clauses.length === 1 ? scope : { AND: clauses },
     include: { actor: { select: { displayName: true } } },
-    orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+    orderBy,
+    ...(customSort && cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
     take: limit + 1,
   });
   // Keep the extra row so the caller can detect whether a next page exists.
@@ -5009,10 +5041,26 @@ export async function toggleUserActive(
   });
 }
 
-export async function listAccessAuditEvents(actor: PrCenterActor, take = 100) {
+export async function listAccessAuditEvents(
+  actor: PrCenterActor,
+  take = 100,
+  sort?: string,
+  offset = 0,
+) {
   if (!canManageAccess(actorRoles(actor)))
     throw new PrCenterError("You cannot view access audit events", 403, "FORBIDDEN");
   const limit = Math.min(Math.max(take, 1), 500);
+  if (
+    !Number.isSafeInteger(offset) ||
+    offset < 0 ||
+    offset > 100_000 ||
+    !Number.isInteger(limit)
+  )
+    throw new PrCenterError("Invalid pagination", 422, "INVALID_LIST_FILTER");
+  const orderBy = checkedListOrder(
+    "audit",
+    sort,
+  ) as Prisma.PrAuditEventOrderByWithRelationInput[];
   const organizationWide = actorHasOrganizationWideRole(actor, ["RTRDA_ADMIN"]);
   return prisma.prAuditEvent.findMany({
     where: {
@@ -5029,8 +5077,9 @@ export async function listAccessAuditEvents(actor: PrCenterActor, take = 100) {
       },
     },
     include: { actor: { select: { displayName: true, email: true } } },
-    orderBy: { createdAt: "desc" },
+    orderBy,
     take: limit,
+    skip: offset,
   });
 }
 

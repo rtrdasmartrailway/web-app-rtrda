@@ -9,6 +9,11 @@ import {
   useState,
 } from "react";
 import Image from "next/image";
+import {
+  DEFAULT_LIST_SORT,
+  listSortFields,
+  type ListSortKind,
+} from "@/lib/pr-center/list-sorting";
 import type { CreateContentIdeaInput } from "@/lib/pr-center/idea-input";
 import { submitIdeaForm } from "@/lib/pr-center/idea-form";
 import {
@@ -313,15 +318,75 @@ function mapIdeaRecord(idea: IdeaListRecord): Idea {
     version: idea.version,
   };
 }
+function ListSorting({
+  kind,
+  value,
+  onChange,
+  language,
+}: {
+  kind: ListSortKind;
+  value: string;
+  onChange: (value: string) => void;
+  language: Language;
+}) {
+  const [field, direction] = value.split(":");
+  const thai = language === "th";
+  return (
+    <div className={styles.filterBar}>
+      <label>
+        {thai ? "เรียงตาม " : "Sort by "}
+        <select
+          value={field}
+          onChange={(event) => onChange(`${event.target.value}:${direction}`)}
+        >
+          {listSortFields[kind].map(([key, th, en]) => (
+            <option key={key} value={key}>
+              {thai ? th : en}
+            </option>
+          ))}
+        </select>
+      </label>
+      <label>
+        {thai ? "ลำดับ " : "Order "}
+        <select
+          value={direction}
+          onChange={(event) => onChange(`${field}:${event.target.value}`)}
+        >
+          <option value="desc">
+            {field === "createdAt" || field === "requestedFor"
+              ? thai
+                ? "ใหม่ไปเก่า"
+                : "Newest first"
+              : thai
+                ? "มากไปน้อย / ฮ–ก"
+                : "Descending / Z–A"}
+          </option>
+          <option value="asc">
+            {field === "createdAt" || field === "requestedFor"
+              ? thai
+                ? "เก่าไปใหม่"
+                : "Oldest first"
+              : thai
+                ? "น้อยไปมาก / ก–ฮ"
+                : "Ascending / A–Z"}
+          </option>
+        </select>
+      </label>
+    </div>
+  );
+}
+
 async function fetchIdeaPage(
   offset: number,
   search = "",
   status = "",
   signal?: AbortSignal,
+  sort = DEFAULT_LIST_SORT,
 ) {
   const query = new URLSearchParams({
     take: String(IDEAS_PAGE_SIZE),
     offset: String(offset),
+    sort,
   });
   if (search.trim()) query.set("search", search.trim());
   if (status) query.set("status", status);
@@ -364,6 +429,7 @@ type Snapshot = {
   state: PrCenterState;
 };
 type AuditEntry = {
+  actorName?: string;
   id: string;
   actorId: string;
   entity: "request" | "task" | "notification" | "system";
@@ -1518,11 +1584,19 @@ export function PrCenterApp({
     "loading",
   );
   const [ideaSearch, setIdeaSearch] = useState("");
+  const [listSorts, setListSorts] = useState<Record<string, string>>({});
+  const requestSort = listSorts[page] ?? DEFAULT_LIST_SORT;
+  const ideaSort = listSorts.ideas ?? DEFAULT_LIST_SORT;
+  const auditSort = listSorts.history ?? DEFAULT_LIST_SORT;
   const [ideaStatusFilter, setIdeaStatusFilter] = useState("");
-  const latestIdeaFilters = useRef({ search: ideaSearch, status: ideaStatusFilter });
+  const latestIdeaFilters = useRef({
+    search: ideaSearch,
+    status: ideaStatusFilter,
+    sort: ideaSort,
+  });
   const changeIdeaFilters = (search: string, status: "all" | IdeaStatus) => {
     const nextStatus = status === "all" ? "" : status.toUpperCase();
-    latestIdeaFilters.current = { search, status: nextStatus };
+    latestIdeaFilters.current = { search, status: nextStatus, sort: ideaSort };
     setIdeaListStatus("loading");
     setIdeaNextOffset(null);
     setIdeaSearch(search);
@@ -1585,6 +1659,7 @@ export function PrCenterApp({
     mode: requestMode,
     search: requestSearch.trim(),
     status: requestStatusFilter,
+    sort: requestSort,
   });
   const visibleRequestList = requestListContext === requestContextKey ? requestList : [];
   useEffect(() => {
@@ -1594,6 +1669,7 @@ export function PrCenterApp({
     const controller = new AbortController();
     const timer = window.setTimeout(() => {
       const query = new URLSearchParams({ take: "100" });
+      query.set("sort", requestSort);
       if (requestMode === "mine") query.set("mine", "true");
       if (requestSearch.trim()) query.set("q", requestSearch.trim());
       if (requestStatusFilter) query.set("status", requestStatusFilter);
@@ -1636,6 +1712,7 @@ export function PrCenterApp({
     requestStatusFilter,
     requestListReload,
     requestContextKey,
+    requestSort,
   ]);
   const changeRequestFilters = (search: string, status: string) => {
     ++requestListGeneration.current;
@@ -1666,6 +1743,7 @@ export function PrCenterApp({
     setRequestListLoadingMore(true);
     const generation = requestListGeneration.current;
     const query = new URLSearchParams({ take: "100", cursor: requestListCursor });
+    query.set("sort", requestSort);
     if (requestMode === "mine") query.set("mine", "true");
     if (requestSearch.trim()) query.set("q", requestSearch.trim());
     if (requestStatusFilter) query.set("status", requestStatusFilter);
@@ -1742,7 +1820,7 @@ export function PrCenterApp({
   useEffect(() => {
     if (!actor?.userId) return;
     const controller = new AbortController();
-    fetchIdeaPage(0, ideaSearch, ideaStatusFilter, controller.signal)
+    fetchIdeaPage(0, ideaSearch, ideaStatusFilter, controller.signal, ideaSort)
       .then((page) => {
         if (controller.signal.aborted) return;
         setState((previous) => ({ ...previous, ideas: page.items.map(mapIdeaRecord) }));
@@ -1756,7 +1834,7 @@ export function PrCenterApp({
         setNotice("Unable to load Content Ideas");
       });
     return () => controller.abort();
-  }, [actor?.userId, ideaSearch, ideaStatusFilter]);
+  }, [actor?.userId, ideaSearch, ideaStatusFilter, ideaSort]);
   useEffect(() => {
     if (!actor?.userId) return;
     let disposed = false;
@@ -1851,6 +1929,7 @@ export function PrCenterApp({
   const mapAuditRecord = (entry: {
     id: string;
     actorId: string | null;
+    actor?: { displayName: string } | null;
     entityType: string;
     entityId: string;
     action: string;
@@ -1858,6 +1937,7 @@ export function PrCenterApp({
   }): AuditEntry => ({
     id: entry.id,
     actorId: entry.actorId || "system",
+    actorName: entry.actor?.displayName,
     entity: ["request", "task", "notification"].includes(entry.entityType)
       ? (entry.entityType as AuditEntry["entity"])
       : "system",
@@ -1878,11 +1958,14 @@ export function PrCenterApp({
         setAuditError(false);
       }
     });
-    fetch("/api/pr-center/audit?take=100", {
-      credentials: "same-origin",
-      cache: "no-store",
-      signal: controller.signal,
-    })
+    fetch(
+      `/api/pr-center/audit?${new URLSearchParams({ take: "100", sort: auditSort })}`,
+      {
+        credentials: "same-origin",
+        cache: "no-store",
+        signal: controller.signal,
+      },
+    )
       .then(async (response) => {
         if (!response.ok) throw new Error("Audit history unavailable");
         const records = (await response.json()) as Array<
@@ -1906,7 +1989,7 @@ export function PrCenterApp({
       ++generationRef.current;
       controller.abort();
     };
-  }, [actor?.userId, page, auditReload]);
+  }, [actor?.userId, page, auditReload, auditSort]);
   const loadMoreAudit = async () => {
     if (!auditCursor || !auditHasMore || auditBusy.current || auditLoading) return;
     auditBusy.current = true;
@@ -1914,6 +1997,7 @@ export function PrCenterApp({
     const generation = auditGeneration.current;
     try {
       const query = new URLSearchParams({ take: "100", cursor: auditCursor });
+      query.set("sort", auditSort);
       const response = await fetch(`/api/pr-center/audit?${query}`, {
         credentials: "same-origin",
         cache: "no-store",
@@ -3214,17 +3298,24 @@ export function PrCenterApp({
   const refreshIdeas = async () => {
     if (!actor?.userId) return;
     setIdeaListStatus("loading");
-    const requestedFilters = { search: ideaSearch, status: ideaStatusFilter };
+    const requestedFilters = {
+      search: ideaSearch,
+      status: ideaStatusFilter,
+      sort: ideaSort,
+    };
     try {
       const page = await fetchIdeaPage(
         0,
         requestedFilters.search,
         requestedFilters.status,
+        undefined,
+        requestedFilters.sort,
       );
       if (
         latestActorId.current !== actor.userId ||
         latestIdeaFilters.current.search !== requestedFilters.search ||
-        latestIdeaFilters.current.status !== requestedFilters.status
+        latestIdeaFilters.current.status !== requestedFilters.status ||
+        latestIdeaFilters.current.sort !== requestedFilters.sort
       )
         return;
       setState((previous) => ({ ...previous, ideas: page.items.map(mapIdeaRecord) }));
@@ -3235,7 +3326,8 @@ export function PrCenterApp({
       if (
         latestActorId.current !== actor.userId ||
         latestIdeaFilters.current.search !== requestedFilters.search ||
-        latestIdeaFilters.current.status !== requestedFilters.status
+        latestIdeaFilters.current.status !== requestedFilters.status ||
+        latestIdeaFilters.current.sort !== requestedFilters.sort
       )
         return;
       setIdeaListStatus("error");
@@ -3251,17 +3343,24 @@ export function PrCenterApp({
     )
       return;
     setLoadingMoreIdeas(true);
-    const requestedFilters = { search: ideaSearch, status: ideaStatusFilter };
+    const requestedFilters = {
+      search: ideaSearch,
+      status: ideaStatusFilter,
+      sort: ideaSort,
+    };
     try {
       const page = await fetchIdeaPage(
         ideaNextOffset,
         requestedFilters.search,
         requestedFilters.status,
+        undefined,
+        requestedFilters.sort,
       );
       if (
         latestActorId.current !== actor.userId ||
         latestIdeaFilters.current.search !== requestedFilters.search ||
-        latestIdeaFilters.current.status !== requestedFilters.status
+        latestIdeaFilters.current.status !== requestedFilters.status ||
+        latestIdeaFilters.current.sort !== requestedFilters.sort
       )
         return;
       const nextIdeas = page.items.map(mapIdeaRecord);
@@ -3280,7 +3379,8 @@ export function PrCenterApp({
       if (
         latestActorId.current === actor?.userId &&
         latestIdeaFilters.current.search === requestedFilters.search &&
-        latestIdeaFilters.current.status === requestedFilters.status
+        latestIdeaFilters.current.status === requestedFilters.status &&
+        latestIdeaFilters.current.sort === requestedFilters.sort
       )
         setNotice("Unable to load more Content Ideas");
     } finally {
@@ -3511,6 +3611,38 @@ export function PrCenterApp({
               onNavigate={go}
               tasks={state.tasks}
               requests={state.requests}
+            />
+          )}
+          {["my-requests", "requests", "ideas", "history"].includes(page) && (
+            <ListSorting
+              kind={
+                page === "ideas" ? "ideas" : page === "history" ? "audit" : "requests"
+              }
+              value={listSorts[page] ?? DEFAULT_LIST_SORT}
+              language={state.language}
+              onChange={(sort) => {
+                if (page === "ideas") {
+                  latestIdeaFilters.current = {
+                    search: ideaSearch,
+                    status: ideaStatusFilter,
+                    sort,
+                  };
+                  setIdeaListStatus("loading");
+                  setIdeaNextOffset(null);
+                  setState((previous) => ({ ...previous, ideas: [] }));
+                } else if (page === "history") {
+                  ++auditGeneration.current;
+                  setAuditLoading(true);
+                  setAuditHasMore(false);
+                  setAuditCursor(null);
+                } else {
+                  ++requestListGeneration.current;
+                  setRequestListLoading(true);
+                  setRequestListHasMore(false);
+                  setRequestListCursor(null);
+                }
+                setListSorts((previous) => ({ ...previous, [page]: sort }));
+              }}
             />
           )}
           {page === "new-request" && hasUiRole("requester", "pr", "admin") && (
@@ -9556,8 +9688,8 @@ function History({
       <article className={styles.card}>
         <p role="note">
           {language === "th"
-            ? "แสดงกิจกรรมในขอบเขตสิทธิ์ของคุณ เรียงจากใหม่ไปเก่า"
-            : "Activity in your authorized scope, newest first."}
+            ? "แสดงกิจกรรมในขอบเขตสิทธิ์ของคุณ ตามลำดับที่เลือก"
+            : "Activity in your authorized scope, in the selected order."}
         </p>
         {loading && (
           <p role="status">
@@ -9578,7 +9710,7 @@ function History({
               language === "th" ? "th-TH-u-ca-buddhist" : "en-GB",
               { timeZone: "Asia/Bangkok" },
             ),
-            getUser(entry.actorId)?.name ?? entry.actorId,
+            entry.actorName ?? getUser(entry.actorId)?.name ?? entry.actorId,
             entry.action,
             entry.entityId,
           ])}
@@ -10309,6 +10441,10 @@ function MasterDataEditor({
   );
 }
 function Settings({ language }: { language: Language }) {
+  const [sort, setSort] = useState(DEFAULT_LIST_SORT);
+  const [offset, setOffset] = useState(0);
+  const [hasMore, setHasMore] = useState(false);
+  const [reload, setReload] = useState(0);
   const [auditEvents, setAuditEvents] = useState<
     Array<{
       id: string;
@@ -10326,10 +10462,26 @@ function Settings({ language }: { language: Language }) {
 
   useEffect(() => {
     let cancelled = false;
-    fetch("/api/pr-center/admin/access-audit?take=200", { credentials: "same-origin" })
+    fetch(
+      `/api/pr-center/admin/access-audit?${new URLSearchParams({ take: "201", sort, offset: String(offset) })}`,
+      { credentials: "same-origin", cache: "no-store" },
+    )
       .then(async (r) => {
         if (!r.ok) throw new Error("Could not load access audit");
-        if (!cancelled) setAuditEvents(await r.json());
+        const events = (await r.json()) as typeof auditEvents;
+        if (!cancelled) {
+          setAuditEvents((previous) =>
+            offset === 0
+              ? events.slice(0, 200)
+              : [
+                  ...previous,
+                  ...events
+                    .slice(0, 200)
+                    .filter((event) => !previous.some((item) => item.id === event.id)),
+                ],
+          );
+          setHasMore(events.length > 200);
+        }
       })
       .catch(() => {
         if (!cancelled) setError("Could not load access audit events");
@@ -10340,7 +10492,7 @@ function Settings({ language }: { language: Language }) {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [sort, offset, reload]);
 
   const actionLabel: Record<string, string> = {
     "access.role_granted": "Role granted",
@@ -10356,8 +10508,39 @@ function Settings({ language }: { language: Language }) {
         eyebrow="ACCESS ADMINISTRATION"
         title={language === "th" ? "บันทึกการเข้าถึง" : "Access Audit Log"}
       />
-      {error && <p style={{ color: "#dc2626", fontSize: 13 }}>{error}</p>}
-      {loading && <p>Loading audit events…</p>}
+      <ListSorting
+        kind="audit"
+        value={sort}
+        language={language}
+        onChange={(value) => {
+          setLoading(true);
+          setError(null);
+          setAuditEvents([]);
+          setOffset(0);
+          setHasMore(false);
+          setSort(value);
+        }}
+      />
+      {error && (
+        <p role="alert" style={{ color: "#dc2626", fontSize: 13 }}>
+          {language === "th" ? "โหลดบันทึกการเข้าถึงไม่สำเร็จ" : error}
+          <button
+            type="button"
+            onClick={() => {
+              setLoading(true);
+              setError(null);
+              setReload((value) => value + 1);
+            }}
+          >
+            {language === "th" ? "ลองอีกครั้ง" : "Retry"}
+          </button>
+        </p>
+      )}
+      {loading && (
+        <p role="status">
+          {language === "th" ? "กำลังโหลดประวัติการเข้าถึง…" : "Loading audit events…"}
+        </p>
+      )}
       {!loading && auditEvents.length === 0 && (
         <article className={styles.card}>
           <p>No access events recorded yet.</p>
@@ -10377,6 +10560,18 @@ function Settings({ language }: { language: Language }) {
               JSON.stringify(event.after || event.before || ""),
             ])}
           />
+          {hasMore && !error && (
+            <button
+              type="button"
+              onClick={() => {
+                setLoading(true);
+                setError(null);
+                setOffset((value) => value + 200);
+              }}
+            >
+              {language === "th" ? "โหลดบันทึกเพิ่ม" : "Load more events"}
+            </button>
+          )}
         </article>
       )}
     </>

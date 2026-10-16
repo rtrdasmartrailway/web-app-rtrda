@@ -92,6 +92,36 @@ describe("listIdeas pagination and scope", () => {
     });
   });
 
+  it("keeps filtered scope and stable title order when loading subsequent pages", async () => {
+    await listIdeas(actor, {
+      take: 2,
+      offset: 2,
+      status: "PROPOSED",
+      search: "launch",
+      sort: "title:asc",
+    });
+    expect(mocks.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        skip: 2,
+        take: 3,
+        orderBy: [{ title: "asc" }, { id: "asc" }],
+        where: expect.objectContaining({ organizationId: "org-1", status: "PROPOSED" }),
+      }),
+    );
+  });
+
+  it("puts missing priorities last and rejects unsupported sorting", async () => {
+    await listIdeas(actor, { sort: "priority:desc" });
+    expect(mocks.findMany.mock.calls[0][0].orderBy).toEqual([
+      { priority: { sort: "desc", nulls: "last" } },
+      { id: "desc" },
+    ]);
+    await expect(listIdeas(actor, { sort: "title:sideways" })).rejects.toMatchObject({
+      statusCode: 422,
+    });
+    expect(mocks.findMany).toHaveBeenCalledTimes(1);
+  });
+
   it("supports rejected ideas and exposes their decision reason within the existing scope", async () => {
     const rejectedIdea = {
       ...idea("idea-rejected"),

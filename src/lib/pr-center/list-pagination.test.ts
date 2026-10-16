@@ -7,7 +7,12 @@ const { prismaMock } = vi.hoisted(() => ({
   },
 }));
 vi.mock("@/lib/db/client", () => ({ prisma: prismaMock }));
-import { listRequests, listAuditEvents, type PrCenterActor } from "./service";
+import {
+  listRequests,
+  listAuditEvents,
+  listAccessAuditEvents,
+  type PrCenterActor,
+} from "./service";
 
 const actor: PrCenterActor = {
   id: "mine",
@@ -25,6 +30,48 @@ beforeEach(() => {
 });
 
 describe("request list filtering and pagination", () => {
+  it.each([
+    "title:asc",
+    "requestedFor:desc",
+    "department:asc",
+    "requester:desc",
+    "status:asc",
+    "createdAt:asc",
+  ])(
+    "paginates %s using the selected order within scoped filtered rows",
+    async (sort) => {
+      prismaMock.prRequest.findFirst.mockResolvedValue({ id: cursor, createdAt: date });
+      await listRequests(actor, 2, cursor, { sort, mine: true, status: "DRAFT" });
+      const query = prismaMock.prRequest.findMany.mock.calls[0][0];
+      expect(query).toMatchObject({ cursor: { id: cursor }, skip: 1, take: 3 });
+      expect(query.where.AND).toContainEqual({ requesterId: actor.id });
+      expect(query.where.AND).toContainEqual({ status: "DRAFT" });
+      expect(query.where.AND).toContainEqual({
+        organizationId: "org",
+        OR: [{ requesterId: "mine" }],
+      });
+      expect(query.where.AND).not.toContainEqual({
+        OR: [{ createdAt: { lt: date } }, { createdAt: date, id: { lt: cursor } }],
+      });
+      const [field, direction] = sort.split(":");
+      const primary =
+        field === "requestedFor"
+          ? { requestedFor: { sort: direction, nulls: "last" } }
+          : field === "department"
+            ? { department: { name: direction } }
+            : field === "requester"
+              ? { requester: { displayName: direction } }
+              : { [field]: direction };
+      expect(query.orderBy).toEqual([primary, { id: direction }]);
+    },
+  );
+
+  it("rejects unknown sort fields before querying data", async () => {
+    await expect(
+      listRequests(actor, 2, undefined, { sort: "organizationId:asc" }),
+    ).rejects.toMatchObject({ statusCode: 422 });
+    expect(prismaMock.prRequest.findMany).not.toHaveBeenCalled();
+  });
   it("conjoins scoped access with title/number search, status and mine", async () => {
     await listRequests(actor, 2, undefined, {
       q: "Budget",
@@ -125,6 +172,35 @@ describe("request list filtering and pagination", () => {
 });
 
 describe("audit history pagination", () => {
+  it("keeps the actor sort and own-event scope on subsequent pages", async () => {
+    prismaMock.prAuditEvent.findFirst.mockResolvedValue({ id: cursor, createdAt: date });
+    await listAuditEvents(actor, 2, cursor, { sort: "actor:asc" });
+    expect(prismaMock.prAuditEvent.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { organizationId: "org", actorId: "mine" },
+        cursor: { id: cursor },
+        skip: 1,
+        orderBy: [{ actor: { displayName: "asc" } }, { id: "asc" }],
+      }),
+    );
+  });
+
+  it("sorts access events before taking an offset page and retains access filters", async () => {
+    await listAccessAuditEvents(
+      { ...actor, role: "RTRDA_ADMIN" },
+      201,
+      "action:asc",
+      200,
+    );
+    const query = prismaMock.prAuditEvent.findMany.mock.calls[0][0];
+    expect(query).toMatchObject({
+      take: 201,
+      skip: 200,
+      orderBy: [{ action: "asc" }, { id: "asc" }],
+    });
+    expect(query.where.organizationId).toBe("org");
+    expect(query.where.action.in).toContain("auth.oidc_login");
+  });
   it("limits department-scoped grants to own events and applies search", async () => {
     await listAuditEvents(
       {
