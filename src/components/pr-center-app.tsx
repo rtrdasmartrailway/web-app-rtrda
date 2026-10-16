@@ -71,6 +71,10 @@ import {
 import { isRootPrCenterAdministrator } from "@/lib/pr-center/access-authority";
 import { unavailableMetricDisplay } from "@/lib/pr-center/metric-display";
 import {
+  createExecutiveOverviewExport,
+  getExecutiveWorkflowCounts,
+} from "@/lib/pr-center/executive-overview";
+import {
   RELEASE_EVIDENCE_GATES,
   type ReleaseEvidenceGate,
 } from "@/lib/pr-center/release-evidence";
@@ -4000,6 +4004,11 @@ export function PrCenterApp({
           {page === "executive" && (
             <ExecutiveDashboard
               language={state.language}
+              currentUserName={currentUser.name}
+              currentUserRole={currentUser.role}
+              unreadNotifications={
+                state.notifications.filter((notification) => !notification.read).length
+              }
               onNavigate={go}
               tasks={state.tasks}
               requests={state.requests}
@@ -5089,33 +5098,24 @@ function Table({
 }
 function ExecutiveDashboard({
   language,
+  currentUserName,
+  currentUserRole,
+  unreadNotifications,
   onNavigate,
   tasks,
   requests,
 }: {
   language: Language;
+  currentUserName: string;
+  currentUserRole: Role;
+  unreadNotifications: number;
   onNavigate: (page: Page) => void;
   tasks: Task[];
   requests: Request[];
 }) {
   const thai = language === "th";
-  const published = tasks.filter((task) =>
-    ["published", "closed"].includes(task.status),
-  ).length;
-  const pending = tasks.filter((task) =>
-    ["pr_editorial_review", "management_approval"].includes(task.status),
-  ).length;
-  const planning = tasks.filter((task) =>
-    ["draft", "communication_planning"].includes(task.status),
-  ).length;
-  const waiting = tasks.filter(
-    (task) => task.status === "waiting_for_information",
-  ).length;
-  const production = tasks.filter((task) =>
-    ["in_production", "source_fact_check", "technical_review"].includes(task.status),
-  ).length;
-  const approved = tasks.filter((task) => task.status === "approved").length;
-  const scheduled = tasks.filter((task) => task.status === "scheduled").length;
+  const counts = getExecutiveWorkflowCounts(tasks, requests);
+  const { published, pending, planning, waiting, production, approved } = counts;
   const unavailable = unavailableMetricDisplay(language);
   const date = new Intl.DateTimeFormat(thai ? "th-TH-u-ca-buddhist" : "en-GB", {
     day: "numeric",
@@ -5123,10 +5123,33 @@ function ExecutiveDashboard({
     year: "numeric",
     timeZone: "Asia/Bangkok",
   }).format(new Date());
+  const roleLabel = thai
+    ? {
+        admin: "ผู้ดูแลระบบ",
+        pr: "เจ้าหน้าที่ PR",
+        executive: "ผู้บริหาร",
+        project_owner: "เจ้าของงาน",
+        approver: "ผู้อนุมัติ",
+        writer: "ผู้เขียน",
+        designer: "นักออกแบบ",
+        video: "ผู้ผลิตวิดีโอ",
+        requester: "ผู้ส่งคำขอ",
+      }[currentUserRole]
+    : {
+        admin: "Administrator",
+        pr: "PR Operations",
+        executive: "Executive",
+        project_owner: "Project owner",
+        approver: "Approver",
+        writer: "Writer",
+        designer: "Designer",
+        video: "Video producer",
+        requester: "Requester",
+      }[currentUserRole];
   const primaryMetrics = [
     {
       icon: "▤",
-      label: thai ? "เผยแพร่แล้ว" : "Published",
+      label: thai ? "ผลงานเผยแพร่ทั้งหมด" : "Published work",
       value: String(published),
       tone: "blue",
     },
@@ -5175,42 +5198,58 @@ function ExecutiveDashboard({
       tone: "gold",
     },
   ];
-  const pipelineRows = [
-    [thai ? "วางแผน" : "Planning", String(planning), thai ? "รายการ" : "items"],
-    [
-      thai ? "กำลังผลิตและตรวจทาน" : "Production and review",
-      String(production),
-      thai ? "รายการ" : "items",
-    ],
-    [thai ? "อนุมัติแล้ว" : "Approved", String(approved), thai ? "รายการ" : "items"],
-    [thai ? "กำหนดเผยแพร่" : "Scheduled", String(scheduled), thai ? "รายการ" : "items"],
-    [thai ? "เผยแพร่แล้ว" : "Published", String(published), thai ? "รายการ" : "items"],
-  ];
+  const exportSummary = () => {
+    const generatedAt = new Date();
+    const summary = createExecutiveOverviewExport({
+      generatedAt,
+      scopeLabel: thai
+        ? "สรุปจำนวนจากข้อมูลที่โหลดให้บัญชีนี้"
+        : "Aggregate counts from data loaded for this account",
+      counts,
+      totalRequests: requests.length,
+      totalTasks: tasks.length,
+      unavailableReason: unavailable.trend,
+    });
+    const file = new Blob([JSON.stringify(summary, null, 2)], {
+      type: "application/json",
+    });
+    const objectUrl = URL.createObjectURL(file);
+    const link = document.createElement("a");
+    link.href = objectUrl;
+    link.download = `pr-center-executive-overview-${generatedAt.toISOString().slice(0, 10)}.json`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.setTimeout(() => URL.revokeObjectURL(objectUrl), 0);
+  };
 
   return (
-    <>
+    <div className={styles.executiveDashboard}>
+      <aside className={styles.executiveNotice} role="note">
+        <span aria-hidden="true">📊</span>
+        <p>
+          {thai
+            ? "ตัวเลขสถานะงานอ้างอิงข้อมูลที่ระบบโหลดตามสิทธิ์ของคุณ ส่วน Reach และ Engagement ยังไม่มีแหล่งข้อมูลที่ยืนยันได้"
+            : "Workflow counts reflect data loaded for your access scope. Reach and engagement metrics do not yet have a verified source."}
+        </p>
+      </aside>
       <section className={styles.hero}>
         <div className={styles.heroCopy}>
           <p>EXECUTIVE OVERVIEW · MILESTONES · MEASURABLE RESULTS</p>
           <h1>
             {thai
-              ? "ภาพรวมงานสื่อสารองค์กรและประชาสัมพันธ์"
-              : "Executive communications overview"}
+              ? "งานสื่อสารองค์กรและประชาสัมพันธ์"
+              : "Corporate communications and public relations"}
           </h1>
           <div className={styles.heroChips}>
             <b>📅 {date}</b>
-            <b>📊 {thai ? "ภาพรวมผู้บริหาร" : "Executive overview"}</b>
-            <b>
-              🧾{" "}
-              {thai
-                ? `${requests.length} คำขอในขอบเขต`
-                : `${requests.length} in-scope requests`}
-            </b>
-            <b>📋 {thai ? `${tasks.length} งาน` : `${tasks.length} tasks`}</b>
+            <b>👤 {currentUserName}</b>
+            <b>▣ {roleLabel}</b>
+            <b>🔔 {unreadNotifications}</b>
           </div>
         </div>
-        <button className={styles.heroSecondary} onClick={() => onNavigate("operations")}>
-          {thai ? "ดูภาพรวมงาน" : "View operations"} →
+        <button className={styles.executiveExportButton} onClick={exportSummary}>
+          ↓ {thai ? "ส่งออก JSON" : "Export JSON"}
         </button>
       </section>
 
@@ -5227,7 +5266,9 @@ function ExecutiveDashboard({
             <span aria-hidden="true">{metric.icon}</span>
             <small>{metric.label}</small>
             <strong>{metric.value}</strong>
-            {metric.tone !== "blue" && <em>{unavailable.trend}</em>}
+            {metric.tone !== "blue" && (
+              <em>{thai ? "ยังไม่มีข้อมูลยืนยัน" : "No verified data"}</em>
+            )}
           </article>
         ))}
       </section>
@@ -5253,21 +5294,21 @@ function ExecutiveDashboard({
         <article className={`${styles.card} ${styles.wideCard}`}>
           <header>
             <div>
-              <p className={styles.eyebrow}>CONTENT PIPELINE · WORKFLOW STATUS</p>
-              <h2>{thai ? "ภาพรวมตามขั้นตอนการทำงาน" : "Work by workflow stage"}</h2>
+              <p className={styles.eyebrow}>CONTENT PILLARS</p>
+              <h2>{thai ? "Content ตามเสาหลัก" : "Content by pillar"}</h2>
             </div>
             <button onClick={() => onNavigate("operations")}>
-              {thai ? "ดูงานทั้งหมด" : "View all"}
+              {thai ? "เปิด Content Operations" : "Open Content Operations"}
             </button>
           </header>
-          <Table
-            headers={[
-              thai ? "ขั้นตอน" : "Stage",
-              thai ? "จำนวน" : "Items",
-              thai ? "หน่วย" : "Unit",
-            ]}
-            rows={pipelineRows}
-          />
+          <div className={styles.executiveEmpty}>
+            <span aria-hidden="true">◌</span>
+            <p>
+              {thai
+                ? "ยังไม่มีข้อมูลจัดกลุ่มตามเสาหลักในชุดข้อมูลที่เชื่อมต่อ จึงยังแสดงสัดส่วนไม่ได้"
+                : "Pillar classifications are not available in the connected data, so distribution cannot be shown yet."}
+            </p>
+          </div>
         </article>
         <article className={`${styles.card} ${styles.wideCard}`}>
           <header>
@@ -5313,7 +5354,7 @@ function ExecutiveDashboard({
         </article>
       </section>
       <DashboardScheduleInsights language={language} onNavigate={onNavigate} />
-    </>
+    </div>
   );
 }
 function NewRequest({

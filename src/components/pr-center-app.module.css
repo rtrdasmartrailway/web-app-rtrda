@@ -4206,6 +4206,168 @@
   font-size: 22px;
 }
 
+.executiveDashboard {
+  min-width: 0;
+  width: 100%;
+}
+
+.executiveNotice {
+  align-items: center;
+  background: linear-gradient(100deg, #eef7ff, #eef9f7);
+  border: 1px solid #d7e8ef;
+  border-radius: 14px;
+  color: #456074;
+  display: flex;
+  gap: 11px;
+  margin-bottom: 16px;
+  padding: 10px 16px;
+}
+.executiveNotice > span {
+  flex: 0 0 auto;
+  font-size: 17px;
+}
+.executiveNotice p {
+  font-size: 12px;
+  line-height: 1.5;
+  margin: 0;
+}
+
+.executiveDashboard .hero {
+  align-items: flex-start;
+  background: linear-gradient(112deg, #072449 0%, #0a4b78 49%, #108d8a 100%);
+  border-radius: 21px;
+  min-height: 184px;
+  padding: 31px 34px;
+}
+.executiveDashboard .hero::after {
+  border-color: rgb(255 255 255 / 8%);
+  height: 245px;
+  right: 2%;
+  top: -150px;
+  width: 245px;
+}
+.executiveDashboard .hero h1 {
+  font-size: clamp(23px, 2.6vw, 32px);
+}
+.executiveDashboard .heroChips {
+  gap: 9px;
+  margin-top: 22px;
+}
+.executiveDashboard .heroChips b {
+  background: rgb(255 255 255 / 15%);
+  border: 1px solid rgb(255 255 255 / 13%);
+  border-radius: 999px;
+  color: #fff;
+  font-size: 11px;
+  padding: 8px 12px;
+}
+
+.executiveExportButton {
+  align-items: center;
+  background: rgb(255 255 255 / 15%);
+  border: 1px solid rgb(255 255 255 / 30%);
+  border-radius: 13px;
+  color: #fff;
+  cursor: pointer;
+  display: inline-flex;
+  flex: 0 0 auto;
+  font-size: 14px;
+  font-weight: 750;
+  gap: 7px;
+  min-height: 46px;
+  padding: 0 15px;
+  position: relative;
+  z-index: 1;
+}
+.executiveExportButton:hover {
+  background: rgb(255 255 255 / 24%);
+}
+.executiveExportButton:focus-visible {
+  outline: 3px solid #fff;
+  outline-offset: 3px;
+}
+
+.executiveMetric {
+  min-height: 151px;
+  padding: 22px;
+}
+.executiveMetric strong {
+  font-size: clamp(30px, 3vw, 38px);
+  margin-top: 17px;
+}
+.executiveMetrics {
+  margin: 18px 0 14px;
+}
+.executiveWorkflowMetrics {
+  margin-bottom: 18px;
+}
+
+.executiveEmpty {
+  align-content: center;
+  background: linear-gradient(135deg, #f7f9fc, #f2f7fb);
+  border: 1px dashed #d6e0ec;
+  border-radius: 14px;
+  display: grid;
+  justify-items: center;
+  margin-top: 18px;
+  min-height: 178px;
+  padding: 20px;
+  text-align: center;
+}
+.executiveEmpty > span {
+  align-items: center;
+  background: #e7f0fa;
+  border-radius: 50%;
+  color: #5580ac;
+  display: inline-flex;
+  font-size: 27px;
+  height: 48px;
+  justify-content: center;
+  width: 48px;
+}
+.executiveEmpty p {
+  color: #64748b;
+  font-size: 12px;
+  line-height: 1.7;
+  margin: 12px 0 0;
+  max-width: 390px;
+}
+
+.executiveHealth p {
+  border: 1px solid #edf1f6;
+  min-height: 64px;
+}
+
+@media (max-width: 760px) {
+  .executiveDashboard .hero {
+    min-height: 0;
+    padding: 22px 20px;
+  }
+  .executiveDashboard .heroChips {
+    margin-top: 16px;
+  }
+  .executiveExportButton {
+    align-self: flex-start;
+  }
+  .executiveNotice {
+    align-items: flex-start;
+    padding: 10px 12px;
+  }
+}
+
+@media (max-width: 560px) {
+  .executiveDashboard .hero h1 {
+    font-size: 22px;
+  }
+  .executiveDashboard .heroChips b {
+    font-size: 10px;
+    padding: 7px 9px;
+  }
+  .executiveEmpty {
+    min-height: 145px;
+  }
+}
+
 @media (max-width: 1050px) {
   .executiveMetrics,
   .executiveWorkflowMetrics {
