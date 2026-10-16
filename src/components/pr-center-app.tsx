@@ -15,6 +15,7 @@ import { useBoardHoldDrag } from "./pr-center-board-drag";
 import { PrCenterRequestRestore } from "./pr-center-request-restore";
 import { PrCenterFileManagement } from "./pr-center-file-management";
 import PrCenterPlatformChart from "./pr-center-platform-chart";
+import { recentOperations } from "@/lib/pr-center/recent-operations";
 import { directoryUserAuthority } from "@/lib/pr-center/directory-access";
 import { grantCoversDepartment } from "@/lib/pr-center/client-grant-scope";
 import { BOARD_COLUMNS, boardMove, type BoardColumn } from "@/lib/pr-center/board-moves";
@@ -336,6 +337,7 @@ type Task = {
   type: string;
   title: string;
   status: StatusId;
+  updatedAt?: string;
   ownerId: string;
   ownerName?: string;
   dueDate: string;
@@ -529,6 +531,7 @@ type ApiRequestRecord = {
   statusHistory: { toState: string; reason: string | null; createdAt: string }[];
   tasks: Array<{
     id: string;
+    updatedAt: string;
     title: string;
     contentType: string;
     status: string;
@@ -751,6 +754,7 @@ function mapRequestTasks(records: ApiRequestRecord[]): Task[] {
       type: task.contentType,
       title: task.title,
       status: task.status.toLowerCase() as StatusId,
+      updatedAt: task.updatedAt,
       ownerId: task.ownerId || "",
       ownerName: task.owner?.displayName,
       dueDate: task.dueAt?.slice(0, 10) || "",
@@ -1652,8 +1656,8 @@ export function PrCenterApp({
     "loading" | "loaded" | "error"
   >("loading");
   const [notice, setNotice] = useState<string | null>(null);
-  const [, setLoadingRequests] = useState(true);
-  const [, setRequestsUnavailable] = useState(false);
+  const [loadingRequests, setLoadingRequests] = useState(true);
+  const [requestsUnavailable, setRequestsUnavailable] = useState(false);
   const [ideaNextOffset, setIdeaNextOffset] = useState<number | null>(null);
   const ideaTransitionInFlight = useRef(new Set<string>());
   const [ideasOwnerId, setIdeasOwnerId] = useState<string | null>(null);
@@ -2410,6 +2414,7 @@ export function PrCenterApp({
       setNotificationFocus(null);
     }
     if (!canOpenPage(next)) return;
+    if (next === "home" && page !== "home") void refreshRequests();
     setPage(next);
     if (next === "message-house") void loadMessageHouse();
     setSidebarOpen(false);
@@ -2854,6 +2859,8 @@ export function PrCenterApp({
         requestCreatedFromPartial.current = false;
       }
       let submitError: string | null = null;
+      let savedStatus = updated.status;
+      let savedVersion = updated.version;
       if (submitAfterSave && samplesUploaded) {
         try {
           const submitResponse = await fetch(
@@ -2878,8 +2885,8 @@ export function PrCenterApp({
             status: Request["status"];
             version: number;
           };
-          updated.status = submitted.status;
-          updated.version = submitted.version;
+          savedStatus = submitted.status;
+          savedVersion = submitted.version;
         } catch (error) {
           submitError = error instanceof Error ? error.message : "Submission rejected";
         }
@@ -2888,13 +2895,11 @@ export function PrCenterApp({
         ...previous,
         requests: previous.requests.map((request) =>
           request.id === updated.id
-            ? { ...request, status: updated.status, version: updated.version }
+            ? { ...request, status: savedStatus, version: savedVersion }
             : request,
         ),
         tasks: previous.tasks.map((task) =>
-          task.requestId === updated.id
-            ? { ...task, requestStatus: updated.status }
-            : task,
+          task.requestId === updated.id ? { ...task, requestStatus: savedStatus } : task,
         ),
       }));
       void refreshRequests();
@@ -3248,7 +3253,7 @@ export function PrCenterApp({
       );
       return false;
     }
-    if (Date.parse(scheduledForIso) <= Date.now()) {
+    if (Date.parse(scheduledForIso) <= new Date().getTime()) {
       announce(
         state.language === "th"
           ? "ต้องตั้งเวลาเผยแพร่ในอนาคต"
@@ -3993,6 +3998,8 @@ export function PrCenterApp({
               currentUserName={currentUser.name}
               currentUserRole={currentUser.role}
               canManageReleaseEvidence={canManageGlobalAdmin}
+              loading={loadingRequests}
+              requestsUnavailable={requestsUnavailable}
               requests={state.requests}
               tasks={state.tasks}
             />
@@ -4355,6 +4362,8 @@ function Dashboard({
   currentUserName,
   currentUserRole,
   canManageReleaseEvidence,
+  loading,
+  requestsUnavailable,
   requests: requestItems,
   tasks: taskItems,
 }: {
@@ -4366,15 +4375,14 @@ function Dashboard({
   currentUserName: string;
   currentUserRole: Role;
   canManageReleaseEvidence: boolean;
+  loading: boolean;
+  requestsUnavailable: boolean;
   requests: Request[];
   tasks: Task[];
 }) {
   const thai = language === "th";
   const now = new Date();
   const todayKey = now.toISOString().slice(0, 10);
-  const published = taskItems.filter((task) =>
-    ["published", "closed"].includes(task.status),
-  ).length;
   const pending = taskItems.filter((task) =>
     ["pr_editorial_review", "management_approval"].includes(task.status),
   ).length;
@@ -4438,6 +4446,15 @@ function Dashboard({
     year: "numeric",
     timeZone: "Asia/Bangkok",
   }).format(now);
+  const latestOperations = recentOperations(taskItems);
+  const updatedDate = new Intl.DateTimeFormat(thai ? "th-TH-u-ca-buddhist" : "en-GB", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    timeZone: "Asia/Bangkok",
+  });
 
   return (
     <>
@@ -4482,28 +4499,48 @@ function Dashboard({
           <header>
             <div>
               <p className={styles.eyebrow}>{t.workflow}</p>
-              <h2>Content pipeline</h2>
+              <h2>
+                {thai
+                  ? "อัปเดตล่าสุดจาก Content Operations"
+                  : "Latest Content Operations"}
+              </h2>
             </div>
             <button onClick={() => onNavigate("operations")}>{t.viewAll}</button>
           </header>
-          <div className={styles.pipeline}>
-            {[
-              ["New request", workflow.planning],
-              ["In production", workflow.production],
-              ["Review", workflow.approval],
-              [
-                "Scheduled",
-                taskItems.filter((task) => task.status === "scheduled").length,
-              ],
-              ["Published", published],
-            ].map(([name, count]) => (
-              <div key={String(name)}>
-                <span>{name}</span>
-                <b>{count}</b>
-                <i style={{ width: `${Number(count) * 3}%` }} />
-              </div>
-            ))}
-          </div>
+          {loading ? (
+            <p className={styles.dashboardNote} role="status">
+              {thai ? "กำลังโหลดสถานะงาน…" : "Loading operations…"}
+            </p>
+          ) : requestsUnavailable ? (
+            <p className={styles.dashboardNote} role="alert">
+              {thai ? "โหลดสถานะงานไม่สำเร็จ" : "Operations could not be loaded."}
+            </p>
+          ) : latestOperations.length ? (
+            <ol
+              className={styles.recentOperations}
+              aria-label={
+                thai ? "งานอัปเดตล่าสุด 10 รายการ" : "10 most recently updated operations"
+              }
+            >
+              {latestOperations.map((task) => (
+                <li key={task.id}>
+                  <div className={styles.recentOperationInfo}>
+                    <strong>{task.title}</strong>
+                    <span>{STATUS_LABELS[task.status] ?? task.status}</span>
+                  </div>
+                  <time dateTime={task.updatedAt}>
+                    {updatedDate.format(new Date(task.updatedAt!))}
+                  </time>
+                </li>
+              ))}
+            </ol>
+          ) : (
+            <p className={styles.dashboardNote}>
+              {thai
+                ? "ยังไม่มีงาน Content Operations ในขอบเขตที่เข้าถึงได้"
+                : "No Content Operations are available in your access scope."}
+            </p>
+          )}
         </article>
         <article className={`${styles.card} ${styles.wideCard}`}>
           <header>

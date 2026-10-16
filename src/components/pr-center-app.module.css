@@ -645,29 +645,52 @@
 .wideCard {
   grid-column: span 1;
 }
-.pipeline {
+.recentOperations {
   display: grid;
-  gap: 14px;
-  margin-top: 20px;
+  list-style: none;
+  margin: 15px 0 0;
+  padding: 0;
 }
-.pipeline div {
+.recentOperations li {
   align-items: center;
+  border-bottom: 1px solid var(--pc-line);
+  display: flex;
+  gap: 14px;
+  justify-content: space-between;
+  min-width: 0;
+  padding: 10px 0;
+}
+.recentOperations li:last-child {
+  border-bottom: 0;
+}
+.recentOperationInfo {
   display: grid;
-  gap: 9px;
-  grid-template-columns: 125px 24px 1fr;
+  gap: 3px;
+  min-width: 0;
 }
-.pipeline span {
-  font-size: 12px;
-}
-.pipeline b {
-  color: #274767;
+.recentOperationInfo strong {
+  color: var(--pc-ink);
   font-size: 13px;
+  overflow-wrap: anywhere;
 }
-.pipeline i {
-  background: linear-gradient(90deg, #1f77e4, #70b4ff);
-  border-radius: 3px;
-  height: 7px;
-  min-width: 11px;
+.recentOperationInfo span,
+.recentOperations time {
+  color: var(--pc-muted);
+  font-size: 11px;
+}
+.recentOperations time {
+  flex: 0 0 auto;
+  text-align: right;
+}
+@media (max-width: 520px) {
+  .recentOperations li {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .recentOperations time {
+    text-align: left;
+  }
 }
 .timeline {
   display: grid;
