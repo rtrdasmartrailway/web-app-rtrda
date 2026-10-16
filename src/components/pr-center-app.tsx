@@ -14,6 +14,7 @@ import { PrCenterDialog } from "./pr-center-dialog";
 import { useBoardHoldDrag } from "./pr-center-board-drag";
 import { PrCenterRequestRestore } from "./pr-center-request-restore";
 import { PrCenterFileManagement } from "./pr-center-file-management";
+import PrCenterPlatformChart from "./pr-center-platform-chart";
 import { directoryUserAuthority } from "@/lib/pr-center/directory-access";
 import { grantCoversDepartment } from "@/lib/pr-center/client-grant-scope";
 import { BOARD_COLUMNS, boardMove, type BoardColumn } from "@/lib/pr-center/board-moves";
@@ -1258,9 +1259,6 @@ function createAuthenticatedState(): PrCenterState {
 function getUser(userId: string) {
   return users.find((user) => user.id === userId);
 }
-function requestStatus(request: Request, allTasks: Task[]): StatusId {
-  return allTasks.find((task) => request.taskIds.includes(task.id))?.status ?? "draft";
-}
 function emptyRequestDraft(user: Pick<User, "name" | "department">): RequestDraft {
   return {
     type: "pr",
@@ -1654,8 +1652,8 @@ export function PrCenterApp({
     "loading" | "loaded" | "error"
   >("loading");
   const [notice, setNotice] = useState<string | null>(null);
-  const [loadingRequests, setLoadingRequests] = useState(true);
-  const [requestsUnavailable, setRequestsUnavailable] = useState(false);
+  const [, setLoadingRequests] = useState(true);
+  const [, setRequestsUnavailable] = useState(false);
   const [ideaNextOffset, setIdeaNextOffset] = useState<number | null>(null);
   const ideaTransitionInFlight = useRef(new Set<string>());
   const [ideasOwnerId, setIdeasOwnerId] = useState<string | null>(null);
@@ -3995,10 +3993,8 @@ export function PrCenterApp({
               currentUserName={currentUser.name}
               currentUserRole={currentUser.role}
               canManageReleaseEvidence={canManageGlobalAdmin}
-              requestsUnavailable={requestsUnavailable}
               requests={state.requests}
               tasks={state.tasks}
-              loading={loadingRequests}
             />
           )}
           {page === "executive" && (
@@ -4359,8 +4355,6 @@ function Dashboard({
   currentUserName,
   currentUserRole,
   canManageReleaseEvidence,
-  requestsUnavailable,
-  loading,
   requests: requestItems,
   tasks: taskItems,
 }: {
@@ -4372,8 +4366,6 @@ function Dashboard({
   currentUserName: string;
   currentUserRole: Role;
   canManageReleaseEvidence: boolean;
-  requestsUnavailable: boolean;
-  loading: boolean;
   requests: Request[];
   tasks: Task[];
 }) {
@@ -4447,12 +4439,6 @@ function Dashboard({
     timeZone: "Asia/Bangkok",
   }).format(now);
 
-  const requestRows = requestItems.map((request) => [
-    request.id,
-    request.title,
-    STATUS_LABELS[requestStatus(request, taskItems)],
-    request.requestedDate,
-  ]);
   return (
     <>
       <section className={styles.hero}>
@@ -4522,37 +4508,13 @@ function Dashboard({
         <article className={`${styles.card} ${styles.wideCard}`}>
           <header>
             <div>
-              <p className={styles.eyebrow}>{t.recentRequests}</p>
-              <h2>Latest work requests</h2>
+              <p className={styles.eyebrow}>
+                {thai ? "ข้อมูลจาก Google Sheets" : "GOOGLE SHEETS DATA"}
+              </p>
+              <h2>{thai ? "สัดส่วนโพสต์ตามแพลตฟอร์ม" : "Posts by platform"}</h2>
             </div>
-            <button onClick={() => onNavigate("requests")}>{t.viewAll}</button>
           </header>
-          {loading ? (
-            <p className={styles.dashboardNote} role="status">
-              {thai ? "กำลังโหลดคำขอจากระบบ…" : "Loading requests from the system…"}
-            </p>
-          ) : requestsUnavailable ? (
-            <p className={styles.dashboardNote} role="alert">
-              {thai
-                ? "โหลดคำขอไม่สำเร็จ กรุณาเปิดคำขอของฉันเพื่อลองอีกครั้ง"
-                : "Requests could not be loaded. Open My Requests to retry."}{" "}
-              <button type="button" onClick={() => onNavigate("my-requests")}>
-                {thai ? "เปิดคำขอของฉัน" : "Open My Requests"}
-              </button>
-            </p>
-          ) : requestRows.length ? (
-            <Table
-              rows={requestRows}
-              statusColumn={2}
-              headers={["ID", "Project", "Status", "Target date"]}
-            />
-          ) : (
-            <p className={styles.dashboardNote}>
-              {thai
-                ? "ยังไม่มีคำขอในขอบเขตที่คุณเข้าถึงได้"
-                : "No requests are available in your access scope."}
-            </p>
-          )}
+          <PrCenterPlatformChart language={language} />
         </article>
       </section>
       <DashboardScheduleInsights language={language} onNavigate={onNavigate} />
@@ -5294,21 +5256,13 @@ function ExecutiveDashboard({
         <article className={`${styles.card} ${styles.wideCard}`}>
           <header>
             <div>
-              <p className={styles.eyebrow}>CONTENT PILLARS</p>
-              <h2>{thai ? "Content ตามเสาหลัก" : "Content by pillar"}</h2>
+              <p className={styles.eyebrow}>
+                {thai ? "ข้อมูลจาก Google Sheets" : "GOOGLE SHEETS DATA"}
+              </p>
+              <h2>{thai ? "สัดส่วนตามแพลตฟอร์ม" : "Distribution by platform"}</h2>
             </div>
-            <button onClick={() => onNavigate("operations")}>
-              {thai ? "เปิด Content Operations" : "Open Content Operations"}
-            </button>
           </header>
-          <div className={styles.executiveEmpty}>
-            <span aria-hidden="true">◌</span>
-            <p>
-              {thai
-                ? "ยังไม่มีข้อมูลจัดกลุ่มตามเสาหลักในชุดข้อมูลที่เชื่อมต่อ จึงยังแสดงสัดส่วนไม่ได้"
-                : "Pillar classifications are not available in the connected data, so distribution cannot be shown yet."}
-            </p>
-          </div>
+          <PrCenterPlatformChart language={language} />
         </article>
         <article className={`${styles.card} ${styles.wideCard}`}>
           <header>

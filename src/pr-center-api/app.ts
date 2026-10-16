@@ -71,6 +71,12 @@ import {
   type RequestListFilters,
 } from "@/lib/pr-center/service";
 import { parseAbsoluteScheduleDate } from "@/lib/pr-center/schedule-time";
+import { readPlatformDistribution } from "./platform-distribution";
+import {
+  PLATFORM_NAMES,
+  type PlatformName,
+  type PlatformPeriod,
+} from "@/lib/pr-center/platform-distribution-data";
 import {
   TASK_TRANSITIONS,
   type PrCenterRole,
@@ -194,7 +200,7 @@ export function buildPrCenterApi(
   });
   app.get("/healthz", async () => ({ ok: true, service: "pr-center-api" }));
 
-  app.addHook("preHandler", async (request) => {
+  app.addHook("preHandler", async (request: FastifyRequest) => {
     if (
       request.routeOptions.url === "/healthz" ||
       request.routeOptions.url === "/auth/login" ||
@@ -205,6 +211,30 @@ export function buildPrCenterApi(
     if (!actor)
       throw new PrCenterError("Authentication is required", 401, "UNAUTHENTICATED");
     request.prCenterActor = actor;
+  });
+
+  app.get("/executive/platform-distribution", async (request: FastifyRequest) => {
+    const query = request.query as Record<string, unknown>;
+    const period = query.period ?? "all";
+    const platform = query.platform;
+    if (
+      Object.keys(query).some((key) => key !== "period" && key !== "platform") ||
+      !["all", "7", "30", "90"].includes(String(period)) ||
+      (platform !== undefined && !PLATFORM_NAMES.includes(platform as PlatformName))
+    )
+      throw new PrCenterError("Invalid platform filters", 422, "INVALID_PLATFORM_FILTER");
+    try {
+      return await readPlatformDistribution({
+        period: period as PlatformPeriod,
+        platform: platform as PlatformName | undefined,
+      });
+    } catch {
+      throw new PrCenterError(
+        "Spreadsheet data is temporarily unavailable",
+        503,
+        "PLATFORM_SHEET_UNAVAILABLE",
+      );
+    }
   });
 
   app.get("/requests", async (request) => {
