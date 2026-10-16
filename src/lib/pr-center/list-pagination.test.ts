@@ -30,6 +30,27 @@ beforeEach(() => {
 });
 
 describe("request list filtering and pagination", () => {
+  it("returns contact email for readable requests and selects it with the requester name", async () => {
+    const requester = { displayName: "Requester", email: "requester@example.org" };
+    prismaMock.prRequest.findMany.mockResolvedValue([
+      {
+        id: "request",
+        organizationId: actor.organizationId,
+        requesterId: actor.id,
+        requester,
+      },
+    ]);
+    expect((await listRequests(actor, 2, undefined, { mine: true }))[0]).toMatchObject({
+      requester,
+    });
+    expect(prismaMock.prRequest.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        include: expect.objectContaining({
+          requester: { select: { displayName: true, email: true } },
+        }),
+      }),
+    );
+  });
   it("continues across lifecycle status buckets without relying on database enum order", async () => {
     prismaMock.prRequest.findFirst.mockResolvedValue({
       id: cursor,
@@ -179,6 +200,7 @@ describe("request list filtering and pagination", () => {
       Array.from({ length: 3 }, (_, i) => ({
         id: String(i),
         requesterId: "other",
+        requester: { displayName: "Hidden requester", email: "hidden@example.org" },
         organizationId: "org",
         departmentId: "elsewhere",
         status: "DRAFT",

@@ -169,7 +169,7 @@ describe("request intake approval", () => {
           ],
         }),
         include: expect.objectContaining({
-          requester: { select: { displayName: true } },
+          requester: { select: { displayName: true, email: true } },
           statusHistory: expect.objectContaining({
             where: { toState: { in: ["REJECTED", "APPROVED"] } },
             select: expect.objectContaining({ reason: true, toState: true }),

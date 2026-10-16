@@ -117,6 +117,7 @@ type Request = {
   requestedDate: string;
   createdAt?: string;
   requesterName?: string;
+  requesterEmail?: string;
   taskIds: string[];
   source?: string;
   sources?: string[];
@@ -392,7 +393,7 @@ type ApiRequestRecord = {
   priorityReason: string | null;
   createdAt: string;
   department: { name: string };
-  requester: { displayName: string };
+  requester: { displayName: string; email?: string | null };
   requesterId: string;
   status: Request["status"];
   version: number;
@@ -574,6 +575,7 @@ function mapRequestRecord(request: ApiRequestRecord): Request {
     requestedDate: request.requestedFor?.slice(0, 10) || "",
     createdAt: request.createdAt,
     requesterName: request.requester.displayName,
+    requesterEmail: request.requester.email?.trim() || undefined,
     taskIds: request.tasks.map((task) => task.id),
     status: request.status,
     version: request.version,
@@ -4862,7 +4864,44 @@ function Requests({
                     <td>
                       <span>{request.department}</span>
                     </td>
-                    <td>{request.requesterName || "—"}</td>
+                    <td>
+                      {request.requesterEmail ? (
+                        <a
+                          className={styles.requesterContact}
+                          href={`mailto:${encodeURIComponent(request.requesterEmail)}`}
+                          aria-label={
+                            language === "th"
+                              ? `เขียนอีเมลถึง ${request.requesterName || request.requesterEmail}`
+                              : `Email ${request.requesterName || request.requesterEmail}`
+                          }
+                          title={request.requesterEmail}
+                        >
+                          <span>
+                            <svg
+                              aria-hidden="true"
+                              width="16"
+                              height="16"
+                              viewBox="0 0 24 24"
+                              fill="none"
+                              stroke="currentColor"
+                              strokeWidth="1.8"
+                            >
+                              <rect x="3" y="5" width="18" height="14" rx="2" />
+                              <path d="m3 6 9 7 9-7" />
+                            </svg>
+                            {request.requesterName || request.requesterEmail}
+                          </span>
+                          <small>{request.requesterEmail}</small>
+                        </a>
+                      ) : (
+                        <>
+                          <span>{request.requesterName || "—"}</span>
+                          <small>
+                            {language === "th" ? "ไม่มีอีเมลติดต่อ" : "No contact email"}
+                          </small>
+                        </>
+                      )}
+                    </td>
                     <td>{submittedAt}</td>
                     <td>
                       {request.requestedDate

@@ -1053,7 +1053,7 @@ export async function listRequests(
     ...(customSort && !statusSort && cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
     include: {
       department: { select: { name: true } },
-      requester: { select: { displayName: true } },
+      requester: { select: { displayName: true, email: true } },
       sources: { select: { url: true } },
       statusHistory: {
         where: { toState: { in: ["REJECTED", "APPROVED"] } },

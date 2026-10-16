@@ -749,6 +749,31 @@
   flex-wrap: wrap;
   gap: 6px;
 }
+.requesterContact {
+  border: 1px solid #bcd2ec;
+  border-radius: 7px;
+  background: #f2f7ff;
+  color: #155da6;
+  display: inline-flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 7px 9px;
+  overflow-wrap: anywhere;
+}
+.requesterContact > span {
+  align-items: center;
+  display: inline-flex;
+  gap: 6px;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.requesterContact svg {
+  flex: 0 0 16px;
+}
+.requesterContact:hover {
+  background: #e3efff;
+  border-color: #5992cb;
+}
 .requestActions button {
   white-space: nowrap;
 }
