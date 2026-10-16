@@ -12,9 +12,10 @@ import Image from "next/image";
 import {
   SortableHeading,
   TableSummary,
+  sortDirectionLabel,
   type TableSorting,
 } from "./pr-center-table-sorting";
-import { DEFAULT_LIST_SORT } from "@/lib/pr-center/list-sorting";
+import { DEFAULT_LIST_SORT, listSortFields } from "@/lib/pr-center/list-sorting";
 import type { CreateContentIdeaInput } from "@/lib/pr-center/idea-input";
 import { submitIdeaForm } from "@/lib/pr-center/idea-form";
 import {
@@ -3414,7 +3415,9 @@ export function PrCenterApp({
   };
 
   return (
-    <div className={styles.app}>
+    <div
+      className={`${styles.app} ${page === "my-requests" || page === "requests" ? styles.requestsPage : ""}`}
+    >
       <aside
         className={`${styles.sidebar} ${sidebarOpen ? styles.sidebarOpen : ""}`}
         aria-label="PR Center navigation"
@@ -4747,7 +4750,7 @@ function Requests({
           </div>
         }
       />
-      <section className={styles.filterBar}>
+      <section className={`${styles.filterBar} ${styles.requestFilters}`}>
         <input
           value={query}
           maxLength={120}
@@ -4786,20 +4789,43 @@ function Requests({
         <button type="button" onClick={() => onFiltersChange("", "")}>
           {language === "th" ? "ล้างตัวกรอง" : "Clear filters"}
         </button>
+        <label className={styles.requestMobileSort}>
+          <span>{language === "th" ? "เรียงคำขอตาม" : "Sort requests by"}</span>
+          <select
+            value={sorting.value}
+            onChange={(event) => sorting.onChange(event.target.value)}
+          >
+            {listSortFields.requests.map(([field, th, en]) => (
+              <optgroup key={field} label={language === "th" ? th : en}>
+                {["desc", "asc"].map((direction) => (
+                  <option key={direction} value={`${field}:${direction}`}>
+                    {language === "th" ? th : en} ·{" "}
+                    {sortDirectionLabel(field, direction, language === "th")}
+                  </option>
+                ))}
+              </optgroup>
+            ))}
+          </select>
+        </label>
       </section>
       <p role="note">
         {language === "th"
           ? "ค้นหาชื่อหรือเลขคำขอและกรองสถานะจากระบบในขอบเขตสิทธิ์ของคุณ"
           : "Search request titles or numbers and filter status across your authorized scope."}
       </p>
-      <article className={styles.card}>
+      <article className={`${styles.card} ${styles.requestListCard}`}>
         <TableSummary
           sorting={sorting}
           count={visibleRequests.length}
           hasMore={hasMore}
         />
-        <div className={styles.tableWrap}>
-          <table>
+        <div className={`${styles.tableWrap} ${styles.requestTableWrap}`}>
+          <table className={styles.requestTable} aria-label={title}>
+            <colgroup>
+              {[20, 8, 8, 18, 10, 10, 10, 10, 6].map((width, index) => (
+                <col key={index} style={{ width: `${width}%` }} />
+              ))}
+            </colgroup>
             <thead>
               <tr>
                 <SortableHeading field="title" sorting={sorting}>
@@ -4816,9 +4842,9 @@ function Requests({
                   {language === "th" ? "วันที่สร้าง" : "Created"}
                 </SortableHeading>
                 <SortableHeading field="requestedFor" sorting={sorting}>
-                  {language === "th" ? "วันที่ต้องการเผยแพร่" : "Requested date"}
+                  {language === "th" ? "ต้องการเผยแพร่" : "Publish date"}
                 </SortableHeading>
-                <th scope="col">Content Package</th>
+                <th scope="col">{language === "th" ? "ชิ้นงาน" : "Content"}</th>
                 <SortableHeading field="status" sorting={sorting}>
                   {language === "th" ? "สถานะคำขอ" : "Request status"}
                 </SortableHeading>
@@ -4841,18 +4867,17 @@ function Requests({
                       language === "th" ? "th-TH-u-ca-buddhist" : "en-GB",
                       {
                         dateStyle: "short",
-                        timeStyle: "short",
                         timeZone: "Asia/Bangkok",
                       },
                     )
                   : "—";
                 return (
                   <tr key={request.id} id={`request-${request.id}`}>
-                    <td>
+                    <td data-label={language === "th" ? "โครงการ" : "Project"}>
                       <strong>{request.title}</strong>
                       <small>{request.id}</small>
                     </td>
-                    <td>
+                    <td data-label={language === "th" ? "ประเภทคำขอ" : "Request type"}>
                       {request.type === "offsite"
                         ? language === "th"
                           ? "นอกสถานที่"
@@ -4861,10 +4886,10 @@ function Requests({
                           ? "ประชาสัมพันธ์"
                           : "PR"}
                     </td>
-                    <td>
+                    <td data-label={language === "th" ? "ฝ่าย" : "Department"}>
                       <span>{request.department}</span>
                     </td>
-                    <td>
+                    <td data-label={language === "th" ? "ผู้ส่งคำขอ" : "Requester"}>
                       {request.requesterEmail ? (
                         <a
                           className={styles.requesterContact}
@@ -4902,8 +4927,24 @@ function Requests({
                         </>
                       )}
                     </td>
-                    <td>{submittedAt}</td>
-                    <td>
+                    <td data-label={language === "th" ? "วันที่สร้าง" : "Created"}>
+                      {submittedAt}
+                      {request.createdAt && (
+                        <small>
+                          {new Date(request.createdAt).toLocaleTimeString(
+                            language === "th" ? "th-TH" : "en-GB",
+                            {
+                              hour: "2-digit",
+                              minute: "2-digit",
+                              timeZone: "Asia/Bangkok",
+                            },
+                          )}
+                        </small>
+                      )}
+                    </td>
+                    <td
+                      data-label={language === "th" ? "ต้องการเผยแพร่" : "Publish date"}
+                    >
                       {request.requestedDate
                         ? new Date(
                             `${request.requestedDate}T00:00:00Z`,
@@ -4913,7 +4954,7 @@ function Requests({
                           )
                         : "—"}
                     </td>
-                    <td>
+                    <td data-label={language === "th" ? "ชิ้นงาน" : "Content"}>
                       <strong>{contentPackage.count}</strong>{" "}
                       {language === "th" ? "ชิ้น" : "items"}
                       <small>
@@ -4924,7 +4965,7 @@ function Requests({
                             : "No content types yet"}
                       </small>
                     </td>
-                    <td>
+                    <td data-label={language === "th" ? "สถานะคำขอ" : "Request status"}>
                       <Status>
                         {requestIntakeStatusLabel(request.status, language)}
                       </Status>
@@ -4935,7 +4976,7 @@ function Requests({
                         </small>
                       )}
                     </td>
-                    <td>
+                    <td data-label={language === "th" ? "จัดการ" : "Actions"}>
                       <button onClick={() => setSelectedId(request.id)}>
                         {language === "th" ? "เปิด" : "Open"}
                       </button>

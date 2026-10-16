@@ -774,6 +774,175 @@
   background: #e3efff;
   border-color: #5992cb;
 }
+
+/* Request views fit their available width; compact screens use labelled rows. */
+.requestsPage .requestFilters {
+  min-width: 0;
+  max-width: 100%;
+}
+.requestsPage .requestFilters > input {
+  flex: 1 1 220px;
+  min-width: 0;
+  max-width: 100%;
+}
+.requestsPage .requestFilters > select {
+  min-width: 0;
+  max-width: 100%;
+}
+.requestsPage .requestListCard {
+  min-width: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+.requestsPage .requestTableWrap {
+  overflow: visible;
+  max-width: 100%;
+}
+.requestsPage .requestTable {
+  width: 100%;
+  min-width: 0;
+  table-layout: fixed;
+}
+.requestsPage .requestTable :is(th, td) {
+  min-width: 0;
+  padding: 9px 6px;
+  overflow-wrap: anywhere;
+  white-space: normal;
+  font-size: 12px;
+  line-height: 1.55;
+}
+.requestsPage .requestTable th {
+  font-size: 11px;
+}
+.requestsPage .requestTable .sortTrigger {
+  min-width: 0;
+  width: 100%;
+  padding: 6px 0;
+  gap: 3px;
+  white-space: normal;
+  align-items: flex-start;
+  overflow-wrap: anywhere;
+  font-size: inherit;
+}
+.requestsPage .requestTable .sortTrigger > span {
+  flex: 0 0 auto;
+  white-space: nowrap;
+  font-size: 10px;
+}
+.requestsPage .requestTable .requesterContact {
+  max-width: 100%;
+  min-width: 0;
+  padding: 6px;
+}
+.requestsPage .requesterContact > span {
+  display: block;
+}
+.requestsPage .requesterContact svg {
+  display: inline-block;
+  vertical-align: middle;
+  margin-right: 5px;
+}
+.requestsPage .requestTable :is(small, .status) {
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+.requestsPage .requestTable td > button {
+  min-width: 0;
+  max-width: 100%;
+  padding: 7px 5px;
+  font-size: 12px;
+}
+.requestMobileSort {
+  display: none;
+}
+@media (max-width: 1150px) {
+  .requestsPage .requestListCard {
+    padding: 14px;
+  }
+  .requestsPage .requestMobileSort {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    flex: 1 1 100%;
+    min-width: 0;
+    font-size: 12px;
+    font-weight: 600;
+    color: #345170;
+  }
+  .requestsPage .requestMobileSort select {
+    min-width: 0;
+    max-width: 100%;
+    width: 100%;
+    text-overflow: ellipsis;
+  }
+  .requestsPage .requestTable,
+  .requestsPage .requestTable tbody {
+    display: block;
+    width: 100%;
+  }
+  .requestsPage .requestTable colgroup,
+  .requestsPage .requestTable thead {
+    display: none;
+  }
+  .requestsPage .requestTable tbody {
+    display: grid;
+    gap: 14px;
+  }
+  .requestsPage .requestTable tbody tr {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    min-width: 0;
+    gap: 0 14px;
+    background: #fff;
+    border: 1px solid #d5e1ef;
+    border-radius: 10px;
+    padding: 6px 12px;
+  }
+  .requestsPage .requestTable td {
+    display: block;
+    padding: 10px 0;
+    border-top: 1px solid #e5edf6;
+    font-size: 13px;
+  }
+  .requestsPage .requestTable td::before {
+    content: attr(data-label);
+    display: block;
+    margin-bottom: 5px;
+    color: #5b718b;
+    font-size: 11px;
+    font-weight: 600;
+  }
+  .requestsPage .requestTable td:is(:first-child, :nth-child(4), :last-child) {
+    grid-column: 1 / -1;
+  }
+  .requestsPage .requestTable td:first-child {
+    border-top: 0;
+    font-size: 14px;
+  }
+  .requestsPage .requestTable td:last-child > button {
+    min-height: 42px;
+    min-width: 84px;
+  }
+  .requestsPage .requestTable .requesterContact {
+    padding: 8px 10px;
+  }
+}
+@media (max-width: 760px) {
+  .requestsPage .topbar {
+    flex-wrap: wrap;
+    height: auto;
+    gap: 8px;
+    padding: 8px 10px;
+  }
+  .requestsPage .topActions {
+    flex: 1 1 220px;
+    flex-wrap: wrap;
+    max-width: 100%;
+    min-width: 0;
+    justify-content: flex-end;
+  }
+}
 .requestActions button {
   white-space: nowrap;
 }
