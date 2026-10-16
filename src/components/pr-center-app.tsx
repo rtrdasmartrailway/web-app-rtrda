@@ -750,8 +750,8 @@ function isPageEnabled(page: Page) {
 
 const copy = {
   th: {
-    greeting: "สวัสดี, ทีมสื่อสารองค์กร",
-    subheading: "ภาพรวมงานประชาสัมพันธ์และการสื่อสารของ สทร.",
+    greeting: "ภาพรวมงานสื่อสารองค์กร",
+    subheading: "EXECUTIVE OVERVIEW · MILESTONES · MEASURABLE RESULTS",
     newRequest: "ส่งคำขอใหม่",
     search: "ค้นหางาน คำขอ หรือเนื้อหา",
     prototype: "Phase 1 Test · ข้อมูลคำขอและงานมาจากระบบ PR Center",
@@ -768,8 +768,8 @@ const copy = {
     rejectionReason: "เหตุผล/ความคิดเห็นที่ปฏิเสธ",
   },
   en: {
-    greeting: "Welcome, Communications Team",
-    subheading: "RTRDA public relations and communications overview.",
+    greeting: "Executive communications overview",
+    subheading: "Milestones · measurable results",
     newRequest: "New request",
     search: "Search work, requests, or content",
     prototype: "Phase 1 Test · requests and tasks are served by PR Center",
@@ -4217,14 +4217,13 @@ function Dashboard({
   tasks: Task[];
 }) {
   const thai = language === "th";
+  const now = new Date();
+  const todayKey = now.toISOString().slice(0, 10);
   const published = taskItems.filter((task) =>
     ["published", "closed"].includes(task.status),
   ).length;
   const pending = taskItems.filter((task) =>
     ["pr_editorial_review", "management_approval"].includes(task.status),
-  ).length;
-  const active = taskItems.filter(
-    (task) => !["closed", "cancelled", "rejected"].includes(task.status),
   ).length;
   const workflow = {
     planning: taskItems.filter((task) =>
@@ -4241,11 +4240,52 @@ function Dashboard({
     ).length,
     approval: pending,
   };
-  const metricsUnavailable = unavailableMetricDisplay(language);
-  const currentMonth = new Intl.DateTimeFormat(
-    language === "th" ? "th-TH-u-ca-buddhist" : "en-GB",
-    { month: "long", year: "numeric" },
-  ).format(new Date());
+  const dueSoon = taskItems.filter(
+    (task) =>
+      task.dueDate >= todayKey &&
+      task.dueDate <=
+        new Date(now.getTime() + 7 * 86_400_000).toISOString().slice(0, 10) &&
+      !["closed", "cancelled", "rejected", "published"].includes(task.status),
+  ).length;
+  const review = taskItems.filter((task) =>
+    ["source_fact_check", "technical_review", "pr_editorial_review"].includes(
+      task.status,
+    ),
+  ).length;
+  const metrics = [
+    [
+      "📥",
+      thai ? "คำขอใหม่" : "New requests",
+      String(requestItems.filter((request) => request.status === "SUBMITTED").length),
+    ],
+    ["📩", thai ? "รอข้อมูล" : "Waiting for information", String(workflow.waiting)],
+    ["🛠️", thai ? "กำลังผลิต" : "In production", String(workflow.production)],
+    ["⌛", thai ? "ใกล้ครบกำหนด" : "Due soon", String(dueSoon)],
+    ["🔎", thai ? "รอตรวจ" : "Under review", String(review)],
+    ["✅", thai ? "งานรออนุมัติ" : "Awaiting approval", String(workflow.approval)],
+    [
+      "🗓️",
+      thai ? "กำหนดเผยแพร่แล้ว" : "Scheduled",
+      String(taskItems.filter((task) => task.status === "scheduled").length),
+    ],
+    [
+      "👥",
+      thai ? "ภาระงานรายบุคคล" : "Assigned work",
+      String(
+        taskItems.filter(
+          (task) =>
+            task.ownerId && !["closed", "cancelled", "rejected"].includes(task.status),
+        ).length,
+      ),
+    ],
+  ];
+  const currentDate = new Intl.DateTimeFormat(thai ? "th-TH-u-ca-buddhist" : "en-GB", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+    timeZone: "Asia/Bangkok",
+  }).format(now);
+
   const requestRows = requestItems.map((request) => [
     request.id,
     request.title,
@@ -4256,75 +4296,40 @@ function Dashboard({
     <>
       <section className={styles.hero}>
         <div className={styles.heroCopy}>
-          <p>
-            {currentUserName} · {currentUserRole}
-          </p>
-          <h1>{t.greeting}</h1>
-          <span>{t.subheading}</span>
+          <p>EXECUTIVE OVERVIEW · MILESTONES · MEASURABLE RESULTS</p>
+          <h1>{thai ? "ภาพรวมงานสื่อสารองค์กร" : "Executive communications overview"}</h1>
           <div className={styles.heroChips}>
-            <b>{currentMonth}</b>
-            <b>{published} published items</b>
-            <b>{pending} approvals pending</b>
+            <b>📅 {currentDate}</b>
+            <b>👤 {currentUserName}</b>
+            <b>▣ {currentUserRole}</b>
+            <b>🔔 {requestItems.length + taskItems.length}</b>
           </div>
         </div>
         <div className={styles.heroActions}>
-          <button className={styles.heroSecondary} onClick={() => onNavigate("calendar")}>
-            View calendar
-          </button>
           {canCreateRequest && (
             <button className={styles.primary} onClick={onOpenRequest}>
               + {t.newRequest}
             </button>
           )}
+          <button className={styles.heroSecondary} onClick={() => onNavigate("ideas")}>
+            💡 {thai ? "เสนอ Content Idea" : "Suggest content idea"}
+          </button>
         </div>
       </section>
-      <section className={styles.metrics}>
-        <Metric
-          value={String(published)}
-          label={t.published}
-          trend={`${active} active work items`}
-          tone="blue"
-        />
-        <Metric
-          value={metricsUnavailable.value}
-          label={t.reach}
-          trend={metricsUnavailable.trend}
-          tone="green"
-        />
-        <Metric
-          value={metricsUnavailable.value}
-          label={t.engagement}
-          trend={metricsUnavailable.trend}
-          tone="purple"
-        />
-        <Metric
-          value={String(pending)}
-          label={t.pending}
-          trend="Review within 2 days"
-          tone="gold"
-        />
-      </section>
-      <section className={styles.workflowStrip} aria-label="Workflow health">
-        {[
-          ["Planning", String(workflow.planning), styles.workflowPlan],
-          ["Waiting for information", String(workflow.waiting), styles.workflowWait],
-          ["In production", String(workflow.production), styles.workflowDoing],
-          ["Awaiting approval", String(workflow.approval), styles.workflowApproval],
-        ].map(([name, count, className]) => (
-          <button
-            className={`${styles.workflowCell} ${className}`}
-            key={name}
-            onClick={() => onNavigate("operations")}
-          >
-            <span>{name}</span>
-            <b>{count}</b>
-          </button>
+      <section
+        className={styles.referenceMetrics}
+        aria-label={thai ? "ภาพรวมสถานะงาน" : "Work status overview"}
+      >
+        {metrics.map(([icon, label, value]) => (
+          <article className={styles.referenceMetric} key={label}>
+            <span aria-hidden="true">{icon}</span>
+            <div>
+              <small>{label}</small>
+              <strong>{value}</strong>
+            </div>
+          </article>
         ))}
       </section>
-      <ProductionReadiness
-        language={language}
-        canManageEvidence={canManageReleaseEvidence}
-      />
       <section className={styles.dashboardGrid}>
         <article className={`${styles.card} ${styles.wideCard}`}>
           <header>
@@ -4390,6 +4395,10 @@ function Dashboard({
         </article>
       </section>
       <DashboardScheduleInsights language={language} onNavigate={onNavigate} />
+      <ProductionReadiness
+        language={language}
+        canManageEvidence={canManageReleaseEvidence}
+      />
     </>
   );
 }
