@@ -1294,28 +1294,6 @@ function Status({ children }: { children: string }) {
   return <span className={`${styles.status} ${styles[tone]}`}>{children}</span>;
 }
 
-function Metric({
-  value,
-  label: metricLabel,
-  trend,
-  tone,
-}: {
-  value: string;
-  label: string;
-  trend: string;
-  tone: "blue" | "green" | "purple" | "gold";
-}) {
-  return (
-    <article
-      className={`${styles.metric} ${styles[`metric${tone[0].toUpperCase()}${tone.slice(1)}`]}`}
-    >
-      <p>{metricLabel}</p>
-      <strong>{value}</strong>
-      <span>{trend}</span>
-    </article>
-  );
-}
-
 function DashboardScheduleInsights({
   language,
   onNavigate,
@@ -4021,7 +3999,6 @@ export function PrCenterApp({
           )}
           {page === "executive" && (
             <ExecutiveDashboard
-              t={t}
               language={state.language}
               onNavigate={go}
               tasks={state.tasks}
@@ -5111,85 +5088,230 @@ function Table({
   );
 }
 function ExecutiveDashboard({
-  t,
   language,
   onNavigate,
   tasks,
   requests,
 }: {
-  t: (typeof copy)[Language];
   language: Language;
   onNavigate: (page: Page) => void;
   tasks: Task[];
   requests: Request[];
 }) {
+  const thai = language === "th";
   const published = tasks.filter((task) =>
     ["published", "closed"].includes(task.status),
   ).length;
   const pending = tasks.filter((task) =>
     ["pr_editorial_review", "management_approval"].includes(task.status),
   ).length;
-  const scheduled = tasks.filter((task) =>
-    ["approved", "scheduled"].includes(task.status),
+  const planning = tasks.filter((task) =>
+    ["draft", "communication_planning"].includes(task.status),
   ).length;
+  const waiting = tasks.filter(
+    (task) => task.status === "waiting_for_information",
+  ).length;
+  const production = tasks.filter((task) =>
+    ["in_production", "source_fact_check", "technical_review"].includes(task.status),
+  ).length;
+  const approved = tasks.filter((task) => task.status === "approved").length;
+  const scheduled = tasks.filter((task) => task.status === "scheduled").length;
+  const unavailable = unavailableMetricDisplay(language);
+  const date = new Intl.DateTimeFormat(thai ? "th-TH-u-ca-buddhist" : "en-GB", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+    timeZone: "Asia/Bangkok",
+  }).format(new Date());
+  const primaryMetrics = [
+    {
+      icon: "▤",
+      label: thai ? "เผยแพร่แล้ว" : "Published",
+      value: String(published),
+      tone: "blue",
+    },
+    {
+      icon: "📡",
+      label: thai ? "ยอดการเข้าถึงรวม" : "Total reach",
+      value: unavailable.value,
+      tone: "green",
+    },
+    {
+      icon: "💬",
+      label: thai ? "ยอดปฏิสัมพันธ์รวม" : "Total interactions",
+      value: unavailable.value,
+      tone: "purple",
+    },
+    {
+      icon: "📈",
+      label: thai ? "อัตราการมีส่วนร่วม" : "Engagement rate",
+      value: unavailable.value,
+      tone: "gold",
+    },
+  ];
+  const workflowMetrics = [
+    {
+      icon: "🗓️",
+      label: thai ? "วางแผนการสื่อสาร" : "Planning",
+      value: planning,
+      tone: "blue",
+    },
+    {
+      icon: "📩",
+      label: thai ? "รอข้อมูล" : "Waiting for information",
+      value: waiting,
+      tone: "orange",
+    },
+    {
+      icon: "🛠️",
+      label: thai ? "กำลังผลิต" : "In production",
+      value: production,
+      tone: "sky",
+    },
+    {
+      icon: "✅",
+      label: thai ? "งานรออนุมัติ" : "Awaiting approval",
+      value: pending,
+      tone: "gold",
+    },
+  ];
+  const pipelineRows = [
+    [thai ? "วางแผน" : "Planning", String(planning), thai ? "รายการ" : "items"],
+    [
+      thai ? "กำลังผลิตและตรวจทาน" : "Production and review",
+      String(production),
+      thai ? "รายการ" : "items",
+    ],
+    [thai ? "อนุมัติแล้ว" : "Approved", String(approved), thai ? "รายการ" : "items"],
+    [thai ? "กำหนดเผยแพร่" : "Scheduled", String(scheduled), thai ? "รายการ" : "items"],
+    [thai ? "เผยแพร่แล้ว" : "Published", String(published), thai ? "รายการ" : "items"],
+  ];
 
-  const metricsUnavailable = unavailableMetricDisplay(language);
   return (
     <>
-      <SectionHeading eyebrow="EXECUTIVE OVERVIEW" title="Executive Dashboard" />
-      <section className={styles.metrics}>
-        <Metric
-          value={String(published)}
-          label={t.published}
-          trend={`${requests.length} requests tracked`}
-          tone="blue"
-        />
-        <Metric
-          value={metricsUnavailable.value}
-          label={t.reach}
-          trend={metricsUnavailable.trend}
-          tone="green"
-        />
-        <Metric
-          value={metricsUnavailable.value}
-          label={t.engagement}
-          trend={metricsUnavailable.trend}
-          tone="purple"
-        />
-        <Metric
-          value={String(pending)}
-          label={t.pending}
-          trend={
-            language === "th"
-              ? "ยังไม่มีข้อมูลยืนยันการตรงเวลา"
-              : "On-time performance not verified"
-          }
-          tone="gold"
-        />
-      </section>
-      <article className={styles.card}>
-        <h2>Content pipeline</h2>
-        <Table
-          headers={["Stage", "Items", "Status"]}
-          statusColumn={2}
-          rows={[
-            [
-              "Planning",
-              String(
-                tasks.filter((task) =>
-                  ["draft", "communication_planning"].includes(task.status),
-                ).length,
-              ),
-              "In production",
-            ],
-            ["Review", String(pending), "Awaiting approval"],
-            ["Scheduled", String(scheduled), "Scheduled"],
-          ]}
-        />
-        <button className={styles.primary} onClick={() => onNavigate("operations")}>
-          View content operations
+      <section className={styles.hero}>
+        <div className={styles.heroCopy}>
+          <p>EXECUTIVE OVERVIEW · MILESTONES · MEASURABLE RESULTS</p>
+          <h1>
+            {thai
+              ? "ภาพรวมงานสื่อสารองค์กรและประชาสัมพันธ์"
+              : "Executive communications overview"}
+          </h1>
+          <div className={styles.heroChips}>
+            <b>📅 {date}</b>
+            <b>📊 {thai ? "ภาพรวมผู้บริหาร" : "Executive overview"}</b>
+            <b>
+              🧾{" "}
+              {thai
+                ? `${requests.length} คำขอในขอบเขต`
+                : `${requests.length} in-scope requests`}
+            </b>
+            <b>📋 {thai ? `${tasks.length} งาน` : `${tasks.length} tasks`}</b>
+          </div>
+        </div>
+        <button className={styles.heroSecondary} onClick={() => onNavigate("operations")}>
+          {thai ? "ดูภาพรวมงาน" : "View operations"} →
         </button>
-      </article>
+      </section>
+
+      <section
+        className={styles.executiveMetrics}
+        aria-label={thai ? "ตัวชี้วัดผลลัพธ์" : "Outcome metrics"}
+      >
+        {primaryMetrics.map((metric) => (
+          <article
+            className={styles.executiveMetric}
+            data-tone={metric.tone}
+            key={metric.label}
+          >
+            <span aria-hidden="true">{metric.icon}</span>
+            <small>{metric.label}</small>
+            <strong>{metric.value}</strong>
+            {metric.tone !== "blue" && <em>{unavailable.trend}</em>}
+          </article>
+        ))}
+      </section>
+
+      <section
+        className={styles.executiveWorkflowMetrics}
+        aria-label={thai ? "สถานะงานตามขั้นตอน" : "Workflow status"}
+      >
+        {workflowMetrics.map((metric) => (
+          <article
+            className={styles.executiveWorkflowMetric}
+            data-tone={metric.tone}
+            key={metric.label}
+          >
+            <span aria-hidden="true">{metric.icon}</span>
+            <small>{metric.label}</small>
+            <strong>{metric.value}</strong>
+          </article>
+        ))}
+      </section>
+
+      <section className={styles.dashboardGrid}>
+        <article className={`${styles.card} ${styles.wideCard}`}>
+          <header>
+            <div>
+              <p className={styles.eyebrow}>CONTENT PIPELINE · WORKFLOW STATUS</p>
+              <h2>{thai ? "ภาพรวมตามขั้นตอนการทำงาน" : "Work by workflow stage"}</h2>
+            </div>
+            <button onClick={() => onNavigate("operations")}>
+              {thai ? "ดูงานทั้งหมด" : "View all"}
+            </button>
+          </header>
+          <Table
+            headers={[
+              thai ? "ขั้นตอน" : "Stage",
+              thai ? "จำนวน" : "Items",
+              thai ? "หน่วย" : "Unit",
+            ]}
+            rows={pipelineRows}
+          />
+        </article>
+        <article className={`${styles.card} ${styles.wideCard}`}>
+          <header>
+            <div>
+              <p className={styles.eyebrow}>
+                {thai ? "WORKFLOW HEALTH" : "WORKFLOW HEALTH"}
+              </p>
+              <h2>{thai ? "สุขภาพ Workflow" : "Workflow health"}</h2>
+            </div>
+            <button onClick={() => onNavigate("approvals")}>
+              {thai ? "เปิดคิวอนุมัติ" : "Open approvals"}
+            </button>
+          </header>
+          <div className={styles.executiveHealth}>
+            <p>
+              <span>{thai ? "คำขอที่ส่งแล้ว" : "Submitted requests"}</span>
+              <strong>
+                {requests.filter((request) => request.status === "SUBMITTED").length}
+              </strong>
+            </p>
+            <p>
+              <span>{thai ? "กำลังดำเนินการ" : "Active tasks"}</span>
+              <strong>
+                {
+                  tasks.filter(
+                    (task) =>
+                      !["closed", "cancelled", "rejected", "published"].includes(
+                        task.status,
+                      ),
+                  ).length
+                }
+              </strong>
+            </p>
+            <p>
+              <span>{thai ? "รออนุมัติ" : "Awaiting approval"}</span>
+              <strong>{pending}</strong>
+            </p>
+            <p>
+              <span>{thai ? "รอกำหนดเผยแพร่" : "Awaiting schedule"}</span>
+              <strong>{approved}</strong>
+            </p>
+          </div>
+        </article>
+      </section>
       <DashboardScheduleInsights language={language} onNavigate={onNavigate} />
     </>
   );
