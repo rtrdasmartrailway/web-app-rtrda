@@ -92,7 +92,7 @@ export function useBoardHoldDrag(options: Options) {
       x = e.clientX;
       y = e.clientY;
       if (!active) {
-        if (Math.hypot(x - initial.x, y - initial.y) > 8) finish(false);
+        if (Math.hypot(x - initial.x, y - initial.y) > 20) finish(false);
         return;
       }
       e.preventDefault();
@@ -142,7 +142,7 @@ export function useBoardHoldDrag(options: Options) {
       setPreview({ title: item.title, x, y });
       locate();
       frame = requestAnimationFrame(animate);
-    }, 400);
+    }, 100);
     document.addEventListener("pointermove", move, { passive: false });
     document.addEventListener("pointerup", up, { passive: false });
     document.addEventListener("pointercancel", cancel);

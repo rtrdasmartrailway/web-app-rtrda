@@ -2,6 +2,22 @@ import { describe, expect, it } from "vitest";
 import { boardMove } from "./board-moves";
 
 describe("board column moves", () => {
+  it("lets explicit PR board mode skip or reverse stages while retaining approved requests", () => {
+    expect(boardMove("DRAFT", "APPROVED", "Review", undefined, true)).toEqual({
+      action: "transition",
+      status: "SOURCE_FACT_CHECK",
+    });
+    expect(boardMove("DRAFT", "APPROVED", "Scheduled", undefined, true)).toEqual({
+      action: "schedule",
+    });
+    expect(boardMove("SCHEDULED", "APPROVED", "New request", undefined, true)).toEqual({
+      action: "transition",
+      status: "DRAFT",
+    });
+    expect(boardMove("DRAFT", "SUBMITTED", "Planning", undefined, true).action).toBe(
+      "blocked",
+    );
+  });
   it.each(["Revision required", "Not proceeding", "unknown"])(
     "does not treat display-only %s as a review transition",
     (column) => {

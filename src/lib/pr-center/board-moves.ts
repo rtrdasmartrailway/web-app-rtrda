@@ -18,10 +18,25 @@ export function boardMove(
   requestStatus: string | undefined,
   column: BoardColumn,
   reviewEntry?: PrTaskStatus,
+  freeMove = false,
 ): BoardMove {
   if (!(BOARD_COLUMNS as readonly string[]).includes(column))
     return { action: "blocked", reason: "workflow" };
   if (requestStatus !== "APPROVED") return { action: "blocked", reason: "request" };
+  if (freeMove) {
+    if (column === "Scheduled") return { action: "schedule" };
+    return {
+      action: "transition",
+      status:
+        column === "New request"
+          ? "DRAFT"
+          : column === "Planning"
+            ? "COMMUNICATION_PLANNING"
+            : column === "In production"
+              ? "IN_PRODUCTION"
+              : "SOURCE_FACT_CHECK",
+    };
+  }
   if (column === "Scheduled")
     return from === "APPROVED"
       ? { action: "schedule" }

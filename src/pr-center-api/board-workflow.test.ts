@@ -36,6 +36,45 @@ const policy = {
 };
 afterEach(() => vi.unstubAllEnvs());
 describe("board workflow metadata", () => {
+  it("requires authentication, a UUID and a row version for the free board command", async () => {
+    const publicApp = buildPrCenterApi(async () => null);
+    expect(
+      (
+        await publicApp.inject({
+          method: "POST",
+          url: "/tasks/00000000-0000-4000-8000-000000000001/board-move",
+          payload: { column: "Review" },
+        })
+      ).statusCode,
+    ).toBe(401);
+    await publicApp.close();
+    const app = buildPrCenterApi(async () => ({
+      id: "pr",
+      organizationId: "org",
+      departmentId: null,
+      role: "RTRDA_PR",
+    }));
+    expect(
+      (
+        await app.inject({
+          method: "POST",
+          url: "/tasks/not-a-uuid/board-move",
+          headers: { "if-match": "1" },
+          payload: { column: "Planning" },
+        })
+      ).statusCode,
+    ).toBe(422);
+    expect(
+      (
+        await app.inject({
+          method: "POST",
+          url: "/tasks/00000000-0000-4000-8000-000000000001/board-move",
+          payload: { column: "Planning" },
+        })
+      ).statusCode,
+    ).toBe(428);
+    await app.close();
+  });
   it("returns the active workflow for PR without database writes", async () => {
     vi.stubEnv("PR_CENTER_APPROVAL_POLICY_JSON", JSON.stringify(policy));
     const app = buildPrCenterApi(async () => ({

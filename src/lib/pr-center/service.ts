@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { boardMove, type BoardColumn } from "./board-moves";
 import {
   DEFAULT_LIST_SORT,
   listOrderBy,
@@ -3174,6 +3175,185 @@ export function getBoardApprovalPolicy(actor: PrCenterActor) {
   if (!canManageTasks(actorRoles(actor)))
     throw new PrCenterError("You cannot manage this workflow", 403, "FORBIDDEN");
   return loadApprovalPolicy();
+}
+
+/** PR board positioning is independent of the sequential content approval commands. */
+export async function moveBoardTask(
+  actor: PrCenterActor,
+  taskId: string,
+  fromVersion: number,
+  input: {
+    column: BoardColumn;
+    channel?: string;
+    scheduledFor?: Date;
+    idempotencyKey?: string;
+  },
+  correlationId: string = randomUUID(),
+) {
+  if (!actorHasRole(actor, "RTRDA_PR"))
+    throw new PrCenterError(
+      "RTRDA_PR is required to freely move board tasks",
+      403,
+      "FORBIDDEN",
+    );
+  const task = await prisma.prTask.findFirst({
+    where: {
+      id: taskId,
+      request: {
+        organizationId: actor.organizationId,
+        OR: roleDepartmentClauses(actor, ["RTRDA_PR"]),
+      },
+    },
+    include: {
+      request: { select: { status: true } },
+      revisions: { orderBy: { revisionNumber: "desc" }, take: 1 },
+    },
+  });
+  if (!task) throw new PrCenterError("Task not found in your PR scope", 404, "NOT_FOUND");
+  const move = boardMove(
+    task.status as WorkflowStatus,
+    task.request.status,
+    input.column,
+    undefined,
+    true,
+  );
+  if (move.action === "blocked")
+    throw new PrCenterError(
+      "The request must be approved and the destination must be a board column",
+      422,
+      "INVALID_BOARD_MOVE",
+    );
+  const channel = input.channel?.trim();
+  const time = input.scheduledFor;
+  const key = input.idempotencyKey?.trim();
+  if (move.action === "schedule") {
+    if (
+      !channel ||
+      channel.length > 100 ||
+      !time ||
+      !Number.isFinite(time.getTime()) ||
+      time.getTime() <= Date.now() ||
+      !key ||
+      key.length < 8 ||
+      key.length > 128
+    )
+      throw new PrCenterError(
+        "A channel, future schedule time and idempotency key are required",
+        422,
+        "INVALID_SCHEDULE",
+      );
+    const existing = await prisma.prSchedule.findUnique({
+      where: { idempotencyKey: key },
+    });
+    if (existing) {
+      if (
+        existing.taskId === task.id &&
+        existing.channel === channel &&
+        existing.scheduledFor.getTime() === time.getTime() &&
+        task.status === "SCHEDULED" &&
+        existing.taskRevision === (task.revisions[0]?.revisionNumber ?? 1)
+      )
+        return { ...task, taskVersion: task.version };
+      throw new PrCenterError(
+        "Idempotency key is already in use",
+        409,
+        "IDEMPOTENCY_CONFLICT",
+      );
+    }
+  }
+  if (task.version !== fromVersion)
+    throw new PrCenterError(
+      "This task has changed. Refresh and try again.",
+      409,
+      "STALE_UPDATE",
+    );
+  const target = move.action === "schedule" ? "SCHEDULED" : move.status;
+  if (task.status === target && move.action !== "schedule")
+    return { ...task, taskVersion: task.version };
+  return prisma.$transaction(async (tx) => {
+    const changed = await tx.prTask.updateMany({
+      where: {
+        id: task.id,
+        version: fromVersion,
+        status: task.status,
+        request: { status: "APPROVED" },
+      },
+      data: {
+        status: target,
+        channel: move.action === "schedule" ? channel : null,
+        version: { increment: 1 },
+      },
+    });
+    if (changed.count !== 1)
+      throw new PrCenterError(
+        "This task or request has changed. Refresh and try again.",
+        409,
+        "STALE_UPDATE",
+      );
+    // Remove superseded pending dates so moving backwards cannot leave live reminders.
+    // Published evidence remains intact; the replaced pending dates are recorded in audit.
+    const previousSchedules = await tx.prSchedule.findMany({
+      where: { taskId: task.id, publishedAt: null },
+      select: { id: true, channel: true, scheduledFor: true },
+    });
+    if (move.action !== "schedule" || task.status !== "SCHEDULED")
+      await tx.prSchedule.deleteMany({ where: { taskId: task.id, publishedAt: null } });
+    if (move.action === "schedule") {
+      const duplicate = await tx.prSchedule.findFirst({
+        where: {
+          taskId: task.id,
+          channel,
+          taskRevision: task.revisions[0]?.revisionNumber ?? 1,
+          publishedAt: null,
+        },
+      });
+      if (duplicate)
+        throw new PrCenterError(
+          "This channel already has a pending schedule. Move the task out of Scheduled before replacing it.",
+          409,
+          "CHANNEL_SCHEDULE_EXISTS",
+        );
+      await tx.prSchedule.create({
+        data: {
+          taskId: task.id,
+          channel: channel!,
+          taskRevision: task.revisions[0]?.revisionNumber ?? 1,
+          scheduledFor: time!,
+          idempotencyKey: key!,
+        },
+      });
+    }
+    await tx.prStatusHistory.create({
+      data: {
+        taskId: task.id,
+        fromState: task.status,
+        toState: target,
+        actorId: actor.id,
+        reason: `PR board move: ${input.column}`,
+      },
+    });
+    await auditAndOutbox(tx, {
+      actor,
+      action: "task.board_moved",
+      entityType: "task",
+      entityId: task.id,
+      after: {
+        from: task.status,
+        to: target,
+        column: input.column,
+        version: fromVersion + 1,
+        contentApprovalRequired: false,
+        previousSchedules,
+        ...(move.action === "schedule"
+          ? { channel, scheduledFor: time!.toISOString() }
+          : {}),
+      },
+      eventType: "pr.task.transitioned",
+      correlationId,
+    });
+    const updated = await tx.prTask.findUniqueOrThrow({ where: { id: task.id } });
+    return { ...updated, taskVersion: fromVersion + 1 };
+  });
 }
 
 function loadApprovalPolicy() {

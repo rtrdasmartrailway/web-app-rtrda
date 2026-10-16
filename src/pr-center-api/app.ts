@@ -1,6 +1,7 @@
 import Fastify, { type FastifyInstance, type FastifyRequest } from "fastify";
 import {
   createRequest,
+  moveBoardTask,
   getBoardApprovalPolicy,
   createIdea,
   addIdeaComment,
@@ -604,6 +605,25 @@ export function buildPrCenterApi(
       expectedVersion(request),
       to as PrTaskStatus,
       typeof input.reason === "string" ? input.reason : undefined,
+      correlationId(request),
+    );
+  });
+  app.post("/tasks/:taskId/board-move", async (request) => {
+    const input = await body(request);
+    return moveBoardTask(
+      request.prCenterActor!,
+      taskId((request.params as { taskId: string }).taskId),
+      expectedVersion(request),
+      {
+        column: input.column as Parameters<typeof moveBoardTask>[3]["column"],
+        channel: typeof input.channel === "string" ? input.channel : undefined,
+        scheduledFor:
+          input.column === "Scheduled"
+            ? parseAbsoluteScheduleDate(input.scheduledFor)
+            : undefined,
+        idempotencyKey:
+          typeof input.idempotencyKey === "string" ? input.idempotencyKey : undefined,
+      },
       correlationId(request),
     );
   });

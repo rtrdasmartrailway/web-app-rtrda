@@ -2909,19 +2909,28 @@ export function PrCenterApp({
       announce(error instanceof Error ? error.message : "Request could not be withdrawn");
     }
   };
-  const transitionTask = async (taskId: string, nextStatus: StatusId) => {
+  const transitionTask = async (
+    taskId: string,
+    nextStatus: StatusId,
+    boardColumn?: BoardColumn,
+  ) => {
     const task = state.tasks.find((item) => item.id === taskId);
     if (!task) return { ok: false, message: "Task not found. Refresh the board." };
     try {
-      const response = await fetch(`/api/pr-center/tasks/${taskId}/transitions`, {
-        method: "POST",
-        credentials: "same-origin",
-        headers: {
-          "Content-Type": "application/json",
-          "If-Match": String(task.version ?? 0),
+      const response = await fetch(
+        `/api/pr-center/tasks/${taskId}/${boardColumn ? "board-move" : "transitions"}`,
+        {
+          method: "POST",
+          credentials: "same-origin",
+          headers: {
+            "Content-Type": "application/json",
+            "If-Match": String(task.version ?? 0),
+          },
+          body: JSON.stringify(
+            boardColumn ? { column: boardColumn } : { to: nextStatus.toUpperCase() },
+          ),
         },
-        body: JSON.stringify({ to: nextStatus.toUpperCase() }),
-      });
+      );
       if (!response.ok) {
         const result = (await response.json().catch(() => null)) as {
           message?: string;
@@ -3060,6 +3069,7 @@ export function PrCenterApp({
     taskId: string,
     channel: string,
     scheduledFor: string,
+    freeBoardMove = false,
   ): Promise<boolean> => {
     const task = state.tasks.find((item) => item.id === taskId);
     if (!task) return false;
@@ -3081,23 +3091,28 @@ export function PrCenterApp({
       return false;
     }
     try {
-      const response = await fetch(`/api/pr-center/tasks/${taskId}/schedule`, {
-        method: "POST",
-        credentials: "same-origin",
-        headers: {
-          "Content-Type": "application/json",
-          "If-Match": String(task.version ?? 0),
+      const response = await fetch(
+        `/api/pr-center/tasks/${taskId}/${freeBoardMove ? "board-move" : "schedule"}`,
+        {
+          method: "POST",
+          credentials: "same-origin",
+          headers: {
+            "Content-Type": "application/json",
+            "If-Match": String(task.version ?? 0),
+          },
+          body: JSON.stringify({
+            ...(freeBoardMove ? { column: "Scheduled" } : {}),
+            channel,
+            scheduledFor: scheduledForIso,
+            idempotencyKey: `schedule:${taskId}:${channel}:${scheduledForIso}`,
+          }),
         },
-        body: JSON.stringify({
-          channel,
-          scheduledFor: scheduledForIso,
-          idempotencyKey: `schedule:${taskId}:${channel}:${scheduledForIso}`,
-        }),
-      });
+      );
       if (!response.ok) {
         const result = (await response.json().catch(() => null)) as {
           message?: string;
         } | null;
+        if (response.status === 409) await refreshRequests().catch(() => undefined);
         throw new Error(
           result?.message || "Scheduling failed. Complete the publication gate first.",
         );
@@ -3848,6 +3863,7 @@ export function PrCenterApp({
               onPublish={publishTask}
               onCreateRevision={createTaskRevision}
               canManageTasks={hasUiRole("pr", "admin")}
+              canFreelyMoveTasks={actorRoleCodes.includes("RTRDA_PR")}
               currentUserId={currentUser.id}
               canFactCheckPR={actorRoleCodes.includes("RTRDA_PR")}
               canConfigureApprovalRequirements={actorRoleCodes.includes("RTRDA_PR")}
@@ -5348,6 +5364,7 @@ function Operations({
   onPublish,
   onCreateRevision,
   canManageTasks,
+  canFreelyMoveTasks,
   currentUserId,
   canFactCheckPR,
   canConfigureApprovalRequirements,
@@ -5361,6 +5378,7 @@ function Operations({
   onTransition: (
     taskId: string,
     status: StatusId,
+    boardColumn?: BoardColumn,
   ) => Promise<{ ok: boolean; message?: string }>;
   onAssign: (
     taskId: string,
@@ -5370,7 +5388,12 @@ function Operations({
     technicalReviewRequired?: boolean,
     managementApprovalRequired?: boolean,
   ) => Promise<void>;
-  onSchedule: (taskId: string, channel: string, scheduledFor: string) => Promise<boolean>;
+  onSchedule: (
+    taskId: string,
+    channel: string,
+    scheduledFor: string,
+    freeBoardMove?: boolean,
+  ) => Promise<boolean>;
   onPublish: (
     taskId: string,
     channel: string,
@@ -5384,6 +5407,7 @@ function Operations({
     changeSummary: string,
   ) => Promise<boolean>;
   canManageTasks: boolean;
+  canFreelyMoveTasks: boolean;
   canConfigureApprovalRequirements: boolean;
   currentUserId: string;
   canFactCheckPR: boolean;
@@ -5592,6 +5616,7 @@ function Operations({
       task.requestStatus,
       column,
       first,
+      canFreelyMoveTasks,
     );
   };
   const moveTask = async (task: Task, column: BoardColumn) => {
@@ -5618,7 +5643,11 @@ function Operations({
     moveBusy.current = true;
     setMovingId(task.id);
     try {
-      const result = await onTransition(task.id, move.status.toLowerCase() as StatusId);
+      const result = await onTransition(
+        task.id,
+        move.status.toLowerCase() as StatusId,
+        canFreelyMoveTasks ? column : undefined,
+      );
       if (!result.ok)
         setMoveError(
           result.message ||
@@ -5728,8 +5757,8 @@ function Operations({
           <p className={styles.boardInstructions}>
             {canManageTasks
               ? language === "th"
-                ? "กดค้างที่หัวข้อหรือพื้นที่ว่างบนการ์ด 0.4 วินาที แล้วลากไปช่องที่มีกรอบสี หรือเลือกสถานะจาก dropdown · New request แสดงเฉพาะคำขอที่อนุมัติแล้ว"
-                : "Hold a card title or empty space for 0.4 seconds, then drag to a highlighted column, or select its column from the dropdown. New request shows approved requests only."
+                ? "กดค้าง 0.1 วินาทีจนการ์ดลอยขึ้น แล้วลากไปช่องที่มีกรอบสี หรือเลือกจาก dropdown · RTRDA_PR ย้ายข้ามขั้น/ย้อนกลับได้ และนัดเผยแพร่ได้โดยไม่ต้องอนุมัติเนื้อหา · New request แสดงเฉพาะคำขอที่อนุมัติแล้ว"
+                : "Hold for 0.1 seconds until the card lifts, then drag or use the dropdown. RTRDA_PR can skip or reverse stages and schedule without content approval. New request shows approved requests only."
               : language === "th"
                 ? "ดูสถานะงานและเปิดรายละเอียดได้ตามสิทธิ์ของคุณ"
                 : "View task status and details within your authorized scope."}
@@ -6169,7 +6198,9 @@ function Operations({
                 </label>
               )}
             {canManageTasks &&
-              (selected.status === "approved" || selected.status === "scheduled") && (
+              (canFreelyMoveTasks ||
+                selected.status === "approved" ||
+                selected.status === "scheduled") && (
                 <>
                   <label>
                     Channel{" "}
@@ -6210,6 +6241,7 @@ function Operations({
                           selected.id,
                           channel,
                           scheduledFor,
+                          canFreelyMoveTasks,
                         );
                         if (saved)
                           await loadTaskSchedules(selected.id).catch(() =>
