@@ -1,9 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const mocks = vi.hoisted(() => ({ findMany: vi.fn() }));
+const mocks = vi.hoisted(() => ({ findMany: vi.fn(), groupBy: vi.fn() }));
 
 vi.mock("@/lib/db/client", () => ({
-  prisma: { prContentIdea: { findMany: mocks.findMany } },
+  prisma: { prContentIdea: { findMany: mocks.findMany, groupBy: mocks.groupBy } },
 }));
 
 import { listIdeas } from "./service";
@@ -36,6 +36,7 @@ describe("listIdeas pagination and scope", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.findMany.mockResolvedValue([]);
+    mocks.groupBy.mockResolvedValue([]);
   });
 
   it("returns a stable page and next offset using the actor's department scope", async () => {
@@ -120,6 +121,37 @@ describe("listIdeas pagination and scope", () => {
       statusCode: 422,
     });
     expect(mocks.findMany).toHaveBeenCalledTimes(1);
+  });
+
+  it("pages semantic priority buckets with scoped counts before loading full records", async () => {
+    mocks.groupBy.mockResolvedValue([
+      { priority: "LOW", _count: { _all: 1 } },
+      { priority: "URGENT", _count: { _all: 1 } },
+      { priority: null, _count: { _all: 2 } },
+      { priority: "HIGH", _count: { _all: 2 } },
+    ]);
+    mocks.findMany
+      .mockResolvedValueOnce([{ id: "high-2" }])
+      .mockResolvedValueOnce([{ id: "low" }])
+      .mockResolvedValueOnce([{ id: "empty" }])
+      .mockResolvedValueOnce([idea("empty"), idea("low"), idea("high-2")]);
+    const result = await listIdeas(actor, {
+      sort: "priority:desc",
+      offset: 2,
+      take: 2,
+      search: "rail",
+    });
+    expect(result.items.map((row) => row.id)).toEqual(["high-2", "low"]);
+    expect(result.nextOffset).toBe(4);
+    expect(mocks.groupBy.mock.calls[0][0].where.organizationId).toBe("org-1");
+    expect(mocks.findMany.mock.calls[0][0]).toMatchObject({
+      skip: 1,
+      where: {
+        AND: [expect.objectContaining({ organizationId: "org-1" }), { priority: "HIGH" }],
+      },
+    });
+    expect(mocks.findMany.mock.calls[1][0].where.AND[1]).toEqual({ priority: "LOW" });
+    expect(mocks.findMany.mock.calls[2][0].where.AND[1]).toEqual({ priority: null });
   });
 
   it("supports rejected ideas and exposes their decision reason within the existing scope", async () => {

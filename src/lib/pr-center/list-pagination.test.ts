@@ -30,12 +30,39 @@ beforeEach(() => {
 });
 
 describe("request list filtering and pagination", () => {
+  it("continues across lifecycle status buckets without relying on database enum order", async () => {
+    prismaMock.prRequest.findFirst.mockResolvedValue({
+      id: cursor,
+      createdAt: date,
+      status: "SUBMITTED",
+    });
+    prismaMock.prRequest.findMany
+      .mockResolvedValueOnce([{ id: "submitted-next" }])
+      .mockResolvedValueOnce([{ id: "approved" }])
+      .mockResolvedValueOnce([{ id: "closed" }])
+      .mockResolvedValueOnce(
+        ["closed", "approved", "submitted-next"].map((id) => ({
+          id,
+          requesterId: actor.id,
+          organizationId: actor.organizationId,
+        })),
+      );
+    const rows = await listRequests(actor, 2, cursor, { sort: "status:asc", mine: true });
+    expect(rows.map((row) => row.id)).toEqual(["submitted-next", "approved", "closed"]);
+    const queries = prismaMock.prRequest.findMany.mock.calls.map((call) => call[0]);
+    expect(queries[0].where.AND).toContainEqual({ status: "SUBMITTED" });
+    expect(queries[0].where.AND).toContainEqual({ id: { gt: cursor } });
+    expect(queries[1].where.AND).toContainEqual({ status: "APPROVED" });
+    expect(queries[2].where.AND).toContainEqual({ status: "CLOSED" });
+    for (const query of queries)
+      expect(query.where.AND).toContainEqual({ requesterId: actor.id });
+    expect(queries[3].cursor).toBeUndefined();
+  });
   it.each([
     "title:asc",
     "requestedFor:desc",
     "department:asc",
     "requester:desc",
-    "status:asc",
     "createdAt:asc",
   ])(
     "paginates %s using the selected order within scoped filtered rows",

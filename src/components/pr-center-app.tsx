@@ -10,10 +10,11 @@ import {
 } from "react";
 import Image from "next/image";
 import {
-  DEFAULT_LIST_SORT,
-  listSortFields,
-  type ListSortKind,
-} from "@/lib/pr-center/list-sorting";
+  SortableHeading,
+  TableSummary,
+  type TableSorting,
+} from "./pr-center-table-sorting";
+import { DEFAULT_LIST_SORT } from "@/lib/pr-center/list-sorting";
 import type { CreateContentIdeaInput } from "@/lib/pr-center/idea-input";
 import { submitIdeaForm } from "@/lib/pr-center/idea-form";
 import {
@@ -318,64 +319,6 @@ function mapIdeaRecord(idea: IdeaListRecord): Idea {
     version: idea.version,
   };
 }
-function ListSorting({
-  kind,
-  value,
-  onChange,
-  language,
-}: {
-  kind: ListSortKind;
-  value: string;
-  onChange: (value: string) => void;
-  language: Language;
-}) {
-  const [field, direction] = value.split(":");
-  const thai = language === "th";
-  return (
-    <div className={styles.filterBar}>
-      <label>
-        {thai ? "เรียงตาม " : "Sort by "}
-        <select
-          value={field}
-          onChange={(event) => onChange(`${event.target.value}:${direction}`)}
-        >
-          {listSortFields[kind].map(([key, th, en]) => (
-            <option key={key} value={key}>
-              {thai ? th : en}
-            </option>
-          ))}
-        </select>
-      </label>
-      <label>
-        {thai ? "ลำดับ " : "Order "}
-        <select
-          value={direction}
-          onChange={(event) => onChange(`${field}:${event.target.value}`)}
-        >
-          <option value="desc">
-            {field === "createdAt" || field === "requestedFor"
-              ? thai
-                ? "ใหม่ไปเก่า"
-                : "Newest first"
-              : thai
-                ? "มากไปน้อย / ฮ–ก"
-                : "Descending / Z–A"}
-          </option>
-          <option value="asc">
-            {field === "createdAt" || field === "requestedFor"
-              ? thai
-                ? "เก่าไปใหม่"
-                : "Oldest first"
-              : thai
-                ? "น้อยไปมาก / ก–ฮ"
-                : "Ascending / A–Z"}
-          </option>
-        </select>
-      </label>
-    </div>
-  );
-}
-
 async function fetchIdeaPage(
   offset: number,
   search = "",
@@ -1594,6 +1537,32 @@ export function PrCenterApp({
     status: ideaStatusFilter,
     sort: ideaSort,
   });
+  const changeListSort = (sort: string) => {
+    if (sort === (listSorts[page] ?? DEFAULT_LIST_SORT)) return;
+    if (page === "ideas") {
+      latestIdeaFilters.current = { search: ideaSearch, status: ideaStatusFilter, sort };
+      setIdeaListStatus("loading");
+      setIdeaNextOffset(null);
+      setState((previous) => ({ ...previous, ideas: [] }));
+    } else if (page === "history") {
+      ++auditGeneration.current;
+      setAuditLoading(true);
+      setAuditHasMore(false);
+      setAuditCursor(null);
+    } else {
+      ++requestListGeneration.current;
+      setRequestListLoading(true);
+      setRequestListHasMore(false);
+      setRequestListCursor(null);
+    }
+    setListSorts((previous) => ({ ...previous, [page]: sort }));
+  };
+  const tableSorting: TableSorting = {
+    kind: page === "ideas" ? "ideas" : page === "history" ? "audit" : "requests",
+    value: listSorts[page] ?? DEFAULT_LIST_SORT,
+    onChange: changeListSort,
+    language: state.language,
+  };
   const changeIdeaFilters = (search: string, status: "all" | IdeaStatus) => {
     const nextStatus = status === "all" ? "" : status.toUpperCase();
     latestIdeaFilters.current = { search, status: nextStatus, sort: ideaSort };
@@ -3535,8 +3504,21 @@ export function PrCenterApp({
             <button
               className={styles.bell}
               onClick={() => go("notifications")}
-              aria-label="Open notifications"
+              aria-label={
+                state.language === "th" ? "เปิดการแจ้งเตือน" : "Open notifications"
+              }
             >
+              <svg
+                aria-hidden="true"
+                width="20"
+                height="20"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.8"
+              >
+                <path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4" />
+              </svg>
               <span>{unreadCount}</span>
             </button>
             <select
@@ -3613,38 +3595,6 @@ export function PrCenterApp({
               requests={state.requests}
             />
           )}
-          {["my-requests", "requests", "ideas", "history"].includes(page) && (
-            <ListSorting
-              kind={
-                page === "ideas" ? "ideas" : page === "history" ? "audit" : "requests"
-              }
-              value={listSorts[page] ?? DEFAULT_LIST_SORT}
-              language={state.language}
-              onChange={(sort) => {
-                if (page === "ideas") {
-                  latestIdeaFilters.current = {
-                    search: ideaSearch,
-                    status: ideaStatusFilter,
-                    sort,
-                  };
-                  setIdeaListStatus("loading");
-                  setIdeaNextOffset(null);
-                  setState((previous) => ({ ...previous, ideas: [] }));
-                } else if (page === "history") {
-                  ++auditGeneration.current;
-                  setAuditLoading(true);
-                  setAuditHasMore(false);
-                  setAuditCursor(null);
-                } else {
-                  ++requestListGeneration.current;
-                  setRequestListLoading(true);
-                  setRequestListHasMore(false);
-                  setRequestListCursor(null);
-                }
-                setListSorts((previous) => ({ ...previous, [page]: sort }));
-              }}
-            />
-          )}
           {page === "new-request" && hasUiRole("requester", "pr", "admin") && (
             <NewRequest t={t} onOpenRequest={openRequest} />
           )}
@@ -3657,6 +3607,7 @@ export function PrCenterApp({
               onSubmitRequest={submitRequest}
               onWithdrawRequest={withdrawRequest}
               mode="mine"
+              sorting={tableSorting}
               canCreate={hasUiRole("requester", "pr", "admin")}
               requests={visibleRequestList
                 .filter((record) => !record.assignedTaskOnly)
@@ -3683,6 +3634,7 @@ export function PrCenterApp({
               onSubmitRequest={submitRequest}
               onWithdrawRequest={withdrawRequest}
               mode="all"
+              sorting={tableSorting}
               canCreate={false}
               requests={visibleRequestList
                 .filter((record) => !record.assignedTaskOnly)
@@ -3743,6 +3695,7 @@ export function PrCenterApp({
           {page === "library" && <Library language={state.language} />}
           {page === "ideas" && (
             <Ideas
+              sorting={tableSorting}
               ideas={ideasOwnerId === actor?.userId ? state.ideas : []}
               currentUser={currentUser}
               channels={state.masterData.channels}
@@ -3792,6 +3745,7 @@ export function PrCenterApp({
           )}
           {page === "history" && (
             <History
+              sorting={tableSorting}
               audit={auditLoading ? [] : state.audit}
               language={state.language}
               loading={auditLoading}
@@ -4054,6 +4008,7 @@ function Dashboard({
           ) : requestRows.length ? (
             <Table
               rows={requestRows}
+              statusColumn={2}
               headers={["ID", "Project", "Status", "Target date"]}
             />
           ) : (
@@ -4556,22 +4511,44 @@ function SectionHeading({
     </section>
   );
 }
-function Table({ headers, rows }: { headers: string[]; rows: string[][] }) {
+function Table({
+  headers,
+  rows,
+  sorting,
+  fields,
+  statusColumn,
+}: {
+  headers: string[];
+  rows: string[][];
+  sorting?: TableSorting;
+  fields?: Array<string | null>;
+  statusColumn?: number;
+}) {
   return (
     <div className={styles.tableWrap}>
       <table>
         <thead>
           <tr>
-            {headers.map((header) => (
-              <th key={header}>{header}</th>
-            ))}
+            {headers.map((header, index) =>
+              sorting && fields?.[index] ? (
+                <SortableHeading key={header} field={fields[index]!} sorting={sorting}>
+                  {header}
+                </SortableHeading>
+              ) : (
+                <th scope="col" key={header}>
+                  {header}
+                </th>
+              ),
+            )}
           </tr>
         </thead>
         <tbody>
-          {rows.map((row) => (
-            <tr key={row[0]}>
+          {rows.map((row, rowIndex) => (
+            <tr key={`${row[0]}-${rowIndex}`}>
               {row.map((cell, index) => (
-                <td key={cell}>{index === 2 ? <Status>{cell}</Status> : cell}</td>
+                <td key={index}>
+                  {index === statusColumn ? <Status>{cell}</Status> : cell}
+                </td>
               ))}
             </tr>
           ))}
@@ -4637,6 +4614,7 @@ function ExecutiveDashboard({
         <h2>Content pipeline</h2>
         <Table
           headers={["Stage", "Items", "Status"]}
+          statusColumn={2}
           rows={[
             [
               "Planning",
@@ -4687,6 +4665,7 @@ function NewRequest({
   );
 }
 function Requests({
+  sorting,
   t,
   language,
   onOpenRequest,
@@ -4708,6 +4687,7 @@ function Requests({
   error,
   onFiltersChange,
 }: {
+  sorting: TableSorting;
   t: (typeof copy)[Language];
   language: Language;
   onOpenRequest: () => void;
@@ -4729,7 +4709,14 @@ function Requests({
   error: boolean;
   onFiltersChange: (query: string, status: string) => void;
 }) {
-  const title = mode === "mine" ? "My Requests" : "All Requests";
+  const title =
+    language === "th"
+      ? mode === "mine"
+        ? "คำขอของฉัน"
+        : "คำขอทั้งหมด"
+      : mode === "mine"
+        ? "My Requests"
+        : "All Requests";
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const visibleRequests =
     mode === "mine"
@@ -4804,21 +4791,35 @@ function Requests({
           : "Search request titles or numbers and filter status across your authorized scope."}
       </p>
       <article className={styles.card}>
+        <TableSummary
+          sorting={sorting}
+          count={visibleRequests.length}
+          hasMore={hasMore}
+        />
         <div className={styles.tableWrap}>
           <table>
             <thead>
               <tr>
-                <th scope="col">{language === "th" ? "โครงการ" : "Project"}</th>
+                <SortableHeading field="title" sorting={sorting}>
+                  {language === "th" ? "โครงการ" : "Project"}
+                </SortableHeading>
                 <th scope="col">{language === "th" ? "ประเภทคำขอ" : "Request type"}</th>
-                <th scope="col">
-                  {language === "th" ? "ฝ่าย / ผู้ส่งคำขอ" : "Department / requester"}
-                </th>
-                <th scope="col">{language === "th" ? "วันที่สร้าง" : "Created"}</th>
-                <th scope="col">
+                <SortableHeading field="department" sorting={sorting}>
+                  {language === "th" ? "ฝ่าย" : "Department"}
+                </SortableHeading>
+                <SortableHeading field="requester" sorting={sorting}>
+                  {language === "th" ? "ผู้ส่งคำขอ" : "Requester"}
+                </SortableHeading>
+                <SortableHeading field="createdAt" sorting={sorting}>
+                  {language === "th" ? "วันที่สร้าง" : "Created"}
+                </SortableHeading>
+                <SortableHeading field="requestedFor" sorting={sorting}>
                   {language === "th" ? "วันที่ต้องการเผยแพร่" : "Requested date"}
-                </th>
+                </SortableHeading>
                 <th scope="col">Content Package</th>
-                <th scope="col">{language === "th" ? "สถานะคำขอ" : "Request status"}</th>
+                <SortableHeading field="status" sorting={sorting}>
+                  {language === "th" ? "สถานะคำขอ" : "Request status"}
+                </SortableHeading>
                 <th scope="col">{language === "th" ? "จัดการ" : "Actions"}</th>
               </tr>
             </thead>
@@ -4860,8 +4861,8 @@ function Requests({
                     </td>
                     <td>
                       <span>{request.department}</span>
-                      <small>{request.requesterName || "—"}</small>
                     </td>
+                    <td>{request.requesterName || "—"}</td>
                     <td>{submittedAt}</td>
                     <td>
                       {request.requestedDate
@@ -7061,6 +7062,7 @@ function Approvals({
                       decidingRequestId === request.id ||
                       !requestComments[request.id]?.trim()
                     }
+                    className={styles.dangerButton}
                     onClick={() => void submitRequestDecision(request, "REJECTED")}
                   >
                     {language === "th" ? "ปฏิเสธคำขอ" : "Reject request"}
@@ -7177,6 +7179,7 @@ function Approvals({
                     {language === "th" ? "ขอให้แก้ไข" : "Request revision"}
                   </button>
                   <button
+                    className={styles.dangerButton}
                     onClick={() =>
                       onDecision(
                         task.id,
@@ -7719,6 +7722,7 @@ function ideaChannelMark(channel: string): string {
 }
 
 function Ideas({
+  sorting,
   ideas,
   currentUser,
   channels,
@@ -7737,6 +7741,7 @@ function Ideas({
   onRefresh,
   onFilters,
 }: {
+  sorting: TableSorting;
   ideas: Idea[];
   currentUser: User;
   channels: string[];
@@ -8447,20 +8452,25 @@ function Ideas({
               : "No loaded ideas match these filters."}
         </p>
       )}
+      <TableSummary sorting={sorting} count={visible.length} hasMore={hasMore} />
       <div className={styles.ideaTableWrap}>
         <table className={styles.ideaTable}>
           <thead>
             <tr>
-              <th>ID</th>
-              <th>{language === "th" ? "หัวข้อ Content" : "Content title"}</th>
-              <th>
-                {language === "th" ? "เนื้อหา / รายละเอียด Content" : "Content details"}
-              </th>
+              <SortableHeading field="title" sorting={sorting}>
+                {language === "th" ? "หัวข้อ Content" : "Content title"}
+              </SortableHeading>
+              <SortableHeading field="createdAt" sorting={sorting}>
+                {language === "th" ? "วันที่เสนอ" : "Proposed date"}
+              </SortableHeading>
               <th>{language === "th" ? "ช่องทาง" : "Channels"}</th>
-              <th>{language === "th" ? "ระดับความสำคัญ" : "Priority"}</th>
-              <th>{language === "th" ? "สถานะไอเดีย" : "Idea status"}</th>
+              <SortableHeading field="priority" sorting={sorting}>
+                {language === "th" ? "ระดับความสำคัญ" : "Priority"}
+              </SortableHeading>
+              <SortableHeading field="status" sorting={sorting}>
+                {language === "th" ? "สถานะไอเดีย" : "Idea status"}
+              </SortableHeading>
               <th>{language === "th" ? "ผู้บันทึก" : "Submitted by"}</th>
-              <th>{language === "th" ? "Link / Folder โครงการ" : "Project links"}</th>
               <th>{language === "th" ? "จัดการ" : "Actions"}</th>
             </tr>
           </thead>
@@ -8472,14 +8482,15 @@ function Ideas({
               return (
                 <Fragment key={idea.id}>
                   <tr id={`idea-${idea.id}`}>
-                    <td className={styles.ideaId}>{idea.id}</td>
                     <td className={styles.ideaTitleCell}>
                       <strong>{idea.title}</strong>
+                      <small className={styles.ideaId}>{idea.id}</small>
                     </td>
-                    <td className={styles.ideaSummaryCell}>
-                      <span className={styles.ideaSummaryText}>
-                        {idea.summary || "—"}
-                      </span>
+                    <td>
+                      {new Date(idea.createdAt).toLocaleDateString(
+                        language === "th" ? "th-TH-u-ca-buddhist" : "en-GB",
+                        { timeZone: "Asia/Bangkok" },
+                      )}
                     </td>
                     <td>
                       <div className={styles.ideaChannelChips}>
@@ -8513,29 +8524,10 @@ function Ideas({
                         {ideaStatusLabel(idea.status)}
                       </span>
                     </td>
-                    <td>{getUser(idea.authorId)?.name ?? "Unknown"}</td>
                     <td>
-                      {idea.evidenceUrls?.length ? (
-                        <div className={styles.ideaLinks}>
-                          {idea.evidenceUrls.slice(0, 2).map((url, index) => (
-                            <a
-                              href={url}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              key={url}
-                            >
-                              {language === "th"
-                                ? `เปิด ${index + 1}`
-                                : `Open ${index + 1}`}
-                            </a>
-                          ))}
-                          {idea.evidenceUrls.length > 2 && (
-                            <span>+{idea.evidenceUrls.length - 2}</span>
-                          )}
-                        </div>
-                      ) : (
-                        "—"
-                      )}
+                      {idea.authorId === currentUser.id
+                        ? currentUser.name
+                        : (getUser(idea.authorId)?.name ?? "—")}
                     </td>
                     <td>
                       <div className={styles.ideaManageActions}>
@@ -8621,7 +8613,7 @@ function Ideas({
                   </tr>
                   {expanded && (
                     <tr className={styles.ideaDetailsRow}>
-                      <td colSpan={9}>
+                      <td colSpan={7}>
                         <div className={styles.ideaExpandedDetails}>
                           <div>
                             <strong>
@@ -8680,13 +8672,8 @@ function Ideas({
           </tbody>
         </table>
       </div>
-      {listStatus === "loaded" && (
+      {listStatus === "loaded" && hasMore && (
         <div className={styles.filterBar}>
-          <span>
-            {language === "th"
-              ? `โหลดแล้ว ${ideas.length} แนวคิด`
-              : `Loaded ${ideas.length} ideas`}
-          </span>
           {hasMore && (
             <button
               className={styles.secondaryButton}
@@ -9656,6 +9643,7 @@ function Notifications({
   );
 }
 function History({
+  sorting,
   audit,
   language,
   loading,
@@ -9665,6 +9653,7 @@ function History({
   onRefresh,
   onLoadMore,
 }: {
+  sorting: TableSorting;
   audit: AuditEntry[];
   language: Language;
   loading: boolean;
@@ -9703,8 +9692,15 @@ function History({
               : "Unable to load history. Retry or refresh."}
           </p>
         )}
+        <TableSummary sorting={sorting} count={audit.length} hasMore={hasMore} />
         <Table
-          headers={["Time", "Actor", "Action", "Entity"]}
+          sorting={sorting}
+          fields={["createdAt", "actor", "action", "entityId"]}
+          headers={
+            language === "th"
+              ? ["วันเวลา", "ผู้ดำเนินการ", "การดำเนินการ", "รายการ"]
+              : ["Time", "Actor", "Action", "Entity"]
+          }
           rows={audit.map((entry) => [
             new Date(entry.createdAt).toLocaleString(
               language === "th" ? "th-TH-u-ca-buddhist" : "en-GB",
@@ -10494,12 +10490,26 @@ function Settings({ language }: { language: Language }) {
     };
   }, [sort, offset, reload]);
 
-  const actionLabel: Record<string, string> = {
-    "access.role_granted": "Role granted",
-    "access.role_revoked": "Role revoked",
-    "access.user_activated": "User activated",
-    "access.user_deactivated": "User deactivated",
-    "auth.oidc_login": "SSO login",
+  const actionLabel: Record<string, readonly [string, string]> = {
+    "access.role_granted": ["เพิ่ม role", "Role granted"],
+    "access.role_revoked": ["ถอน role", "Role revoked"],
+    "access.user_activated": ["เปิดใช้งานผู้ใช้", "User activated"],
+    "access.user_deactivated": ["ระงับผู้ใช้", "User deactivated"],
+    "auth.oidc_login": ["เข้าสู่ระบบ SSO", "SSO login"],
+  };
+  const sorting: TableSorting = {
+    kind: "audit",
+    value: sort,
+    language,
+    onChange: (value) => {
+      if (value === sort) return;
+      setLoading(true);
+      setError(null);
+      setAuditEvents([]);
+      setOffset(0);
+      setHasMore(false);
+      setSort(value);
+    },
   };
 
   return (
@@ -10507,19 +10517,6 @@ function Settings({ language }: { language: Language }) {
       <SectionHeading
         eyebrow="ACCESS ADMINISTRATION"
         title={language === "th" ? "บันทึกการเข้าถึง" : "Access Audit Log"}
-      />
-      <ListSorting
-        kind="audit"
-        value={sort}
-        language={language}
-        onChange={(value) => {
-          setLoading(true);
-          setError(null);
-          setAuditEvents([]);
-          setOffset(0);
-          setHasMore(false);
-          setSort(value);
-        }}
       />
       {error && (
         <p role="alert" style={{ color: "#dc2626", fontSize: 13 }}>
@@ -10541,39 +10538,46 @@ function Settings({ language }: { language: Language }) {
           {language === "th" ? "กำลังโหลดประวัติการเข้าถึง…" : "Loading audit events…"}
         </p>
       )}
-      {!loading && auditEvents.length === 0 && (
-        <article className={styles.card}>
-          <p>No access events recorded yet.</p>
-        </article>
-      )}
-      {!loading && auditEvents.length > 0 && (
-        <article className={styles.card}>
-          <Table
-            headers={["Time", "Action", "Actor", "Entity", "Details"]}
-            rows={auditEvents.map((event) => [
-              new Date(event.createdAt).toLocaleString(
-                language === "th" ? "th-TH-u-ca-buddhist" : "en-GB",
-              ),
-              actionLabel[event.action] || event.action,
-              event.actor?.displayName || "system",
-              event.entityId,
-              JSON.stringify(event.after || event.before || ""),
-            ])}
-          />
-          {hasMore && !error && (
-            <button
-              type="button"
-              onClick={() => {
-                setLoading(true);
-                setError(null);
-                setOffset((value) => value + 200);
-              }}
-            >
-              {language === "th" ? "โหลดบันทึกเพิ่ม" : "Load more events"}
-            </button>
-          )}
-        </article>
-      )}
+      <article className={styles.card} aria-busy={loading}>
+        <TableSummary sorting={sorting} count={auditEvents.length} hasMore={hasMore} />
+        {!loading && !error && auditEvents.length === 0 && (
+          <p>
+            {language === "th"
+              ? "ยังไม่มีบันทึกการเข้าถึง"
+              : "No access events recorded yet."}
+          </p>
+        )}
+        <Table
+          sorting={sorting}
+          fields={["createdAt", "action", "actor", "entityId", null]}
+          headers={
+            language === "th"
+              ? ["เวลา", "การดำเนินการ", "ผู้ดำเนินการ", "รายการ", "รายละเอียด"]
+              : ["Time", "Action", "Actor", "Entity", "Details"]
+          }
+          rows={auditEvents.map((event) => [
+            new Date(event.createdAt).toLocaleString(
+              language === "th" ? "th-TH-u-ca-buddhist" : "en-GB",
+            ),
+            actionLabel[event.action]?.[language === "th" ? 0 : 1] || event.action,
+            event.actor?.displayName || "system",
+            event.entityId,
+            JSON.stringify(event.after || event.before || ""),
+          ])}
+        />
+        {hasMore && !error && !loading && (
+          <button
+            type="button"
+            onClick={() => {
+              setLoading(true);
+              setError(null);
+              setOffset((value) => value + 200);
+            }}
+          >
+            {language === "th" ? "โหลดบันทึกเพิ่ม" : "Load more events"}
+          </button>
+        )}
+      </article>
     </>
   );
 }

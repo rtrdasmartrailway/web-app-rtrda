@@ -965,7 +965,7 @@
   display: flex;
   gap: 5px;
 }
-.segmented button:first-child {
+.segmented button[aria-pressed="true"] {
   background: #175fca;
   color: #fff;
 }
@@ -2366,20 +2366,22 @@
   outline: 0;
 }
 .ideaClearFilters {
-  background: transparent;
-  border: 0;
+  background: #f1f6ff;
+  border: 1px solid #bed1e8;
+  border-radius: 7px;
   color: #315b7b;
   cursor: pointer;
   font-size: 12px;
   font-weight: 700;
   min-height: 40px;
-  padding: 0 8px;
+  padding: 7px 12px;
   white-space: nowrap;
 }
 .ideaClearFilters:hover,
 .ideaTextAction:hover {
+  background: #e4efff;
   color: #075eb4;
-  text-decoration: underline;
+  border-color: #6c9ccc;
 }
 .ideaScopeNote {
   color: #75859a;
@@ -2398,7 +2400,7 @@
   border-collapse: separate;
   border-spacing: 0;
   font-size: 12px;
-  min-width: 1160px;
+  min-width: 900px;
   width: 100%;
 }
 .ideaTable th {
@@ -2561,14 +2563,218 @@
   overflow-wrap: anywhere;
 }
 .ideaTextAction {
-  background: transparent;
-  border: 0;
+  background: #f1f6ff;
+  border: 1px solid #bed1e8;
+  border-radius: 7px;
   color: #1769b4;
   cursor: pointer;
   font-size: 11px;
   font-weight: 700;
-  padding: 3px 0;
+  min-height: 36px;
+  padding: 7px 11px;
   text-align: left;
+}
+
+/* Shared affordances: unstyled actions must still look like buttons. */
+:where(.app) button {
+  align-items: center;
+  background: #f1f5fb;
+  border: 1px solid #b8c9de;
+  border-radius: 7px;
+  color: #24415f;
+  cursor: pointer;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.45;
+  min-height: 38px;
+  padding: 8px 12px;
+  transition:
+    background-color 120ms,
+    border-color 120ms,
+    box-shadow 120ms;
+}
+:where(.app) button:hover:not(:disabled) {
+  box-shadow: 0 2px 5px rgb(20 48 80 / 12%);
+}
+:where(.app) button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+  box-shadow: none;
+}
+.card header button:not(.primary),
+.helpGrid button {
+  background: #f1f6ff;
+  border: 1px solid #bed1e8;
+  border-radius: 7px;
+  padding: 8px 12px;
+}
+.secondaryButton:hover:not(:disabled),
+.ideaTextAction:hover:not(:disabled) {
+  background: #e4efff;
+  border-color: #6c9ccc;
+}
+.dangerButton {
+  background: #fff1f2;
+  border-color: #f1a6ad;
+  color: #ab2434;
+}
+.dangerButton:hover:not(:disabled) {
+  background: #ffe1e5;
+}
+.tableSummary {
+  align-items: center;
+  color: #51657f;
+  display: flex;
+  flex-wrap: wrap;
+  font-size: 12px;
+  gap: 8px 20px;
+  justify-content: space-between;
+  padding: 12px 0;
+}
+.tableSummary strong {
+  color: #154c87;
+}
+.tableSummary button {
+  font-size: 12px;
+}
+.tableWrap table,
+.ideaTable {
+  font-size: 13px;
+}
+.tableWrap th,
+.ideaTable th {
+  background: #f0f5fb;
+  border-bottom: 2px solid #d5e1ef;
+  color: #314d6d;
+  font-size: 12px;
+  letter-spacing: normal;
+  text-transform: none;
+  vertical-align: middle;
+}
+.tableWrap tbody tr:nth-child(even),
+.ideaTable tbody tr:nth-child(even) {
+  background: #f9fbfe;
+}
+.tableWrap tbody tr:hover,
+.ideaTable tbody tr:hover {
+  background: #eef5ff;
+}
+.tableWrap td,
+.ideaTable td {
+  vertical-align: top;
+  line-height: 1.65;
+}
+.tableWrap td small,
+.ideaTitleCell small {
+  display: block;
+  color: #60758c;
+  font-size: 11px;
+  font-weight: 400;
+}
+.tableWrap .sortedHeading,
+.ideaTable .sortedHeading {
+  background: #e3efff;
+  border-bottom-color: #3181d4;
+}
+.app .sortTrigger {
+  align-items: center;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 5px;
+  color: inherit;
+  display: inline-flex;
+  font-size: inherit;
+  font-weight: 700;
+  gap: 10px;
+  min-height: 38px;
+  padding: 7px 5px;
+  text-align: left;
+  white-space: nowrap;
+}
+.app .sortTrigger:hover {
+  background: #d7e7fb;
+  border-color: #adc9e9;
+}
+.sortTrigger span {
+  color: #246db8;
+}
+.sortMenu {
+  background: #fff;
+  border: 1px solid #a9c0dd;
+  border-radius: 10px;
+  box-shadow: 0 12px 35px rgb(15 35 65 / 23%);
+  color: #203b59;
+  font-family: var(--font-thai, "IBM Plex Sans Thai"), sans-serif;
+  max-height: calc(100dvh - 16px);
+  overflow-y: auto;
+  padding: 8px;
+  position: fixed;
+  width: 280px;
+  z-index: 10000;
+}
+.sortMenu p {
+  border-bottom: 1px solid #e0e8f2;
+  font-size: 12px;
+  font-weight: 700;
+  margin: 0 0 4px;
+  padding: 8px;
+}
+.sortMenu button {
+  align-items: center;
+  background: #fff;
+  border: 1px solid transparent;
+  border-radius: 5px;
+  color: #24415f;
+  cursor: pointer;
+  display: flex;
+  font: inherit;
+  font-size: 13px;
+  gap: 8px;
+  min-height: 42px;
+  padding: 8px;
+  text-align: left;
+  width: 100%;
+}
+.sortMenu button span {
+  flex: 0 0 18px;
+}
+.sortMenu button:hover,
+.sortMenu button:focus-visible,
+.sortMenu button[aria-checked="true"] {
+  background: #e7f1ff;
+  border-color: #a3c3ec;
+  outline: none;
+}
+.sortMenu .sortReset {
+  border-top: 1px solid #dce5f0;
+  color: #61728b;
+  margin-top: 5px;
+}
+.filterBar {
+  align-items: center;
+  flex-wrap: wrap;
+}
+@media (max-width: 760px) {
+  :where(.app) button {
+    min-height: 44px;
+  }
+  .app .sortTrigger {
+    min-height: 44px;
+  }
+  .tableSummary {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 7px;
+  }
+  .pageHeading {
+    align-items: flex-start;
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+  .pageHeading > :last-child {
+    flex-wrap: wrap;
+  }
 }
 .ideaDetailsRow td {
   background: #f8fafc;

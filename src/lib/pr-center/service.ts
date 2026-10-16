@@ -1,5 +1,11 @@
 import { randomUUID } from "node:crypto";
-import { DEFAULT_LIST_SORT, listOrderBy, type ListSortKind } from "./list-sorting";
+import {
+  DEFAULT_LIST_SORT,
+  listOrderBy,
+  REQUEST_STATUS_ORDER,
+  compareIdeaPriorities,
+  type ListSortKind,
+} from "./list-sorting";
 import {
   Prisma,
   type PrContentIdeaStatus,
@@ -964,6 +970,7 @@ export async function listRequests(
     filters.sort,
   ) as Prisma.PrRequestOrderByWithRelationInput[];
   const customSort = filters.sort && filters.sort !== DEFAULT_LIST_SORT;
+  const statusSort = filters.sort?.startsWith("status:");
   if (
     filters.status !== undefined &&
     !(
@@ -996,20 +1003,54 @@ export async function listRequests(
     });
   const where: Prisma.PrRequestWhereInput =
     clauses.length === 1 ? clauses[0] : { AND: clauses };
+  let statusAnchor: { id: string; status: PrRequestStatus } | null = null;
   if (cursor) {
     const anchor = await prisma.prRequest.findFirst({
       where: { AND: [...clauses, { id: cursor }] },
-      select: { id: true, createdAt: true },
+      select: { id: true, createdAt: true, status: true },
     });
     if (!anchor)
       throw new PrCenterError("Cursor not found in this list", 422, "INVALID_CURSOR");
+    if (statusSort) statusAnchor = anchor;
     if (!customSort) clauses.push(afterCursor(anchor.createdAt, anchor.id));
   }
+  let rankedIds: string[] | undefined;
+  if (statusSort) {
+    const descending = filters.sort === "status:desc";
+    const statuses = descending
+      ? [...REQUEST_STATUS_ORDER].reverse()
+      : [...REQUEST_STATUS_ORDER];
+    const start = statusAnchor ? statuses.indexOf(statusAnchor.status) : 0;
+    rankedIds = [];
+    for (const status of statuses.slice(start)) {
+      if (filters.status && filters.status !== status) continue;
+      const rows = await prisma.prRequest.findMany({
+        where: {
+          AND: [
+            ...clauses,
+            { status },
+            ...(statusAnchor?.status === status
+              ? [{ id: { [descending ? "lt" : "gt"]: statusAnchor.id } }]
+              : []),
+          ],
+        },
+        orderBy: { id: descending ? "desc" : "asc" },
+        take: limit + 1 - rankedIds.length,
+        select: { id: true },
+      });
+      rankedIds.push(...rows.map((row) => row.id));
+      if (rankedIds.length >= limit + 1) break;
+    }
+  }
   const requests = await prisma.prRequest.findMany({
-    where: clauses.length === 1 ? where : { AND: clauses },
+    where: rankedIds
+      ? { AND: [...clauses, { id: { in: rankedIds } }] }
+      : clauses.length === 1
+        ? where
+        : { AND: clauses },
     take: limit + 1,
     orderBy,
-    ...(customSort && cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
+    ...(customSort && !statusSort && cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
     include: {
       department: { select: { name: true } },
       requester: { select: { displayName: true } },
@@ -1065,6 +1106,10 @@ export async function listRequests(
     },
   });
   // Preserve the extra row as a has-more sentinel for existing array clients.
+  if (rankedIds) {
+    const positions = new Map(rankedIds.map((id, index) => [id, index]));
+    requests.sort((a, b) => positions.get(a.id)! - positions.get(b.id)!);
+  }
   // Consumers render at most `limit` rows and use length > limit for pagination.
   return requests.map((request) => {
     if (canReadRequestRecord(actor, request)) return request;
@@ -1629,10 +1674,38 @@ export async function listIdeas(
     ],
     ...(status ? { status: status as (typeof allowedStatuses)[number] } : {}),
   };
+  let rankedIds: string[] | undefined;
+  if (pagination.sort?.startsWith("priority:")) {
+    const descending = pagination.sort === "priority:desc";
+    const groups = await prisma.prContentIdea.groupBy({
+      by: ["priority"],
+      where,
+      _count: { _all: true },
+    });
+    groups.sort((a, b) => compareIdeaPriorities(a.priority, b.priority, descending));
+    let skip = offset;
+    rankedIds = [];
+    for (const group of groups) {
+      if (skip >= group._count._all) {
+        skip -= group._count._all;
+        continue;
+      }
+      const rows = await prisma.prContentIdea.findMany({
+        where: { AND: [where, { priority: group.priority }] },
+        skip,
+        take: take + 1 - rankedIds.length,
+        orderBy: { id: descending ? "desc" : "asc" },
+        select: { id: true },
+      });
+      rankedIds.push(...rows.map((row) => row.id));
+      skip = 0;
+      if (rankedIds.length >= take + 1) break;
+    }
+  }
   const rows = await prisma.prContentIdea.findMany({
-    where,
+    where: rankedIds ? { AND: [where, { id: { in: rankedIds } }] } : where,
     orderBy,
-    skip: offset,
+    skip: rankedIds ? 0 : offset,
     take: take + 1,
     select: {
       id: true,
@@ -1652,6 +1725,10 @@ export async function listIdeas(
       version: true,
     },
   });
+  if (rankedIds) {
+    const positions = new Map(rankedIds.map((id, index) => [id, index]));
+    rows.sort((a, b) => positions.get(a.id)! - positions.get(b.id)!);
+  }
   const hasMore = rows.length > take;
   return {
     items: rows.slice(0, take),
