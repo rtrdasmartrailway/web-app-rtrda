@@ -112,7 +112,9 @@ function matches(row: unknown, where: Record<string, unknown>): boolean {
     if (key === "AND")
       return (value as Record<string, unknown>[]).every((w) => matches(row, w));
     if (key === "OR")
-      return (value as Record<string, unknown>[]).some((w) => matches(row, w));
+      return (value as Record<string, unknown>[])
+        .filter((w) => Object.keys(w).length > 0)
+        .some((w) => matches(row, w));
     if (key === "is")
       return value === null
         ? row == null

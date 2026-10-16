@@ -194,9 +194,11 @@ function roleDepartmentScopes(
 function roleDepartmentClauses(
   actor: PrCenterActor,
   roles: readonly PrCenterRole[],
-): Array<{ departmentId?: string }> {
+): Array<{ departmentId?: string; organizationId?: string }> {
   const scopes = roleDepartmentScopes(actor, roles);
-  if (scopes.organizationWide) return [{}];
+  // Prisma treats an empty object inside OR as an absent branch, not TRUE.
+  // Keep an explicit tenant predicate so organization-wide grants match rows.
+  if (scopes.organizationWide) return [{ organizationId: actor.organizationId }];
   return scopes.departmentIds.map((departmentId) => ({ departmentId }));
 }
 
@@ -214,7 +216,7 @@ function requestReadWhere(actor: PrCenterActor): Prisma.PrRequestWhereInput {
     "RTRDA_BORD",
     "RTRDA_ADMIN",
   ]);
-  if (roleScopes.some((scope) => Object.keys(scope).length === 0))
+  if (roleScopes.some((scope) => scope.organizationId === actor.organizationId))
     return { organizationId: actor.organizationId };
   return {
     organizationId: actor.organizationId,
@@ -228,7 +230,7 @@ function assignedRequestReadWhere(actor: PrCenterActor): Prisma.PrRequestWhereIn
     "RTRDA_BORD",
     "RTRDA_ADMIN",
   ]);
-  if (roleScopes.some((scope) => Object.keys(scope).length === 0))
+  if (roleScopes.some((scope) => scope.organizationId === actor.organizationId))
     return { organizationId: actor.organizationId };
   return {
     organizationId: actor.organizationId,
@@ -5337,7 +5339,9 @@ export async function listAdminUsers(actor: PrCenterActor) {
   )
     throw new PrCenterError("You cannot view user directory", 403, "FORBIDDEN");
   const scopeFor = (scope: typeof admin) =>
-    scope.organizationWide ? {} : { departmentId: { in: scope.departmentIds } };
+    scope.organizationWide
+      ? { organizationId: actor.organizationId }
+      : { departmentId: { in: scope.departmentIds } };
   const rows = await prisma.prCenterUser.findMany({
     where: {
       organizationId: actor.organizationId,
@@ -5355,7 +5359,7 @@ export async function listAdminUsers(actor: PrCenterActor) {
           organizationId: actor.organizationId,
           OR: [
             ...(admin.organizationWide
-              ? [{}]
+              ? [{ organizationId: actor.organizationId }]
               : [
                   { departmentId: { in: admin.departmentIds } },
                   ...(admin.departmentIds.length ? [{ departmentId: null }] : []),
@@ -5381,6 +5385,7 @@ export async function listAdminUsers(actor: PrCenterActor) {
   // Relation authority follows each user row, not the actor's broadest role.
   return rows.map((user) => ({
     ...user,
+    rolesRestricted: !admin.organizationWide,
     roles: user.roles.filter((role) =>
       canManageDepartmentScope(actor, user.departmentId)
         ? canManageDepartmentScope(actor, role.departmentId) || role.departmentId === null

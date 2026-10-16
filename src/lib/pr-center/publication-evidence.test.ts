@@ -119,7 +119,7 @@ describe("scheduleTask", () => {
         id: "task",
         version: 4,
         status: "SCHEDULED",
-        request: { organizationId: "org", OR: [{}] },
+        request: { organizationId: "org", OR: [{ organizationId: "org" }] },
       },
       data: { channel: "Web", version: { increment: 1 } },
     });
@@ -236,7 +236,7 @@ describe("recordPublishingEvidence", () => {
             id: "task",
             version: 4,
             status: "PUBLISHED",
-            request: { organizationId: "org", OR: [{}] },
+            request: { organizationId: "org", OR: [{ organizationId: "org" }] },
           },
         },
       }),
@@ -308,7 +308,7 @@ describe("recordPublishingEvidence", () => {
         id: "task",
         version: 3,
         status: "SCHEDULED",
-        request: { organizationId: "org", OR: [{}] },
+        request: { organizationId: "org", OR: [{ organizationId: "org" }] },
       },
       data: { status: "PUBLISHED", version: { increment: 1 } },
     });

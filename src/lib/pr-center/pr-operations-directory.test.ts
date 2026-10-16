@@ -54,9 +54,9 @@ beforeEach(() => {
 function matches(row: Record<string, unknown>, where: Record<string, unknown>): boolean {
   return Object.entries(where).every(([key, condition]) => {
     if (key === "OR" || key === "AND") {
-      const results = (condition as Record<string, unknown>[]).map((clause) =>
-        matches(row, clause),
-      );
+      const results = (condition as Record<string, unknown>[])
+        .filter((clause) => key !== "OR" || Object.keys(clause).length > 0)
+        .map((clause) => matches(row, clause));
       return key === "OR" ? results.some(Boolean) : results.every(Boolean);
     }
     if (condition && typeof condition === "object" && "in" in condition)
@@ -66,6 +66,58 @@ function matches(row: Record<string, unknown>, where: Record<string, unknown>): 
 }
 
 describe("PR operations directory and grants", () => {
+  it.each(["RTRDA_ADMIN", "RTRDA_PR", "RTRDA_BORD"] as const)(
+    "does not compile an organization-wide %s grant to empty OR branches",
+    async (role) => {
+      const actor = { ...pr, roleGrants: [{ role, departmentId: null }] };
+      const fixtures = [
+        { id: "one", organizationId: "org", departmentId: "dept-1", active: true },
+        { id: "two", organizationId: "org", departmentId: "dept-2", active: true },
+        { id: "inactive", organizationId: "org", departmentId: "dept-2", active: false },
+        {
+          id: "outside",
+          organizationId: "other-org",
+          departmentId: "dept-1",
+          active: true,
+        },
+      ];
+      const roles = ["RTRDA_ALL_USER", "RTRDA_PR", "RTRDA_ADMIN", "RTRDA_BORD"].map(
+        (role, index) => ({
+          id: String(index),
+          organizationId: "org",
+          role,
+          departmentId: null,
+        }),
+      );
+      db.prCenterUser.findMany.mockImplementation(async (query) =>
+        fixtures
+          .filter((user) => matches(user, query.where))
+          .map((user) => ({
+            ...user,
+            roles: roles.filter((role) => matches(role, query.select.roles.where)),
+          })),
+      );
+      const rows = await listAdminUsers(actor);
+      expect(rows.map((row) => row.id)).toEqual(
+        role === "RTRDA_ADMIN" ? ["one", "two", "inactive"] : ["one", "two"],
+      );
+      for (const row of rows) {
+        expect(row.roles.map((grant) => grant.role)).toEqual(
+          role === "RTRDA_ADMIN" ? roles.map((grant) => grant.role) : ["RTRDA_BORD"],
+        );
+        expect(row.rolesRestricted).toBe(role !== "RTRDA_ADMIN");
+      }
+    },
+  );
+  it("marks hidden role sets as restricted rather than claiming no assignment", async () => {
+    db.prCenterUser.findMany.mockResolvedValue([
+      { id: "target", departmentId: "dept-2", roles: [] },
+    ]);
+    expect((await listAdminUsers(pr))[0]).toMatchObject({
+      roles: [],
+      rolesRestricted: true,
+    });
+  });
   it("uses the PR grant rather than home department, display role or unrelated global grant", async () => {
     await listAdminUsers(pr);
     expect(db.prCenterUser.findMany).toHaveBeenCalledWith(

@@ -947,7 +947,7 @@ describe("request intake approval", () => {
         version: 2,
         status: "SUBMITTED",
         organizationId: "org-1",
-        OR: [{}],
+        OR: [{ organizationId: adminActor.organizationId }],
       },
       data: { status: "APPROVED", version: { increment: 1 } },
     });

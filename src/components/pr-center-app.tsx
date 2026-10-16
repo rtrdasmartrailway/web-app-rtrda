@@ -10625,6 +10625,7 @@ function Directory({
       active: boolean;
       department: { id: string; name: string } | null;
       roles: Array<{ id: string; role: string; departmentId: string | null }>;
+      rolesRestricted?: boolean;
     }>
   >([]);
   const [loading, setLoading] = useState(true);
@@ -10942,7 +10943,15 @@ function Directory({
                   Assigned roles:
                 </p>
                 {user.roles.length === 0 && (
-                  <p style={{ fontSize: 12, color: "#6b7280" }}>No roles assigned</p>
+                  <p style={{ fontSize: 12, color: "#6b7280" }}>
+                    {user.rolesRestricted
+                      ? language === "th"
+                        ? "ไม่มี role ที่แสดงได้ในขอบเขตสิทธิ์ของคุณ"
+                        : "No roles visible within your access scope"
+                      : language === "th"
+                        ? "ยังไม่ได้กำหนด role"
+                        : "No roles assigned"}
+                  </p>
                 )}
                 {user.roles.map((r) => (
                   <span

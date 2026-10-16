@@ -74,7 +74,9 @@ function accepts(row: unknown, filter: unknown): boolean {
     if (key === "AND")
       return (Array.isArray(value) ? value : [value]).every((v) => accepts(row, v));
     if (key === "OR")
-      return (Array.isArray(value) ? value : [value]).some((v) => accepts(row, v));
+      return (Array.isArray(value) ? value : [value])
+        .filter((v) => v && typeof v === "object" && Object.keys(v).length > 0)
+        .some((v) => accepts(row, v));
     if (key === "is") return accepts(row, value);
     return accepts(record[key], value);
   });
