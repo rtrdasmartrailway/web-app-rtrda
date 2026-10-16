@@ -180,6 +180,7 @@ describe("scope-sensitive file and audit operations", () => {
       where: {
         id: "request-1",
         version: 4,
+        status: "WITHDRAWN",
         organizationId: "org-1",
         OR: [{ departmentId: "dept-1" }],
       },
@@ -215,6 +216,7 @@ describe("scope-sensitive file and audit operations", () => {
       where: {
         id: "request-1",
         version: 4,
+        status: "WITHDRAWN",
         organizationId: "org-1",
         OR: [{ departmentId: "dept-1" }],
       },

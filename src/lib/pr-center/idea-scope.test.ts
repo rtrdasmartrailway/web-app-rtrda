@@ -80,6 +80,7 @@ describe("idea reviewer scope", () => {
           organizationId: "org-1",
           OR: [{ departmentId: "dept-1" }],
           version: 3,
+          status: "PROPOSED",
         },
       }),
     );
@@ -135,6 +136,7 @@ describe("idea reviewer scope", () => {
           organizationId: "org-1",
           OR: [{ departmentId: "dept-1" }],
           version: 3,
+          status: "PENDING_APPROVAL",
         },
         data: expect.objectContaining({
           status: "REJECTED",

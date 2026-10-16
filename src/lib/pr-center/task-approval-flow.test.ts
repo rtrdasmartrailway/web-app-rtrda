@@ -129,6 +129,7 @@ describe("task-stage approval flow", () => {
         version: task.version,
         status: task.status,
         request: { organizationId: "org-1", OR: [{ departmentId: "dept-1" }] },
+        AND: [{ request: { status: { notIn: ["REJECTED", "CANCELLED"] } } }],
       },
       data: { status: "SOURCE_FACT_CHECK", version: { increment: 1 } },
     });
@@ -337,6 +338,7 @@ describe("task-stage approval flow", () => {
         version: task.version,
         status: task.status,
         request: { organizationId: "org-1", OR: [{ departmentId: "dept-1" }] },
+        AND: [{ request: { status: { notIn: ["REJECTED", "CANCELLED"] } } }],
       },
       data: { status: "CLOSED", version: { increment: 1 } },
     });

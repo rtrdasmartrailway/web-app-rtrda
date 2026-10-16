@@ -64,6 +64,8 @@ function accepts(row: unknown, filter: unknown): boolean {
   if (filter && typeof filter === "object" && "in" in filter && Array.isArray(filter.in))
     return filter.in.includes(row);
   if (filter === null || typeof filter !== "object") return row === filter;
+  if ("notIn" in filter && Array.isArray(filter.notIn))
+    return !filter.notIn.includes(row);
   if ("is" in filter) return accepts(row, filter.is);
   if ("isNot" in filter) return !accepts(row, filter.isNot);
   if (!row || typeof row !== "object") return false;

@@ -956,7 +956,7 @@ export function buildPrCenterApi(
       actorId: typeof input.actorId === "string" ? input.actorId : undefined,
     });
   });
-  // ── Restore / compensating-change (RTRDA_ADMIN) ─────────────
+  // ── Restore / compensating-change (scoped RTRDA_BORD / RTRDA_ADMIN) ──
   app.post("/requests/:requestId/restore", async (request) => {
     const input = await body(request);
     return restoreRequest(

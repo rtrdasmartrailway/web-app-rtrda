@@ -11,6 +11,7 @@ import {
 import Image from "next/image";
 import { PrCenterDialog } from "./pr-center-dialog";
 import { useBoardHoldDrag } from "./pr-center-board-drag";
+import { PrCenterRequestRestore } from "./pr-center-request-restore";
 import { PrCenterFileManagement } from "./pr-center-file-management";
 import { directoryUserAuthority } from "@/lib/pr-center/directory-access";
 import { grantCoversDepartment } from "@/lib/pr-center/client-grant-scope";
@@ -3824,6 +3825,16 @@ export function PrCenterApp({
                   : "requests"
               }
               onWithdrawRequest={withdrawRequest}
+              restoreGrants={actor?.roleGrants ?? []}
+              onRestored={async () => {
+                await refreshRequests();
+                await refreshRequestList();
+                setNotice(
+                  state.language === "th"
+                    ? "กู้คืนเป็นฉบับร่างแล้ว เจ้าของคำขอต้องตรวจสอบและส่งเข้าคิวอนุมัติอีกครั้ง"
+                    : "Restored to draft. The requester must review and submit it for approval again.",
+                );
+              }}
               mode="mine"
               sorting={tableSorting}
               canCreate={hasUiRole("requester", "pr", "admin")}
@@ -3861,6 +3872,16 @@ export function PrCenterApp({
                   : "requests"
               }
               onWithdrawRequest={withdrawRequest}
+              restoreGrants={actor?.roleGrants ?? []}
+              onRestored={async () => {
+                await refreshRequests();
+                await refreshRequestList();
+                setNotice(
+                  state.language === "th"
+                    ? "กู้คืนเป็นฉบับร่างแล้ว เจ้าของคำขอต้องตรวจสอบและส่งเข้าคิวอนุมัติอีกครั้ง"
+                    : "Restored to draft. The requester must review and submit it for approval again.",
+                );
+              }}
               mode="all"
               sorting={tableSorting}
               canCreate={false}
@@ -4964,6 +4985,8 @@ function Requests({
   onEditRequest,
   onSubmitRequest,
   onWithdrawRequest,
+  restoreGrants,
+  onRestored,
   mode,
   canCreate,
   requests: requestItems,
@@ -4987,6 +5010,8 @@ function Requests({
   onEditRequest: (request: Request) => void;
   onSubmitRequest: (request: Request) => void;
   onWithdrawRequest: (request: Request) => void;
+  restoreGrants: readonly { role: string; departmentId: string | null }[];
+  onRestored: () => Promise<void>;
   mode: "all" | "mine";
   canCreate: boolean;
   requests: Request[];
@@ -5401,6 +5426,13 @@ function Requests({
                 .map((task) => task.title)
                 .join(", ") || "None"}
             </p>
+            <PrCenterRequestRestore
+              key={selected.id}
+              request={selected}
+              grants={restoreGrants}
+              language={language}
+              onRestored={onRestored}
+            />
             {canEditOwnRequest(selected, currentUserId) && (
               <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                 <button onClick={() => onEditRequest(selected)}>
@@ -7847,8 +7879,8 @@ function Approvals({
               {request.intakeDecisionBlockedReason === "SELF_SUBMISSION" ? (
                 <p role="note">
                   {language === "th"
-                    ? "คุณเป็นผู้ส่งคำขอนี้ ต้องให้เจ้าหน้าที่ PR คนอื่นพิจารณา"
-                    : "You submitted this request. Another PR Operations user must decide it."}
+                    ? "คุณเป็นผู้ส่งคำขอนี้ ต้องให้ผู้มีสิทธิ์คนอื่นพิจารณา"
+                    : "You submitted this request. Another authorized reviewer must decide it."}
                 </p>
               ) : request.intakeDecisionBlockedReason === "TASK_WORK_ALREADY_STARTED" ? (
                 <p role="alert">
@@ -7858,23 +7890,25 @@ function Approvals({
                 </p>
               ) : canDecideRequests ? (
                 <>
-                  <label>
+                  <label htmlFor={`intake-request-comment-${request.id}`}>
                     {language === "th"
                       ? "คอมเมนต์ / เหตุผล (อนุมัติไม่บังคับ)"
                       : "Comment / reason (optional for approval)"}
-                    <textarea
-                      disabled={decidingRequestId === request.id}
-                      value={requestComments[request.id] || ""}
-                      maxLength={5000}
-                      rows={3}
-                      onChange={(event) =>
-                        setRequestComments((previous) => ({
-                          ...previous,
-                          [request.id]: event.target.value,
-                        }))
-                      }
-                    />
                   </label>
+                  <textarea
+                    id={`intake-request-comment-${request.id}`}
+                    disabled={decidingRequestId === request.id}
+                    value={requestComments[request.id] || ""}
+                    maxLength={5000}
+                    rows={3}
+                    onChange={(event) =>
+                      setRequestComments((previous) => ({
+                        ...previous,
+                        [request.id]: event.target.value,
+                      }))
+                    }
+                  />
+
                   <small>
                     {language === "th"
                       ? "อนุมัติ: ไม่บังคับ · ปฏิเสธ: ต้องระบุเหตุผล"
@@ -7924,7 +7958,7 @@ function Approvals({
           <p>
             {language === "th"
               ? "ไม่มีคำขอรออนุมัติในขอบเขตสิทธิ์ของคุณ"
-              : "No submitted requests are currently visible in your PR Operations scope."}
+              : "No submitted requests are currently visible in your review scope."}
           </p>
         )}
       </section>
@@ -8016,21 +8050,23 @@ function Approvals({
               )}
               {canDecideTasks ? (
                 <>
-                  <label>
+                  <label htmlFor={`stage-task-comment-${task.id}`}>
                     {language === "th" ? "ความคิดเห็น / เหตุผล" : "Comment / reason"}
-                    <textarea
-                      value={taskComments[task.id] || ""}
-                      maxLength={5000}
-                      rows={4}
-                      disabled={decidingTaskId === task.id}
-                      onChange={(event) =>
-                        setTaskComments((previous) => ({
-                          ...previous,
-                          [task.id]: event.target.value,
-                        }))
-                      }
-                    />
                   </label>
+                  <textarea
+                    id={`stage-task-comment-${task.id}`}
+                    value={taskComments[task.id] || ""}
+                    maxLength={5000}
+                    rows={4}
+                    disabled={decidingTaskId === task.id}
+                    onChange={(event) =>
+                      setTaskComments((previous) => ({
+                        ...previous,
+                        [task.id]: event.target.value,
+                      }))
+                    }
+                  />
+
                   <small>
                     {language === "th"
                       ? "ต้องระบุเหตุผลเมื่อขอแก้ไขหรือปฏิเสธ"
