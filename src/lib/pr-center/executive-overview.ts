@@ -1,3 +1,8 @@
+import {
+  sheetEngagementRate,
+  type PlatformDistribution,
+} from "./platform-distribution-data";
+
 export type ExecutiveTaskStatus =
   | "draft"
   | "waiting_for_information"
@@ -61,17 +66,19 @@ export function createExecutiveOverviewExport(input: {
   totalRequests: number;
   totalTasks: number;
   unavailableReason: string;
+  sheet?: PlatformDistribution | null;
 }) {
   return {
     schemaVersion: 1,
     generatedAt: input.generatedAt.toISOString(),
     scope: input.scopeLabel,
     metrics: {
-      published: input.counts.published,
-      reach: null,
-      interactions: null,
-      engagementRate: null,
-      unavailableReason: input.unavailableReason,
+      published: input.sheet?.totals.posts ?? null,
+      reach: input.sheet?.totals.viewers ?? null,
+      interactions: input.sheet?.totals.comments ?? null,
+      engagementRate: input.sheet ? sheetEngagementRate(input.sheet.totals) : null,
+      unavailableReason: input.sheet ? null : input.unavailableReason,
+      sampleData: input.sheet?.sampleData ?? null,
     },
     workflow: {
       planning: input.counts.planning,

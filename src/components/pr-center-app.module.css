@@ -309,26 +309,52 @@
   grid-template-columns: repeat(2, minmax(0, 1fr));
   margin-top: 18px;
 }
-.upcomingList,
 .channelMix ul {
   list-style: none;
   margin: 0;
   padding: 0;
 }
-.upcomingList li {
-  border-bottom: 1px solid var(--pc-line);
-  display: grid;
-  gap: 4px;
-  padding: 10px 0;
+.monthlyTrend {
+  align-items: end;
+  display: flex;
+  gap: 12px;
+  margin-top: 18px;
+  max-width: 100%;
+  min-height: 240px;
+  overflow-x: auto;
+  padding: 0 4px 8px;
 }
-.upcomingList li:last-child {
-  border-bottom: 0;
+.monthlyTrendColumn {
+  align-items: center;
+  display: flex;
+  flex: 1 0 65px;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 65px;
+  text-align: center;
 }
-.upcomingList span {
-  font-weight: 700;
+.monthlyTrendColumn strong {
+  color: var(--pc-ink);
+  font-size: 13px;
 }
-.upcomingList small {
+.monthlyTrendColumn small {
   color: var(--pc-muted);
+  font-size: 11px;
+  white-space: nowrap;
+}
+.monthlyTrendBarArea {
+  align-items: end;
+  border-bottom: 1px solid var(--pc-line);
+  display: flex;
+  height: 180px;
+  width: 100%;
+}
+.monthlyTrendBar {
+  background: linear-gradient(180deg, var(--pc-blue), var(--pc-teal));
+  border-radius: 6px 6px 0 0;
+  display: block;
+  min-height: 2px;
+  width: 100%;
 }
 .channelMix {
   align-items: center;

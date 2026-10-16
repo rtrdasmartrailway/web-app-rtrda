@@ -26,13 +26,13 @@ const COLORS = [
   "#ac6a9d",
 ];
 
-type Props = { language: "th" | "en" };
-type LoadState =
+type Props = { language: "th" | "en"; onLoadStateChange?: (state: LoadState) => void };
+export type LoadState =
   | { status: "loading" }
   | { status: "error" }
   | { status: "ready"; data: PlatformDistribution };
 
-export default function PrCenterPlatformChart({ language }: Props) {
+export default function PrCenterPlatformChart({ language, onLoadStateChange }: Props) {
   const thai = language === "th";
   const [metric, setMetric] = useState<PlatformMetric>("posts");
   const [period, setPeriod] = useState<PlatformPeriod>("all");
@@ -41,6 +41,7 @@ export default function PrCenterPlatformChart({ language }: Props) {
   const [refreshKey, setRefreshKey] = useState(0);
   const refresh = () => {
     setState({ status: "loading" });
+    onLoadStateChange?.({ status: "loading" });
     setRefreshKey((value) => value + 1);
   };
 
@@ -59,16 +60,22 @@ export default function PrCenterPlatformChart({ language }: Props) {
         return (await response.json()) as PlatformDistribution;
       })
       .then((data) => {
-        if (active) setState({ status: "ready", data });
+        if (active) {
+          setState({ status: "ready", data });
+          onLoadStateChange?.({ status: "ready", data });
+        }
       })
       .catch(() => {
-        if (active && !controller.signal.aborted) setState({ status: "error" });
+        if (active && !controller.signal.aborted) {
+          setState({ status: "error" });
+          onLoadStateChange?.({ status: "error" });
+        }
       });
     return () => {
       active = false;
       controller.abort();
     };
-  }, [refreshKey, period, platform]);
+  }, [refreshKey, period, platform, onLoadStateChange]);
 
   const selectedMetric = METRICS.find((item) => item.id === metric)!;
   const data = state.status === "ready" ? state.data : null;
@@ -106,6 +113,7 @@ export default function PrCenterPlatformChart({ language }: Props) {
               onChange={(event) => {
                 setPeriod(event.target.value as PlatformPeriod);
                 setState({ status: "loading" });
+                onLoadStateChange?.({ status: "loading" });
               }}
             >
               <option value="all">{thai ? "ทั้งหมด" : "All time"}</option>
@@ -121,6 +129,7 @@ export default function PrCenterPlatformChart({ language }: Props) {
               onChange={(event) => {
                 setPlatform(event.target.value as PlatformName | "all");
                 setState({ status: "loading" });
+                onLoadStateChange?.({ status: "loading" });
               }}
             >
               <option value="all">{thai ? "ทุกแพลตฟอร์ม" : "All platforms"}</option>

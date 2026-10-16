@@ -15,6 +15,8 @@ import { useBoardHoldDrag } from "./pr-center-board-drag";
 import { PrCenterRequestRestore } from "./pr-center-request-restore";
 import { PrCenterFileManagement } from "./pr-center-file-management";
 import PrCenterPlatformChart from "./pr-center-platform-chart";
+import type { LoadState as PlatformLoadState } from "./pr-center-platform-chart";
+import { sheetEngagementRate } from "@/lib/pr-center/platform-distribution-data";
 import { recentOperations } from "@/lib/pr-center/recent-operations";
 import { directoryUserAuthority } from "@/lib/pr-center/directory-access";
 import { grantCoversDepartment } from "@/lib/pr-center/client-grant-scope";
@@ -1302,16 +1304,15 @@ function Status({ children }: { children: string }) {
 
 function DashboardScheduleInsights({
   language,
-  onNavigate,
+  monthlyState,
 }: {
   language: Language;
-  onNavigate: (page: Page) => void;
+  monthlyState?: PlatformLoadState;
 }) {
   const thai = language === "th";
   const locale = thai ? "th-TH-u-ca-buddhist" : "en-GB";
   const [dashboardAnchor] = useState(() => new Date());
   const now = dashboardAnchor;
-  const today = bangkokDateKey(now);
   const rangeStart = bangkokCalendarAnchor(now);
   rangeStart.setUTCDate(rangeStart.getUTCDate() - 14);
   const rangeEnd = bangkokCalendarAnchor(now);
@@ -1350,12 +1351,6 @@ function DashboardScheduleInsights({
     return () => controller.abort();
   }, [from, to]);
 
-  const upcoming = entries
-    .filter(
-      (entry) => entry.status === "SCHEDULED" && bangkokDateKey(entry.date) >= today,
-    )
-    .sort((left, right) => left.date.localeCompare(right.date))
-    .slice(0, 5);
   const channelCounts = new Map<string, number>();
   for (const entry of entries) {
     if (entry.status !== "SCHEDULED" && entry.status !== "PUBLISHED") continue;
@@ -1399,54 +1394,21 @@ function DashboardScheduleInsights({
 
   return (
     <section className={styles.dashboardInsightsGrid}>
-      <article className={styles.card}>
-        <header>
-          <div>
-            <p className={styles.eyebrow}>
-              {thai ? "กำหนดเผยแพร่" : "UPCOMING PUBLICATIONS"}
-            </p>
-            <h2>{thai ? "รายการเผยแพร่เร็ว ๆ นี้" : "Upcoming publications"}</h2>
-          </div>
-          <button type="button" onClick={() => onNavigate("calendar")}>
-            {thai ? "เปิดปฏิทิน" : "Open calendar"}
-          </button>
-        </header>
-        {loading ? (
-          <p role="status">{thai ? "กำลังโหลดกำหนดการ…" : "Loading schedules…"}</p>
-        ) : error ? (
-          <p role="alert">
-            {thai ? "โหลดกำหนดการไม่สำเร็จ" : "Schedules could not be loaded."}
-          </p>
-        ) : upcoming.length === 0 ? (
-          <p className={styles.dashboardNote}>
-            {thai
-              ? "ยังไม่มีรายการที่กำหนดเผยแพร่"
-              : "No upcoming publications are scheduled."}
-          </p>
-        ) : (
-          <ul className={styles.upcomingList}>
-            {upcoming.map((entry) => (
-              <li key={entry.id}>
-                <span>{entry.title}</span>
-                <small>
-                  {entry.channel} ·{" "}
-                  {new Date(entry.date).toLocaleString(locale, {
-                    timeZone: "Asia/Bangkok",
-                    dateStyle: "medium",
-                    timeStyle: "short",
-                  })}
-                </small>
-              </li>
-            ))}
-          </ul>
-        )}
-      </article>
+      {monthlyState && <ExecutiveMonthlyTrend language={language} state={monthlyState} />}
       <article className={styles.card}>
         <p className={styles.eyebrow}>{thai ? "สัดส่วนแผนเผยแพร่" : "CHANNEL MIX"}</p>
         <h2>
           {thai ? "กำหนดการและเผยแพร่ตามช่องทาง" : "Scheduled and published by channel"}
         </h2>
-        {channelTotal > 0 ? (
+        {loading ? (
+          <p className={styles.dashboardNote} role="status">
+            {thai ? "กำลังโหลดกำหนดการ…" : "Loading schedules…"}
+          </p>
+        ) : error ? (
+          <p className={styles.dashboardNote} role="alert">
+            {thai ? "โหลดกำหนดการไม่สำเร็จ" : "Schedules could not be loaded."}
+          </p>
+        ) : channelTotal > 0 ? (
           <div className={styles.channelMix}>
             <div
               className={styles.channelMixDonut}
@@ -1518,11 +1480,94 @@ function DashboardScheduleInsights({
         </h2>
         <p className={styles.dashboardNote}>
           {thai
-            ? "ยังไม่มีแหล่งข้อมูล analytics ที่ตรวจสอบและยืนยันได้ จึงยังไม่แสดงแนวโน้ม Reach รายเดือนหรือ Top Content"
-            : "No verified analytics source is connected, so monthly reach trends and Top Content remain unavailable."}
+            ? "ข้อมูลผู้ชมและคอมเมนต์รวมอ่านจาก Google Sheets ในภาพรวมผู้บริหาร ยังไม่มีข้อมูลผลงานเด่นสำหรับจัดอันดับ"
+            : "The executive overview reads total viewers and comments from Google Sheets. Ranked top content is not available."}
         </p>
       </article>
     </section>
+  );
+}
+
+function ExecutiveMonthlyTrend({
+  language,
+  state,
+}: {
+  language: Language;
+  state: PlatformLoadState;
+}) {
+  const thai = language === "th";
+  const months = state.status === "ready" ? state.data.monthly : [];
+  const max = Math.max(1, ...months.map((item) => item.posts));
+  const formatter = new Intl.DateTimeFormat(thai ? "th-TH-u-ca-buddhist" : "en-GB", {
+    month: "short",
+    year: "numeric",
+    timeZone: "UTC",
+  });
+  return (
+    <article className={styles.card}>
+      <p className={styles.eyebrow}>
+        {thai ? "ข้อมูลจาก Google Sheets" : "GOOGLE SHEETS DATA"}
+      </p>
+      <h2>{thai ? "แนวโน้มรายเดือน" : "Monthly trend"}</h2>
+      {state.status === "loading" ? (
+        <p className={styles.dashboardNote} role="status">
+          {thai ? "กำลังโหลดข้อมูล…" : "Loading data…"}
+        </p>
+      ) : state.status === "error" ? (
+        <p className={styles.dashboardNote} role="alert">
+          {thai
+            ? "โหลดข้อมูลจาก Google Sheets ไม่สำเร็จ"
+            : "Google Sheets data could not be loaded."}
+        </p>
+      ) : months.length ? (
+        <>
+          <div
+            className={styles.monthlyTrend}
+            role="img"
+            aria-label={months
+              .map(
+                ({ month, posts }) =>
+                  `${formatter.format(new Date(`${month}-01T00:00:00Z`))}: ${posts}`,
+              )
+              .join(", ")}
+          >
+            {months.map(({ month, posts }) => (
+              <div className={styles.monthlyTrendColumn} key={month}>
+                <strong>{posts}</strong>
+                <div className={styles.monthlyTrendBarArea}>
+                  <span
+                    className={styles.monthlyTrendBar}
+                    style={{ height: `${(posts / max) * 100}%` }}
+                  />
+                </div>
+                <small>{formatter.format(new Date(`${month}-01T00:00:00Z`))}</small>
+              </div>
+            ))}
+          </div>
+          {state.data.sampleData && (
+            <p className={styles.dashboardNote}>
+              {thai
+                ? "ข้อมูลตัวอย่างสมมติสำหรับทดสอบกราฟ"
+                : "Sample data for chart testing"}
+            </p>
+          )}
+          {months.reduce((sum, item) => sum + item.posts, 0) <
+            state.data.totals.posts && (
+            <p className={styles.dashboardNote}>
+              {thai
+                ? "รายการที่ไม่มีวันที่ถูกต้องไม่รวมในกราฟรายเดือน"
+                : "Posts without a valid date are excluded from the monthly chart."}
+            </p>
+          )}
+        </>
+      ) : (
+        <p className={styles.dashboardNote}>
+          {thai
+            ? "ยังไม่มีโพสต์ที่ระบุวันที่ในช่วงที่เลือก"
+            : "No dated posts in the selected range."}
+        </p>
+      )}
+    </article>
   );
 }
 
@@ -4554,7 +4599,7 @@ function Dashboard({
           <PrCenterPlatformChart language={language} />
         </article>
       </section>
-      <DashboardScheduleInsights language={language} onNavigate={onNavigate} />
+      <DashboardScheduleInsights language={language} />
       <ProductionReadiness
         language={language}
         canManageEvidence={canManageReleaseEvidence}
@@ -5113,8 +5158,12 @@ function ExecutiveDashboard({
   requests: Request[];
 }) {
   const thai = language === "th";
+  const [sheetState, setSheetState] = useState<PlatformLoadState>({ status: "loading" });
+  const sheet = sheetState.status === "ready" ? sheetState.data : null;
+  const number = new Intl.NumberFormat(thai ? "th-TH" : "en-US");
+  const rate = sheet ? sheetEngagementRate(sheet.totals) : null;
   const counts = getExecutiveWorkflowCounts(tasks, requests);
-  const { published, pending, planning, waiting, production, approved } = counts;
+  const { pending, planning, waiting, production, approved } = counts;
   const unavailable = unavailableMetricDisplay(language);
   const date = new Intl.DateTimeFormat(thai ? "th-TH-u-ca-buddhist" : "en-GB", {
     day: "numeric",
@@ -5149,25 +5198,25 @@ function ExecutiveDashboard({
     {
       icon: "▤",
       label: thai ? "ผลงานเผยแพร่ทั้งหมด" : "Published work",
-      value: String(published),
+      value: sheet ? number.format(sheet.totals.posts) : unavailable.value,
       tone: "blue",
     },
     {
       icon: "📡",
       label: thai ? "ยอดการเข้าถึงรวม" : "Total reach",
-      value: unavailable.value,
+      value: sheet ? number.format(sheet.totals.viewers) : unavailable.value,
       tone: "green",
     },
     {
       icon: "💬",
       label: thai ? "ยอดปฏิสัมพันธ์รวม" : "Total interactions",
-      value: unavailable.value,
+      value: sheet ? number.format(sheet.totals.comments) : unavailable.value,
       tone: "purple",
     },
     {
       icon: "📈",
       label: thai ? "อัตราการมีส่วนร่วม" : "Engagement rate",
-      value: unavailable.value,
+      value: rate === null ? unavailable.value : `${rate.toFixed(2)}%`,
       tone: "gold",
     },
   ];
@@ -5208,6 +5257,7 @@ function ExecutiveDashboard({
       totalRequests: requests.length,
       totalTasks: tasks.length,
       unavailableReason: unavailable.trend,
+      sheet,
     });
     const file = new Blob([JSON.stringify(summary, null, 2)], {
       type: "application/json",
@@ -5228,8 +5278,8 @@ function ExecutiveDashboard({
         <span aria-hidden="true">📊</span>
         <p>
           {thai
-            ? "ตัวเลขสถานะงานอ้างอิงข้อมูลที่ระบบโหลดตามสิทธิ์ของคุณ ส่วน Reach และ Engagement ยังไม่มีแหล่งข้อมูลที่ยืนยันได้"
-            : "Workflow counts reflect data loaded for your access scope. Reach and engagement metrics do not yet have a verified source."}
+            ? "สถานะงานอ้างอิง Content Operations ตามสิทธิ์ของคุณ ส่วนตัวชี้วัดผลลัพธ์อ้างอิง Google Sheets และอัตราการมีส่วนร่วมคำนวณจากคอมเมนต์ ÷ ผู้ชม"
+            : "Workflow counts reflect Content Operations in your access scope. Outcome metrics come from Google Sheets; engagement is comments divided by viewers."}
         </p>
       </aside>
       <section className={styles.hero}>
@@ -5265,9 +5315,21 @@ function ExecutiveDashboard({
             <span aria-hidden="true">{metric.icon}</span>
             <small>{metric.label}</small>
             <strong>{metric.value}</strong>
-            {metric.tone !== "blue" && (
-              <em>{thai ? "ยังไม่มีข้อมูลยืนยัน" : "No verified data"}</em>
-            )}
+            {sheetState.status === "loading" ? (
+              <em>{thai ? "กำลังโหลดข้อมูลจากชีต…" : "Loading spreadsheet…"}</em>
+            ) : sheetState.status === "error" ? (
+              <em>{thai ? "โหลดชีตไม่สำเร็จ" : "Spreadsheet unavailable"}</em>
+            ) : sheet?.sampleData ? (
+              <em>{thai ? "ข้อมูลตัวอย่างสมมติ" : "Sample data"}</em>
+            ) : metric.tone === "gold" && rate === null ? (
+              <em>
+                {thai ? "ไม่มีจำนวนผู้ชมสำหรับคำนวณ" : "No viewers for calculation"}
+              </em>
+            ) : metric.tone === "purple" ? (
+              <em>{thai ? "นับเฉพาะคอมเมนต์" : "Comments only"}</em>
+            ) : metric.tone === "gold" ? (
+              <em>{thai ? "คอมเมนต์ ÷ ผู้ชม" : "Comments ÷ viewers"}</em>
+            ) : null}
           </article>
         ))}
       </section>
@@ -5299,7 +5361,7 @@ function ExecutiveDashboard({
               <h2>{thai ? "สัดส่วนตามแพลตฟอร์ม" : "Distribution by platform"}</h2>
             </div>
           </header>
-          <PrCenterPlatformChart language={language} />
+          <PrCenterPlatformChart language={language} onLoadStateChange={setSheetState} />
         </article>
         <article className={`${styles.card} ${styles.wideCard}`}>
           <header>
@@ -5344,7 +5406,7 @@ function ExecutiveDashboard({
           </div>
         </article>
       </section>
-      <DashboardScheduleInsights language={language} onNavigate={onNavigate} />
+      <DashboardScheduleInsights language={language} monthlyState={sheetState} />
     </div>
   );
 }

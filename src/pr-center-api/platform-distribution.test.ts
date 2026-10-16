@@ -65,6 +65,7 @@ describe("executive platform distribution API", () => {
       viewers: 120,
       comments: 5,
     });
+    expect(response.json().monthly).toEqual([{ month: "2026-10", posts: 1 }]);
     await app.close();
   });
 

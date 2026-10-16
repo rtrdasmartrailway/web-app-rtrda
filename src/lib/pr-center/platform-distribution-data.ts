@@ -18,6 +18,7 @@ export type PlatformDistribution = {
   recordCount: number;
   unclassifiedRows: number;
   totals: { posts: number; viewers: number; comments: number };
+  monthly: Array<{ month: string; posts: number }>;
   platforms: Array<{
     name: PlatformName;
     posts: number;
@@ -118,6 +119,7 @@ export function aggregatePlatformDistribution(
     today.getUTCDate(),
   );
   const totals = { posts: 0, viewers: 0, comments: 0 };
+  const byMonth = new Map<string, number>();
   const byPlatform = new Map<PlatformName, PlatformDistribution["platforms"][number]>(
     PLATFORM_NAMES.map((name) => [name, { name, posts: 0, viewers: 0, comments: 0 }]),
   );
@@ -157,6 +159,11 @@ export function aggregatePlatformDistribution(
     totals.viewers += viewers;
     totals.comments += comments;
     recordCount += 1;
+    const date = sheetDate(row[dateIndex] ?? "");
+    if (date !== null) {
+      const month = new Date(date).toISOString().slice(0, 7);
+      byMonth.set(month, (byMonth.get(month) ?? 0) + 1);
+    }
   }
 
   return {
@@ -165,6 +172,15 @@ export function aggregatePlatformDistribution(
     recordCount,
     unclassifiedRows,
     totals,
+    monthly: [...byMonth]
+      .sort(([left], [right]) => left.localeCompare(right))
+      .map(([month, posts]) => ({ month, posts })),
     platforms: [...byPlatform.values()],
   };
+}
+
+export function sheetEngagementRate(
+  totals: PlatformDistribution["totals"],
+): number | null {
+  return totals.viewers > 0 ? (totals.comments / totals.viewers) * 100 : null;
 }

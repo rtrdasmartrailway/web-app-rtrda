@@ -54,13 +54,42 @@ describe("executive overview", () => {
     });
 
     expect(result.metrics).toEqual({
-      published: 0,
+      published: null,
       reach: null,
       interactions: null,
       engagementRate: null,
       unavailableReason: "No verified metric data source yet",
+      sampleData: null,
     });
     expect(result.generatedAt).toBe("2026-10-16T00:00:00.000Z");
     expect(result.scope).toBe("authorized data only");
+  });
+
+  it("exports the same filtered spreadsheet totals and rate as the outcome cards", () => {
+    const result = createExecutiveOverviewExport({
+      generatedAt: new Date("2026-10-16T00:00:00.000Z"),
+      scopeLabel: "authorized data only",
+      counts: getExecutiveWorkflowCounts([], []),
+      totalRequests: 0,
+      totalTasks: 0,
+      unavailableReason: "No data",
+      sheet: {
+        fetchedAt: "2026-10-16T00:00:00.000Z",
+        sampleData: true,
+        recordCount: 2,
+        unclassifiedRows: 0,
+        totals: { posts: 2, viewers: 200, comments: 10 },
+        monthly: [{ month: "2026-10", posts: 2 }],
+        platforms: [],
+      },
+    });
+    expect(result.metrics).toEqual({
+      published: 2,
+      reach: 200,
+      interactions: 10,
+      engagementRate: 5,
+      unavailableReason: null,
+      sampleData: true,
+    });
   });
 });

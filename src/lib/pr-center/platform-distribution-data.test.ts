@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { aggregatePlatformDistribution, parseCsv } from "./platform-distribution-data";
+import {
+  aggregatePlatformDistribution,
+  parseCsv,
+  sheetEngagementRate,
+} from "./platform-distribution-data";
 
 const HEADER = [
   "ลำดับ",
@@ -111,5 +115,36 @@ describe("platform distribution spreadsheet data", () => {
       sheetRow("1", "Facebook", "10", "1"),
     ]);
     expect(result.sampleData).toBe(true);
+  });
+
+  it("groups filtered posts by calendar month regardless of sheet row order", () => {
+    const rows = [
+      HEADER,
+      sheetRow("3", "Facebook", "200", "10", "1/2/2026"),
+      sheetRow("1", "YouTube", "100", "5", "31/1/2026"),
+      sheetRow("4", "Facebook", "400", "20", "2/2/2026"),
+      sheetRow("2", "Facebook", "300", "15", "1/1/2026"),
+      sheetRow("5", "Facebook", "0", "0", "not-a-date"),
+    ];
+    const result = aggregatePlatformDistribution(rows, "2026-02-03T02:00:00Z", {
+      platform: "Facebook",
+    });
+    expect(result.totals).toEqual({ posts: 4, viewers: 900, comments: 45 });
+    expect(result.monthly).toEqual([
+      { month: "2026-01", posts: 1 },
+      { month: "2026-02", posts: 2 },
+    ]);
+    expect(
+      aggregatePlatformDistribution(rows, "2026-02-03T02:00:00Z", { period: "7" })
+        .monthly,
+    ).toEqual([
+      { month: "2026-01", posts: 1 },
+      { month: "2026-02", posts: 2 },
+    ]);
+  });
+
+  it("calculates engagement as comments divided by viewers and avoids division by zero", () => {
+    expect(sheetEngagementRate({ posts: 3, viewers: 200, comments: 10 })).toBe(5);
+    expect(sheetEngagementRate({ posts: 3, viewers: 0, comments: 10 })).toBeNull();
   });
 });
