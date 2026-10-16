@@ -10,6 +10,7 @@ import {
 } from "react";
 import Image from "next/image";
 import { PrCenterDialog } from "./pr-center-dialog";
+import { useBoardHoldDrag } from "./pr-center-board-drag";
 import { BOARD_COLUMNS, boardMove, type BoardColumn } from "@/lib/pr-center/board-moves";
 import {
   getFirstApprovalStage,
@@ -5348,6 +5349,8 @@ function Operations({
   }, [selectedId, selectedVersion, canManageTasks]);
   const visibleTasks = taskItems.filter(
     (task) =>
+      (!["draft", "waiting_for_information"].includes(task.status) ||
+        task.requestStatus === "APPROVED") &&
       (canManageTasks ||
         task.ownerId === currentUserId ||
         task.requesterId === currentUserId) &&
@@ -5452,6 +5455,21 @@ function Operations({
   useEffect(() => {
     if (scheduleRequested && selectedId) scheduleInput.current?.focus();
   }, [scheduleRequested, selectedId]);
+  const holdDrag = useBoardHoldDrag({
+    onStart: (id) => {
+      setDraggedId(id);
+      setMoveError("");
+    },
+    onHover: setDropColumn,
+    onFinish: () => {
+      setDraggedId(null);
+      setDropColumn(null);
+    },
+    onDrop: (id, column) => {
+      const task = visibleTasks.find((item) => item.id === id);
+      if (task) void moveTask(task, column);
+    },
+  });
   return (
     <>
       <SectionHeading
@@ -5523,8 +5541,8 @@ function Operations({
           <p className={styles.boardInstructions}>
             {canManageTasks
               ? language === "th"
-                ? "ลากการ์ดไปช่องที่มีกรอบสี หรือใช้เมนู ‘ย้ายไป…’ บนการ์ด · การนัดเผยแพร่ต้องผ่านอนุมัติและระบุช่องทาง/เวลา"
-                : "Drag cards to highlighted columns or use Move to… · Scheduling requires approval, a channel and a date/time."
+                ? "กดค้างที่หัวข้อหรือพื้นที่ว่างบนการ์ด 0.4 วินาที แล้วลากไปช่องที่มีกรอบสี หรือเลือกสถานะจาก dropdown · New request แสดงเฉพาะคำขอที่อนุมัติแล้ว"
+                : "Hold a card title or empty space for 0.4 seconds, then drag to a highlighted column, or select its column from the dropdown. New request shows approved requests only."
               : language === "th"
                 ? "ดูสถานะงานและเปิดรายละเอียดได้ตามสิทธิ์ของคุณ"
                 : "View task status and details within your authorized scope."}
@@ -5535,7 +5553,8 @@ function Operations({
             </p>
           )}
           {moveNotice && <p role="status">{moveNotice}</p>}
-          <div className={styles.board}>
+          {holdDrag.ghost}
+          <div className={styles.board} data-operations-board>
             {columns.map(([column, statuses]) => {
               const dragging = taskItems.find((task) => task.id === draggedId);
               const allowed =
@@ -5545,6 +5564,7 @@ function Operations({
                 <section
                   key={column}
                   aria-label={column}
+                  data-board-column={column}
                   className={
                     dropColumn === column
                       ? allowed
@@ -5554,31 +5574,6 @@ function Operations({
                         ? styles.boardDropAllowed
                         : undefined
                   }
-                  onDragOver={(event) => {
-                    if (canManageTasks && draggedId && !movingId) {
-                      event.preventDefault();
-                      event.dataTransfer.dropEffect = "move";
-                      setDropColumn(column as BoardColumn);
-                    }
-                  }}
-                  onDragLeave={(event) => {
-                    if (
-                      !(event.relatedTarget instanceof Node) ||
-                      !event.currentTarget.contains(event.relatedTarget)
-                    )
-                      setDropColumn(null);
-                  }}
-                  onDrop={(event) => {
-                    event.preventDefault();
-                    const id =
-                      event.dataTransfer.getData("application/x-prcenter-task") ||
-                      draggedId;
-                    setDraggedId(null);
-                    setDropColumn(null);
-                    const task = taskItems.find((item) => item.id === id);
-                    if (task && canManageTasks)
-                      void moveTask(task, column as BoardColumn);
-                  }}
                 >
                   <header>
                     <b>{column}</b>
@@ -5596,86 +5591,67 @@ function Operations({
                         key={`${column}-${task.id}`}
                         id={`task-${task.id}`}
                         aria-busy={movingId === task.id}
-                        draggable={
+                        className={`${styles.compactBoardCard} ${draggedId === task.id ? styles.boardCardDragging : ""}`}
+                        data-hold-draggable={
                           canManageTasks &&
                           !movingId &&
                           BOARD_COLUMNS.some(
-                            (column) => taskMove(task, column).action !== "blocked",
+                            (target) => taskMove(task, target).action !== "blocked",
+                          )
+                            ? "true"
+                            : "false"
+                        }
+                        onPointerDown={(event) =>
+                          holdDrag.onPointerDown(
+                            event,
+                            task,
+                            canManageTasks &&
+                              !movingId &&
+                              BOARD_COLUMNS.some(
+                                (target) => taskMove(task, target).action !== "blocked",
+                              ),
                           )
                         }
-                        onDragStart={(event) => {
-                          if (!canManageTasks || movingId) {
-                            event.preventDefault();
-                            return;
-                          }
-                          event.dataTransfer.setData(
-                            "application/x-prcenter-task",
-                            task.id,
-                          );
-                          event.dataTransfer.effectAllowed = "move";
-                          setDraggedId(task.id);
-                          setMoveError("");
-                        }}
-                        onDragEnd={() => {
-                          setDraggedId(null);
-                          setDropColumn(null);
+                        onDragStart={(event) => event.preventDefault()}
+                        onContextMenu={(event) => {
+                          if (canManageTasks) event.preventDefault();
                         }}
                       >
-                        <small>{task.type}</small>
                         <b>{task.title}</b>
-                        <Status>{STATUS_LABELS[task.status]}</Status>
-                        <footer>
-                          {getUser(task.ownerId)?.name ?? task.ownerName ?? "Unassigned"}
-                          <span>{task.dueDate}</span>
-                        </footer>
                         <div className={styles.boardCardActions}>
                           <button type="button" onClick={() => openTask(task)}>
                             {language === "th" ? "รายละเอียด" : "Details"}
                           </button>
-                          {canManageTasks && (
-                            <label>
-                              <span className={styles.srOnly}>
-                                {language === "th"
+                          <label>
+                            <span className={styles.srOnly}>
+                              {language === "th"
+                                ? `ย้าย ${task.title}`
+                                : `Move ${task.title}`}
+                            </span>
+                            <select
+                              aria-label={
+                                language === "th"
                                   ? `ย้าย ${task.title}`
-                                  : `Move ${task.title}`}
-                              </span>
-                              <select
-                                aria-label={
-                                  language === "th"
-                                    ? `ย้าย ${task.title}`
-                                    : `Move ${task.title}`
-                                }
-                                value=""
-                                disabled={!!movingId}
-                                onChange={(event) => {
-                                  if (event.target.value)
-                                    void moveTask(
-                                      task,
-                                      event.target.value as BoardColumn,
-                                    );
-                                }}
-                              >
-                                <option value="">
-                                  {movingId === task.id
-                                    ? language === "th"
-                                      ? "กำลังย้าย…"
-                                      : "Moving…"
-                                    : language === "th"
-                                      ? "ย้ายไป…"
-                                      : "Move to…"}
+                                  : `Move ${task.title}`
+                              }
+                              value={column}
+                              disabled={!canManageTasks || !!movingId}
+                              onChange={(event) => {
+                                if (event.target.value)
+                                  void moveTask(task, event.target.value as BoardColumn);
+                              }}
+                            >
+                              {BOARD_COLUMNS.map((column) => (
+                                <option
+                                  key={column}
+                                  value={column}
+                                  disabled={taskMove(task, column).action === "blocked"}
+                                >
+                                  {column}
                                 </option>
-                                {BOARD_COLUMNS.map((column) => (
-                                  <option
-                                    key={column}
-                                    value={column}
-                                    disabled={taskMove(task, column).action === "blocked"}
-                                  >
-                                    {column}
-                                  </option>
-                                ))}
-                              </select>
-                            </label>
-                          )}
+                              ))}
+                            </select>
+                          </label>
                         </div>
                       </article>
                     ))}
@@ -5751,6 +5727,13 @@ function Operations({
               {selected.id} · due {selected.dueDate}
             </p>
             <Status>{STATUS_LABELS[selected.status]}</Status>
+            <p>
+              {language === "th" ? "ประเภทงาน: " : "Content type: "}
+              {selected.type} · {language === "th" ? "ผู้รับผิดชอบ: " : "Owner: "}
+              {getUser(selected.ownerId)?.name ??
+                selected.ownerName ??
+                (language === "th" ? "ยังไม่มอบหมาย" : "Unassigned")}
+            </p>
             <p>
               {language === "th" ? "ฉบับเนื้อหา" : "Content revision"}:{" "}
               {selected.revisionNumber ?? "—"}

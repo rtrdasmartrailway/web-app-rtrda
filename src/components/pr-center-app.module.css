@@ -1460,6 +1460,85 @@
   font-size: 12px;
   line-height: 1.4;
 }
+.app .board > section {
+  min-width: 0;
+}
+.app .board .compactBoardCard {
+  min-width: 0;
+  max-width: 100%;
+  grid-template-columns: minmax(0, 1fr);
+  padding: 9px;
+  gap: 8px;
+  overflow-wrap: anywhere;
+}
+.compactBoardCard > b {
+  min-width: 0;
+  max-width: 100%;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.compactBoardCard[data-hold-draggable="true"] {
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+  cursor: grab;
+}
+.compactBoardCard .boardCardActions {
+  display: grid;
+  grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+  gap: 5px;
+  margin-top: 0;
+  min-width: 0;
+}
+.compactBoardCard .boardCardActions > label {
+  min-width: 0;
+  max-width: 100%;
+}
+.app .compactBoardCard .boardCardActions :is(button, select) {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  min-height: 32px;
+  font-size: 11px;
+  line-height: 1.4;
+  padding: 5px;
+}
+.compactBoardCard .boardCardActions select {
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.compactBoardCard .boardCardActions button {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.app .board .boardCardDragging {
+  opacity: 0.45;
+  border-color: #1769e0;
+  outline: 2px solid #1769e0;
+}
+.boardDragPreview {
+  position: fixed;
+  z-index: 11000;
+  pointer-events: none;
+  width: 200px;
+  max-height: 80px;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+  padding: 12px;
+  border: 2px solid #1769e0;
+  border-radius: 8px;
+  background: #fff;
+  color: #204361;
+  box-shadow: 0 12px 30px rgb(10 35 70 / 25%);
+  font: 600 12px/1.5 sans-serif;
+}
+@media (max-width: 760px) {
+  .app .compactBoardCard .boardCardActions :is(button, select) {
+    min-height: 36px;
+  }
+}
 .board footer {
   color: #7d8da1;
   display: flex;
