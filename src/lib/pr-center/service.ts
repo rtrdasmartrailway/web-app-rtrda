@@ -3126,6 +3126,12 @@ export async function transitionTask(
   });
 }
 
+export function getBoardApprovalPolicy(actor: PrCenterActor) {
+  if (!canManageTasks(actorRoles(actor)))
+    throw new PrCenterError("You cannot manage this workflow", 403, "FORBIDDEN");
+  return loadApprovalPolicy();
+}
+
 function loadApprovalPolicy() {
   try {
     return parseApprovalPolicy(process.env.PR_CENTER_APPROVAL_POLICY_JSON);

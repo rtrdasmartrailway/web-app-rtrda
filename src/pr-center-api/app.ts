@@ -1,6 +1,7 @@
 import Fastify, { type FastifyInstance, type FastifyRequest } from "fastify";
 import {
   createRequest,
+  getBoardApprovalPolicy,
   createIdea,
   addIdeaComment,
   listIdeaComments,
@@ -412,6 +413,9 @@ export function buildPrCenterApi(
     });
   });
   app.get("/session", async (request) => sessionProfile(request.prCenterActor!));
+  app.get("/workflow/approval-policy", async (request) =>
+    getBoardApprovalPolicy(request.prCenterActor!),
+  );
   app.get("/auth/login", async (request, reply) => {
     if (!entraAuth)
       throw new PrCenterError(

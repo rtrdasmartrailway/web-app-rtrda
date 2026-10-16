@@ -9,6 +9,13 @@ import {
   useState,
 } from "react";
 import Image from "next/image";
+import { PrCenterDialog } from "./pr-center-dialog";
+import { BOARD_COLUMNS, boardMove, type BoardColumn } from "@/lib/pr-center/board-moves";
+import {
+  getFirstApprovalStage,
+  type ApprovalPolicy,
+} from "@/lib/pr-center/approval-policy";
+import type { PrTaskStatus as WorkflowTaskStatus } from "@/lib/pr-center/workflow";
 import {
   SortableHeading,
   TableSummary,
@@ -2758,7 +2765,7 @@ export function PrCenterApp({
   };
   const transitionTask = async (taskId: string, nextStatus: StatusId) => {
     const task = state.tasks.find((item) => item.id === taskId);
-    if (!task) return;
+    if (!task) return { ok: false, message: "Task not found. Refresh the board." };
     try {
       const response = await fetch(`/api/pr-center/tasks/${taskId}/transitions`, {
         method: "POST",
@@ -2769,7 +2776,13 @@ export function PrCenterApp({
         },
         body: JSON.stringify({ to: nextStatus.toUpperCase() }),
       });
-      if (!response.ok) throw new Error("Transition rejected");
+      if (!response.ok) {
+        const result = (await response.json().catch(() => null)) as {
+          message?: string;
+        } | null;
+        if (response.status === 409) await refreshRequests().catch(() => undefined);
+        throw new Error(result?.message || "Transition rejected");
+      }
       const updated = (await response.json()) as { status: string; version: number };
       setState((previous) => ({
         ...previous,
@@ -2792,32 +2805,23 @@ export function PrCenterApp({
             ? "เปลี่ยนสถานะงานแล้ว"
             : "Task status updated",
       );
-    } catch {
-      announce(
-        state.language === "th"
-          ? "ไม่สามารถเปลี่ยนสถานะงานได้"
-          : "Task transition failed",
-      );
+      return { ok: true };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Task transition failed";
+      announce(message);
+      return { ok: false, message };
     }
   };
   const recordApproval = async (
     taskId: string,
     decision: "APPROVED" | "REVISION_REQUIRED" | "REJECTED",
     reviewChecklist?: EditorialReviewChecklist,
+    reason = "",
   ) => {
     const task = approvalTasks.find((item) => item.id === taskId);
-    if (!task?.version) return;
-    const comment =
-      decision === "APPROVED"
-        ? ""
-        : window
-            .prompt(
-              state.language === "th"
-                ? "ระบุเหตุผลสำหรับการขอแก้ไข/ปฏิเสธ"
-                : "Enter a reason for requesting revision or rejecting",
-            )
-            ?.trim() || "";
-    if (decision !== "APPROVED" && !comment) return;
+    if (!task?.version) return false;
+    const comment = reason.trim();
+    if (decision !== "APPROVED" && !comment) return false;
     try {
       const response = await fetch(`/api/pr-center/tasks/${taskId}/approvals`, {
         method: "POST",
@@ -2856,8 +2860,10 @@ export function PrCenterApp({
             : "Decision saved, but the queue could not refresh. Reopen the queue.",
         );
       }
+      return true;
     } catch (error) {
       announce(error instanceof Error ? error.message : "Approval decision failed");
+      return false;
     }
   };
   const recordRequestDecision = async (
@@ -3416,7 +3422,7 @@ export function PrCenterApp({
 
   return (
     <div
-      className={`${styles.app} ${page === "my-requests" || page === "requests" ? styles.requestsPage : ""}`}
+      className={`${styles.app} ${page === "my-requests" || page === "requests" ? styles.requestsPage : page === "operations" || page === "approvals" ? styles.operationalPage : ""}`}
     >
       <aside
         className={`${styles.sidebar} ${sidebarOpen ? styles.sidebarOpen : ""}`}
@@ -5159,7 +5165,10 @@ function Operations({
   tasks: Task[];
   channels: string[];
   language: Language;
-  onTransition: (taskId: string, status: StatusId) => void;
+  onTransition: (
+    taskId: string,
+    status: StatusId,
+  ) => Promise<{ ok: boolean; message?: string }>;
   onAssign: (
     taskId: string,
     ownerId: string,
@@ -5189,6 +5198,18 @@ function Operations({
   canViewPublishing: boolean;
 }) {
   const [view, setView] = useState<"board" | "table" | "publishing">("board");
+  const [approvalPolicy, setApprovalPolicy] = useState<ApprovalPolicy | null>(null);
+  const [draggedId, setDraggedId] = useState<string | null>(null);
+  const [dropColumn, setDropColumn] = useState<BoardColumn | null>(null);
+  const [movingId, setMovingId] = useState<string | null>(null);
+  const moveBusy = useRef(false);
+  const [moveError, setMoveError] = useState("");
+  const [moveNotice, setMoveNotice] = useState("");
+  const scheduleInput = useRef<HTMLInputElement>(null);
+  const [scheduleRequested, setScheduleRequested] = useState(false);
+  const [savingSchedule, setSavingSchedule] = useState(false);
+  const scheduleBusy = useRef(false);
+  const [scheduleError, setScheduleError] = useState("");
   const [status, setStatus] = useState<"all" | StatusId>("all");
   const [ownerId, setOwnerId] = useState("all");
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -5226,6 +5247,7 @@ function Operations({
   const [activityTaskId, setActivityTaskId] = useState<string | null>(null);
   const [commentBody, setCommentBody] = useState("");
   const [activityError, setActivityError] = useState("");
+  const selectedVersion = taskItems.find((task) => task.id === selectedId)?.version;
   const loadTaskActivity = async (taskId: string) => {
     const response = await fetch(`/api/pr-center/tasks/${taskId}/history`, {
       credentials: "same-origin",
@@ -5256,6 +5278,22 @@ function Operations({
   };
   useEffect(() => {
     if (!canManageTasks) return;
+    const controller = new AbortController();
+    fetch("/api/pr-center/workflow/approval-policy", {
+      credentials: "same-origin",
+      cache: "no-store",
+      signal: controller.signal,
+    })
+      .then(async (response) => {
+        if (!response.ok) throw new Error("Workflow unavailable");
+        const policy = (await response.json()) as ApprovalPolicy;
+        if (!controller.signal.aborted) setApprovalPolicy(policy);
+      })
+      .catch(() => undefined);
+    return () => controller.abort();
+  }, [canManageTasks]);
+  useEffect(() => {
+    if (!canManageTasks) return;
     fetch("/api/pr-center/users/assignable", { credentials: "same-origin" })
       .then(async (response) => {
         if (response.ok) setAssignableUsers(await response.json());
@@ -5270,10 +5308,15 @@ function Operations({
     })
       .then(async (response) => {
         if (!response.ok) throw new Error("Unable to load task history");
-        setActivity(await response.json());
-        setActivityTaskId(selectedId);
+        const result = await response.json();
+        if (!cancelled) {
+          setActivity(result);
+          setActivityTaskId(selectedId);
+        }
       })
-      .catch(() => setActivityError("Unable to load task activity"));
+      .catch(() => {
+        if (!cancelled) setActivityError("Unable to load task activity");
+      });
     fetch(`/api/pr-center/tasks/${selectedId}/schedules`, {
       credentials: "same-origin",
     })
@@ -5302,7 +5345,7 @@ function Operations({
     return () => {
       cancelled = true;
     };
-  }, [selectedId, canManageTasks]);
+  }, [selectedId, selectedVersion, canManageTasks]);
   const visibleTasks = taskItems.filter(
     (task) =>
       (canManageTasks ||
@@ -5314,7 +5357,7 @@ function Operations({
   const columns: [string, StatusId[]][] = [
     ["New request", ["draft", "waiting_for_information"]],
     ["Planning", ["communication_planning"]],
-    ["In production", ["in_production"]],
+    ["In production", ["in_production", "revision_required"]],
     [
       "Review",
       [
@@ -5328,6 +5371,87 @@ function Operations({
   ];
   const selected = visibleTasks.find((task) => task.id === selectedId);
   const currentActivity = activityTaskId === selected?.id ? activity : null;
+  const openTask = (task: Task, schedule = false) => {
+    setSelectedId(task.id);
+    setDueDate(task.dueDate);
+    setAssigneeId(task.ownerId);
+    setPlanningKeyMessage(task.planningKeyMessage || "");
+    setTechnicalReviewRequired(task.technicalReviewRequired === true);
+    setManagementApprovalRequired(task.managementApprovalRequired === true);
+    setRevisionBody(task.contentBody || "");
+    setRevisionKeyMessage(task.keyMessage || "");
+    setRevisionSummary("");
+    setActivityError("");
+    setCommentBody("");
+    setChannel("");
+    setScheduledFor("");
+    setScheduleRequested(schedule);
+    setScheduleError("");
+  };
+  const taskMove = (task: Task, column: BoardColumn) => {
+    let first: WorkflowTaskStatus | undefined;
+    if (approvalPolicy) {
+      try {
+        first = getFirstApprovalStage(approvalPolicy, task).status;
+      } catch {
+        /* server policy still validates every transition */
+      }
+    }
+    return boardMove(
+      task.status.toUpperCase() as WorkflowTaskStatus,
+      task.requestStatus,
+      column,
+      first,
+    );
+  };
+  const moveTask = async (task: Task, column: BoardColumn) => {
+    if (!canManageTasks || moveBusy.current) return;
+    setMoveError("");
+    setMoveNotice("");
+    const move = taskMove(task, column);
+    if (move.action === "blocked") {
+      setMoveError(
+        language === "th"
+          ? move.reason === "request"
+            ? "ต้องอนุมัติคำขอก่อนเริ่มงาน"
+            : move.reason === "policy"
+              ? "โหลดขั้นตอนตรวจสอบไม่สำเร็จ กรุณาเปิดบอร์ดใหม่"
+              : "ย้ายไปช่องนี้จากสถานะปัจจุบันไม่ได้ กรุณาดำเนินการตามขั้นตอนตรวจและอนุมัติ"
+          : "This move is unavailable. Follow the request, review and approval workflow.",
+      );
+      return;
+    }
+    if (move.action === "schedule") {
+      openTask(task, true);
+      return;
+    }
+    moveBusy.current = true;
+    setMovingId(task.id);
+    try {
+      const result = await onTransition(task.id, move.status.toLowerCase() as StatusId);
+      if (!result.ok)
+        setMoveError(
+          result.message ||
+            (language === "th" ? "ย้ายงานไม่สำเร็จ" : "Unable to move task"),
+        );
+      else
+        setMoveNotice(
+          language === "th" ? `ย้ายงานไป ${column} แล้ว` : `Task moved to ${column}`,
+        );
+    } catch {
+      setMoveError(
+        language === "th"
+          ? "ย้ายงานไม่สำเร็จ กรุณาลองอีกครั้ง"
+          : "Unable to move task. Retry.",
+      );
+    } finally {
+      moveBusy.current = false;
+      setMovingId(null);
+    }
+  };
+  useEffect(() => {
+    if (scheduleRequested && selectedId) scheduleInput.current?.focus();
+  }, [scheduleRequested, selectedId]);
   return (
     <>
       <SectionHeading
@@ -5337,15 +5461,17 @@ function Operations({
             ? language === "th"
               ? "สถานะการเผยแพร่"
               : "Publishing status"
-            : "Production board"
+            : language === "th"
+              ? "บอร์ดติดตามการผลิต"
+              : "Production board"
         }
         action={
           <div className={styles.segmented}>
             <button aria-pressed={view === "board"} onClick={() => setView("board")}>
-              Board
+              {language === "th" ? "บอร์ด" : "Board"}
             </button>
             <button aria-pressed={view === "table"} onClick={() => setView("table")}>
-              Table
+              {language === "th" ? "ตาราง" : "Table"}
             </button>
             {canViewPublishing && (
               <button
@@ -5360,73 +5486,204 @@ function Operations({
       />
       {view !== "publishing" && (
         <section className={styles.filterBar}>
-          <select
-            value={status}
-            onChange={(event) => setStatus(event.target.value as "all" | StatusId)}
-          >
-            <option value="all">All statuses</option>
-            {Object.entries(STATUS_LABELS).map(([id, name]) => (
-              <option key={id} value={id}>
-                {name}
+          <label>
+            {language === "th" ? "สถานะงาน" : "Task status"}
+            <select
+              value={status}
+              onChange={(event) => setStatus(event.target.value as "all" | StatusId)}
+            >
+              <option value="all">
+                {language === "th" ? "ทุกสถานะ" : "All statuses"}
               </option>
-            ))}
-          </select>
-          <select value={ownerId} onChange={(event) => setOwnerId(event.target.value)}>
-            <option value="all">All owners</option>
-            {assignableUsers.map((user) => (
-              <option key={user.id} value={user.id}>
-                {user.displayName}
-              </option>
-            ))}
-          </select>
+              {Object.entries(STATUS_LABELS).map(([id]) => (
+                <option key={id} value={id}>
+                  {requestTableStatusLabel(id as StatusId, language)}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
+            {language === "th" ? "ผู้รับผิดชอบ" : "Task owner"}
+            <select value={ownerId} onChange={(event) => setOwnerId(event.target.value)}>
+              <option value="all">{language === "th" ? "ทุกคน" : "All owners"}</option>
+              {assignableUsers.map((user) => (
+                <option key={user.id} value={user.id}>
+                  {user.displayName}
+                </option>
+              ))}
+            </select>
+          </label>
         </section>
       )}
       {view === "publishing" && canViewPublishing && (
         <PublishingOperations language={language} />
       )}
       {view === "board" && (
-        <div className={styles.board}>
-          {columns.map(([column, statuses]) => (
-            <section key={column}>
-              <header>
-                <b>{column}</b>
-                <span>
-                  {visibleTasks.filter((task) => statuses.includes(task.status)).length}
-                </span>
-              </header>
-              {visibleTasks
-                .filter((task) => statuses.includes(task.status))
-                .map((task) => (
-                  <article key={`${column}-${task.id}`} id={`task-${task.id}`}>
-                    <small>{task.type}</small>
-                    <b>{task.title}</b>
-                    <Status>{STATUS_LABELS[task.status]}</Status>
-                    <footer>
-                      {getUser(task.ownerId)?.name ?? task.ownerName ?? "Unassigned"}
-                      <span>{task.dueDate}</span>
-                    </footer>
-                    <button
-                      onClick={() => {
-                        setSelectedId(task.id);
-                        setDueDate(task.dueDate);
-                        setAssigneeId(task.ownerId);
-                        setPlanningKeyMessage(task.planningKeyMessage || "");
-                        setTechnicalReviewRequired(task.technicalReviewRequired === true);
-                        setManagementApprovalRequired(
-                          task.managementApprovalRequired === true,
-                        );
-                        setRevisionBody(task.contentBody || "");
-                        setRevisionKeyMessage(task.keyMessage || "");
-                        setRevisionSummary("");
-                      }}
-                    >
-                      Details
-                    </button>
-                  </article>
-                ))}
-            </section>
-          ))}
-        </div>
+        <>
+          <p className={styles.boardInstructions}>
+            {canManageTasks
+              ? language === "th"
+                ? "ลากการ์ดไปช่องที่มีกรอบสี หรือใช้เมนู ‘ย้ายไป…’ บนการ์ด · การนัดเผยแพร่ต้องผ่านอนุมัติและระบุช่องทาง/เวลา"
+                : "Drag cards to highlighted columns or use Move to… · Scheduling requires approval, a channel and a date/time."
+              : language === "th"
+                ? "ดูสถานะงานและเปิดรายละเอียดได้ตามสิทธิ์ของคุณ"
+                : "View task status and details within your authorized scope."}
+          </p>
+          {moveError && (
+            <p role="alert" className={styles.formError}>
+              {moveError}
+            </p>
+          )}
+          {moveNotice && <p role="status">{moveNotice}</p>}
+          <div className={styles.board}>
+            {columns.map(([column, statuses]) => {
+              const dragging = taskItems.find((task) => task.id === draggedId);
+              const allowed =
+                dragging &&
+                taskMove(dragging, column as BoardColumn).action !== "blocked";
+              return (
+                <section
+                  key={column}
+                  aria-label={column}
+                  className={
+                    dropColumn === column
+                      ? allowed
+                        ? styles.boardDropActive
+                        : styles.boardDropRejected
+                      : allowed
+                        ? styles.boardDropAllowed
+                        : undefined
+                  }
+                  onDragOver={(event) => {
+                    if (canManageTasks && draggedId && !movingId) {
+                      event.preventDefault();
+                      event.dataTransfer.dropEffect = "move";
+                      setDropColumn(column as BoardColumn);
+                    }
+                  }}
+                  onDragLeave={(event) => {
+                    if (
+                      !(event.relatedTarget instanceof Node) ||
+                      !event.currentTarget.contains(event.relatedTarget)
+                    )
+                      setDropColumn(null);
+                  }}
+                  onDrop={(event) => {
+                    event.preventDefault();
+                    const id =
+                      event.dataTransfer.getData("application/x-prcenter-task") ||
+                      draggedId;
+                    setDraggedId(null);
+                    setDropColumn(null);
+                    const task = taskItems.find((item) => item.id === id);
+                    if (task && canManageTasks)
+                      void moveTask(task, column as BoardColumn);
+                  }}
+                >
+                  <header>
+                    <b>{column}</b>
+                    <span>
+                      {
+                        visibleTasks.filter((task) => statuses.includes(task.status))
+                          .length
+                      }
+                    </span>
+                  </header>
+                  {visibleTasks
+                    .filter((task) => statuses.includes(task.status))
+                    .map((task) => (
+                      <article
+                        key={`${column}-${task.id}`}
+                        id={`task-${task.id}`}
+                        aria-busy={movingId === task.id}
+                        draggable={
+                          canManageTasks &&
+                          !movingId &&
+                          BOARD_COLUMNS.some(
+                            (column) => taskMove(task, column).action !== "blocked",
+                          )
+                        }
+                        onDragStart={(event) => {
+                          if (!canManageTasks || movingId) {
+                            event.preventDefault();
+                            return;
+                          }
+                          event.dataTransfer.setData(
+                            "application/x-prcenter-task",
+                            task.id,
+                          );
+                          event.dataTransfer.effectAllowed = "move";
+                          setDraggedId(task.id);
+                          setMoveError("");
+                        }}
+                        onDragEnd={() => {
+                          setDraggedId(null);
+                          setDropColumn(null);
+                        }}
+                      >
+                        <small>{task.type}</small>
+                        <b>{task.title}</b>
+                        <Status>{STATUS_LABELS[task.status]}</Status>
+                        <footer>
+                          {getUser(task.ownerId)?.name ?? task.ownerName ?? "Unassigned"}
+                          <span>{task.dueDate}</span>
+                        </footer>
+                        <div className={styles.boardCardActions}>
+                          <button type="button" onClick={() => openTask(task)}>
+                            {language === "th" ? "รายละเอียด" : "Details"}
+                          </button>
+                          {canManageTasks && (
+                            <label>
+                              <span className={styles.srOnly}>
+                                {language === "th"
+                                  ? `ย้าย ${task.title}`
+                                  : `Move ${task.title}`}
+                              </span>
+                              <select
+                                aria-label={
+                                  language === "th"
+                                    ? `ย้าย ${task.title}`
+                                    : `Move ${task.title}`
+                                }
+                                value=""
+                                disabled={!!movingId}
+                                onChange={(event) => {
+                                  if (event.target.value)
+                                    void moveTask(
+                                      task,
+                                      event.target.value as BoardColumn,
+                                    );
+                                }}
+                              >
+                                <option value="">
+                                  {movingId === task.id
+                                    ? language === "th"
+                                      ? "กำลังย้าย…"
+                                      : "Moving…"
+                                    : language === "th"
+                                      ? "ย้ายไป…"
+                                      : "Move to…"}
+                                </option>
+                                {BOARD_COLUMNS.map((column) => (
+                                  <option
+                                    key={column}
+                                    value={column}
+                                    disabled={taskMove(task, column).action === "blocked"}
+                                  >
+                                    {column}
+                                  </option>
+                                ))}
+                              </select>
+                            </label>
+                          )}
+                        </div>
+                      </article>
+                    ))}
+                </section>
+              );
+            })}
+          </div>
+        </>
       )}
       {view === "table" && (
         <article className={styles.card}>
@@ -5460,24 +5717,7 @@ function Operations({
                         (language === "th" ? "ยังไม่มอบหมาย" : "Unassigned")}
                     </td>
                     <td>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setSelectedId(task.id);
-                          setDueDate(task.dueDate);
-                          setAssigneeId(task.ownerId);
-                          setPlanningKeyMessage(task.planningKeyMessage || "");
-                          setTechnicalReviewRequired(
-                            task.technicalReviewRequired === true,
-                          );
-                          setManagementApprovalRequired(
-                            task.managementApprovalRequired === true,
-                          );
-                          setRevisionBody(task.contentBody || "");
-                          setRevisionKeyMessage(task.keyMessage || "");
-                          setRevisionSummary("");
-                        }}
-                      >
+                      <button type="button" onClick={() => openTask(task)}>
                         {language === "th" ? "เปิดรายละเอียด" : "Open details"}
                       </button>
                     </td>
@@ -5498,457 +5738,504 @@ function Operations({
         </article>
       )}
       {selected && view !== "publishing" && (
-        <article className={styles.card}>
-          <p className={styles.eyebrow}>
-            {selected.id} · due {selected.dueDate}
-          </p>
-          <h2>{selected.title}</h2>
-          <p>
-            {language === "th" ? "ฉบับเนื้อหา" : "Content revision"}:{" "}
-            {selected.revisionNumber ?? "—"}
-            {selected.keyMessage ? ` · ${selected.keyMessage}` : ""}
-          </p>
-          {selected.contentBody && (
-            <section className={styles.card}>
-              <h3>{language === "th" ? "เนื้อหาฉบับปัจจุบัน" : "Current content"}</h3>
-              <p style={{ whiteSpace: "pre-wrap" }}>{selected.contentBody}</p>
-            </section>
-          )}
-          {selected.sourceUrls && selected.sourceUrls.length > 0 && (
-            <section className={styles.card}>
-              <h3>
-                {language === "th" ? "แหล่งข้อมูลที่แนบกับคำขอ" : "Request sources"}
-              </h3>
-              <ul>
-                {selected.sourceUrls.map((url) => (
-                  <li key={url}>
-                    <a href={url} target="_blank" rel="noreferrer">
-                      {url}
-                    </a>
-                  </li>
-                ))}
-              </ul>
-            </section>
-          )}
-          {canManageTasks &&
-            selected.requestStatus === "APPROVED" &&
-            ["in_production", "revision_required"].includes(selected.status) && (
-              <form
-                className={styles.taskRevisionForm}
-                onSubmit={async (event) => {
-                  event.preventDefault();
-                  if (savingRevision) return;
-                  setSavingRevision(true);
-                  const saved = await onCreateRevision(
-                    selected.id,
-                    revisionBody,
-                    revisionKeyMessage,
-                    revisionSummary,
-                  );
-                  if (saved) {
-                    setRevisionBody("");
-                    setRevisionSummary("");
-                  }
-                  setSavingRevision(false);
-                }}
-              >
+        <PrCenterDialog
+          title={selected.title}
+          language={language}
+          onClose={() => {
+            setSelectedId(null);
+            setScheduleRequested(false);
+          }}
+        >
+          <article className={`${styles.card} ${styles.taskDetailsCard}`}>
+            <p className={styles.eyebrow}>
+              {selected.id} · due {selected.dueDate}
+            </p>
+            <Status>{STATUS_LABELS[selected.status]}</Status>
+            <p>
+              {language === "th" ? "ฉบับเนื้อหา" : "Content revision"}:{" "}
+              {selected.revisionNumber ?? "—"}
+              {selected.keyMessage ? ` · ${selected.keyMessage}` : ""}
+            </p>
+            {selected.contentBody && (
+              <section className={styles.card}>
+                <h3>{language === "th" ? "เนื้อหาฉบับปัจจุบัน" : "Current content"}</h3>
+                <p style={{ whiteSpace: "pre-wrap" }}>{selected.contentBody}</p>
+              </section>
+            )}
+            {selected.sourceUrls && selected.sourceUrls.length > 0 && (
+              <section className={styles.card}>
                 <h3>
-                  {language === "th"
-                    ? "บันทึกฉบับเนื้อหาใหม่"
-                    : "Create content revision"}
+                  {language === "th" ? "แหล่งข้อมูลที่แนบกับคำขอ" : "Request sources"}
                 </h3>
-                <label>
-                  {language === "th" ? "เนื้อหาฉบับที่จะส่งตรวจ" : "Content to review"}
-                  <textarea
-                    value={revisionBody}
-                    onChange={(event) => setRevisionBody(event.target.value)}
-                    maxLength={20000}
-                    rows={4}
-                    required
-                  />
-                </label>
-                <label>
-                  {language === "th" ? "Key Message" : "Key message"}
-                  <textarea
-                    value={revisionKeyMessage}
-                    onChange={(event) => setRevisionKeyMessage(event.target.value)}
-                    maxLength={2000}
-                    rows={2}
-                    required
-                  />
-                </label>
-                <label>
-                  {language === "th" ? "สรุปการเปลี่ยนแปลง" : "Change summary"}
-                  <input
-                    value={revisionSummary}
-                    onChange={(event) => setRevisionSummary(event.target.value)}
-                    maxLength={1000}
-                  />
-                </label>
-                <button
-                  className={styles.secondaryButton}
-                  type="submit"
-                  disabled={savingRevision}
-                >
-                  {savingRevision
-                    ? language === "th"
-                      ? "กำลังบันทึก…"
-                      : "Saving…"
-                    : language === "th"
-                      ? "บันทึกและส่งกลับเข้าสู่การผลิต"
-                      : "Save and return to production"}
-                </button>
-              </form>
-            )}
-          {canManageTasks && (
-            <>
-              <label>
-                Assign to{" "}
-                <select
-                  value={assigneeId}
-                  onChange={(event) => setAssigneeId(event.target.value)}
-                >
-                  <option value="">Unassigned</option>
-                  {assignableUsers.map((user) => (
-                    <option key={user.id} value={user.id}>
-                      {user.displayName}
-                      {user.department?.name ? ` · ${user.department.name}` : ""}
-                    </option>
+                <ul>
+                  {selected.sourceUrls.map((url) => (
+                    <li key={url}>
+                      <a href={url} target="_blank" rel="noreferrer">
+                        {url}
+                      </a>
+                    </li>
                   ))}
-                </select>
-              </label>
-              {selected.planningKeyMessage && (
-                <p>
-                  <strong>
-                    {language === "th"
-                      ? "Key Message สำหรับแผนงาน:"
-                      : "Planning key message:"}
-                  </strong>{" "}
-                  {selected.planningKeyMessage}
-                </p>
-              )}
-              {selected.status === "communication_planning" &&
-                canConfigureApprovalRequirements && (
-                  <fieldset className={styles.card}>
-                    <legend>
-                      {language === "th"
-                        ? "ขั้นตอนตรวจอนุมัติของงานนี้"
-                        : "Review requirements for this task"}
-                    </legend>
-                    <label>
-                      <input
-                        type="checkbox"
-                        checked={technicalReviewRequired}
-                        onChange={(event) =>
-                          setTechnicalReviewRequired(event.target.checked)
-                        }
-                      />
-                      {language === "th"
-                        ? "ต้องตรวจงานเทคนิค (ผู้อนุมัติ/PR)"
-                        : "Require technical review (Approver/PR)"}
-                    </label>
-                    <label>
-                      <input
-                        type="checkbox"
-                        checked={managementApprovalRequired}
-                        onChange={(event) =>
-                          setManagementApprovalRequired(event.target.checked)
-                        }
-                      />
-                      {language === "th"
-                        ? "ต้องขออนุมัติจากผู้บริหาร"
-                        : "Require management approval"}
-                    </label>
-                  </fieldset>
-                )}
-              {selected.status === "communication_planning" && (
-                <label>
-                  {language === "th" ? "Key Message (แผนงาน)" : "Planning key message"}
-                  <textarea
-                    value={planningKeyMessage}
-                    onChange={(event) => setPlanningKeyMessage(event.target.value)}
-                    maxLength={2000}
-                    rows={2}
-                    placeholder={
-                      language === "th"
-                        ? "ใจความสำคัญที่ต้องการสื่อ"
-                        : "Core message to communicate"
-                    }
-                  />
-                </label>
-              )}
-              <label>
-                Due date{" "}
-                <input
-                  type="date"
-                  value={dueDate}
-                  onChange={(event) => setDueDate(event.target.value)}
-                />
-              </label>
-              <button
-                onClick={() =>
-                  onAssign(
-                    selected.id,
-                    assigneeId,
-                    dueDate,
-                    selected.status === "communication_planning"
-                      ? planningKeyMessage
-                      : undefined,
-                    selected.status === "communication_planning" &&
-                      canConfigureApprovalRequirements
-                      ? technicalReviewRequired
-                      : undefined,
-                    selected.status === "communication_planning" &&
-                      canConfigureApprovalRequirements
-                      ? managementApprovalRequired
-                      : undefined,
-                  )
-                }
-              >
-                Save assignment
-              </button>
-            </>
-          )}
-          {(canFactCheckPR || selected.ownerId === currentUserId) &&
-            selected.revisionNumber !== undefined &&
-            ["in_production", "source_fact_check", "revision_required"].includes(
-              selected.status,
-            ) && (
-              <TaskFactCheckPanel key={selected.id} task={selected} language={language} />
+                </ul>
+              </section>
             )}
-          {canManageTasks &&
-            STATUS_TRANSITIONS[selected.status].filter(
-              (next) =>
-                next !== "scheduled" &&
-                next !== "published" &&
-                !(selected.status === "published" && next === "closed"),
-            ).length > 0 && (
-              <label>
-                Move to{" "}
-                <select
-                  value=""
-                  onChange={(event) => {
-                    if (event.target.value)
-                      onTransition(selected.id, event.target.value as StatusId);
-                  }}
-                >
-                  <option value="">Choose a legal next state</option>
-                  {STATUS_TRANSITIONS[selected.status]
-                    .filter((next) => next !== "scheduled" && next !== "published")
-                    .map((next) => (
-                      <option key={next} value={next}>
-                        {STATUS_LABELS[next]}
-                      </option>
-                    ))}
-                </select>
-              </label>
-            )}
-          {canManageTasks &&
-            (selected.status === "approved" || selected.status === "scheduled") && (
-              <>
-                <label>
-                  Channel{" "}
-                  <select
-                    value={channel}
-                    onChange={(event) => setChannel(event.target.value)}
-                    required
-                  >
-                    <option value="">Select a channel</option>
-                    {channels.map((item) => (
-                      <option key={item} value={item}>
-                        {item}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <label>
-                  {language === "th"
-                    ? "วันและเวลาเผยแพร่ (เวลาไทย, Asia/Bangkok)"
-                    : "Schedule time (Thailand, Asia/Bangkok)"}{" "}
-                  <input
-                    type="datetime-local"
-                    value={scheduledFor}
-                    onChange={(event) => setScheduledFor(event.target.value)}
-                    required
-                  />
-                </label>
-                <button
-                  onClick={async () => {
-                    const saved = await onSchedule(selected.id, channel, scheduledFor);
-                    if (saved)
-                      await loadTaskSchedules(selected.id).catch(() =>
-                        setScheduleChoices([]),
-                      );
-                  }}
-                >
-                  Schedule channel
-                </button>
-              </>
-            )}
-          {canManageTasks &&
-            (selected.status === "scheduled" || selected.status === "published") &&
-            scheduleChoices.length > 0 && (
-              <>
-                <label>
-                  Evidence channel{" "}
-                  <select
-                    value={evidenceChannel}
-                    onChange={(event) => setEvidenceChannel(event.target.value)}
-                  >
-                    {scheduleChoices.map((schedule) => (
-                      <option key={schedule.id} value={schedule.channel}>
-                        {schedule.channel} ·{" "}
-                        {new Date(schedule.scheduledFor).toLocaleString()}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <label>
-                  Published URL{" "}
-                  <input
-                    type="url"
-                    value={publishedUrl}
-                    onChange={(event) => setPublishedUrl(event.target.value)}
-                    required
-                  />
-                </label>
-                <label>
-                  Publication reference{" "}
-                  <input
-                    value={publishedReference}
-                    onChange={(event) => setPublishedReference(event.target.value)}
-                    required
-                  />
-                </label>
-                <button
-                  onClick={async () => {
-                    const saved = await onPublish(
+            {canManageTasks &&
+              selected.requestStatus === "APPROVED" &&
+              ["in_production", "revision_required"].includes(selected.status) && (
+                <form
+                  className={styles.taskRevisionForm}
+                  onSubmit={async (event) => {
+                    event.preventDefault();
+                    if (savingRevision) return;
+                    setSavingRevision(true);
+                    const saved = await onCreateRevision(
                       selected.id,
-                      evidenceChannel,
-                      publishedUrl,
-                      publishedReference,
+                      revisionBody,
+                      revisionKeyMessage,
+                      revisionSummary,
                     );
-                    if (saved)
-                      await loadTaskSchedules(selected.id).catch(() =>
-                        setScheduleChoices([]),
-                      );
+                    if (saved) {
+                      setRevisionBody("");
+                      setRevisionSummary("");
+                    }
+                    setSavingRevision(false);
                   }}
                 >
-                  Record publishing evidence
+                  <h3>
+                    {language === "th"
+                      ? "บันทึกฉบับเนื้อหาใหม่"
+                      : "Create content revision"}
+                  </h3>
+                  <label>
+                    {language === "th" ? "เนื้อหาฉบับที่จะส่งตรวจ" : "Content to review"}
+                    <textarea
+                      value={revisionBody}
+                      onChange={(event) => setRevisionBody(event.target.value)}
+                      maxLength={20000}
+                      rows={4}
+                      required
+                    />
+                  </label>
+                  <label>
+                    {language === "th" ? "Key Message" : "Key message"}
+                    <textarea
+                      value={revisionKeyMessage}
+                      onChange={(event) => setRevisionKeyMessage(event.target.value)}
+                      maxLength={2000}
+                      rows={2}
+                      required
+                    />
+                  </label>
+                  <label>
+                    {language === "th" ? "สรุปการเปลี่ยนแปลง" : "Change summary"}
+                    <input
+                      value={revisionSummary}
+                      onChange={(event) => setRevisionSummary(event.target.value)}
+                      maxLength={1000}
+                    />
+                  </label>
+                  <button
+                    className={styles.secondaryButton}
+                    type="submit"
+                    disabled={savingRevision}
+                  >
+                    {savingRevision
+                      ? language === "th"
+                        ? "กำลังบันทึก…"
+                        : "Saving…"
+                      : language === "th"
+                        ? "บันทึกและส่งกลับเข้าสู่การผลิต"
+                        : "Save and return to production"}
+                  </button>
+                </form>
+              )}
+            {canManageTasks && (
+              <>
+                <label>
+                  Assign to{" "}
+                  <select
+                    value={assigneeId}
+                    onChange={(event) => setAssigneeId(event.target.value)}
+                  >
+                    <option value="">Unassigned</option>
+                    {assignableUsers.map((user) => (
+                      <option key={user.id} value={user.id}>
+                        {user.displayName}
+                        {user.department?.name ? ` · ${user.department.name}` : ""}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                {selected.planningKeyMessage && (
+                  <p>
+                    <strong>
+                      {language === "th"
+                        ? "Key Message สำหรับแผนงาน:"
+                        : "Planning key message:"}
+                    </strong>{" "}
+                    {selected.planningKeyMessage}
+                  </p>
+                )}
+                {selected.status === "communication_planning" &&
+                  canConfigureApprovalRequirements && (
+                    <fieldset className={styles.card}>
+                      <legend>
+                        {language === "th"
+                          ? "ขั้นตอนตรวจอนุมัติของงานนี้"
+                          : "Review requirements for this task"}
+                      </legend>
+                      <label>
+                        <input
+                          type="checkbox"
+                          checked={technicalReviewRequired}
+                          onChange={(event) =>
+                            setTechnicalReviewRequired(event.target.checked)
+                          }
+                        />
+                        {language === "th"
+                          ? "ต้องตรวจงานเทคนิค (ผู้อนุมัติ/PR)"
+                          : "Require technical review (Approver/PR)"}
+                      </label>
+                      <label>
+                        <input
+                          type="checkbox"
+                          checked={managementApprovalRequired}
+                          onChange={(event) =>
+                            setManagementApprovalRequired(event.target.checked)
+                          }
+                        />
+                        {language === "th"
+                          ? "ต้องขออนุมัติจากผู้บริหาร"
+                          : "Require management approval"}
+                      </label>
+                    </fieldset>
+                  )}
+                {selected.status === "communication_planning" && (
+                  <label>
+                    {language === "th" ? "Key Message (แผนงาน)" : "Planning key message"}
+                    <textarea
+                      value={planningKeyMessage}
+                      onChange={(event) => setPlanningKeyMessage(event.target.value)}
+                      maxLength={2000}
+                      rows={2}
+                      placeholder={
+                        language === "th"
+                          ? "ใจความสำคัญที่ต้องการสื่อ"
+                          : "Core message to communicate"
+                      }
+                    />
+                  </label>
+                )}
+                <label>
+                  Due date{" "}
+                  <input
+                    type="date"
+                    value={dueDate}
+                    onChange={(event) => setDueDate(event.target.value)}
+                  />
+                </label>
+                <button
+                  onClick={() =>
+                    onAssign(
+                      selected.id,
+                      assigneeId,
+                      dueDate,
+                      selected.status === "communication_planning"
+                        ? planningKeyMessage
+                        : undefined,
+                      selected.status === "communication_planning" &&
+                        canConfigureApprovalRequirements
+                        ? technicalReviewRequired
+                        : undefined,
+                      selected.status === "communication_planning" &&
+                        canConfigureApprovalRequirements
+                        ? managementApprovalRequired
+                        : undefined,
+                    )
+                  }
+                >
+                  Save assignment
                 </button>
               </>
             )}
-          {canManageTasks && selected.status === "published" && (
-            <section className={styles.card} aria-labelledby="close-published-task">
-              <h3 id="close-published-task">
-                {language === "th" ? "10. ปิดงาน" : "10. Close task"}
-              </h3>
-              {scheduleChoicesTaskId !== selected.id ? (
-                <p role="status">
-                  {language === "th"
-                    ? "กำลังตรวจสอบสถานะหลักฐานเผยแพร่ของทุกช่องทาง"
-                    : "Checking publication evidence for every scheduled channel…"}
-                </p>
-              ) : scheduleChoices.length > 0 ? (
-                <p role="status">
-                  {language === "th"
-                    ? `ยังต้องเผยแพร่และบันทึกหลักฐานอีก ${scheduleChoices.length} ช่องทางก่อนปิดงาน`
-                    : `Publish and record evidence for ${scheduleChoices.length} remaining channel(s) before closing.`}
-                </p>
-              ) : (
-                <p role="status">
-                  {language === "th"
-                    ? "บันทึกหลักฐานครบทุกช่องทางแล้ว สามารถปิดงานได้"
-                    : "Publication evidence is recorded for every scheduled channel. The task is ready to close."}
-                </p>
+            {(canFactCheckPR || selected.ownerId === currentUserId) &&
+              selected.revisionNumber !== undefined &&
+              ["in_production", "source_fact_check", "revision_required"].includes(
+                selected.status,
+              ) && (
+                <TaskFactCheckPanel
+                  key={selected.id}
+                  task={selected}
+                  language={language}
+                />
               )}
-              <button
-                type="button"
-                disabled={
-                  scheduleChoicesTaskId !== selected.id || scheduleChoices.length > 0
-                }
-                onClick={() => onTransition(selected.id, "closed")}
-              >
-                {language === "th" ? "ปิดงาน" : "Close task"}
-              </button>
-            </section>
-          )}
-          {canManageTasks && (
-            <section className={styles.card}>
-              <h3>Comments and activity</h3>
-              {activityError && <p role="alert">{activityError}</p>}
-              <form
-                onSubmit={async (event) => {
-                  event.preventDefault();
-                  try {
-                    const response = await fetch(
-                      `/api/pr-center/tasks/${selected.id}/comments`,
-                      {
-                        method: "POST",
-                        credentials: "same-origin",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({ body: commentBody }),
-                      },
-                    );
-                    if (!response.ok) {
-                      setActivityError("Unable to add comment");
-                      return;
-                    }
-                    setCommentBody("");
-                    setActivityError("");
-                    await loadTaskActivity(selected.id).catch(() =>
-                      setActivityError("Unable to reload task activity"),
-                    );
-                  } catch {
-                    setActivityError("Unable to add or reload task comment");
-                  }
-                }}
-              >
+            {canManageTasks &&
+              STATUS_TRANSITIONS[selected.status].filter(
+                (next) =>
+                  next !== "scheduled" &&
+                  next !== "published" &&
+                  !(selected.status === "published" && next === "closed"),
+              ).length > 0 && (
                 <label>
-                  Add comment{" "}
-                  <textarea
-                    value={commentBody}
-                    onChange={(event) => setCommentBody(event.target.value)}
-                    maxLength={5000}
-                    required
-                  />
+                  Move to{" "}
+                  <select
+                    value=""
+                    onChange={(event) => {
+                      if (event.target.value)
+                        onTransition(selected.id, event.target.value as StatusId);
+                    }}
+                  >
+                    <option value="">Choose a legal next state</option>
+                    {STATUS_TRANSITIONS[selected.status]
+                      .filter((next) => next !== "scheduled" && next !== "published")
+                      .map((next) => (
+                        <option key={next} value={next}>
+                          {STATUS_LABELS[next]}
+                        </option>
+                      ))}
+                  </select>
                 </label>
-                <button type="submit" disabled={!commentBody.trim()}>
-                  Add comment
+              )}
+            {canManageTasks &&
+              (selected.status === "approved" || selected.status === "scheduled") && (
+                <>
+                  <label>
+                    Channel{" "}
+                    <select
+                      value={channel}
+                      onChange={(event) => setChannel(event.target.value)}
+                      required
+                    >
+                      <option value="">Select a channel</option>
+                      {channels.map((item) => (
+                        <option key={item} value={item}>
+                          {item}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label>
+                    {language === "th"
+                      ? "วันและเวลาเผยแพร่ (เวลาไทย, Asia/Bangkok)"
+                      : "Schedule time (Thailand, Asia/Bangkok)"}{" "}
+                    <input
+                      type="datetime-local"
+                      ref={scheduleInput}
+                      value={scheduledFor}
+                      onChange={(event) => setScheduledFor(event.target.value)}
+                      required
+                    />
+                  </label>
+                  <button
+                    disabled={savingSchedule || !channel || !scheduledFor}
+                    onClick={async () => {
+                      if (scheduleBusy.current) return;
+                      scheduleBusy.current = true;
+                      setSavingSchedule(true);
+                      setScheduleError("");
+                      try {
+                        const saved = await onSchedule(
+                          selected.id,
+                          channel,
+                          scheduledFor,
+                        );
+                        if (saved)
+                          await loadTaskSchedules(selected.id).catch(() =>
+                            setScheduleChoices([]),
+                          );
+                        else
+                          setScheduleError(
+                            language === "th"
+                              ? "นัดเผยแพร่ไม่สำเร็จ กรุณาตรวจวันเวลาและเงื่อนไขการเผยแพร่"
+                              : "Scheduling failed. Check the date/time and publication requirements.",
+                          );
+                      } finally {
+                        scheduleBusy.current = false;
+                        setSavingSchedule(false);
+                      }
+                    }}
+                  >
+                    {savingSchedule
+                      ? language === "th"
+                        ? "กำลังบันทึก…"
+                        : "Saving…"
+                      : language === "th"
+                        ? "บันทึกนัดเผยแพร่"
+                        : "Schedule channel"}
+                  </button>
+                  {scheduleError && (
+                    <p role="alert" className={styles.formError}>
+                      {scheduleError}
+                    </p>
+                  )}
+                </>
+              )}
+            {canManageTasks &&
+              (selected.status === "scheduled" || selected.status === "published") &&
+              scheduleChoices.length > 0 && (
+                <>
+                  <label>
+                    Evidence channel{" "}
+                    <select
+                      value={evidenceChannel}
+                      onChange={(event) => setEvidenceChannel(event.target.value)}
+                    >
+                      {scheduleChoices.map((schedule) => (
+                        <option key={schedule.id} value={schedule.channel}>
+                          {schedule.channel} ·{" "}
+                          {new Date(schedule.scheduledFor).toLocaleString()}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label>
+                    Published URL{" "}
+                    <input
+                      type="url"
+                      value={publishedUrl}
+                      onChange={(event) => setPublishedUrl(event.target.value)}
+                      required
+                    />
+                  </label>
+                  <label>
+                    Publication reference{" "}
+                    <input
+                      value={publishedReference}
+                      onChange={(event) => setPublishedReference(event.target.value)}
+                      required
+                    />
+                  </label>
+                  <button
+                    onClick={async () => {
+                      const saved = await onPublish(
+                        selected.id,
+                        evidenceChannel,
+                        publishedUrl,
+                        publishedReference,
+                      );
+                      if (saved)
+                        await loadTaskSchedules(selected.id).catch(() =>
+                          setScheduleChoices([]),
+                        );
+                    }}
+                  >
+                    Record publishing evidence
+                  </button>
+                </>
+              )}
+            {canManageTasks && selected.status === "published" && (
+              <section className={styles.card} aria-labelledby="close-published-task">
+                <h3 id="close-published-task">
+                  {language === "th" ? "10. ปิดงาน" : "10. Close task"}
+                </h3>
+                {scheduleChoicesTaskId !== selected.id ? (
+                  <p role="status">
+                    {language === "th"
+                      ? "กำลังตรวจสอบสถานะหลักฐานเผยแพร่ของทุกช่องทาง"
+                      : "Checking publication evidence for every scheduled channel…"}
+                  </p>
+                ) : scheduleChoices.length > 0 ? (
+                  <p role="status">
+                    {language === "th"
+                      ? `ยังต้องเผยแพร่และบันทึกหลักฐานอีก ${scheduleChoices.length} ช่องทางก่อนปิดงาน`
+                      : `Publish and record evidence for ${scheduleChoices.length} remaining channel(s) before closing.`}
+                  </p>
+                ) : (
+                  <p role="status">
+                    {language === "th"
+                      ? "บันทึกหลักฐานครบทุกช่องทางแล้ว สามารถปิดงานได้"
+                      : "Publication evidence is recorded for every scheduled channel. The task is ready to close."}
+                  </p>
+                )}
+                <button
+                  type="button"
+                  disabled={
+                    scheduleChoicesTaskId !== selected.id || scheduleChoices.length > 0
+                  }
+                  onClick={() => onTransition(selected.id, "closed")}
+                >
+                  {language === "th" ? "ปิดงาน" : "Close task"}
                 </button>
-              </form>
-              <ul>
-                {currentActivity?.comments.map((comment) => (
-                  <li key={comment.id}>
-                    <b>{comment.author.displayName}</b> ·{" "}
-                    {new Date(comment.createdAt).toLocaleString()}
-                    <p>{comment.body}</p>
-                  </li>
-                ))}
-                {currentActivity?.statuses.map((entry) => (
-                  <li key={entry.id}>
-                    Status: {entry.fromState} → {entry.toState} ·{" "}
-                    {new Date(entry.createdAt).toLocaleString()}
-                  </li>
-                ))}
-                {currentActivity?.audit.map((entry) => (
-                  <li key={entry.id}>
-                    {entry.action} · {new Date(entry.createdAt).toLocaleString()}
-                  </li>
-                ))}
-              </ul>
-            </section>
-          )}
-          {canManageTasks && (
-            <AttachmentPanel
-              taskId={selected.id}
-              taskVersion={selected.version ?? 0}
-              revisionNumber={selected.revisionNumber}
-              finalAssetId={selected.finalAssetId}
-              onFinalAssetAssigned={(fileId) => onFinalAssetAssigned(selected.id, fileId)}
-            />
-          )}
-        </article>
+              </section>
+            )}
+            {canManageTasks && (
+              <section className={styles.card}>
+                <h3>Comments and activity</h3>
+                {activityError && <p role="alert">{activityError}</p>}
+                <form
+                  onSubmit={async (event) => {
+                    event.preventDefault();
+                    try {
+                      const response = await fetch(
+                        `/api/pr-center/tasks/${selected.id}/comments`,
+                        {
+                          method: "POST",
+                          credentials: "same-origin",
+                          headers: { "Content-Type": "application/json" },
+                          body: JSON.stringify({ body: commentBody }),
+                        },
+                      );
+                      if (!response.ok) {
+                        setActivityError("Unable to add comment");
+                        return;
+                      }
+                      setCommentBody("");
+                      setActivityError("");
+                      await loadTaskActivity(selected.id).catch(() =>
+                        setActivityError("Unable to reload task activity"),
+                      );
+                    } catch {
+                      setActivityError("Unable to add or reload task comment");
+                    }
+                  }}
+                >
+                  <label>
+                    Add comment{" "}
+                    <textarea
+                      value={commentBody}
+                      onChange={(event) => setCommentBody(event.target.value)}
+                      maxLength={5000}
+                      required
+                    />
+                  </label>
+                  <button type="submit" disabled={!commentBody.trim()}>
+                    Add comment
+                  </button>
+                </form>
+                <ul>
+                  {currentActivity?.comments.map((comment) => (
+                    <li key={comment.id}>
+                      <b>{comment.author.displayName}</b> ·{" "}
+                      {new Date(comment.createdAt).toLocaleString()}
+                      <p>{comment.body}</p>
+                    </li>
+                  ))}
+                  {currentActivity?.statuses.map((entry) => (
+                    <li key={entry.id}>
+                      Status: {entry.fromState} → {entry.toState} ·{" "}
+                      {new Date(entry.createdAt).toLocaleString()}
+                    </li>
+                  ))}
+                  {currentActivity?.audit.map((entry) => (
+                    <li key={entry.id}>
+                      {entry.action} · {new Date(entry.createdAt).toLocaleString()}
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            )}
+            {canManageTasks && (
+              <AttachmentPanel
+                taskId={selected.id}
+                taskVersion={selected.version ?? 0}
+                revisionNumber={selected.revisionNumber}
+                finalAssetId={selected.finalAssetId}
+                onFinalAssetAssigned={(fileId) =>
+                  onFinalAssetAssigned(selected.id, fileId)
+                }
+              />
+            )}
+          </article>
+        </PrCenterDialog>
       )}
     </>
   );
@@ -6953,7 +7240,8 @@ function Approvals({
     taskId: string,
     decision: "APPROVED" | "REVISION_REQUIRED" | "REJECTED",
     reviewChecklist?: EditorialReviewChecklist,
-  ) => void;
+    reason?: string,
+  ) => Promise<boolean>;
   onRequestDecision: (
     requestId: string,
     decision: "APPROVED" | "REJECTED",
@@ -6965,6 +7253,11 @@ function Approvals({
     Record<string, string>
   >({});
   const [decidingRequestId, setDecidingRequestId] = useState<string | null>(null);
+  const requestDecisionBusy = useRef(false);
+  const taskDecisionBusy = useRef(false);
+  const [taskComments, setTaskComments] = useState<Record<string, string>>({});
+  const [taskErrors, setTaskErrors] = useState<Record<string, string>>({});
+  const [decidingTaskId, setDecidingTaskId] = useState<string | null>(null);
   const [editorialChecklists, setEditorialChecklists] = useState<
     Record<string, EditorialReviewChecklist>
   >({});
@@ -6978,6 +7271,7 @@ function Approvals({
     request: RequestApprovalItem,
     decision: "APPROVED" | "REJECTED",
   ) => {
+    if (requestDecisionBusy.current) return;
     const comment = requestComments[request.id]?.trim() || "";
     if (decision === "REJECTED" && !comment) {
       setRequestDecisionErrors((previous) => ({
@@ -6991,25 +7285,116 @@ function Approvals({
     }
     setRequestDecisionErrors((previous) => ({ ...previous, [request.id]: "" }));
     setDecidingRequestId(request.id);
-    const saved = await onRequestDecision(request.id, decision, comment);
-    setDecidingRequestId(null);
-    if (saved) {
-      setRequestComments((previous) => ({ ...previous, [request.id]: "" }));
-      setRequestDecisionErrors((previous) => ({ ...previous, [request.id]: "" }));
+    requestDecisionBusy.current = true;
+    try {
+      const saved = await onRequestDecision(request.id, decision, comment);
+      if (saved) setRequestComments((previous) => ({ ...previous, [request.id]: "" }));
+      else
+        setRequestDecisionErrors((previous) => ({
+          ...previous,
+          [request.id]:
+            language === "th"
+              ? "บันทึกผลไม่สำเร็จ กรุณาตรวจสอบข้อความแจ้งเตือนแล้วลองอีกครั้ง"
+              : "Decision was not saved. Check the notice and retry.",
+        }));
+    } catch {
+      setRequestDecisionErrors((previous) => ({
+        ...previous,
+        [request.id]:
+          language === "th"
+            ? "เชื่อมต่อไม่สำเร็จ กรุณาลองอีกครั้ง"
+            : "Connection failed. Please retry.",
+      }));
+    } finally {
+      requestDecisionBusy.current = false;
+      setDecidingRequestId(null);
+    }
+  };
+  const submitTaskDecision = async (
+    task: Task,
+    decision: "APPROVED" | "REVISION_REQUIRED" | "REJECTED",
+  ) => {
+    if (taskDecisionBusy.current) return;
+    const comment = taskComments[task.id]?.trim() || "";
+    if (decision !== "APPROVED" && !comment) {
+      setTaskErrors((previous) => ({
+        ...previous,
+        [task.id]:
+          language === "th"
+            ? "กรุณาระบุเหตุผลก่อนขอแก้ไขหรือปฏิเสธ"
+            : "A reason is required to request revision or reject.",
+      }));
+      return;
+    }
+    if (
+      decision === "APPROVED" &&
+      task.status === "pr_editorial_review" &&
+      !isEditorialChecklistComplete(getEditorialChecklist(task.id))
+    )
+      return;
+    taskDecisionBusy.current = true;
+    setDecidingTaskId(task.id);
+    setTaskErrors((previous) => ({ ...previous, [task.id]: "" }));
+    try {
+      const saved = await onDecision(
+        task.id,
+        decision,
+        task.status === "pr_editorial_review"
+          ? getEditorialChecklist(task.id)
+          : undefined,
+        comment,
+      );
+      if (saved) setTaskComments((previous) => ({ ...previous, [task.id]: "" }));
+      else
+        setTaskErrors((previous) => ({
+          ...previous,
+          [task.id]:
+            language === "th"
+              ? "บันทึกผลไม่สำเร็จ กรุณาตรวจสอบข้อความแจ้งเตือนแล้วลองอีกครั้ง"
+              : "Decision was not saved. Check the notice and retry.",
+        }));
+    } catch {
+      setTaskErrors((previous) => ({
+        ...previous,
+        [task.id]:
+          language === "th"
+            ? "เชื่อมต่อไม่สำเร็จ กรุณาลองอีกครั้ง"
+            : "Connection failed. Please retry.",
+      }));
+    } finally {
+      taskDecisionBusy.current = false;
+      setDecidingTaskId(null);
     }
   };
 
   return (
-    <>
-      <SectionHeading eyebrow="REVIEW AND APPROVAL" title="Approval Queue" />
-      <h2>Submitted Requests · Intake Decision</h2>
+    <section className={styles.approvalPage}>
+      <SectionHeading
+        eyebrow="REVIEW AND APPROVAL"
+        title={language === "th" ? "คิวตรวจและอนุมัติ" : "Approval Queue"}
+      />
+      <p className={styles.approvalIntro}>
+        {language === "th"
+          ? "ตรวจข้อมูลและเอกสารประกอบก่อนบันทึกผล · ระบุเหตุผลเมื่อขอแก้ไขหรือปฏิเสธ"
+          : "Review the information and attachments before deciding. Include a reason when requesting revision or rejecting."}
+      </p>
+      <h2 className={styles.approvalSectionTitle}>
+        {language === "th" ? "คำขอรออนุมัติ" : "Submitted requests"}
+        <span>{requests.length}</span>
+      </h2>
       <section className={styles.list}>
         {requestQueueState === "loading" && (
-          <p role="status">Loading submitted requests…</p>
+          <p role="status">
+            {language === "th"
+              ? "กำลังโหลดคำขอรออนุมัติ…"
+              : "Loading submitted requests…"}
+          </p>
         )}
         {requestQueueState === "error" && (
           <p role="alert">
-            Could not load submitted requests. Reopen the queue to retry.
+            {language === "th"
+              ? "โหลดคำขอไม่สำเร็จ กรุณาเปิดคิวอีกครั้งเพื่อลองใหม่"
+              : "Could not load submitted requests. Reopen the queue to retry."}
           </p>
         )}
         {requestQueueState === "not-authorized" && (
@@ -7019,23 +7404,58 @@ function Approvals({
           </p>
         )}
         {requests.map((request) => (
-          <article key={request.id} className={styles.listItem}>
-            <div>
+          <article key={request.id} className={styles.approvalCard}>
+            <div className={styles.approvalInformation}>
               <p>
                 {request.requestNumber} · {request.department.name}
               </p>
               <h2>{request.title}</h2>
-              <span>Submitted by {request.requester.displayName}</span>
+              <span>
+                {language === "th" ? "ผู้ส่งคำขอ: " : "Submitted by: "}
+                {request.requester.displayName}
+              </span>
+              <dl className={styles.approvalMetadata}>
+                <div>
+                  <dt>{language === "th" ? "ประเภทคำขอ" : "Request type"}</dt>
+                  <dd>
+                    {request.type === "OFFSITE"
+                      ? language === "th"
+                        ? "นอกสถานที่"
+                        : "Off-site"
+                      : language === "th"
+                        ? "ประชาสัมพันธ์"
+                        : "PR"}
+                  </dd>
+                </div>
+                <div>
+                  <dt>{language === "th" ? "ต้องการเผยแพร่" : "Requested date"}</dt>
+                  <dd>
+                    {request.requestedFor
+                      ? new Date(request.requestedFor).toLocaleDateString(
+                          language === "th" ? "th-TH-u-ca-buddhist" : "en-GB",
+                          { timeZone: "Asia/Bangkok" },
+                        )
+                      : "—"}
+                  </dd>
+                </div>
+                <div>
+                  <dt>{language === "th" ? "ความสำคัญ" : "Priority"}</dt>
+                  <dd>{request.priority}</dd>
+                </div>
+              </dl>
               <details>
                 <summary>
                   {language === "th" ? "ดูรายละเอียดคำขอ" : "View request details"}
                 </summary>
                 <p>
-                  Type: {request.type} · Requested date:{" "}
+                  {language === "th" ? "ประเภทคำขอ: " : "Type: "}
+                  {request.type} ·{" "}
+                  {language === "th" ? "ต้องการเผยแพร่: " : "Requested date: "}
                   {request.requestedFor?.slice(0, 10) || "—"}
                 </p>
                 <p>
-                  Priority: {request.priority}
+                  {language === "th" ? "ความสำคัญ: " : "Priority: "}
+                  {request.priority}
                   {request.priorityReason ? ` · ${request.priorityReason}` : ""}
                 </p>
                 {request.revisions[0]?.title && (
@@ -7048,10 +7468,16 @@ function Approvals({
                   </p>
                 )}
                 {request.revisions[0]?.objective && (
-                  <p>Objective: {request.revisions[0].objective}</p>
+                  <p>
+                    {language === "th" ? "วัตถุประสงค์: " : "Objective: "}
+                    {request.revisions[0].objective}
+                  </p>
                 )}
                 {request.revisions[0]?.audience && (
-                  <p>Audience: {request.revisions[0].audience}</p>
+                  <p>
+                    {language === "th" ? "กลุ่มเป้าหมาย: " : "Audience: "}
+                    {request.revisions[0].audience}
+                  </p>
                 )}
                 {request.type === "OFFSITE" && (
                   <p>
@@ -7067,7 +7493,7 @@ function Approvals({
                 )}
                 {request.sources.map((source) => (
                   <p key={source.url}>
-                    Source:{" "}
+                    {language === "th" ? "แหล่งข้อมูล: " : "Source: "}
                     <a href={source.url} target="_blank" rel="noreferrer">
                       {source.url}
                     </a>
@@ -7075,13 +7501,14 @@ function Approvals({
                 ))}
                 {request.attachments.map((attachment) => (
                   <p key={attachment.id}>
-                    Evidence: {attachment.file.fileName} · {attachment.file.scanStatus}
+                    {language === "th" ? "เอกสารประกอบ: " : "Evidence: "}
+                    {attachment.file.fileName} · {attachment.file.scanStatus}
                     {attachment.file.scanStatus === "CLEAN" &&
                     !attachment.file.deletedAt ? (
                       <>
                         {" · "}
                         <a href={`/api/pr-center/files/${attachment.file.id}/download`}>
-                          Download
+                          {language === "th" ? "ดาวน์โหลด" : "Download"}
                         </a>
                       </>
                     ) : (
@@ -7104,16 +7531,22 @@ function Approvals({
                 ))}
               </details>
             </div>
-            <div>
-              <Status>Awaiting intake approval</Status>
+            <div className={styles.approvalDecision}>
+              <h3>{language === "th" ? "บันทึกผลพิจารณาคำขอ" : "Intake decision"}</h3>
+              <Status>
+                {language === "th" ? "รออนุมัติคำขอ" : "Awaiting intake approval"}
+              </Status>
               {request.intakeDecisionBlockedReason === "SELF_SUBMISSION" ? (
                 <p role="note">
-                  You submitted this request. Another PR Operations user must decide it.
+                  {language === "th"
+                    ? "คุณเป็นผู้ส่งคำขอนี้ ต้องให้เจ้าหน้าที่ PR คนอื่นพิจารณา"
+                    : "You submitted this request. Another PR Operations user must decide it."}
                 </p>
               ) : request.intakeDecisionBlockedReason === "TASK_WORK_ALREADY_STARTED" ? (
                 <p role="alert">
-                  Task work has already started; intake decision is blocked. Use the task
-                  workflow.
+                  {language === "th"
+                    ? "เริ่มดำเนินงานแล้ว กรุณาใช้ขั้นตอนตรวจและอนุมัติงาน"
+                    : "Task work has already started. Use the task approval workflow."}
                 </p>
               ) : canDecideRequests ? (
                 <>
@@ -7122,6 +7555,7 @@ function Approvals({
                       ? "คอมเมนต์ / เหตุผล (อนุมัติไม่บังคับ)"
                       : "Comment / reason (optional for approval)"}
                     <textarea
+                      disabled={decidingRequestId === request.id}
                       value={requestComments[request.id] || ""}
                       maxLength={5000}
                       rows={3}
@@ -7133,6 +7567,11 @@ function Approvals({
                       }
                     />
                   </label>
+                  <small>
+                    {language === "th"
+                      ? "อนุมัติ: ไม่บังคับ · ปฏิเสธ: ต้องระบุเหตุผล"
+                      : "Optional for approval · Required for rejection"}
+                  </small>
                   {requestDecisionErrors[request.id] && (
                     <p role="alert">{requestDecisionErrors[request.id]}</p>
                   )}
@@ -7140,7 +7579,8 @@ function Approvals({
                     type="button"
                     disabled={
                       decidingRequestId === request.id ||
-                      !requestComments[request.id]?.trim()
+                      !requestComments[request.id]?.trim() ||
+                      decidingRequestId !== null
                     }
                     className={styles.dangerButton}
                     onClick={() => void submitRequestDecision(request, "REJECTED")}
@@ -7150,7 +7590,7 @@ function Approvals({
                   <button
                     type="button"
                     className={styles.primary}
-                    disabled={decidingRequestId === request.id}
+                    disabled={decidingRequestId !== null}
                     onClick={() => void submitRequestDecision(request, "APPROVED")}
                   >
                     {decidingRequestId === request.id
@@ -7163,38 +7603,52 @@ function Approvals({
                   </button>
                 </>
               ) : (
-                <span>View only for your role</span>
+                <span>
+                  {language === "th"
+                    ? "สิทธิ์ของคุณดูรายการนี้ได้เท่านั้น"
+                    : "View only for your role"}
+                </span>
               )}
             </div>
           </article>
         ))}
         {requestQueueState === "loaded" && requests.length === 0 && (
           <p>
-            No submitted requests are currently visible in your PR Operations department
-            scope.
+            {language === "th"
+              ? "ไม่มีคำขอรออนุมัติในขอบเขตสิทธิ์ของคุณ"
+              : "No submitted requests are currently visible in your PR Operations scope."}
           </p>
         )}
       </section>
-      <h2>{language === "th" ? "คิวตรวจและอนุมัติงาน" : "Task Stage Approvals"}</h2>
+      <h2 className={styles.approvalSectionTitle}>
+        {language === "th" ? "คิวตรวจและอนุมัติงาน" : "Task stage approvals"}
+        <span>{taskItems.length}</span>
+      </h2>
       <section className={styles.list}>
         {taskItems.map((task) => (
-          <article key={task.id} id={`task-${task.id}`} className={styles.listItem}>
-            <div>
-              <p>{STATUS_LABELS[task.status]}</p>
+          <article key={task.id} id={`task-${task.id}`} className={styles.approvalCard}>
+            <div className={styles.approvalInformation}>
+              <p>{requestTableStatusLabel(task.status, language)}</p>
               <h2>{task.title}</h2>
               <span>
-                Assigned to{" "}
+                {language === "th" ? "ผู้รับผิดชอบ: " : "Assigned to: "}
                 {getUser(task.ownerId)?.name ?? task.ownerName ?? "Unassigned"}
               </span>
               {task.revisionNumber !== undefined && (
-                <p>Content revision {task.revisionNumber}</p>
+                <p>
+                  {language === "th" ? "เนื้อหาฉบับที่ " : "Content revision "}
+                  {task.revisionNumber}
+                </p>
               )}
               {task.contentBody && (
                 <p className={styles.approvalContent}>{task.contentBody}</p>
               )}
               {task.keyMessage && (
                 <p>
-                  <strong>Key message:</strong> {task.keyMessage}
+                  <strong>
+                    {language === "th" ? "ประเด็นสื่อสารหลัก: " : "Key message: "}
+                  </strong>{" "}
+                  {task.keyMessage}
                 </p>
               )}
               {task.sourceUrls?.map((url) => (
@@ -7206,13 +7660,21 @@ function Approvals({
                 </p>
               ))}
               {task.finalAssetId ? (
-                <p>Final asset attached · {task.finalAssetId}</p>
+                <p>
+                  {language === "th" ? "แนบไฟล์ฉบับสมบูรณ์แล้ว" : "Final asset attached"}{" "}
+                  · {task.finalAssetId}
+                </p>
               ) : (
-                <p role="note">Final asset has not been assigned yet.</p>
+                <p role="note">
+                  {language === "th"
+                    ? "ยังไม่ได้กำหนดไฟล์ฉบับสมบูรณ์"
+                    : "Final asset has not been assigned yet."}
+                </p>
               )}
               <ApprovalAttachments taskId={task.id} finalAssetId={task.finalAssetId} />
             </div>
-            <div>
+            <div className={styles.approvalDecision}>
+              <h3>{language === "th" ? "บันทึกผลตรวจงาน" : "Task review decision"}</h3>
               <Status>
                 {language === "th" ? "รอการตรวจและอนุมัติ" : "Awaiting approval"}
               </Status>
@@ -7227,6 +7689,7 @@ function Approvals({
                     <label key={item.key}>
                       <input
                         type="checkbox"
+                        disabled={decidingTaskId !== null}
                         checked={getEditorialChecklist(task.id)[item.key]}
                         onChange={(event) =>
                           setEditorialChecklists((previous) => ({
@@ -7245,50 +7708,60 @@ function Approvals({
               )}
               {canDecideTasks ? (
                 <>
+                  <label>
+                    {language === "th" ? "ความคิดเห็น / เหตุผล" : "Comment / reason"}
+                    <textarea
+                      value={taskComments[task.id] || ""}
+                      maxLength={5000}
+                      rows={4}
+                      disabled={decidingTaskId === task.id}
+                      onChange={(event) =>
+                        setTaskComments((previous) => ({
+                          ...previous,
+                          [task.id]: event.target.value,
+                        }))
+                      }
+                    />
+                  </label>
+                  <small>
+                    {language === "th"
+                      ? "ต้องระบุเหตุผลเมื่อขอแก้ไขหรือปฏิเสธ"
+                      : "A reason is required for revision or rejection."}
+                  </small>
+                  {taskErrors[task.id] && (
+                    <p role="alert" className={styles.formError}>
+                      {taskErrors[task.id]}
+                    </p>
+                  )}
                   <button
-                    onClick={() =>
-                      onDecision(
-                        task.id,
-                        "REVISION_REQUIRED",
-                        task.status === "pr_editorial_review"
-                          ? getEditorialChecklist(task.id)
-                          : undefined,
-                      )
-                    }
+                    disabled={decidingTaskId !== null}
+                    onClick={() => void submitTaskDecision(task, "REVISION_REQUIRED")}
                   >
                     {language === "th" ? "ขอให้แก้ไข" : "Request revision"}
                   </button>
                   <button
                     className={styles.dangerButton}
-                    onClick={() =>
-                      onDecision(
-                        task.id,
-                        "REJECTED",
-                        task.status === "pr_editorial_review"
-                          ? getEditorialChecklist(task.id)
-                          : undefined,
-                      )
-                    }
+                    disabled={decidingTaskId !== null}
+                    onClick={() => void submitTaskDecision(task, "REJECTED")}
                   >
                     {language === "th" ? "ปฏิเสธงาน" : "Reject"}
                   </button>
                   <button
                     className={styles.primary}
                     disabled={
-                      task.status === "pr_editorial_review" &&
-                      !isEditorialChecklistComplete(getEditorialChecklist(task.id))
+                      decidingTaskId !== null ||
+                      (task.status === "pr_editorial_review" &&
+                        !isEditorialChecklistComplete(getEditorialChecklist(task.id)))
                     }
-                    onClick={() =>
-                      onDecision(
-                        task.id,
-                        "APPROVED",
-                        task.status === "pr_editorial_review"
-                          ? getEditorialChecklist(task.id)
-                          : undefined,
-                      )
-                    }
+                    onClick={() => void submitTaskDecision(task, "APPROVED")}
                   >
-                    {language === "th" ? "อนุมัติ" : "Approve"}
+                    {decidingTaskId === task.id
+                      ? language === "th"
+                        ? "กำลังบันทึก…"
+                        : "Saving…"
+                      : language === "th"
+                        ? "อนุมัติ"
+                        : "Approve"}
                   </button>
                 </>
               ) : (
@@ -7297,9 +7770,15 @@ function Approvals({
             </div>
           </article>
         ))}
-        {taskItems.length === 0 && <p>No task-stage approvals are waiting.</p>}
+        {taskItems.length === 0 && (
+          <p>
+            {language === "th"
+              ? "ไม่มีงานรอตรวจและอนุมัติในขณะนี้"
+              : "No task-stage approvals are waiting."}
+          </p>
+        )}
       </section>
-    </>
+    </section>
   );
 }
 

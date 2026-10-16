@@ -946,6 +946,380 @@
 .requestActions button {
   white-space: nowrap;
 }
+
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+.boardInstructions,
+.approvalIntro {
+  color: #526b85;
+  font-size: 13px;
+  line-height: 1.7;
+  margin: 0 0 16px;
+}
+.board > .boardDropAllowed {
+  outline: 2px dashed #4a95d4;
+  outline-offset: -3px;
+}
+.board > .boardDropActive {
+  outline: 3px solid #1769e0;
+  outline-offset: -3px;
+  background: #dcecff;
+}
+.board > .boardDropRejected {
+  outline: 2px solid #d16a72;
+  outline-offset: -3px;
+  background: #fff0f1;
+}
+.board article[draggable="true"] {
+  cursor: grab;
+}
+.board article[draggable="true"]:active {
+  cursor: grabbing;
+}
+.board article[aria-busy="true"] {
+  opacity: 0.65;
+}
+.boardCardActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin-top: 12px;
+}
+.boardCardActions > label {
+  min-width: 0;
+  flex: 1 1 100px;
+}
+.boardCardActions select {
+  background: #fff;
+  border: 1px solid #b7cce2;
+  border-radius: 7px;
+  color: #24415f;
+  min-height: 38px;
+  padding: 7px;
+  width: 100%;
+  font-size: 12px;
+}
+.formError {
+  background: #fff1f2;
+  border: 1px solid #f4b8bf;
+  border-radius: 8px;
+  color: #a72d3c;
+  font-size: 13px;
+  padding: 10px 12px;
+  overflow-wrap: anywhere;
+}
+.app.workspaceDialogBackdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  min-height: 0;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgb(8 24 46 / 60%);
+  font-family: var(--font-thai, "IBM Plex Sans Thai"), sans-serif;
+}
+.workspaceDialog {
+  width: min(1050px, 100%);
+  min-width: 0;
+  max-height: calc(100dvh - 48px);
+  overflow-y: auto;
+  background: #fff;
+  border: 1px solid #c5d7ea;
+  border-radius: 15px;
+  box-shadow: 0 24px 80px rgb(0 0 0 / 25%);
+  color: #203851;
+}
+.workspaceDialogHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 15px;
+  padding: 18px 22px;
+  background: #f2f7fd;
+  border-bottom: 1px solid #d6e2f0;
+  position: sticky;
+  top: 0;
+  z-index: 2;
+}
+.workspaceDialogHeader h2 {
+  margin: 0;
+  font-size: 19px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+.workspaceDialogHeader button {
+  flex: 0 0 42px;
+  min-height: 42px;
+  border: 1px solid #adc5df;
+  border-radius: 8px;
+  background: #fff;
+  font-size: 20px;
+  color: #254665;
+}
+.workspaceDialogBody {
+  padding: 20px;
+  overflow-wrap: anywhere;
+  min-width: 0;
+}
+.workspaceDialogBody .taskDetailsCard {
+  box-shadow: none;
+  border: 0;
+  padding: 0;
+  min-width: 0;
+}
+.taskDetailsCard label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 13px;
+  color: #365370;
+  margin: 12px 0;
+}
+.taskDetailsCard :is(input, select, textarea) {
+  min-width: 0;
+  max-width: 100%;
+  border: 1px solid #becfe2;
+  border-radius: 7px;
+  padding: 9px;
+  color: #203851;
+  background: #fff;
+}
+.taskDetailsCard :is(input[type="checkbox"], input[type="radio"]) {
+  width: auto;
+}
+.taskDetailsCard label:has(input[type="checkbox"]) {
+  flex-direction: row;
+  align-items: center;
+}
+.taskDetailsCard button {
+  margin: 5px 5px 5px 0;
+}
+.taskDetailsCard .card {
+  min-width: 0;
+  margin: 16px 0;
+}
+.approvalPage {
+  min-width: 0;
+}
+.approvalSectionTitle {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  font-size: 18px;
+  margin: 28px 0 14px;
+}
+.approvalSectionTitle > span {
+  display: inline-grid;
+  place-items: center;
+  min-width: 28px;
+  padding: 3px 8px;
+  background: #dfedff;
+  border-radius: 999px;
+  color: #165caa;
+  font-size: 12px;
+}
+.approvalCard {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(280px, 1fr);
+  background: #fff;
+  border: 1px solid #d5e1ef;
+  border-radius: 13px;
+  box-shadow: 0 5px 20px rgb(30 70 115 / 5%);
+  overflow-wrap: anywhere;
+}
+.approvalInformation {
+  padding: 22px;
+  min-width: 0;
+}
+.approvalInformation > p:first-child {
+  color: #61758e;
+  font-size: 12px;
+  margin-top: 0;
+}
+.approvalInformation h2 {
+  font-size: 18px;
+  line-height: 1.5;
+  margin: 5px 0 10px;
+}
+.approvalInformation > span {
+  color: #506c87;
+  font-size: 13px;
+}
+.approvalInformation :is(p, a) {
+  font-size: 13px;
+  line-height: 1.7;
+}
+.approvalInformation a {
+  color: #1769ba;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.approvalInformation details {
+  border: 1px solid #dfe7f2;
+  border-radius: 8px;
+  padding: 12px;
+  margin-top: 16px;
+}
+.approvalInformation summary {
+  cursor: pointer;
+  color: #195f9e;
+  font-size: 13px;
+  font-weight: 600;
+}
+.approvalMetadata {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin: 16px 0;
+  padding: 12px;
+  background: #f4f8fd;
+  border-radius: 8px;
+}
+.approvalMetadata dt {
+  color: #647b94;
+  font-size: 11px;
+}
+.approvalMetadata dd {
+  margin: 5px 0 0;
+  font-size: 13px;
+  font-weight: 600;
+}
+.approvalDecision {
+  min-width: 0;
+  padding: 22px;
+  border-left: 1px solid #dfe8f2;
+  background: #f9fbfe;
+  border-radius: 0 13px 13px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  align-items: stretch;
+}
+.approvalDecision h3 {
+  font-size: 15px;
+  margin: 0;
+}
+.approvalDecision > .status {
+  align-self: flex-start;
+}
+.approvalDecision > small {
+  color: #60748b;
+  font-size: 11px;
+  line-height: 1.6;
+}
+.approvalDecision label {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  font-size: 13px;
+  color: #385570;
+}
+.approvalDecision textarea {
+  width: 100%;
+  min-width: 0;
+  border: 1px solid #b7cbe1;
+  border-radius: 8px;
+  padding: 10px;
+  background: #fff;
+  resize: vertical;
+  min-height: 96px;
+  font: inherit;
+  line-height: 1.6;
+  color: #203851;
+}
+.approvalDecision fieldset {
+  min-width: 0;
+  border: 1px solid #c8d8eb;
+  border-radius: 8px;
+  padding: 12px;
+  background: #fff;
+}
+.approvalDecision legend {
+  font-size: 12px;
+  font-weight: 600;
+  color: #42617f;
+}
+.approvalDecision fieldset label {
+  flex-direction: row;
+  align-items: flex-start;
+  gap: 9px;
+  padding: 8px 0;
+  line-height: 1.6;
+  cursor: pointer;
+}
+.approvalDecision input[type="checkbox"] {
+  flex: 0 0 18px;
+  width: 18px;
+  height: 18px;
+  margin-top: 2px;
+  accent-color: #1769e0;
+}
+.approvalDecision > button {
+  min-height: 42px;
+}
+@media (max-width: 1050px) {
+  .approvalCard {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .approvalDecision {
+    border-left: 0;
+    border-top: 1px solid #dfe8f2;
+    border-radius: 0 0 13px 13px;
+  }
+}
+@media (max-width: 760px) {
+  .app.workspaceDialogBackdrop {
+    padding: 8px;
+  }
+  .workspaceDialog {
+    max-height: calc(100dvh - 16px);
+    border-radius: 10px;
+  }
+  .workspaceDialogHeader {
+    padding: 12px;
+  }
+  .workspaceDialogHeader h2 {
+    font-size: 16px;
+  }
+  .workspaceDialogBody,
+  .approvalInformation,
+  .approvalDecision {
+    padding: 14px;
+  }
+  .approvalMetadata {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .app .board {
+    grid-template-columns: minmax(0, 1fr);
+    overflow-x: visible;
+  }
+  .app .board > section {
+    min-width: 0;
+  }
+  .boardCardActions {
+    align-items: stretch;
+  }
+  .operationalPage .topbar {
+    flex-wrap: wrap;
+    height: auto;
+    gap: 8px;
+    padding: 8px 10px;
+  }
+  .operationalPage .topActions {
+    flex: 1 1 220px;
+    flex-wrap: wrap;
+    max-width: 100%;
+    min-width: 0;
+    justify-content: flex-end;
+  }
+}
 .donut {
   align-items: center;
   background: conic-gradient(
