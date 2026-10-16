@@ -35,8 +35,8 @@ import {
 } from "@/lib/pr-center/draft-persistence";
 import {
   getRequestFormIssue,
-  getRequestFormErrorMessage,
-} from "@/lib/pr-center/request-form-submission";
+  requestFormIssueMessage,
+} from "@/lib/pr-center/request-form-validation";
 import { OPERATION_COLUMNS } from "@/lib/pr-center/operation-columns";
 import { DEFAULT_LIST_SORT, listSortFields } from "@/lib/pr-center/list-sorting";
 import {
@@ -251,6 +251,77 @@ const EDITORIAL_REVIEW_ITEMS: Array<{
     },
   },
 ];
+
+function useDialogFocusTrap<T extends HTMLElement>(
+  open: boolean,
+  onDismiss: () => void,
+  canDismiss = true,
+) {
+  const rootRef = useRef<T | null>(null);
+  const dismissRef = useRef(onDismiss);
+  const canDismissRef = useRef(canDismiss);
+
+  useEffect(() => {
+    dismissRef.current = onDismiss;
+    canDismissRef.current = canDismiss;
+  }, [onDismiss, canDismiss]);
+
+  useEffect(() => {
+    if (!open) return;
+    const root = rootRef.current;
+    if (!root) return;
+    const previouslyFocused =
+      document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    root.focus();
+    const focusable = () =>
+      Array.from(
+        root.querySelectorAll<HTMLElement>(
+          'button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), a[href], [tabindex]:not([tabindex="-1"])',
+        ),
+      ).filter((element) => element.getClientRects().length > 0);
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape" && canDismissRef.current) {
+        event.preventDefault();
+        dismissRef.current();
+        return;
+      }
+      if (event.key !== "Tab") return;
+      const elements = focusable();
+      const first = elements[0];
+      const last = elements.at(-1);
+      if (!first || !last) {
+        event.preventDefault();
+        root.focus();
+      } else if (
+        event.shiftKey &&
+        (document.activeElement === first ||
+          document.activeElement === root ||
+          !root.contains(document.activeElement))
+      ) {
+        event.preventDefault();
+        last.focus();
+      } else if (
+        !event.shiftKey &&
+        (document.activeElement === last ||
+          document.activeElement === root ||
+          !root.contains(document.activeElement))
+      ) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("keydown", onKeyDown);
+      document.body.style.overflow = previousOverflow;
+      if (previouslyFocused?.isConnected) previouslyFocused.focus();
+    };
+  }, [open]);
+
+  return rootRef;
+}
 
 type Task = {
   departmentId?: string;
@@ -1396,7 +1467,7 @@ function DashboardScheduleInsights({
             <div
               className={styles.channelMixDonut}
               style={{ background: gradient }}
-              aria-label={thai ? "กราฟสัดส่วนช่องทาง" : "Channel mix chart"}
+              aria-hidden="true"
             />
             <ul>
               {channelMix.map((item, index) => (
@@ -1498,6 +1569,67 @@ export function PrCenterApp({
     actor ? createAuthenticatedState() : cloneDefaultState(),
   );
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const sidebarRef = useRef<HTMLElement>(null);
+  const menuButtonRef = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    if (!sidebarOpen) return;
+    const media = window.matchMedia("(max-width: 760px)");
+    if (!media.matches) return;
+    const sidebar = sidebarRef.current;
+    if (!sidebar) return;
+    const previousOverflow = document.body.style.overflow;
+    const previouslyFocused =
+      document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const menuButton = menuButtonRef.current;
+    document.body.style.overflow = "hidden";
+    const focusable = () =>
+      Array.from(
+        sidebar.querySelectorAll<HTMLElement>(
+          'button:not([disabled]), a[href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+        ),
+      ).filter((element) => element.getClientRects().length > 0);
+    focusable()[0]?.focus();
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (!media.matches) return;
+      if (event.key === "Escape") {
+        event.preventDefault();
+        setSidebarOpen(false);
+        return;
+      }
+      if (event.key !== "Tab") return;
+      const elements = focusable();
+      const first = elements[0];
+      const last = elements.at(-1);
+      if (!first || !last) {
+        event.preventDefault();
+        sidebar.focus();
+      } else if (
+        event.shiftKey &&
+        (document.activeElement === first || !sidebar.contains(document.activeElement))
+      ) {
+        event.preventDefault();
+        last.focus();
+      } else if (
+        !event.shiftKey &&
+        (document.activeElement === last || !sidebar.contains(document.activeElement))
+      ) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+    const onMediaChange = (event: MediaQueryListEvent) => {
+      if (!event.matches) setSidebarOpen(false);
+    };
+    document.addEventListener("keydown", onKeyDown);
+    media.addEventListener("change", onMediaChange);
+    return () => {
+      document.removeEventListener("keydown", onKeyDown);
+      media.removeEventListener("change", onMediaChange);
+      document.body.style.overflow = previousOverflow;
+      if (previouslyFocused?.isConnected) previouslyFocused.focus();
+      else menuButton?.focus();
+    };
+  }, [sidebarOpen]);
   const [requestOpen, setRequestOpen] = useState(false);
   const [requestEditId, setRequestEditId] = useState<string | null>(null);
   const [requestDraft, setRequestDraft] = useState<RequestDraft>(() =>
@@ -2513,7 +2645,11 @@ export function PrCenterApp({
               ? "บันทึกร่างข้อความแล้ว เปิดส่งคำขอใหม่เพื่อทำต่อ (ยังไม่สร้างเลขคำขอ; ไฟล์แนบต้องเลือกใหม่)"
               : "Partial text draft saved. Choose New request to continue. No request number yet; reselect attachments.",
           );
-      } else announce(getRequestFormErrorMessage(issue, state.language));
+      } else {
+        announce(requestFormIssueMessage(issue, state.language === "th"));
+        const field = issue === "whyNowLength" ? "whyNow" : issue;
+        document.querySelector<HTMLElement>(`[data-request-field="${field}"]`)?.focus();
+      }
       return;
     }
     const priorStatus = editId
@@ -3661,7 +3797,19 @@ export function PrCenterApp({
     <div
       className={`${styles.app} ${page === "my-requests" || page === "requests" ? styles.requestsPage : page === "operations" || page === "approvals" ? styles.operationalPage : ""}`}
     >
+      {sidebarOpen && (
+        <button
+          type="button"
+          className={styles.sidebarBackdrop}
+          aria-label={state.language === "th" ? "ปิดเมนูนำทาง" : "Close navigation"}
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
       <aside
+        ref={sidebarRef}
+        id="pr-center-navigation"
+        role={sidebarOpen ? "dialog" : undefined}
+        aria-modal={sidebarOpen ? true : undefined}
         className={`${styles.sidebar} ${sidebarOpen ? styles.sidebarOpen : ""}`}
         aria-label="PR Center navigation"
       >
@@ -3679,6 +3827,14 @@ export function PrCenterApp({
             <b>RTRDA</b>
             <small>PR CENTER</small>
           </span>
+          <button
+            type="button"
+            className={styles.sidebarCloseButton}
+            aria-label={state.language === "th" ? "ปิดเมนูนำทาง" : "Close navigation"}
+            onClick={() => setSidebarOpen(false)}
+          >
+            <span aria-hidden="true">×</span>
+          </button>
         </div>
         <div className={styles.workspace}>COMMUNICATION WORKSPACE</div>
         <nav className={styles.nav}>
@@ -3687,6 +3843,7 @@ export function PrCenterApp({
               key={item.id}
               className={page === item.id ? styles.navActive : ""}
               aria-current={page === item.id ? "page" : undefined}
+              aria-label={label(item, state.language)}
               onClick={() => {
                 if (item.id === "new-request") {
                   openRequest();
@@ -3727,11 +3884,29 @@ export function PrCenterApp({
       <section className={styles.contentShell}>
         <header className={styles.topbar}>
           <button
+            ref={menuButtonRef}
+            type="button"
             className={styles.menuButton}
             onClick={() => setSidebarOpen(!sidebarOpen)}
-            aria-label="Toggle navigation"
+            aria-label={
+              state.language === "th"
+                ? sidebarOpen
+                  ? "ปิดเมนูนำทาง"
+                  : "เปิดเมนูนำทาง"
+                : sidebarOpen
+                  ? "Close navigation"
+                  : "Open navigation"
+            }
+            aria-expanded={sidebarOpen}
+            aria-controls="pr-center-navigation"
           >
-            Menu
+            {state.language === "th"
+              ? sidebarOpen
+                ? "ปิด"
+                : "เมนู"
+              : sidebarOpen
+                ? "Close"
+                : "Menu"}
           </button>
           <div className={styles.topTitle}>
             <Image
@@ -5383,12 +5558,22 @@ function Requests({
           </p>
         )}
         {loading && visibleRequests.length === 0 && (
-          <p role="status">Loading requests…</p>
+          <p role="status">
+            {language === "th" ? "กำลังโหลดคำขอ…" : "Loading requests…"}
+          </p>
         )}
-        {!loading && !error && visibleRequests.length === 0 && <p>No requests found.</p>}
+        {!loading && !error && visibleRequests.length === 0 && (
+          <p>{language === "th" ? "ไม่พบคำขอ" : "No requests found."}</p>
+        )}
         {hasMore && (
           <button disabled={loadingMore || loading} onClick={onLoadMore}>
-            {loadingMore ? "Loading…" : "Load more requests"}
+            {loadingMore
+              ? language === "th"
+                ? "กำลังโหลด…"
+                : "Loading…"
+              : language === "th"
+                ? "โหลดคำขอเพิ่มเติม"
+                : "Load more requests"}
           </button>
         )}
         {selected && (
@@ -7495,54 +7680,62 @@ function Calendar({ language }: { language: Language }) {
         </p>
       )}
       <article className={styles.card}>
-        <div className={styles.calendarWeek}>
-          {(language === "th"
-            ? ["จ", "อ", "พ", "พฤ", "ศ", "ส", "อา"]
-            : ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
-          ).map((day) => (
-            <b key={day}>{day}</b>
-          ))}
-        </div>
-        <div className={styles.calendar}>
-          {days.map((day) => {
-            const dayKey = day.toISOString().slice(0, 10);
-            const dayEntries = visibleEntries.filter(
-              (entry) => bangkokDateKey(entry.date) === dayKey,
-            );
-            const dayDecisions = decisions.filter(
-              (decision) => bangkokDateKey(decision.date) === dayKey,
-            );
-            return (
-              <div
-                key={dayKey}
-                className={
-                  day.getUTCMonth() !== anchorDate.getUTCMonth() ? styles.mutedDay : ""
-                }
-              >
-                <button
-                  type="button"
-                  className={styles.calendarDayButton}
-                  aria-pressed={selectedDayKey === dayKey}
-                  onClick={() => setSelectedDayKey(dayKey)}
+        <div
+          className={styles.calendarScroller}
+          tabIndex={0}
+          aria-label={
+            language === "th" ? "เลื่อนปฏิทินแนวนอนได้" : "Scrollable calendar grid"
+          }
+        >
+          <div className={styles.calendarWeek}>
+            {(language === "th"
+              ? ["จ", "อ", "พ", "พฤ", "ศ", "ส", "อา"]
+              : ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
+            ).map((day) => (
+              <b key={day}>{day}</b>
+            ))}
+          </div>
+          <div className={styles.calendar}>
+            {days.map((day) => {
+              const dayKey = day.toISOString().slice(0, 10);
+              const dayEntries = visibleEntries.filter(
+                (entry) => bangkokDateKey(entry.date) === dayKey,
+              );
+              const dayDecisions = decisions.filter(
+                (decision) => bangkokDateKey(decision.date) === dayKey,
+              );
+              return (
+                <div
+                  key={dayKey}
+                  className={
+                    day.getUTCMonth() !== anchorDate.getUTCMonth() ? styles.mutedDay : ""
+                  }
                 >
-                  {day.toLocaleDateString(locale, { day: "numeric", timeZone: "UTC" })}
-                  {dayDecisions.length > 0 && <small> · {dayDecisions.length} ✓</small>}
-                </button>
-                {dayEntries.map((entry) => (
                   <button
                     type="button"
-                    key={entryKey(entry)}
-                    className={`${styles.event} ${entry.contentType?.includes("Video") ? styles.videoEvent : ""}`}
-                    onClick={() => setSelectedKey(entryKey(entry))}
+                    className={styles.calendarDayButton}
+                    aria-pressed={selectedDayKey === dayKey}
+                    onClick={() => setSelectedDayKey(dayKey)}
                   >
-                    {statusLabelFor(entry.status)} · {formatTime(entry.date)} ·{" "}
-                    {entry.channel ? `${entry.channel}: ` : ""}
-                    {entry.title}
+                    {day.toLocaleDateString(locale, { day: "numeric", timeZone: "UTC" })}
+                    {dayDecisions.length > 0 && <small> · {dayDecisions.length} ✓</small>}
                   </button>
-                ))}
-              </div>
-            );
-          })}
+                  {dayEntries.map((entry) => (
+                    <button
+                      type="button"
+                      key={entryKey(entry)}
+                      className={`${styles.event} ${entry.contentType?.includes("Video") ? styles.videoEvent : ""}`}
+                      onClick={() => setSelectedKey(entryKey(entry))}
+                    >
+                      {statusLabelFor(entry.status)} · {formatTime(entry.date)} ·{" "}
+                      {entry.channel ? `${entry.channel}: ` : ""}
+                      {entry.title}
+                    </button>
+                  ))}
+                </div>
+              );
+            })}
+          </div>
         </div>
       </article>
       {selected && (
@@ -10844,6 +11037,16 @@ function Directory({
       (grant) => grant.role === "RTRDA_ADMIN" && grant.departmentId === null,
     );
   const [notice, setNotice] = useState<string | null>(null);
+  const grantDialogRef = useDialogFocusTrap<HTMLElement>(
+    grantTarget !== null,
+    () => setGrantTarget(null),
+    !grantSubmitting,
+  );
+  const revokeDialogRef = useDialogFocusTrap<HTMLElement>(
+    revokeTarget !== null,
+    () => setRevokeTarget(null),
+    !revokeSubmitting,
+  );
 
   const reload = () => {
     setError(null);
@@ -11231,13 +11434,12 @@ function Directory({
                 }}
               >
                 <section
+                  ref={grantDialogRef}
+                  tabIndex={-1}
                   role="dialog"
                   aria-modal="true"
                   aria-labelledby="grant-role-title"
                   onClick={(event) => event.stopPropagation()}
-                  onKeyDown={(event) => {
-                    if (event.key === "Escape" && !grantSubmitting) setGrantTarget(null);
-                  }}
                   style={{
                     width: "min(100%, 480px)",
                     display: "grid",
@@ -11373,14 +11575,12 @@ function Directory({
                 }}
               >
                 <section
+                  ref={revokeDialogRef}
+                  tabIndex={-1}
                   role="dialog"
                   aria-modal="true"
                   aria-labelledby="revoke-role-title"
                   onClick={(event) => event.stopPropagation()}
-                  onKeyDown={(event) => {
-                    if (event.key === "Escape" && !revokeSubmitting)
-                      setRevokeTarget(null);
-                  }}
                   style={{
                     width: "min(100%, 480px)",
                     display: "grid",
@@ -11454,11 +11654,13 @@ function Directory({
   );
 }
 function MasterDataEditor({
+  language,
   label: itemLabel,
   canEdit = true,
   values,
   onSave,
 }: {
+  language: Language;
   label: string;
   canEdit?: boolean;
   values: string[];
@@ -11480,7 +11682,13 @@ function MasterDataEditor({
               setEditing(!editing);
             }}
           >
-            {editing ? "Cancel" : "Edit"}
+            {editing
+              ? language === "th"
+                ? "ยกเลิก"
+                : "Cancel"
+              : language === "th"
+                ? "แก้ไข"
+                : "Edit"}
           </button>
         )}
       </header>
@@ -11506,15 +11714,28 @@ function MasterDataEditor({
                     .filter(Boolean),
                 );
                 if (saved) setEditing(false);
-                else setError("Master data save failed");
+                else
+                  setError(
+                    language === "th"
+                      ? "บันทึกข้อมูลไม่สำเร็จ"
+                      : "Master data save failed",
+                  );
               } catch {
-                setError("Master data save failed");
+                setError(
+                  language === "th" ? "บันทึกข้อมูลไม่สำเร็จ" : "Master data save failed",
+                );
               } finally {
                 setSaving(false);
               }
             }}
           >
-            {saving ? "Saving…" : "Save"}
+            {saving
+              ? language === "th"
+                ? "กำลังบันทึก…"
+                : "Saving…"
+              : language === "th"
+                ? "บันทึก"
+                : "Save"}
           </button>
           {error && <p role="alert">{error}</p>}
         </>
@@ -11696,18 +11917,21 @@ function SystemData({
       )}
       <section className={styles.settings}>
         <MasterDataEditor
+          language={language}
           canEdit={canManage}
           label={language === "th" ? "ประเภทเนื้อหา" : "Content types"}
           values={data.contentTypes}
           onSave={(contentTypes) => onSave({ ...data, contentTypes })}
         />
         <MasterDataEditor
+          language={language}
           canEdit={canManage}
           label={language === "th" ? "ช่องทางเผยแพร่" : "Publishing channels"}
           values={data.channels}
           onSave={(channels) => onSave({ ...data, channels })}
         />
         <MasterDataEditor
+          language={language}
           canEdit={canManage}
           label={language === "th" ? "เสาหลักเนื้อหา" : "Content pillars"}
           values={data.contentPillars}
@@ -11869,16 +12093,21 @@ function RequestModal({
   onSubmit: (event: React.FormEvent<HTMLFormElement>) => void;
 }) {
   const thai = language === "th";
+  const dialogRef = useDialogFocusTrap<HTMLFormElement>(true, onClose, !submitting);
+
   return (
     <div
       className={`${styles.modalBackdrop} ${styles.requestModalBackdrop}`}
       role="presentation"
     >
       <form
+        ref={dialogRef}
+        tabIndex={-1}
         className={`${styles.modal} ${styles.requestModal}`}
         role="dialog"
         aria-modal="true"
         aria-labelledby="request-title"
+        aria-describedby="request-form-hint"
         onSubmit={onSubmit}
       >
         <header className={styles.requestModalHeader}>
@@ -11907,10 +12136,10 @@ function RequestModal({
           className={styles.requestModalBody}
           style={{ border: 0, margin: 0, minWidth: 0 }}
         >
-          <div className={styles.requestFormHint}>
+          <div className={styles.requestFormHint} id="request-form-hint">
             {thai
-              ? "เลือกประเภทงานและกรอกข้อมูลที่จำเป็น ระบบจะแสดงช่องกรอกตามประเภทงาน"
-              : "Choose a request type and complete the required fields. The form adapts to your selection."}{" "}
+              ? "กรอกข้อมูลจำเป็นเพื่อสร้างฉบับร่างคำขอ ข้อมูลที่กรอกไว้จะบันทึกอัตโนมัติระหว่างทำงาน"
+              : "Complete the required details to create a request draft. Your in-progress form autosaves as you work."}{" "}
             {draftLoading
               ? thai
                 ? "กำลังตรวจสอบร่างที่บันทึกไว้…"
@@ -11967,6 +12196,7 @@ function RequestModal({
                 {thai ? "ชื่อโครงการหรือกิจกรรม" : "Project / activity name"}
               </FieldLabel>
               <input
+                data-request-field="title"
                 value={draft.title}
                 placeholder={
                   thai
@@ -11990,6 +12220,7 @@ function RequestModal({
             <label>
               <FieldLabel required>{thai ? "ผู้มอบหมายงาน" : "Assigner"}</FieldLabel>
               <input
+                data-request-field="assigner"
                 value={draft.assigner}
                 placeholder={
                   thai
@@ -12005,6 +12236,7 @@ function RequestModal({
                 {thai ? "เจ้าของโครงการ" : "Project owner"}
               </FieldLabel>
               <input
+                data-request-field="owner"
                 value={draft.owner}
                 placeholder={thai ? "ชื่อผู้รับผิดชอบโครงการ" : "Project owner name"}
                 onChange={(event) => onChange({ ...draft, owner: event.target.value })}
@@ -12022,6 +12254,7 @@ function RequestModal({
                     : "Off-site date"}
               </FieldLabel>
               <input
+                data-request-field="requestedDate"
                 type="date"
                 value={draft.requestedDate}
                 onChange={(event) =>
@@ -12031,10 +12264,13 @@ function RequestModal({
               />
             </label>
             <label className={styles.full}>
-              {thai
-                ? "ลิงก์ข้อมูลต้นทาง / โฟลเดอร์โครงการ (ใส่ได้หลายลิงก์ แยกบรรทัด)"
-                : "Source links / project folder (one link per line)"}
+              <FieldLabel required>
+                {thai
+                  ? "ลิงก์ข้อมูลต้นทาง / โฟลเดอร์โครงการ (ใส่ได้หลายลิงก์ แยกบรรทัด)"
+                  : "Source links / project folder (one link per line)"}
+              </FieldLabel>
               <textarea
+                data-request-field="source"
                 value={draft.source}
                 onChange={(event) => onChange({ ...draft, source: event.target.value })}
                 required
@@ -12043,8 +12279,11 @@ function RequestModal({
             {draft.type === "pr" ? (
               <>
                 <label>
-                  {thai ? "วัตถุประสงค์การสื่อสาร" : "Communication objective"}
+                  <FieldLabel required>
+                    {thai ? "วัตถุประสงค์การสื่อสาร" : "Communication objective"}
+                  </FieldLabel>
                   <textarea
+                    data-request-field="objective"
                     value={draft.objective}
                     onChange={(event) =>
                       onChange({ ...draft, objective: event.target.value })
@@ -12053,8 +12292,12 @@ function RequestModal({
                   />
                 </label>
                 <label>
-                  {thai ? "เหตุผลที่ต้องสื่อสารในช่วงนี้" : "Why communicate now?"}
+                  <FieldLabel required>
+                    {thai ? "เหตุผลที่ต้องสื่อสารในช่วงนี้" : "Why communicate now?"}
+                  </FieldLabel>
                   <textarea
+                    data-request-field="whyNow"
+                    maxLength={5000}
                     value={draft.whyNow}
                     onChange={(event) =>
                       onChange({ ...draft, whyNow: event.target.value })
@@ -12063,8 +12306,11 @@ function RequestModal({
                   />
                 </label>
                 <label>
-                  {thai ? "กลุ่มเป้าหมาย" : "Target audience"}
+                  <FieldLabel required>
+                    {thai ? "กลุ่มเป้าหมาย" : "Target audience"}
+                  </FieldLabel>
                   <textarea
+                    data-request-field="audience"
                     value={draft.audience}
                     onChange={(event) =>
                       onChange({ ...draft, audience: event.target.value })
@@ -12072,8 +12318,17 @@ function RequestModal({
                     required
                   />
                 </label>
-                <fieldset className={`${styles.contentTypeChoices} ${styles.full}`}>
-                  <legend>{thai ? "ประเภทเนื้อหาที่ต้องการ" : "Content types"}</legend>
+                <fieldset
+                  className={`${styles.contentTypeChoices} ${styles.full}`}
+                  aria-required="true"
+                  data-request-field="contentTypes"
+                  tabIndex={-1}
+                >
+                  <legend>
+                    <FieldLabel required>
+                      {thai ? "ประเภทเนื้อหาที่ต้องการ" : "Content types"}
+                    </FieldLabel>
+                  </legend>
                   <div>
                     {contentTypes.map((contentType) => (
                       <label key={contentType}>
@@ -12097,8 +12352,9 @@ function RequestModal({
                   </div>
                 </fieldset>
                 <label>
-                  {thai ? "ระดับความสำคัญ" : "Priority"}
+                  <FieldLabel required>{thai ? "ระดับความสำคัญ" : "Priority"}</FieldLabel>
                   <select
+                    data-request-field="priority"
                     value={draft.priority}
                     onChange={(event) =>
                       onChange({ ...draft, priority: event.target.value })
@@ -12112,8 +12368,12 @@ function RequestModal({
                   </select>
                 </label>
                 <label>
-                  {thai ? "เหตุผลประกอบความสำคัญ (ถ้ามี)" : "Priority reason (optional)"}
+                  <FieldLabel>
+                    {thai ? "เหตุผลประกอบความสำคัญ" : "Priority reason"}
+                  </FieldLabel>
                   <input
+                    data-request-field="priorityReason"
+                    maxLength={1000}
                     value={draft.priorityReason}
                     onChange={(event) =>
                       onChange({ ...draft, priorityReason: event.target.value })
@@ -12128,6 +12388,8 @@ function RequestModal({
                     ? "รายละเอียดและวัตถุประสงค์ หรือความคืบหน้าของโครงการ (ไม่บังคับ)"
                     : "Project details, objective, or progress (optional)"}
                   <textarea
+                    data-request-field="projectDetails"
+                    maxLength={5000}
                     value={draft.projectDetails}
                     onChange={(event) =>
                       onChange({ ...draft, projectDetails: event.target.value })
@@ -12135,8 +12397,9 @@ function RequestModal({
                   />
                 </label>
                 <label>
-                  {thai ? "เวลาเริ่มต้น" : "Start time"}
+                  <FieldLabel required>{thai ? "เวลาเริ่มต้น" : "Start time"}</FieldLabel>
                   <input
+                    data-request-field="startTime"
                     type="time"
                     value={draft.startTime}
                     onChange={(event) =>
@@ -12146,8 +12409,9 @@ function RequestModal({
                   />
                 </label>
                 <label>
-                  {thai ? "เวลาสิ้นสุด" : "End time"}
+                  <FieldLabel required>{thai ? "เวลาสิ้นสุด" : "End time"}</FieldLabel>
                   <input
+                    data-request-field="endTime"
                     type="time"
                     min={draft.startTime || undefined}
                     value={draft.endTime}
@@ -12158,8 +12422,12 @@ function RequestModal({
                   />
                 </label>
                 <label>
-                  {thai ? "การเดินทาง" : "Travel arrangement"}
+                  <FieldLabel required>
+                    {thai ? "การเดินทาง" : "Travel arrangement"}
+                  </FieldLabel>
                   <select
+                    data-request-field="travel"
+                    required
                     value={draft.travel}
                     onChange={(event) =>
                       onChange({ ...draft, travel: event.target.value })
@@ -12196,8 +12464,8 @@ function RequestModal({
             )}
             <label className={styles.full}>
               {thai
-                ? "ไฟล์ตัวอย่าง / เอกสารประกอบ"
-                : "Sample files / supporting documents"}
+                ? "ไฟล์ตัวอย่าง / เอกสารประกอบ (ไม่บังคับ)"
+                : "Sample files / supporting documents (optional)"}
               <input
                 type="file"
                 multiple
@@ -12212,6 +12480,7 @@ function RequestModal({
             </label>
             <label className={`${styles.confirmAccuracy} ${styles.full}`}>
               <input
+                data-request-field="confirmation"
                 type="checkbox"
                 checked={draft.confirmed}
                 onChange={(event) =>
@@ -12235,7 +12504,7 @@ function RequestModal({
             formNoValidate
             disabled={draftLoading || submitting}
           >
-            {thai ? "บันทึกฉบับร่าง" : "Save draft"}
+            {thai ? "บันทึกร่างคำขอ" : "Save request draft"}
           </button>
           <button
             className={styles.primary}

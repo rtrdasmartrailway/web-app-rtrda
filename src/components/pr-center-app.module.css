@@ -2255,8 +2255,8 @@
   display: flex;
   justify-content: space-between;
 }
-.modal > header button,
-.modal > footer > button:first-child {
+.modal:not(.requestModal) > header button,
+.modal:not(.requestModal) > footer > button:first-child {
   background: transparent;
   border: 0;
   color: #64748b;
@@ -2870,18 +2870,18 @@
 
 @media (max-width: 1050px) {
   .sidebar {
-    flex-basis: 82px;
+    flex-basis: 220px;
     padding: 16px 10px;
   }
   .brand > span:last-child,
   .workspace {
-    font-size: 0;
+    font-size: inherit;
   }
   .nav button {
-    justify-content: center;
+    justify-content: flex-start;
   }
   .navLabel {
-    display: none;
+    display: inline;
   }
   .navIcon {
     font-size: 17px;
@@ -3993,5 +3993,70 @@
   }
   .referenceMetric strong {
     font-size: 24px;
+  }
+}
+
+.sidebarBackdrop,
+.sidebarCloseButton {
+  display: none;
+}
+
+.calendarScroller {
+  max-width: 100%;
+  overscroll-behavior-x: contain;
+  overflow-x: auto;
+}
+
+.calendarScroller:focus-visible {
+  outline: 2px solid #5594e8;
+  outline-offset: 2px;
+}
+
+.modal.requestModal {
+  max-width: 1180px;
+}
+
+@media (max-width: 760px) {
+  .sidebar,
+  .sidebarOpen {
+    transition:
+      left 0.2s ease,
+      visibility 0s linear 0.2s;
+    visibility: hidden;
+  }
+
+  .sidebarOpen {
+    transition-delay: 0s;
+    visibility: visible;
+    z-index: 40;
+  }
+
+  .sidebarBackdrop {
+    background: rgb(8 25 47 / 55%);
+    border: 0;
+    display: block;
+    inset: 0;
+    position: fixed;
+    z-index: 30;
+  }
+
+  .sidebarCloseButton {
+    align-items: center;
+    background: transparent;
+    border: 1px solid rgb(255 255 255 / 35%);
+    border-radius: 0.5rem;
+    color: #fff;
+    display: inline-flex;
+    flex: 0 0 2.5rem;
+    font-size: 1.4rem;
+    height: 2.5rem;
+    justify-content: center;
+    margin-left: auto;
+    width: 2.5rem;
+  }
+
+  .calendarScroller .calendarWeek,
+  .calendarScroller .calendar {
+    min-width: 700px;
   }
 }
