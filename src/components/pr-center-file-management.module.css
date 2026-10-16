@@ -1,0 +1,30 @@
+.management {
+  display: grid;
+  gap: 16px;
+  min-width: 0;
+}
+.management section {
+  min-width: 0;
+}
+.management label,
+.reason {
+  display: grid;
+  gap: 8px;
+  margin-block: 12px;
+  min-width: 0;
+}
+.management select,
+.reason textarea {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+}
+.management li {
+  margin-block: 12px;
+  overflow-wrap: anywhere;
+}
+.management button {
+  min-height: 40px;
+  margin-block: 4px;
+}

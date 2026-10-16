@@ -861,7 +861,13 @@ describe("request intake approval", () => {
     });
 
     expect(mockPrisma.prRequest.updateMany).toHaveBeenCalledWith({
-      where: { id: requestRecord.id, version: 2, status: "SUBMITTED" },
+      where: {
+        id: requestRecord.id,
+        version: 2,
+        status: "SUBMITTED",
+        organizationId: "org-1",
+        OR: [{ departmentId: "dept-1" }],
+      },
       data: { status: "APPROVED", version: { increment: 1 } },
     });
     expect(mockPrisma.prNotification.createMany).toHaveBeenCalledWith({
@@ -936,7 +942,13 @@ describe("request intake approval", () => {
     });
 
     expect(mockPrisma.prRequest.updateMany).toHaveBeenCalledWith({
-      where: { id: requestRecord.id, version: 2, status: "SUBMITTED" },
+      where: {
+        id: requestRecord.id,
+        version: 2,
+        status: "SUBMITTED",
+        organizationId: "org-1",
+        OR: [{}],
+      },
       data: { status: "APPROVED", version: { increment: 1 } },
     });
   });
@@ -1032,7 +1044,12 @@ describe("request intake approval", () => {
       managementApprovalRequired: true,
     });
     expect(mockPrisma.prTask.updateMany).toHaveBeenCalledWith({
-      where: { id: "task-1", version: 5 },
+      where: {
+        id: "task-1",
+        version: 5,
+        status: "COMMUNICATION_PLANNING",
+        request: { organizationId: "org-1", OR: [{ departmentId: "dept-1" }] },
+      },
       data: {
         ownerId: null,
         dueAt: null,

@@ -757,6 +757,14 @@ export function buildPrCenterApi(
         422,
         "INVALID_BODY",
       );
+    for (const field of ["requestId", "taskId", "kind"] as const) {
+      if (input[field] !== undefined && typeof input[field] !== "string")
+        throw new PrCenterError(
+          "Upload target fields must be strings",
+          422,
+          "INVALID_UPLOAD_TARGET",
+        );
+    }
     let contentBuffer: Buffer;
     try {
       contentBuffer = Buffer.from(input.content, "base64");
@@ -767,7 +775,16 @@ export function buildPrCenterApi(
       throw new PrCenterError("File content is empty", 422, "EMPTY_FILE");
     const fileObject = await uploadFile(
       request.prCenterActor!,
-      { fileName: input.fileName, mimeType: input.mimeType, content: contentBuffer },
+      {
+        fileName: input.fileName,
+        mimeType: input.mimeType,
+        content: contentBuffer,
+        ...(input.requestId !== undefined
+          ? { requestId: input.requestId as string }
+          : {}),
+        ...(input.taskId !== undefined ? { taskId: input.taskId as string } : {}),
+        ...(input.kind !== undefined ? { kind: input.kind as string } : {}),
+      },
       correlationId(request),
     );
     return reply.status(201).send(fileObject);
@@ -879,8 +896,12 @@ export function buildPrCenterApi(
   });
   // ── Quarantine management routes ─────────────────────────────────────
   app.get("/admin/quarantine", async (request) => {
-    const query = request.query as { take?: string };
-    return listQuarantinedFiles(request.prCenterActor!, Number(query.take || 50));
+    const query = request.query as { take?: string; offset?: string };
+    return listQuarantinedFiles(
+      request.prCenterActor!,
+      Number(query.take || 50),
+      Number(query.offset || 0),
+    );
   });
   app.post("/admin/quarantine/:fileId/review", async (request) => {
     const input = await body(request);

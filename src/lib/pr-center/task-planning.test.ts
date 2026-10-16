@@ -68,7 +68,12 @@ describe("task communication planning", () => {
     );
 
     expect(tx.prTask.updateMany).toHaveBeenCalledWith({
-      where: { id: "task-1", version: 3 },
+      where: {
+        id: "task-1",
+        version: 3,
+        status: "COMMUNICATION_PLANNING",
+        request: { organizationId: "org-1", OR: [{ departmentId: "dept-1" }] },
+      },
       data: {
         ownerId: null,
         dueAt,

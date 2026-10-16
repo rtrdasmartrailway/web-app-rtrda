@@ -93,7 +93,12 @@ describe("task revision workflow", () => {
     );
 
     expect(tx.prTask.updateMany).toHaveBeenCalledWith({
-      where: { id: "task-1", version: 3 },
+      where: {
+        id: "task-1",
+        version: 3,
+        status: "IN_PRODUCTION",
+        request: { organizationId: "org-1", OR: [{ departmentId: "dept-1" }] },
+      },
       data: { status: "IN_PRODUCTION", version: { increment: 1 } },
     });
     expect(tx.prTaskRevision.create).toHaveBeenCalledWith({

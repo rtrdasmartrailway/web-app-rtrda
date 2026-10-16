@@ -11,6 +11,9 @@ import {
 import Image from "next/image";
 import { PrCenterDialog } from "./pr-center-dialog";
 import { useBoardHoldDrag } from "./pr-center-board-drag";
+import { PrCenterFileManagement } from "./pr-center-file-management";
+import { directoryUserAuthority } from "@/lib/pr-center/directory-access";
+import { grantCoversDepartment } from "@/lib/pr-center/client-grant-scope";
 import { BOARD_COLUMNS, boardMove, type BoardColumn } from "@/lib/pr-center/board-moves";
 import {
   getFirstApprovalStage,
@@ -132,6 +135,7 @@ type User = {
   active: boolean;
 };
 type Request = {
+  departmentId?: string;
   id: string;
   title: string;
   type: RequestType;
@@ -245,6 +249,7 @@ const EDITORIAL_REVIEW_ITEMS: Array<{
 ];
 
 type Task = {
+  departmentId?: string;
   id: string;
   requestId: string;
   requesterId?: string;
@@ -415,6 +420,7 @@ type ApiRequestRecord = {
   priority: string;
   priorityReason: string | null;
   createdAt: string;
+  departmentId?: string;
   department: { name: string };
   requester: { displayName: string; email?: string | null };
   requesterId: string;
@@ -591,6 +597,7 @@ function mapRequestRecord(request: ApiRequestRecord): Request {
       : null;
   return {
     id: request.id,
+    departmentId: request.departmentId,
     title: request.title,
     type: request.type.toLowerCase() as RequestType,
     requesterId: request.requesterId,
@@ -652,6 +659,7 @@ function mapRequestTasks(records: ApiRequestRecord[]): Task[] {
   return records.flatMap((request) =>
     request.tasks.map((task) => ({
       id: task.id,
+      departmentId: request.departmentId,
       requestId: request.id,
       requesterId: request.requesterId,
       requestStatus: request.status,
@@ -1526,6 +1534,7 @@ export function PrCenterApp({
   const [loadingRequests, setLoadingRequests] = useState(true);
   const [requestsUnavailable, setRequestsUnavailable] = useState(false);
   const [ideaNextOffset, setIdeaNextOffset] = useState<number | null>(null);
+  const ideaTransitionInFlight = useRef(new Set<string>());
   const [ideasOwnerId, setIdeasOwnerId] = useState<string | null>(null);
   const [loadingMoreIdeas, setLoadingMoreIdeas] = useState(false);
   const [ideaListStatus, setIdeaListStatus] = useState<"loading" | "loaded" | "error">(
@@ -2533,6 +2542,7 @@ export function PrCenterApp({
         throw new Error(result?.message || "Request could not be saved");
       }
       const updated = (await response.json()) as {
+        departmentId?: string;
         id: string;
         title: string;
         type: "PR" | "OFFSITE";
@@ -2579,6 +2589,8 @@ export function PrCenterApp({
                 fileName: file.name,
                 mimeType: file.type || "application/octet-stream",
                 content: btoa(binary),
+                requestId: updated.id,
+                kind: "request-sample",
               }),
             });
             if (!uploadResponse.ok) throw new Error("File upload failed");
@@ -2604,6 +2616,7 @@ export function PrCenterApp({
       }
       const mappedRequest: Request = {
         id: updated.id,
+        departmentId: updated.departmentId,
         title: updated.title,
         type: updated.type.toLowerCase() as RequestType,
         requesterId: updated.requesterId,
@@ -2656,6 +2669,7 @@ export function PrCenterApp({
         tasks: [
           ...updated.tasks.map((task) => ({
             id: task.id,
+            departmentId: updated.departmentId,
             requestId: updated.id,
             requestStatus: updated.status,
             type: task.contentType,
@@ -3353,41 +3367,53 @@ export function PrCenterApp({
           ? "เหตุผลยาวเกิน 5,000 ตัวอักษร"
           : "Decision reason must be 5,000 characters or fewer",
       );
-    const response = await fetch(`/api/pr-center/ideas/${id}/transitions`, {
-      method: "POST",
-      credentials: "same-origin",
-      headers: { "Content-Type": "application/json", "If-Match": String(idea.version) },
-      body: JSON.stringify({
-        to: status.toUpperCase(),
-        ...(reason ? { reason } : {}),
-      }),
-    });
-    if (!response.ok) {
-      const result = (await response.json().catch(() => null)) as {
-        message?: unknown;
-      } | null;
-      return announce(
-        typeof result?.message === "string"
-          ? result.message
-          : state.language === "th"
-            ? "เปลี่ยนสถานะแนวคิดไม่สำเร็จ"
-            : "Idea transition failed",
+    if (ideaTransitionInFlight.current.has(id)) return;
+    ideaTransitionInFlight.current.add(id);
+    try {
+      const response = await fetch(`/api/pr-center/ideas/${id}/transitions`, {
+        method: "POST",
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/json", "If-Match": String(idea.version) },
+        body: JSON.stringify({
+          to: status.toUpperCase(),
+          ...(reason ? { reason } : {}),
+        }),
+      });
+      if (!response.ok) {
+        const result = (await response.json().catch(() => null)) as {
+          message?: unknown;
+        } | null;
+        return announce(
+          typeof result?.message === "string"
+            ? result.message
+            : state.language === "th"
+              ? "เปลี่ยนสถานะแนวคิดไม่สำเร็จ"
+              : "Idea transition failed",
+        );
+      }
+      const updated = (await response.json()) as { status: string; version: number };
+      setState((previous) => ({
+        ...previous,
+        ideas: previous.ideas.map((item) =>
+          item.id === id
+            ? {
+                ...item,
+                status: updated.status.toLowerCase() as IdeaStatus,
+                decisionReason: requiresReason ? reason : item.decisionReason,
+                version: updated.version,
+              }
+            : item,
+        ),
+      }));
+    } catch {
+      announce(
+        state.language === "th"
+          ? "เชื่อมต่อระบบไม่ได้ แนวคิดยังไม่เปลี่ยนสถานะ กรุณาลองอีกครั้ง"
+          : "Could not reach the server. Idea status was kept; please retry.",
       );
+    } finally {
+      ideaTransitionInFlight.current.delete(id);
     }
-    const updated = (await response.json()) as { status: string; version: number };
-    setState((previous) => ({
-      ...previous,
-      ideas: previous.ideas.map((item) =>
-        item.id === id
-          ? {
-              ...item,
-              status: updated.status.toLowerCase() as IdeaStatus,
-              decisionReason: requiresReason ? reason : item.decisionReason,
-              version: updated.version,
-            }
-          : item,
-      ),
-    }));
   };
   const convertIdea = async (id: string) => {
     const idea = state.ideas.find((item) => item.id === id);
@@ -3608,7 +3634,17 @@ export function PrCenterApp({
               <span className={styles.navIcon} aria-hidden="true">
                 {item.icon}
               </span>
-              <span className={styles.navLabel}>{label(item, state.language)}</span>
+              <span className={styles.navLabel}>
+                {item.id === "settings"
+                  ? state.language === "th"
+                    ? actorRoleCodes.includes("RTRDA_ADMIN")
+                      ? "สิทธิ์และไฟล์"
+                      : "จัดการไฟล์"
+                    : actorRoleCodes.includes("RTRDA_ADMIN")
+                      ? "Access & Files"
+                      : "File Management"
+                  : label(item, state.language)}
+              </span>
             </button>
           ))}
         </nav>
@@ -3848,6 +3884,7 @@ export function PrCenterApp({
               onPublish={publishTask}
               onCreateRevision={createTaskRevision}
               canManageTasks={hasUiRole("pr", "admin")}
+              roleGrants={actor?.roleGrants ?? []}
               currentUserId={currentUser.id}
               canFactCheckPR={actorRoleCodes.includes("RTRDA_PR")}
               canConfigureApprovalRequirements={actorRoleCodes.includes("RTRDA_PR")}
@@ -3955,7 +3992,51 @@ export function PrCenterApp({
           {page === "directory" && actor && (
             <Directory actor={actor} language={state.language} />
           )}
-          {page === "settings" && actor && <Settings language={state.language} />}
+          {page === "settings" && actor && (
+            <>
+              {actorRoleCodes.includes("RTRDA_ADMIN") && (
+                <Settings language={state.language} />
+              )}
+              {actorRoleCodes.some((role) =>
+                ["RTRDA_PR", "RTRDA_BORD", "RTRDA_ADMIN"].includes(role),
+              ) && (
+                <PrCenterFileManagement
+                  language={state.language}
+                  targets={[
+                    ...state.requests
+                      .filter((request) =>
+                        grantCoversDepartment(
+                          actor.roleGrants,
+                          ["RTRDA_PR", "RTRDA_BORD", "RTRDA_ADMIN"],
+                          request.departmentId,
+                        ),
+                      )
+                      .map((request) => ({
+                        id: request.id,
+                        label: request.title,
+                        kind: "request" as const,
+                      })),
+                    ...state.tasks
+                      .filter((task) =>
+                        grantCoversDepartment(
+                          actor.roleGrants,
+                          ["RTRDA_PR", "RTRDA_BORD", "RTRDA_ADMIN"],
+                          task.departmentId,
+                        ),
+                      )
+                      .map((task) => ({
+                        id: task.id,
+                        label: task.title,
+                        kind: "task" as const,
+                      })),
+                  ]}
+                  onChanged={() => {
+                    void refreshRequests();
+                  }}
+                />
+              )}
+            </>
+          )}
           {page === "system-data" && (
             <SystemData
               state={state}
@@ -5348,6 +5429,7 @@ function Operations({
   onPublish,
   onCreateRevision,
   canManageTasks,
+  roleGrants,
   currentUserId,
   canFactCheckPR,
   canConfigureApprovalRequirements,
@@ -5384,12 +5466,21 @@ function Operations({
     changeSummary: string,
   ) => Promise<boolean>;
   canManageTasks: boolean;
+  roleGrants: readonly { role: string; departmentId: string | null }[];
   canConfigureApprovalRequirements: boolean;
   currentUserId: string;
   canFactCheckPR: boolean;
   onFinalAssetAssigned: (taskId: string, fileId: string) => void;
   canViewPublishing: boolean;
 }) {
+  const canManageTask = (task: Task) =>
+    grantCoversDepartment(
+      roleGrants,
+      ["RTRDA_PR", "RTRDA_BORD", "RTRDA_ADMIN"],
+      task.departmentId,
+    );
+  const canPrTask = (task: Task) =>
+    grantCoversDepartment(roleGrants, ["RTRDA_PR"], task.departmentId);
   const initialTask = taskItems.find((task) => task.id === targetId);
   const [view, setView] = useState<"board" | "table" | "publishing">("board");
   const [approvalPolicy, setApprovalPolicy] = useState<ApprovalPolicy | null>(null);
@@ -5560,6 +5651,8 @@ function Operations({
   );
   const columns = OPERATION_COLUMNS;
   const selected = visibleTasks.find((task) => task.id === selectedId);
+  const canManageSelectedTask = !!selected && canManageTask(selected);
+  const canPrSelectedTask = !!selected && canPrTask(selected);
   const currentActivity = activityTaskId === selected?.id ? activity : null;
   const openTask = (task: Task, schedule = false) => {
     setSelectedId(task.id);
@@ -5595,7 +5688,7 @@ function Operations({
     );
   };
   const moveTask = async (task: Task, column: BoardColumn) => {
-    if (!canManageTasks || moveBusy.current) return;
+    if (!canManageTask(task) || moveBusy.current) return;
     setMoveError("");
     setMoveNotice("");
     const move = taskMove(task, column);
@@ -5780,7 +5873,7 @@ function Operations({
                         aria-busy={movingId === task.id}
                         className={`${styles.compactBoardCard} ${draggedId === task.id ? styles.boardCardDragging : ""}`}
                         data-hold-draggable={
-                          canManageTasks &&
+                          canManageTask(task) &&
                           !movingId &&
                           BOARD_COLUMNS.some(
                             (target) => taskMove(task, target).action !== "blocked",
@@ -5792,7 +5885,7 @@ function Operations({
                           holdDrag.onPointerDown(
                             event,
                             task,
-                            canManageTasks &&
+                            canManageTask(task) &&
                               !movingId &&
                               BOARD_COLUMNS.some(
                                 (target) => taskMove(task, target).action !== "blocked",
@@ -5801,7 +5894,7 @@ function Operations({
                         }
                         onDragStart={(event) => event.preventDefault()}
                         onContextMenu={(event) => {
-                          if (canManageTasks) event.preventDefault();
+                          if (canManageTask(task)) event.preventDefault();
                         }}
                       >
                         <b>{task.title}</b>
@@ -5822,7 +5915,7 @@ function Operations({
                                   : `Move ${task.title}`
                               }
                               value={column}
-                              disabled={!canManageTasks || !!movingId}
+                              disabled={!canManageTask(task) || !!movingId}
                               onChange={(event) => {
                                 if (event.target.value)
                                   void moveTask(task, event.target.value as BoardColumn);
@@ -5951,7 +6044,7 @@ function Operations({
                 </ul>
               </section>
             )}
-            {canManageTasks &&
+            {canManageSelectedTask &&
               selected.requestStatus === "APPROVED" &&
               ["in_production", "revision_required"].includes(selected.status) && (
                 <form
@@ -6021,7 +6114,7 @@ function Operations({
                   </button>
                 </form>
               )}
-            {canManageTasks && (
+            {canManageSelectedTask && (
               <>
                 <label>
                   Assign to{" "}
@@ -6049,7 +6142,8 @@ function Operations({
                   </p>
                 )}
                 {selected.status === "communication_planning" &&
-                  canConfigureApprovalRequirements && (
+                  canConfigureApprovalRequirements &&
+                  canPrSelectedTask && (
                     <fieldset className={styles.card}>
                       <legend>
                         {language === "th"
@@ -6116,11 +6210,13 @@ function Operations({
                         ? planningKeyMessage
                         : undefined,
                       selected.status === "communication_planning" &&
-                        canConfigureApprovalRequirements
+                        canConfigureApprovalRequirements &&
+                        canPrSelectedTask
                         ? technicalReviewRequired
                         : undefined,
                       selected.status === "communication_planning" &&
-                        canConfigureApprovalRequirements
+                        canConfigureApprovalRequirements &&
+                        canPrSelectedTask
                         ? managementApprovalRequired
                         : undefined,
                     )
@@ -6130,7 +6226,8 @@ function Operations({
                 </button>
               </>
             )}
-            {(canFactCheckPR || selected.ownerId === currentUserId) &&
+            {((canFactCheckPR && canPrSelectedTask) ||
+              selected.ownerId === currentUserId) &&
               selected.revisionNumber !== undefined &&
               ["in_production", "source_fact_check", "revision_required"].includes(
                 selected.status,
@@ -6141,7 +6238,7 @@ function Operations({
                   language={language}
                 />
               )}
-            {canManageTasks &&
+            {canManageSelectedTask &&
               STATUS_TRANSITIONS[selected.status].filter(
                 (next) =>
                   next !== "scheduled" &&
@@ -6168,7 +6265,7 @@ function Operations({
                   </select>
                 </label>
               )}
-            {canManageTasks &&
+            {canManageSelectedTask &&
               (selected.status === "approved" || selected.status === "scheduled") && (
                 <>
                   <label>
@@ -6242,7 +6339,7 @@ function Operations({
                   )}
                 </>
               )}
-            {canManageTasks &&
+            {canManageSelectedTask &&
               (selected.status === "scheduled" || selected.status === "published") &&
               scheduleChoices.length > 0 && (
                 <>
@@ -6295,7 +6392,7 @@ function Operations({
                   </button>
                 </>
               )}
-            {canManageTasks && selected.status === "published" && (
+            {canManageSelectedTask && selected.status === "published" && (
               <section className={styles.card} aria-labelledby="close-published-task">
                 <h3 id="close-published-task">
                   {language === "th" ? "10. ปิดงาน" : "10. Close task"}
@@ -6330,7 +6427,7 @@ function Operations({
                 </button>
               </section>
             )}
-            {canManageTasks && (
+            {canManageSelectedTask && (
               <section className={styles.card}>
                 <h3>Comments and activity</h3>
                 {activityError && <p role="alert">{activityError}</p>}
@@ -6396,7 +6493,7 @@ function Operations({
                 </ul>
               </section>
             )}
-            {canManageTasks && (
+            {canManageSelectedTask && (
               <AttachmentPanel
                 taskId={selected.id}
                 taskVersion={selected.version ?? 0}
@@ -6857,13 +6954,22 @@ function AttachmentPanel({
           fileName: file.name,
           mimeType: file.type || "application/octet-stream",
           content: base64,
+          taskId,
+          kind: "evidence",
         }),
       });
       if (!uploadRes.ok) {
         const err = await uploadRes.json().catch(() => null);
         throw new Error(err?.message || "Upload failed");
       }
-      const uploaded = (await uploadRes.json()) as { id: string };
+      const uploaded = (await uploadRes.json()) as { id: string; scanStatus: string };
+      if (uploaded.scanStatus !== "CLEAN") {
+        reload();
+        setNotice(
+          "File is held for malware review. Authorized PR staff can rescan or delete it in File Management.",
+        );
+        return;
+      }
       const attachRes = await fetch("/api/pr-center/attachments", {
         method: "POST",
         credentials: "same-origin",
@@ -9488,7 +9594,7 @@ function MessageHouse({
   const [reload, setReload] = useState(0);
   const [reviewReload, setReviewReload] = useState(0);
   const dirtyRef = useRef(false);
-  const dirty = draftContent !== savedContent;
+  const dirty = savedContent !== null && draftContent !== savedContent;
   useEffect(() => {
     dirtyRef.current = dirty;
   }, [dirty]);
@@ -9526,7 +9632,7 @@ function MessageHouse({
           sourceRationale: value?.sourceRationale ?? "",
         };
         setDraft(loadedDraft);
-        setSavedContent(value ? JSON.stringify({ ...loadedDraft, id: "" }) : null);
+        setSavedContent(JSON.stringify({ ...loadedDraft, id: "" }));
       })
       .catch(() => {
         if (!cancelled) {
@@ -10481,7 +10587,7 @@ function Directory({
   const isAdministrator = effectiveRoleCodes.has("RTRDA_ADMIN");
   const isPrOperations = effectiveRoleCodes.has("RTRDA_PR");
   const isBoardRole = effectiveRoleCodes.has("RTRDA_BORD");
-  const canGrantBoardOnly = !isAdministrator && isPrOperations;
+  const isPrOnly = !isAdministrator && isPrOperations;
   const [users, setUsers] = useState<
     Array<{
       id: string;
@@ -10496,8 +10602,11 @@ function Directory({
   const [error, setError] = useState<string | null>(null);
   const [grantTarget, setGrantTarget] = useState<string | null>(null);
   const [grantRole, setGrantRole] = useState<string>(
-    canGrantBoardOnly ? "RTRDA_BORD" : "RTRDA_ALL_USER",
+    isPrOnly ? "RTRDA_BORD" : "RTRDA_ALL_USER",
   );
+  const grantUser = users.find((user) => user.id === grantTarget);
+  const canGrantBoardOnly =
+    isPrOnly || (!!grantUser && !directoryUserAuthority(actor, grantUser).administer);
   const [grantDepartmentId, setGrantDepartmentId] = useState("");
   const [grantReason, setGrantReason] = useState("");
   const [grantConfirmation, setGrantConfirmation] = useState("");
@@ -10735,7 +10844,7 @@ function Directory({
                   </p>
                 </div>
                 <div style={{ display: "flex", gap: 8 }}>
-                  {isAdministrator && (
+                  {directoryUserAuthority(actor, user).administer && (
                     <button
                       onClick={() => handleToggleActive(user.id)}
                       disabled={
@@ -10768,6 +10877,11 @@ function Directory({
                       onClick={() => {
                         const nextTarget = grantTarget === user.id ? null : user.id;
                         setGrantTarget(nextTarget);
+                        setGrantRole(
+                          directoryUserAuthority(actor, user).administer
+                            ? "RTRDA_ALL_USER"
+                            : "RTRDA_BORD",
+                        );
                         setError(null);
                         setGrantReason("");
                         setGrantConfirmation("");
@@ -10776,11 +10890,16 @@ function Directory({
                             isOrganizationAdmin ? "" : (user.department?.id ?? ""),
                           );
                       }}
-                      disabled={user.id === actor.userId}
+                      disabled={
+                        user.id === actor.userId ||
+                        !directoryUserAuthority(actor, user).canGrant
+                      }
                       title={
                         user.id === actor.userId
                           ? "You cannot grant roles to your own account"
-                          : undefined
+                          : !directoryUserAuthority(actor, user).canGrant
+                            ? "An active user in an authorized department is required"
+                            : undefined
                       }
                       style={{ fontSize: 12 }}
                     >
@@ -10812,7 +10931,7 @@ function Directory({
                     }}
                   >
                     {r.role} · {r.departmentId ? `dept ${r.departmentId}` : "org-wide"}
-                    {isAdministrator && (
+                    {directoryUserAuthority(actor, user).administer && (
                       <button
                         type="button"
                         aria-label={`${language === "th" ? "ถอน role" : "Revoke role"}: ${r.role}`}
@@ -10934,7 +11053,7 @@ function Directory({
                   )}
                   <label style={{ display: "grid", gap: 4 }}>
                     <span>{language === "th" ? "ขอบเขตสิทธิ์" : "Role scope"}</span>
-                    {isOrganizationAdmin ? (
+                    {isOrganizationAdmin && !canGrantBoardOnly ? (
                       <select
                         aria-label="Role scope"
                         value={grantDepartmentId}
