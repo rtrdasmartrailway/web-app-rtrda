@@ -1049,6 +1049,7 @@ describe("request intake approval", () => {
         version: 5,
         status: "COMMUNICATION_PLANNING",
         request: { organizationId: "org-1", OR: [{ departmentId: "dept-1" }] },
+        AND: [{ request: { status: { notIn: ["REJECTED", "CANCELLED"] } } }],
       },
       data: {
         ownerId: null,

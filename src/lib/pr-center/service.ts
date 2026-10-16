@@ -2009,7 +2009,7 @@ export async function transitionIdea(
     throw new PrCenterError("Decision reason is too long", 422, "INVALID_REASON");
   return prisma.$transaction(async (tx) => {
     const updated = await tx.prContentIdea.updateMany({
-      where: { ...ideaScope, version: fromVersion },
+      where: { ...ideaScope, version: fromVersion, status: idea.status },
       data: {
         status: to as PrContentIdeaStatus,
         reviewerId: actor.id,
@@ -2724,6 +2724,16 @@ export async function updateTaskAssignment(
           : {}),
         version: fromVersion,
         status: task.status,
+        AND: [
+          {
+            request: {
+              status:
+                task.status === "DRAFT"
+                  ? "APPROVED"
+                  : { notIn: ["REJECTED", "CANCELLED"] },
+            },
+          },
+        ],
       },
       data: {
         ownerId: input.ownerId,
@@ -3191,6 +3201,16 @@ export async function transitionTask(
         ...taskMutationScope(actor, task.id),
         version: fromVersion,
         status: task.status,
+        AND: [
+          {
+            request: {
+              status:
+                task.status === "DRAFT"
+                  ? "APPROVED"
+                  : { notIn: ["REJECTED", "CANCELLED"] },
+            },
+          },
+        ],
       },
       data: { status: to as PrTaskStatus, version: { increment: 1 } },
     });
@@ -3671,7 +3691,9 @@ export async function listRequestApprovalQueue(actor: PrCenterActor) {
   });
   return requests.map((request) => {
     const selfSubmitted = request.requesterId === actor.id;
-    const taskWorkStarted = request.tasks.some((task) => task.status !== "DRAFT");
+    const taskWorkStarted = request.tasks.some(
+      (task) => task.status !== "DRAFT" && task.status !== "CANCELLED",
+    );
     return {
       ...request,
       intakeDecisionBlockedReason: selfSubmitted
@@ -3737,7 +3759,9 @@ export async function recordRequestDecision(
     );
   if (reason.length > 5000)
     throw new PrCenterError("Decision reason is too long", 422, "INVALID_REASON");
-  if (request.tasks.some((task) => task.status !== "DRAFT"))
+  if (
+    request.tasks.some((task) => task.status !== "DRAFT" && task.status !== "CANCELLED")
+  )
     throw new PrCenterError(
       "Task work has already started; use the task-stage workflow instead",
       409,
@@ -3775,6 +3799,7 @@ export async function recordRequestDecision(
 
     if (input.decision === "REJECTED") {
       for (const task of request.tasks) {
+        if (task.status === "CANCELLED") continue;
         const cancelled = await tx.prTask.updateMany({
           where: { id: task.id, status: "DRAFT", version: task.version },
           data: { status: "CANCELLED", version: { increment: 1 } },
@@ -4903,7 +4928,7 @@ export async function downloadFile(
       "FILE_NOT_AVAILABLE",
     );
   // Verify the file is linked to a request/task the actor may access.
-  const attachment = await prisma.prAttachment.findFirst({
+  const attachments = await prisma.prAttachment.findMany({
     where: { fileId },
     include: {
       request: {
@@ -4926,9 +4951,15 @@ export async function downloadFile(
       },
     },
   });
-  if (!attachment) throw new PrCenterError("File not found", 404, "NOT_FOUND");
-  const linkedRequests = [attachment.request, attachment.task?.request].filter(
-    (request): request is NonNullable<typeof request> => Boolean(request),
+  if (
+    attachments.length === 0 ||
+    attachments.some((attachment) => !attachment.request && !attachment.task?.request)
+  )
+    throw new PrCenterError("File not found", 404, "NOT_FOUND");
+  const linkedRequests = attachments.flatMap((attachment) =>
+    [attachment.request, attachment.task?.request].filter(
+      (request): request is NonNullable<typeof request> => Boolean(request),
+    ),
   );
   if (
     linkedRequests.length === 0 ||
@@ -5448,42 +5479,47 @@ export async function grantRole(
       403,
       "FORBIDDEN",
     );
-  const user = await prisma.prCenterUser.findFirst({
-    where: { id: userId, organizationId: actor.organizationId },
-  });
-  if (!user) throw new PrCenterError("User not found", 404, "NOT_FOUND");
-  const adminUserAllowed =
-    adminGrantAllowed && canManageDepartmentScope(actor, user.departmentId);
-  const prUserAllowed =
-    prGrantAllowed && user.departmentId === departmentId && user.active;
-  if (!adminUserAllowed && !prUserAllowed)
-    throw new PrCenterError(
-      "Target user is outside your authorized scope or inactive",
-      403,
-      "FORBIDDEN",
-    );
-  if (departmentId) {
-    const dept = await prisma.prDepartment.findFirst({
-      where: { id: departmentId, organizationId: actor.organizationId },
+  const loadAuthorizedUser = async (db: Prisma.TransactionClient) => {
+    const user = await db.prCenterUser.findFirst({
+      where: { id: userId, organizationId: actor.organizationId },
     });
-    if (!dept)
-      throw new PrCenterError("Department not found", 404, "DEPARTMENT_NOT_FOUND");
-  }
-  const existing = await prisma.prUserRole.findFirst({
-    where: {
-      userId,
-      role,
-      organizationId: actor.organizationId,
-      departmentId: departmentId ?? null,
-    },
-  });
-  if (existing)
-    throw new PrCenterError(
-      "User already has this role in this scope",
-      409,
-      "ROLE_ALREADY_ASSIGNED",
-    );
-  return prisma.$transaction(async (tx) => {
+    if (!user) throw new PrCenterError("User not found", 404, "NOT_FOUND");
+    const adminUserAllowed =
+      adminGrantAllowed && canManageDepartmentScope(actor, user.departmentId);
+    const prUserAllowed =
+      prGrantAllowed && user.departmentId === departmentId && user.active;
+    if (!adminUserAllowed && !prUserAllowed)
+      throw new PrCenterError(
+        "Target user is outside your authorized scope or inactive",
+        403,
+        "FORBIDDEN",
+      );
+    return user;
+  };
+  await loadAuthorizedUser(prisma);
+  return runSerializableAccessTransaction(async (tx) => {
+    await loadAuthorizedUser(tx);
+    if (departmentId) {
+      const dept = await tx.prDepartment.findFirst({
+        where: { id: departmentId, organizationId: actor.organizationId },
+      });
+      if (!dept)
+        throw new PrCenterError("Department not found", 404, "DEPARTMENT_NOT_FOUND");
+    }
+    const existing = await tx.prUserRole.findFirst({
+      where: {
+        userId,
+        role,
+        organizationId: actor.organizationId,
+        departmentId: departmentId ?? null,
+      },
+    });
+    if (existing)
+      throw new PrCenterError(
+        "User already has this role in this scope",
+        409,
+        "ROLE_ALREADY_ASSIGNED",
+      );
     const granted = await tx.prUserRole.create({
       data: {
         userId,
@@ -5522,36 +5558,42 @@ export async function revokeRole(
   if (!canManageAccess(actorRoles(actor)))
     throw new PrCenterError("You cannot revoke roles", 403, "FORBIDDEN");
   const accessReason = normalizeAccessAdminReason(reason);
-  const roleRecord = await prisma.prUserRole.findFirst({
-    where: { id: roleId, organizationId: actor.organizationId },
-    include: {
-      user: {
-        select: {
-          id: true,
-          displayName: true,
-          email: true,
-          departmentId: true,
-          active: true,
+  const loadAuthorizedRole = async (db: Prisma.TransactionClient) => {
+    const roleRecord = await db.prUserRole.findFirst({
+      where: { id: roleId, organizationId: actor.organizationId },
+      include: {
+        user: {
+          select: {
+            id: true,
+            displayName: true,
+            email: true,
+            departmentId: true,
+            active: true,
+          },
         },
       },
-    },
-  });
-  if (!roleRecord) throw new PrCenterError("Role assignment not found", 404, "NOT_FOUND");
-  if (roleRecord.role === "RTRDA_ADMIN" && !actor.isRootAdministrator)
-    throw new PrCenterError(
-      "Only the root PR Center administrator can revoke administrator roles",
-      403,
-      "ROOT_ADMIN_REQUIRED",
-    );
-  if (isRootPrCenterAdministrator(roleRecord.user.email))
-    throw new PrCenterError(
-      "The root PR Center administrator assignment is protected",
-      422,
-      "ROOT_ADMIN_PROTECTED",
-    );
-  assertCanManageDepartmentScope(actor, roleRecord.departmentId);
-  assertCanManageUserScope(actor, roleRecord.user);
+    });
+    if (!roleRecord)
+      throw new PrCenterError("Role assignment not found", 404, "NOT_FOUND");
+    if (roleRecord.role === "RTRDA_ADMIN" && !actor.isRootAdministrator)
+      throw new PrCenterError(
+        "Only the root PR Center administrator can revoke administrator roles",
+        403,
+        "ROOT_ADMIN_REQUIRED",
+      );
+    if (isRootPrCenterAdministrator(roleRecord.user.email))
+      throw new PrCenterError(
+        "The root PR Center administrator assignment is protected",
+        422,
+        "ROOT_ADMIN_PROTECTED",
+      );
+    assertCanManageDepartmentScope(actor, roleRecord.departmentId);
+    assertCanManageUserScope(actor, roleRecord.user);
+    return roleRecord;
+  };
+  await loadAuthorizedRole(prisma);
   return runSerializableAccessTransaction(async (tx) => {
+    const roleRecord = await loadAuthorizedRole(tx);
     if (
       roleRecord.role === "RTRDA_ADMIN" &&
       roleRecord.departmentId === null &&
@@ -5560,7 +5602,25 @@ export async function revokeRole(
       await assertActiveOrganizationAdministratorRemains(tx, actor.organizationId, {
         roleId,
       });
-    await tx.prUserRole.delete({ where: { id: roleId } });
+    const removed = await tx.prUserRole.deleteMany({
+      where: {
+        id: roleId,
+        organizationId: actor.organizationId,
+        role: roleRecord.role,
+        departmentId: roleRecord.departmentId,
+        userId: roleRecord.userId,
+        user: {
+          organizationId: actor.organizationId,
+          departmentId: roleRecord.user.departmentId,
+        },
+      },
+    });
+    if (removed.count !== 1)
+      throw new PrCenterError(
+        "Role assignment changed. Refresh and try again.",
+        409,
+        "STALE_ACCESS_ADMIN_WRITE",
+      );
     await tx.prAuditEvent.create({
       data: {
         organizationId: actor.organizationId,
@@ -5591,35 +5651,40 @@ export async function toggleUserActive(
   if (!canManageAccess(actorRoles(actor)))
     throw new PrCenterError("You cannot modify user status", 403, "FORBIDDEN");
   const accessReason = normalizeAccessAdminReason(reason);
-  const user = await prisma.prCenterUser.findFirst({
-    where: { id: userId, organizationId: actor.organizationId },
-    include: { roles: { select: { role: true, departmentId: true } } },
-  });
-  if (!user) throw new PrCenterError("User not found", 404, "NOT_FOUND");
-  assertCanManageUserScope(actor, user);
-  if (isRootPrCenterAdministrator(user.email))
-    throw new PrCenterError(
-      "The root PR Center administrator account cannot be deactivated",
-      422,
-      "ROOT_ADMIN_PROTECTED",
-    );
-  if (
-    !actor.isRootAdministrator &&
-    user.roles?.some((grant) => grant.role === "RTRDA_ADMIN")
-  )
-    throw new PrCenterError(
-      "Only the root PR Center administrator can change another administrator's active status",
-      403,
-      "ROOT_ADMIN_REQUIRED",
-    );
-  if (user.id === actor.id)
-    throw new PrCenterError(
-      "You cannot deactivate yourself",
-      422,
-      "SELF_DEACTIVATION_BLOCKED",
-    );
-  const nextActive = !user.active;
+  const loadAuthorizedUser = async (db: Prisma.TransactionClient) => {
+    const user = await db.prCenterUser.findFirst({
+      where: { id: userId, organizationId: actor.organizationId },
+      include: { roles: { select: { role: true, departmentId: true } } },
+    });
+    if (!user) throw new PrCenterError("User not found", 404, "NOT_FOUND");
+    assertCanManageUserScope(actor, user);
+    if (isRootPrCenterAdministrator(user.email))
+      throw new PrCenterError(
+        "The root PR Center administrator account cannot be deactivated",
+        422,
+        "ROOT_ADMIN_PROTECTED",
+      );
+    if (
+      !actor.isRootAdministrator &&
+      user.roles?.some((grant) => grant.role === "RTRDA_ADMIN")
+    )
+      throw new PrCenterError(
+        "Only the root PR Center administrator can change another administrator's active status",
+        403,
+        "ROOT_ADMIN_REQUIRED",
+      );
+    if (user.id === actor.id)
+      throw new PrCenterError(
+        "You cannot deactivate yourself",
+        422,
+        "SELF_DEACTIVATION_BLOCKED",
+      );
+    return user;
+  };
+  await loadAuthorizedUser(prisma);
   return runSerializableAccessTransaction(async (tx) => {
+    const user = await loadAuthorizedUser(tx);
+    const nextActive = !user.active;
     if (!nextActive) {
       const orgAdminGrant = await tx.prUserRole.findFirst({
         where: {
@@ -5635,10 +5700,21 @@ export async function toggleUserActive(
           userId,
         });
     }
-    const updated = await tx.prCenterUser.update({
-      where: { id: userId },
+    const updated = await tx.prCenterUser.updateMany({
+      where: {
+        id: userId,
+        organizationId: actor.organizationId,
+        departmentId: user.departmentId,
+        active: user.active,
+      },
       data: { active: nextActive },
     });
+    if (updated.count !== 1)
+      throw new PrCenterError(
+        "User changed. Refresh and try again.",
+        409,
+        "STALE_ACCESS_ADMIN_WRITE",
+      );
     await tx.prAuditEvent.create({
       data: {
         organizationId: actor.organizationId,
@@ -5655,7 +5731,7 @@ export async function toggleUserActive(
         },
       },
     });
-    return { id: userId, active: updated.active };
+    return { id: userId, active: nextActive };
   });
 }
 
@@ -5979,7 +6055,12 @@ export async function restoreRequest(
     );
   return prisma.$transaction(async (tx) => {
     const updated = await tx.prRequest.updateMany({
-      where: { id: request.id, version: fromVersion, ...restoreScope },
+      where: {
+        id: request.id,
+        version: fromVersion,
+        status: request.status,
+        ...restoreScope,
+      },
       data: { status: "DRAFT", version: { increment: 1 } },
     });
     if (updated.count !== 1)

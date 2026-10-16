@@ -2,9 +2,14 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const { mockPrisma } = vi.hoisted(() => {
   const mockPrisma = {
-    prCenterUser: { findMany: vi.fn(), findFirst: vi.fn(), update: vi.fn() },
+    prCenterUser: { findMany: vi.fn(), findFirst: vi.fn(), updateMany: vi.fn() },
     prDepartment: { findFirst: vi.fn() },
-    prUserRole: { findFirst: vi.fn(), create: vi.fn(), delete: vi.fn(), count: vi.fn() },
+    prUserRole: {
+      findFirst: vi.fn(),
+      create: vi.fn(),
+      deleteMany: vi.fn(),
+      count: vi.fn(),
+    },
     prAuditEvent: { create: vi.fn() },
     $transaction: vi.fn(),
   };
@@ -64,8 +69,9 @@ beforeEach(() => {
   mockPrisma.prDepartment.findFirst.mockResolvedValue({ id: "dept-1" });
   mockPrisma.prUserRole.findFirst.mockResolvedValue(null);
   mockPrisma.prUserRole.create.mockResolvedValue({ id: "grant-1" });
-  mockPrisma.prUserRole.delete.mockResolvedValue({ id: "grant-1" });
+  mockPrisma.prUserRole.deleteMany.mockResolvedValue({ count: 1 });
   mockPrisma.prUserRole.count.mockResolvedValue(1);
+  mockPrisma.prCenterUser.updateMany.mockResolvedValue({ count: 1 });
   mockPrisma.prAuditEvent.create.mockResolvedValue({ id: "audit-1" });
   mockPrisma.prCenterUser.findMany.mockResolvedValue([]);
 });
@@ -251,8 +257,8 @@ describe("scoped access administration", () => {
       code: "FORBIDDEN",
     });
     expect(mockPrisma.prUserRole.create).not.toHaveBeenCalled();
-    expect(mockPrisma.prUserRole.delete).not.toHaveBeenCalled();
-    expect(mockPrisma.prCenterUser.update).not.toHaveBeenCalled();
+    expect(mockPrisma.prUserRole.deleteMany).not.toHaveBeenCalled();
+    expect(mockPrisma.prCenterUser.updateMany).not.toHaveBeenCalled();
   });
 
   it("allows only the root administrator to grant a delegated administrator role", async () => {
@@ -296,7 +302,7 @@ describe("scoped access administration", () => {
       statusCode: 403,
       code: "FORBIDDEN",
     });
-    expect(mockPrisma.prUserRole.delete).not.toHaveBeenCalled();
+    expect(mockPrisma.prUserRole.deleteMany).not.toHaveBeenCalled();
   });
 
   it("allows revoking an in-scope grant and audits the authority used", async () => {
@@ -318,8 +324,15 @@ describe("scoped access administration", () => {
     expect(mockPrisma.$transaction.mock.calls[0]?.[1]).toEqual({
       isolationLevel: "Serializable",
     });
-    expect(mockPrisma.prUserRole.delete).toHaveBeenCalledWith({
-      where: { id: "grant-1" },
+    expect(mockPrisma.prUserRole.deleteMany).toHaveBeenCalledWith({
+      where: {
+        id: "grant-1",
+        organizationId: "org-1",
+        role: "RTRDA_PR",
+        departmentId: "dept-1",
+        userId: "user-1",
+        user: { organizationId: "org-1", departmentId: "dept-1" },
+      },
     });
     expect(mockPrisma.prAuditEvent.create).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -349,7 +362,7 @@ describe("scoped access administration", () => {
     await expect(
       revokeRole(scopedAdministrator, "admin-grant", "change admin"),
     ).rejects.toMatchObject({ code: "ROOT_ADMIN_REQUIRED", statusCode: 403 });
-    expect(mockPrisma.prUserRole.delete).not.toHaveBeenCalled();
+    expect(mockPrisma.prUserRole.deleteMany).not.toHaveBeenCalled();
   });
 
   it("denies managing a user whose home department is outside the grantor's scope", async () => {
@@ -398,7 +411,7 @@ describe("scoped access administration", () => {
     await expect(
       revokeRole(organizationAdministrator, "org-admin-grant", "admin transition"),
     ).rejects.toMatchObject({ statusCode: 422, code: "LAST_ORGANIZATION_ADMIN" });
-    expect(mockPrisma.prUserRole.delete).not.toHaveBeenCalled();
+    expect(mockPrisma.prUserRole.deleteMany).not.toHaveBeenCalled();
     expect(mockPrisma.prAuditEvent.create).not.toHaveBeenCalled();
   });
 
@@ -421,8 +434,15 @@ describe("scoped access administration", () => {
     await expect(
       revokeRole(organizationAdministrator, "org-admin-grant", "admin transition"),
     ).resolves.toMatchObject({ removed: true });
-    expect(mockPrisma.prUserRole.delete).toHaveBeenCalledWith({
-      where: { id: "org-admin-grant" },
+    expect(mockPrisma.prUserRole.deleteMany).toHaveBeenCalledWith({
+      where: {
+        id: "org-admin-grant",
+        organizationId: "org-1",
+        role: "RTRDA_ADMIN",
+        departmentId: null,
+        userId: "admin-2",
+        user: { organizationId: "org-1", departmentId: "dept-1" },
+      },
     });
   });
 
@@ -433,7 +453,7 @@ describe("scoped access administration", () => {
       departmentId: "dept-1",
       active: false,
     });
-    mockPrisma.prCenterUser.update.mockResolvedValue({ id: "user-2", active: true });
+    mockPrisma.prCenterUser.updateMany.mockResolvedValue({ count: 1 });
 
     await toggleUserActive(
       organizationAdministrator,
@@ -469,7 +489,7 @@ describe("scoped access administration", () => {
     await expect(
       toggleUserActive(organizationAdministrator, "admin-2", "account maintenance"),
     ).rejects.toMatchObject({ statusCode: 422, code: "LAST_ORGANIZATION_ADMIN" });
-    expect(mockPrisma.prCenterUser.update).not.toHaveBeenCalled();
+    expect(mockPrisma.prCenterUser.updateMany).not.toHaveBeenCalled();
     expect(mockPrisma.prAuditEvent.create).not.toHaveBeenCalled();
   });
 
@@ -485,7 +505,7 @@ describe("scoped access administration", () => {
     await expect(
       toggleUserActive(scopedAdministrator, "admin-2", "remove access"),
     ).rejects.toMatchObject({ code: "ROOT_ADMIN_REQUIRED", statusCode: 403 });
-    expect(mockPrisma.prCenterUser.update).not.toHaveBeenCalled();
+    expect(mockPrisma.prCenterUser.updateMany).not.toHaveBeenCalled();
   });
 
   it("protects the designated root administrator account from deactivation", async () => {
@@ -500,7 +520,7 @@ describe("scoped access administration", () => {
     await expect(
       toggleUserActive(organizationAdministrator, "root-admin", "remove access"),
     ).rejects.toMatchObject({ code: "ROOT_ADMIN_PROTECTED", statusCode: 422 });
-    expect(mockPrisma.prCenterUser.update).not.toHaveBeenCalled();
+    expect(mockPrisma.prCenterUser.updateMany).not.toHaveBeenCalled();
   });
 
   it("maps a serializable transaction conflict to a safe stale-write error", async () => {

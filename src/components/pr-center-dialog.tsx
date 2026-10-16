@@ -6,11 +6,13 @@ import styles from "./pr-center-app.module.css";
 
 export function PrCenterDialog({
   title,
+  closeLabel,
   onClose,
   language,
   children,
 }: {
   title: string;
+  closeLabel?: string;
   onClose: () => void;
   language: "th" | "en";
   children: React.ReactNode;
@@ -82,7 +84,10 @@ export function PrCenterDialog({
           <button
             type="button"
             onClick={onClose}
-            aria-label={language === "th" ? "ปิดรายละเอียดงาน" : "Close task details"}
+            aria-label={
+              closeLabel ??
+              (language === "th" ? "ปิดรายละเอียดงาน" : "Close task details")
+            }
           >
             ✕
           </button>
