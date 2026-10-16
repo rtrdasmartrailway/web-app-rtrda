@@ -2866,6 +2866,7 @@ export async function listAuditEvents(
     filters.sort,
   ) as Prisma.PrAuditEventOrderByWithRelationInput[];
   const customSort = filters.sort && filters.sort !== DEFAULT_LIST_SORT;
+  const actorSort = filters.sort?.startsWith("actor:");
   // Audit payloads can contain sensitive cross-department data. Only an
   // organization-wide eligible grant can read another user's events.
   const scope: Prisma.PrAuditEventWhereInput = actorHasOrganizationWideRole(actor, [
@@ -2887,17 +2888,38 @@ export async function listAuditEvents(
   if (cursor) {
     const anchor = await prisma.prAuditEvent.findFirst({
       where: { AND: [...clauses, { id: cursor }] },
-      select: { id: true, createdAt: true },
+      select: { id: true, createdAt: true, actor: { select: { displayName: true } } },
     });
     if (!anchor)
       throw new PrCenterError("Cursor not found in this history", 422, "INVALID_CURSOR");
     if (!customSort) clauses.push(afterCursor(anchor.createdAt, anchor.id));
+    // Prisma's relation cursor comparison cannot advance past a NULL actor.
+    // Match PostgreSQL's NULL ordering explicitly for this optional relation.
+    if (actorSort) {
+      const descending = filters.sort === "actor:desc";
+      const comparison = descending ? "lt" : "gt";
+      const id = { [comparison]: anchor.id };
+      const name = anchor.actor?.displayName;
+      clauses.push({
+        OR:
+          name === undefined
+            ? [
+                { actor: { is: null }, id },
+                ...(descending ? [{ actor: { isNot: null } }] : []),
+              ]
+            : [
+                { actor: { is: { displayName: { [comparison]: name } } } },
+                { actor: { is: { displayName: name } }, id },
+                ...(!descending ? [{ actor: { is: null } }] : []),
+              ],
+      });
+    }
   }
   const events = await prisma.prAuditEvent.findMany({
     where: clauses.length === 1 ? scope : { AND: clauses },
     include: { actor: { select: { displayName: true } } },
     orderBy,
-    ...(customSort && cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
+    ...(customSort && !actorSort && cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
     take: limit + 1,
   });
   // Keep the extra row so the caller can detect whether a next page exists.

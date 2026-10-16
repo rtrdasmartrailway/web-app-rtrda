@@ -177,12 +177,45 @@ describe("audit history pagination", () => {
     await listAuditEvents(actor, 2, cursor, { sort: "actor:asc" });
     expect(prismaMock.prAuditEvent.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: { organizationId: "org", actorId: "mine" },
-        cursor: { id: cursor },
-        skip: 1,
+        where: {
+          AND: [
+            { organizationId: "org", actorId: "mine" },
+            { OR: [{ actor: { is: null }, id: { gt: cursor } }] },
+          ],
+        },
         orderBy: [{ actor: { displayName: "asc" } }, { id: "asc" }],
       }),
     );
+  });
+
+  it("advances from null actors into named actors when sorting descending", async () => {
+    prismaMock.prAuditEvent.findFirst.mockResolvedValue({
+      id: cursor,
+      createdAt: date,
+      actor: null,
+    });
+    await listAuditEvents(actor, 2, cursor, { sort: "actor:desc" });
+    const query = prismaMock.prAuditEvent.findMany.mock.calls[0][0];
+    expect(query.cursor).toBeUndefined();
+    expect(query.where.AND[1]).toEqual({
+      OR: [{ actor: { is: null }, id: { lt: cursor } }, { actor: { isNot: null } }],
+    });
+  });
+
+  it("includes null actors after equal-name/id rows when sorting ascending", async () => {
+    prismaMock.prAuditEvent.findFirst.mockResolvedValue({
+      id: cursor,
+      createdAt: date,
+      actor: { displayName: "กานต์" },
+    });
+    await listAuditEvents(actor, 2, cursor, { sort: "actor:asc" });
+    expect(prismaMock.prAuditEvent.findMany.mock.calls[0][0].where.AND[1]).toEqual({
+      OR: [
+        { actor: { is: { displayName: { gt: "กานต์" } } } },
+        { actor: { is: { displayName: "กานต์" } }, id: { gt: cursor } },
+        { actor: { is: null } },
+      ],
+    });
   });
 
   it("sorts access events before taking an offset page and retains access filters", async () => {
