@@ -124,7 +124,12 @@ describe("task-stage approval flow", () => {
     await transitionTask(prActor, task.id, task.version, "SOURCE_FACT_CHECK", undefined);
 
     expect(prisma.prTask.updateMany).toHaveBeenCalledWith({
-      where: { id: task.id, version: task.version },
+      where: {
+        id: task.id,
+        version: task.version,
+        status: task.status,
+        request: { organizationId: "org-1", OR: [{ departmentId: "dept-1" }] },
+      },
       data: { status: "SOURCE_FACT_CHECK", version: { increment: 1 } },
     });
   });
@@ -148,7 +153,12 @@ describe("task-stage approval flow", () => {
       });
       expect(result.id).toBe("approval-1");
       expect(prisma.prTask.updateMany).toHaveBeenLastCalledWith({
-        where: { id: task.id, version: task.version },
+        where: {
+          id: task.id,
+          version: task.version,
+          status: task.status,
+          request: { organizationId: "org-1", OR: [{ departmentId: "dept-1" }] },
+        },
         data: { status: nextStatus, version: { increment: 1 } },
       });
       expect(prisma.prApproval.create).toHaveBeenLastCalledWith({
@@ -213,7 +223,12 @@ describe("task-stage approval flow", () => {
       }),
     });
     expect(prisma.prTask.updateMany).toHaveBeenCalledWith({
-      where: { id: task.id, version: task.version },
+      where: {
+        id: task.id,
+        version: task.version,
+        status: task.status,
+        request: { organizationId: "org-1", OR: [{ departmentId: "dept-1" }] },
+      },
       data: { status: "REVISION_REQUIRED", version: { increment: 1 } },
     });
   });
@@ -230,7 +245,12 @@ describe("task-stage approval flow", () => {
     });
 
     expect(prisma.prTask.updateMany).toHaveBeenCalledWith({
-      where: { id: task.id, version: task.version },
+      where: {
+        id: task.id,
+        version: task.version,
+        status: task.status,
+        request: { organizationId: "org-1", OR: [{ departmentId: "dept-1" }] },
+      },
       data: { status: "PR_EDITORIAL_REVIEW", version: { increment: 1 } },
     });
   });
@@ -279,7 +299,12 @@ describe("task-stage approval flow", () => {
       decision: "APPROVED",
     });
     expect(prisma.prTask.updateMany).toHaveBeenCalledWith({
-      where: { id: task.id, version: task.version },
+      where: {
+        id: task.id,
+        version: task.version,
+        status: task.status,
+        request: { organizationId: "org-1", OR: [{ departmentId: "dept-1" }] },
+      },
       data: { status: "APPROVED", version: { increment: 1 } },
     });
   });
@@ -307,7 +332,12 @@ describe("task-stage approval flow", () => {
       select: { publishedAt: true },
     });
     expect(prisma.prTask.updateMany).toHaveBeenCalledWith({
-      where: { id: task.id, version: task.version },
+      where: {
+        id: task.id,
+        version: task.version,
+        status: task.status,
+        request: { organizationId: "org-1", OR: [{ departmentId: "dept-1" }] },
+      },
       data: { status: "CLOSED", version: { increment: 1 } },
     });
   });
@@ -366,5 +396,37 @@ describe("task-stage approval flow", () => {
     const queue = await listApprovalQueue(prActor);
 
     expect(queue.map((task) => task.status)).toEqual(["TECHNICAL_REVIEW"]);
+  });
+
+  it("repeats stage-eligible grant scope, version and status and stops after a lost approval race", async () => {
+    const task = taskAt("PR_EDITORIAL_REVIEW");
+    prisma.prTask.findFirst.mockResolvedValue(task);
+    prisma.prTask.updateMany.mockResolvedValue({ count: 0 });
+    await expect(
+      recordApprovalDecision(
+        {
+          ...prActor,
+          roleGrants: [
+            { role: "RTRDA_PR", departmentId: "dept-1" },
+            { role: "RTRDA_ADMIN", departmentId: null },
+          ],
+        },
+        task.id,
+        task.version,
+        { decision: "APPROVED", reviewChecklist: completeEditorialChecklist },
+      ),
+    ).rejects.toMatchObject({ code: "STALE_UPDATE" });
+    expect(prisma.prTask.updateMany).toHaveBeenCalledWith({
+      where: {
+        id: task.id,
+        version: task.version,
+        status: task.status,
+        request: { organizationId: "org-1", OR: [{ departmentId: "dept-1" }] },
+      },
+      data: { status: "MANAGEMENT_APPROVAL", version: { increment: 1 } },
+    });
+    expect(prisma.prApproval.create).not.toHaveBeenCalled();
+    expect(prisma.prStatusHistory.create).not.toHaveBeenCalled();
+    expect(prisma.prOutboxEvent.create).not.toHaveBeenCalled();
   });
 });

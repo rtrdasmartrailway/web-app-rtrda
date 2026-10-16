@@ -66,12 +66,13 @@ const organizationAdmin: PrCenterActor = {
 };
 const requestScope = {
   organizationId: "org-1",
-  departmentId: { in: ["dept-1"] },
+  OR: [{ departmentId: "dept-1" }],
 };
 const scopedAttachment = {
-  OR: [
-    { request: { is: requestScope } },
-    { task: { is: { request: { is: requestScope } } } },
+  AND: [
+    { OR: [{ request: { is: null } }, { request: { is: requestScope } }] },
+    { OR: [{ task: { is: null } }, { task: { is: { request: { is: requestScope } } } }] },
+    { OR: [{ request: { isNot: null } }, { task: { isNot: null } }] },
   ],
 };
 
@@ -99,7 +100,7 @@ describe("scope-sensitive file and audit operations", () => {
           organizationId: "org-1",
           attachments: { some: scopedAttachment, every: scopedAttachment },
         }),
-        include: {
+        select: expect.objectContaining({
           attachments: {
             where: scopedAttachment,
             select: {
@@ -110,7 +111,7 @@ describe("scope-sensitive file and audit operations", () => {
               taskId: true,
             },
           },
-        },
+        }),
       }),
     );
   });

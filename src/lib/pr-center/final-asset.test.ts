@@ -32,6 +32,7 @@ beforeEach(() => {
   prisma.prTask.findFirst.mockResolvedValue({
     id: "task-1",
     version: 4,
+    status: "IN_PRODUCTION",
     revisions: [{ revisionNumber: 2 }],
   });
   prisma.prFileObject.findFirst.mockResolvedValue({ id: "file-1" });
@@ -60,7 +61,16 @@ describe("final asset assignment", () => {
     );
     expect(tx.prTaskRevision.updateMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: { taskId: "task-1", revisionNumber: 2 },
+        where: {
+          taskId: "task-1",
+          revisionNumber: 2,
+          task: {
+            id: "task-1",
+            version: 4,
+            status: "IN_PRODUCTION",
+            request: { organizationId: "org-1", OR: [{ departmentId: "dept-1" }] },
+          },
+        },
         data: { finalAssetId: "file-1" },
       }),
     );

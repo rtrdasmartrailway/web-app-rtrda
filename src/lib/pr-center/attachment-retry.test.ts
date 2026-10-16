@@ -125,7 +125,20 @@ describe("attachment linkage retries", () => {
           taskId: target.taskId,
           kind: "SOURCE",
         },
-        include: { file: true },
+        include: {
+          file: {
+            select: {
+              id: true,
+              fileName: true,
+              mimeType: true,
+              sizeBytes: true,
+              scanStatus: true,
+              scannedAt: true,
+              createdAt: true,
+              deletedAt: true,
+            },
+          },
+        },
       });
       expect(rows).toHaveLength(1);
       expectNoLinkMutation();

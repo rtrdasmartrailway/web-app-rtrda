@@ -92,12 +92,23 @@ describe("scoped access administration", () => {
       expect.objectContaining({
         where: {
           organizationId: "org-1",
-          departmentId: { in: ["dept-1"] },
+          OR: [
+            { departmentId: { in: ["dept-1"] } },
+            { departmentId: { in: [] }, active: true },
+          ],
         },
-        include: expect.objectContaining({
+        select: expect.objectContaining({
           roles: {
             where: {
-              OR: [{ departmentId: { in: ["dept-1"] } }, { departmentId: null }],
+              organizationId: "org-1",
+              OR: [
+                { departmentId: { in: ["dept-1"] } },
+                { departmentId: null },
+                {
+                  role: "RTRDA_BORD",
+                  OR: [{ departmentId: { in: [] } }, { departmentId: null }],
+                },
+              ],
             },
             select: { id: true, role: true, departmentId: true },
           },
@@ -113,14 +124,22 @@ describe("scoped access administration", () => {
       expect.objectContaining({
         where: {
           organizationId: "org-1",
-          departmentId: { in: ["dept-1"] },
-          active: true,
+          OR: [
+            { departmentId: { in: [] } },
+            { departmentId: { in: ["dept-1"] }, active: true },
+          ],
         },
-        include: expect.objectContaining({
+        select: expect.objectContaining({
           roles: {
             where: {
-              role: "RTRDA_BORD",
-              OR: [{ departmentId: { in: ["dept-1"] } }, { departmentId: null }],
+              organizationId: "org-1",
+              OR: [
+                { departmentId: { in: [] } },
+                {
+                  role: "RTRDA_BORD",
+                  OR: [{ departmentId: { in: ["dept-1"] } }, { departmentId: null }],
+                },
+              ],
             },
             select: { id: true, role: true, departmentId: true },
           },

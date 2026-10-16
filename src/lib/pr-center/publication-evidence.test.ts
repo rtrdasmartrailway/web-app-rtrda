@@ -115,7 +115,12 @@ describe("scheduleTask", () => {
 
     expect(result.id).toBe("schedule-new");
     expect(tx.prTask.updateMany).toHaveBeenCalledWith({
-      where: { id: "task", version: 4, status: "SCHEDULED" },
+      where: {
+        id: "task",
+        version: 4,
+        status: "SCHEDULED",
+        request: { organizationId: "org", OR: [{}] },
+      },
       data: { channel: "Web", version: { increment: 1 } },
     });
     expect(tx.prSchedule.create).toHaveBeenCalledWith({
@@ -222,7 +227,19 @@ describe("recordPublishingEvidence", () => {
 
     expect(result.id).toBe("schedule-web");
     expect(tx.prSchedule.updateMany).toHaveBeenCalledWith(
-      expect.objectContaining({ where: { id: "schedule-web", publishedAt: null } }),
+      expect.objectContaining({
+        where: {
+          id: "schedule-web",
+          taskId: "task",
+          publishedAt: null,
+          task: {
+            id: "task",
+            version: 4,
+            status: "PUBLISHED",
+            request: { organizationId: "org", OR: [{}] },
+          },
+        },
+      }),
     );
     expect(tx.prTask.updateMany).not.toHaveBeenCalled();
     expect(tx.prStatusHistory.create).not.toHaveBeenCalled();
@@ -287,7 +304,12 @@ describe("recordPublishingEvidence", () => {
     });
 
     expect(tx.prTask.updateMany).toHaveBeenCalledWith({
-      where: { id: "task", version: 3, status: "SCHEDULED" },
+      where: {
+        id: "task",
+        version: 3,
+        status: "SCHEDULED",
+        request: { organizationId: "org", OR: [{}] },
+      },
       data: { status: "PUBLISHED", version: { increment: 1 } },
     });
     expect(tx.prStatusHistory.create).toHaveBeenCalledTimes(1);

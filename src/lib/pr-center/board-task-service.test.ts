@@ -66,7 +66,16 @@ describe("PR unrestricted board positioning", () => {
     await moveBoardTask(actor, "task", 4, { column: "In production" }, "correlation");
     expect(db.prTask.updateMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: { id: "task", version: 4, status, request: { status: "APPROVED" } },
+        where: {
+          id: "task",
+          version: 4,
+          status,
+          request: {
+            organizationId: "org",
+            OR: [{ departmentId: "dept" }],
+            status: "APPROVED",
+          },
+        },
         data: { status: "IN_PRODUCTION", channel: null, version: { increment: 1 } },
       }),
     );

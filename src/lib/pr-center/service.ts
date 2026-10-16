@@ -254,23 +254,58 @@ function canReadRequestRecord(
   return scope.organizationWide || scope.departmentIds.includes(request.departmentId);
 }
 
+function mutationRequestScope(
+  actor: PrCenterActor,
+  roles: readonly PrCenterRole[] = ["RTRDA_PR", "RTRDA_BORD", "RTRDA_ADMIN"],
+): Prisma.PrRequestWhereInput {
+  return {
+    organizationId: actor.organizationId,
+    OR: roleDepartmentClauses(actor, roles),
+  };
+}
+
+function taskMutationScope(
+  actor: PrCenterActor,
+  taskId: string,
+): Prisma.PrTaskWhereInput {
+  return { id: taskId, request: mutationRequestScope(actor) };
+}
+
+// A shared attachment is mutable only when every present target is authorized.
+function attachmentMutationScope(actor: PrCenterActor): Prisma.PrAttachmentWhereInput {
+  const request = mutationRequestScope(actor);
+  return {
+    AND: [
+      { OR: [{ request: { is: null } }, { request: { is: request } }] },
+      { OR: [{ task: { is: null } }, { task: { is: { request: { is: request } } } }] },
+      { OR: [{ request: { isNot: null } }, { task: { isNot: null } }] },
+    ],
+  };
+}
+
+const quarantineFileSelect = {
+  id: true,
+  organizationId: true,
+  fileName: true,
+  mimeType: true,
+  sizeBytes: true,
+  scanStatus: true,
+  scannedAt: true,
+  deletedAt: true,
+  createdAt: true,
+} satisfies Prisma.PrFileObjectSelect;
+
 function quarantinedFileScope(actor: PrCenterActor): {
   fileWhere: Prisma.PrFileObjectWhereInput;
   attachmentWhere?: Prisma.PrAttachmentWhereInput;
 } {
   const scope = roleDepartmentScopes(actor, ["RTRDA_PR", "RTRDA_BORD", "RTRDA_ADMIN"]);
-  if (scope.organizationWide) return { fileWhere: {} };
+  const attachmentWhere = attachmentMutationScope(actor);
+  // Only an eligible organization-wide grant may inspect unlinked uploads.
+  // Even then, any existing links must remain inside the actor's organization.
+  if (scope.organizationWide)
+    return { fileWhere: { attachments: { every: attachmentWhere } }, attachmentWhere };
   if (scope.departmentIds.length === 0) return { fileWhere: { id: "__out_of_scope__" } };
-  const requestScope: Prisma.PrRequestWhereInput = {
-    organizationId: actor.organizationId,
-    departmentId: { in: scope.departmentIds },
-  };
-  const attachmentWhere: Prisma.PrAttachmentWhereInput = {
-    OR: [
-      { request: { is: requestScope } },
-      { task: { is: { request: { is: requestScope } } } },
-    ],
-  };
   return {
     fileWhere: { attachments: { some: attachmentWhere, every: attachmentWhere } },
     attachmentWhere,
@@ -2609,7 +2644,12 @@ export async function updateTaskAssignment(
     input.technicalReviewRequired !== undefined ||
     input.managementApprovalRequired !== undefined;
   const task = await prisma.prTask.findFirst({
-    where: taskScopeWhere(actor, taskId),
+    where: {
+      ...taskMutationScope(actor, taskId),
+      ...(configuresApprovalRequirements
+        ? { request: mutationRequestScope(actor, ["RTRDA_PR"]) }
+        : {}),
+    },
     include: { request: { select: { status: true, departmentId: true } } },
   });
   if (!task) throw new PrCenterError("Task not found", 404, "NOT_FOUND");
@@ -2677,7 +2717,14 @@ export async function updateTaskAssignment(
     );
   return prisma.$transaction(async (tx) => {
     const updated = await tx.prTask.updateMany({
-      where: { id: task.id, version: fromVersion },
+      where: {
+        ...taskMutationScope(actor, task.id),
+        ...(configuresApprovalRequirements
+          ? { request: mutationRequestScope(actor, ["RTRDA_PR"]) }
+          : {}),
+        version: fromVersion,
+        status: task.status,
+      },
       data: {
         ownerId: input.ownerId,
         dueAt: input.dueAt,
@@ -3057,7 +3104,7 @@ export async function transitionTask(
   correlationId: string = randomUUID(),
 ) {
   const task = await prisma.prTask.findFirst({
-    where: taskScopeWhere(actor, taskId),
+    where: taskMutationScope(actor, taskId),
     include: { request: { select: { departmentId: true, status: true } } },
   });
   if (!task) throw new PrCenterError("Task not found", 404, "NOT_FOUND");
@@ -3140,7 +3187,11 @@ export async function transitionTask(
 
   return prisma.$transaction(async (tx) => {
     const updated = await tx.prTask.updateMany({
-      where: { id: task.id, version: fromVersion },
+      where: {
+        ...taskMutationScope(actor, task.id),
+        version: fromVersion,
+        status: task.status,
+      },
       data: { status: to as PrTaskStatus, version: { increment: 1 } },
     });
     if (updated.count !== 1)
@@ -3276,7 +3327,7 @@ export async function moveBoardTask(
         id: task.id,
         version: fromVersion,
         status: task.status,
-        request: { status: "APPROVED" },
+        request: { ...mutationRequestScope(actor, ["RTRDA_PR"]), status: "APPROVED" },
       },
       data: {
         status: target,
@@ -3390,7 +3441,7 @@ export async function createTaskRevision(
   if (!canManageTasks(actorRoles(actor)))
     throw new PrCenterError("You cannot revise this task", 403, "FORBIDDEN");
   const task = await prisma.prTask.findFirst({
-    where: taskScopeWhere(actor, taskId),
+    where: taskMutationScope(actor, taskId),
     include: {
       request: { select: { status: true } },
       revisions: { orderBy: { revisionNumber: "desc" } },
@@ -3443,7 +3494,11 @@ export async function createTaskRevision(
   });
   return prisma.$transaction(async (tx) => {
     const updated = await tx.prTask.updateMany({
-      where: { id: task.id, version: fromVersion },
+      where: {
+        ...taskMutationScope(actor, task.id),
+        version: fromVersion,
+        status: task.status,
+      },
       data: { status: "IN_PRODUCTION", version: { increment: 1 } },
     });
     if (updated.count !== 1)
@@ -3638,7 +3693,7 @@ export async function recordRequestDecision(
   if (!canDecideRequestIntake(actorRoles(actor)))
     throw new PrCenterError("You cannot decide this request", 403, "FORBIDDEN");
   const request = await prisma.prRequest.findFirst({
-    where: { id: requestId, ...requestScopeWhere(actor) },
+    where: { id: requestId, ...mutationRequestScope(actor) },
     include: {
       tasks: { select: { id: true, status: true, version: true } },
       requester: {
@@ -3691,7 +3746,12 @@ export async function recordRequestDecision(
 
   return prisma.$transaction(async (tx) => {
     const updated = await tx.prRequest.updateMany({
-      where: { id: request.id, version: fromVersion, status: "SUBMITTED" },
+      where: {
+        id: request.id,
+        ...mutationRequestScope(actor),
+        version: fromVersion,
+        status: "SUBMITTED",
+      },
       data: {
         status: input.decision as PrRequestStatus,
         version: { increment: 1 },
@@ -3862,7 +3922,7 @@ export async function recordApprovalDecision(
 ) {
   assertApprovalAuthority(actor);
   const task = await prisma.prTask.findFirst({
-    where: taskScopeWhere(actor, taskId),
+    where: taskMutationScope(actor, taskId),
     include: {
       request: true,
       revisions: { orderBy: { revisionNumber: "desc" }, take: 1 },
@@ -3986,7 +4046,12 @@ export async function recordApprovalDecision(
       : input.decision;
   return prisma.$transaction(async (tx) => {
     const updated = await tx.prTask.updateMany({
-      where: { id: task.id, version: fromVersion },
+      where: {
+        ...taskMutationScope(actor, task.id),
+        request: mutationRequestScope(actor, stage.roles),
+        version: fromVersion,
+        status: task.status,
+      },
       data: { status: next, version: { increment: 1 } },
     });
     if (updated.count !== 1)
@@ -4251,7 +4316,7 @@ export async function scheduleTask(
   if (idempotencyKey.length < 8 || idempotencyKey.length > 128)
     throw new PrCenterError("Idempotency key is invalid", 422, "INVALID_IDEMPOTENCY_KEY");
   const task = await prisma.prTask.findFirst({
-    where: taskScopeWhere(actor, taskId),
+    where: taskMutationScope(actor, taskId),
     include: {
       request: { include: { sources: true } },
       revisions: { orderBy: { revisionNumber: "desc" }, take: 1 },
@@ -4353,7 +4418,7 @@ export async function scheduleTask(
   return prisma.$transaction(async (tx) => {
     const updated = await tx.prTask.updateMany({
       where: {
-        id: task.id,
+        ...taskMutationScope(actor, task.id),
         version: fromVersion,
         status: task.status,
       },
@@ -4424,7 +4489,7 @@ export async function recordPublishingEvidence(
       "INVALID_PUBLICATION_EVIDENCE",
     );
   const task = await prisma.prTask.findFirst({
-    where: taskScopeWhere(actor, taskId),
+    where: taskMutationScope(actor, taskId),
     include: {
       schedules: {
         where: {
@@ -4469,7 +4534,11 @@ export async function recordPublishingEvidence(
     return await prisma.$transaction(async (tx) => {
       if (firstPublication) {
         const updated = await tx.prTask.updateMany({
-          where: { id: task.id, version: fromVersion, status: "SCHEDULED" },
+          where: {
+            ...taskMutationScope(actor, task.id),
+            version: fromVersion,
+            status: "SCHEDULED",
+          },
           data: { status: "PUBLISHED", version: { increment: 1 } },
         });
         if (updated.count !== 1)
@@ -4481,7 +4550,16 @@ export async function recordPublishingEvidence(
       }
       const publishedAt = new Date();
       const evidence = await tx.prSchedule.updateMany({
-        where: { id: schedule.id, publishedAt: null },
+        where: {
+          id: schedule.id,
+          taskId: task.id,
+          publishedAt: null,
+          task: {
+            ...taskMutationScope(actor, task.id),
+            version: firstPublication ? fromVersion + 1 : fromVersion,
+            status: firstPublication ? "PUBLISHED" : task.status,
+          },
+        },
         data: { publishedUrl, publishedReference, publishedAt },
       });
       if (evidence.count !== 1)
@@ -4567,17 +4645,143 @@ async function scanFile(
 
 // ── File upload, download, attachment, and final-asset helpers ──────────────
 
+const publicFileSelect = {
+  id: true,
+  fileName: true,
+  mimeType: true,
+  sizeBytes: true,
+  scanStatus: true,
+  scannedAt: true,
+  createdAt: true,
+  deletedAt: true,
+} satisfies Prisma.PrFileObjectSelect;
+
+type PublicFile = Prisma.PrFileObjectGetPayload<{ select: typeof publicFileSelect }>;
+function publicFile(file: PublicFile): PublicFile {
+  return {
+    id: file.id,
+    fileName: file.fileName,
+    mimeType: file.mimeType,
+    sizeBytes: file.sizeBytes,
+    scanStatus: file.scanStatus,
+    scannedAt: file.scannedAt,
+    createdAt: file.createdAt,
+    deletedAt: file.deletedAt,
+  };
+}
+
+// Upload binding is evidence scope, not permission to mutate the PR workflow.
+async function uploadTarget(
+  actor: PrCenterActor,
+  input: { requestId?: string; taskId?: string; kind?: string },
+) {
+  const hasRequest = input.requestId !== undefined;
+  const hasTask = input.taskId !== undefined;
+  if (!hasRequest && !hasTask && input.kind === undefined) return null;
+  const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  if (
+    hasRequest === hasTask ||
+    (hasRequest &&
+      (typeof input.requestId !== "string" || !uuid.test(input.requestId))) ||
+    (hasTask && (typeof input.taskId !== "string" || !uuid.test(input.taskId)))
+  )
+    throw new PrCenterError(
+      "Provide exactly one valid request or task ID",
+      422,
+      "INVALID_ATTACHMENT_TARGET",
+    );
+  if (
+    typeof input.kind !== "string" ||
+    !input.kind.trim() ||
+    input.kind.trim().length > 100
+  )
+    throw new PrCenterError(
+      "Attachment kind is required (max 100 characters)",
+      422,
+      "INVALID_KIND",
+    );
+  const task = hasTask
+    ? await prisma.prTask.findFirst({
+        where: taskScopeWhere(actor, input.taskId!),
+        include: { request: true },
+      })
+    : null;
+  const request = hasRequest
+    ? await prisma.prRequest.findFirst({
+        where: { id: input.requestId, ...requestScopeWhere(actor) },
+      })
+    : task?.request;
+  if (!request || (hasTask && !task))
+    throw new PrCenterError("Attachment target not found", 404, "NOT_FOUND");
+  return {
+    request,
+    task,
+    kind: input.kind.trim(),
+    requestId: input.requestId ?? null,
+    taskId: input.taskId ?? null,
+  };
+}
+
+async function lockUploadTarget(
+  tx: Prisma.TransactionClient,
+  actor: PrCenterActor,
+  target: NonNullable<Awaited<ReturnType<typeof uploadTarget>>>,
+) {
+  const { request, task } = target;
+  // Conditional no-op writes lock the rows until commit, closing the check/link
+  // race without changing workflow versions. Include immutable scope snapshots
+  // as well as version/state so even a move that missed a version bump fails.
+  const locked = await tx.prRequest.updateMany({
+    where: {
+      ...requestScopeWhere(actor),
+      id: request.id,
+      departmentId: request.departmentId,
+      requesterId: request.requesterId,
+      version: request.version,
+      status: request.status,
+    },
+    data: { version: request.version, updatedAt: request.updatedAt },
+  });
+  if (locked.count !== 1)
+    throw new PrCenterError(
+      "Attachment target changed. Refresh and try again.",
+      409,
+      "STALE_UPDATE",
+    );
+  if (task) {
+    const lockedTask = await tx.prTask.updateMany({
+      where: {
+        ...taskScopeWhere(actor, task.id),
+        requestId: request.id,
+        version: task.version,
+        status: task.status,
+      },
+      data: { version: task.version, updatedAt: task.updatedAt },
+    });
+    if (lockedTask.count !== 1)
+      throw new PrCenterError(
+        "Attachment target changed. Refresh and try again.",
+        409,
+        "STALE_UPDATE",
+      );
+  }
+}
+
 export async function uploadFile(
   actor: PrCenterActor,
   input: {
     fileName: string;
     mimeType: string;
     content: Buffer;
+    requestId?: string;
+    taskId?: string;
+    kind?: string;
   },
   correlationId: string = randomUUID(),
 ) {
   if (!canAttachFiles(actorRoles(actor)))
     throw new PrCenterError("You cannot upload files", 403, "FORBIDDEN");
+  const target = await uploadTarget(actor, input);
   let stored: StoredFile;
   try {
     stored = await storeFile(actor.organizationId, input);
@@ -4588,54 +4792,99 @@ export async function uploadFile(
   }
   // Scan before exposing the file; non-clean and failed scans remain undownloadable.
   const scan = await scanFile(input.content);
-  return prisma.$transaction(async (tx) => {
-    const fileObject = await tx.prFileObject.create({
-      data: {
-        organizationId: actor.organizationId,
-        storageKey: stored.storageKey,
-        fileName: stored.fileName,
-        mimeType: stored.mimeType,
-        sizeBytes: stored.sizeBytes,
-        checksum: stored.checksum,
-        scanStatus: scan.result,
-        scannedAt: new Date(),
-      },
-    });
-    // Audit: file uploaded
-    await tx.prAuditEvent.create({
-      data: {
-        organizationId: actor.organizationId,
-        actorId: actor.id,
-        action: "file.uploaded",
-        entityType: "file",
-        entityId: fileObject.id,
-        correlationId,
-        after: {
+  try {
+    return await prisma.$transaction(async (tx) => {
+      if (target) await lockUploadTarget(tx, actor, target);
+      const fileObject = await tx.prFileObject.create({
+        data: {
+          organizationId: actor.organizationId,
+          storageKey: stored.storageKey,
           fileName: stored.fileName,
           mimeType: stored.mimeType,
           sizeBytes: stored.sizeBytes,
           checksum: stored.checksum,
           scanStatus: scan.result,
+          scannedAt: new Date(),
         },
-      },
-    });
-    // Audit: scan result (always record scan outcome)
-    await tx.prAuditEvent.create({
-      data: {
-        organizationId: actor.organizationId,
-        actorId: actor.id,
-        action: "file.scan_completed",
-        entityType: "file",
-        entityId: fileObject.id,
-        correlationId,
-        after: {
-          scanStatus: scan.result,
-          reason: scan.reason,
+      });
+      // Audit: file uploaded
+      await tx.prAuditEvent.create({
+        data: {
+          organizationId: actor.organizationId,
+          actorId: actor.id,
+          action: "file.uploaded",
+          entityType: "file",
+          entityId: fileObject.id,
+          correlationId,
+          after: {
+            fileName: stored.fileName,
+            mimeType: stored.mimeType,
+            sizeBytes: stored.sizeBytes,
+            checksum: stored.checksum,
+            scanStatus: scan.result,
+          },
         },
-      },
+      });
+      // Audit: scan result (always record scan outcome)
+      await tx.prAuditEvent.create({
+        data: {
+          organizationId: actor.organizationId,
+          actorId: actor.id,
+          action: "file.scan_completed",
+          entityType: "file",
+          entityId: fileObject.id,
+          correlationId,
+          after: {
+            scanStatus: scan.result,
+            reason: scan.reason,
+          },
+        },
+      });
+      if (target) {
+        const { requestId, taskId, kind } = target;
+        const latest = await tx.prAttachment.findFirst({
+          where: { requestId, taskId, kind },
+          orderBy: { version: "desc" },
+          select: { version: true },
+        });
+        const attachment = await tx.prAttachment.create({
+          data: {
+            requestId,
+            taskId,
+            kind,
+            fileId: fileObject.id,
+            version: (latest?.version ?? 0) + 1,
+          },
+        });
+        await tx.prAuditEvent.create({
+          data: {
+            organizationId: actor.organizationId,
+            actorId: actor.id,
+            action: "attachment.created",
+            entityType: "attachment",
+            entityId: attachment.id,
+            correlationId,
+            after: { fileId: fileObject.id, requestId, taskId, kind },
+          },
+        });
+      }
+      return publicFile(fileObject);
     });
-    return fileObject;
-  });
+  } catch (error) {
+    // storeFile creates a unique key with exclusive creation: only remove bytes
+    // owned by this failed upload, never a caller-supplied or pre-existing key.
+    const removed = await removeFileFromStorage(
+      actor.organizationId,
+      stored.storageKey,
+    ).catch(() => false);
+    if (!removed)
+      throw new PrCenterError(
+        "Upload failed and stored-byte cleanup failed; operator cleanup is required",
+        500,
+        "UPLOAD_CLEANUP_FAILED",
+      );
+    throw error;
+  }
 }
 
 export async function downloadFile(
@@ -4751,9 +5000,9 @@ export async function createAttachment(
         taskId: input.taskId || null,
         kind,
       },
-      include: { file: true },
+      include: { file: { select: publicFileSelect } },
     });
-    if (existing) return existing;
+    if (existing) return { ...existing, file: publicFile(existing.file) };
     // Auto-increment version when replacing evidence for same target+kind
     const where: Record<string, unknown> = { kind };
     if (input.taskId) where.taskId = input.taskId;
@@ -4772,7 +5021,7 @@ export async function createAttachment(
         kind,
         version: nextVersion,
       },
-      include: { file: true },
+      include: { file: { select: publicFileSelect } },
     });
     await tx.prAuditEvent.create({
       data: {
@@ -4790,7 +5039,7 @@ export async function createAttachment(
         },
       },
     });
-    return attachment;
+    return { ...attachment, file: publicFile(attachment.file) };
   });
 }
 
@@ -4813,26 +5062,20 @@ export async function listAttachments(
     });
     if (!task) throw new PrCenterError("Task not found", 404, "NOT_FOUND");
   }
-  return prisma.prAttachment.findMany({
+  const attachments = await prisma.prAttachment.findMany({
     where: {
       ...(input.requestId ? { requestId: input.requestId } : {}),
       ...(input.taskId ? { taskId: input.taskId } : {}),
     },
     include: {
-      file: {
-        select: {
-          id: true,
-          fileName: true,
-          mimeType: true,
-          sizeBytes: true,
-          checksum: true,
-          scanStatus: true,
-          createdAt: true,
-        },
-      },
+      file: { select: publicFileSelect },
     },
     orderBy: { createdAt: "desc" },
   });
+  return attachments.map((attachment) => ({
+    ...attachment,
+    file: publicFile(attachment.file),
+  }));
 }
 
 export async function removeAttachment(
@@ -4842,22 +5085,28 @@ export async function removeAttachment(
 ) {
   if (!canRemoveAttachment(actorRoles(actor)))
     throw new PrCenterError("You cannot remove attachments", 403, "FORBIDDEN");
+  const scope = attachmentMutationScope(actor);
   const attachment = await prisma.prAttachment.findFirst({
-    where: { id: attachmentId },
-    include: {
-      request: { select: { organizationId: true } },
-      task: {
-        select: { request: { select: { organizationId: true } } },
-      },
-    },
+    where: { id: attachmentId, ...scope },
   });
   if (!attachment) throw new PrCenterError("Attachment not found", 404, "NOT_FOUND");
-  const orgId =
-    attachment.request?.organizationId ?? attachment.task?.request.organizationId;
-  if (orgId !== actor.organizationId)
-    throw new PrCenterError("Attachment not found", 404, "NOT_FOUND");
   return prisma.$transaction(async (tx) => {
-    await tx.prAttachment.delete({ where: { id: attachmentId } });
+    const removed = await tx.prAttachment.deleteMany({
+      where: {
+        id: attachmentId,
+        ...scope,
+        version: attachment.version,
+        fileId: attachment.fileId,
+        requestId: attachment.requestId,
+        taskId: attachment.taskId,
+      },
+    });
+    if (removed.count !== 1)
+      throw new PrCenterError(
+        "Attachment changed. Refresh and try again.",
+        409,
+        "STALE_UPDATE",
+      );
     // Check if the file is orphaned (no remaining attachments)
     const remainingAttachments = await tx.prAttachment.count({
       where: { fileId: attachment.fileId },
@@ -4865,11 +5114,16 @@ export async function removeAttachment(
     let fileRemoved = false;
     if (remainingAttachments === 0) {
       // Soft-delete the orphaned file object
-      await tx.prFileObject.update({
-        where: { id: attachment.fileId },
+      const cleaned = await tx.prFileObject.updateMany({
+        where: {
+          id: attachment.fileId,
+          organizationId: actor.organizationId,
+          deletedAt: null,
+          attachments: { none: {} },
+        },
         data: { deletedAt: new Date() },
       });
-      fileRemoved = true;
+      fileRemoved = cleaned.count === 1;
     }
     await tx.prAuditEvent.create({
       data: {
@@ -4902,7 +5156,7 @@ export async function assignFinalAsset(
   if (!canAssignFinalAsset(actorRoles(actor)))
     throw new PrCenterError("You cannot assign final assets", 403, "FORBIDDEN");
   const task = await prisma.prTask.findFirst({
-    where: taskScopeWhere(actor, taskIdArg),
+    where: taskMutationScope(actor, taskIdArg),
     include: { revisions: { orderBy: { revisionNumber: "desc" }, take: 1 } },
   });
   if (!task) throw new PrCenterError("Task not found", 404, "NOT_FOUND");
@@ -4952,6 +5206,11 @@ export async function assignFinalAsset(
     const updated = await tx.prTaskRevision.updateMany({
       where: {
         taskId: task.id,
+        task: {
+          ...taskMutationScope(actor, task.id),
+          version: fromVersion,
+          status: task.status,
+        },
         revisionNumber: targetRevisionNumber,
       },
       data: { finalAssetId: fileObject.id },
@@ -5068,57 +5327,69 @@ async function runSerializableAccessTransaction<T>(
 }
 
 export async function listAdminUsers(actor: PrCenterActor) {
-  const isAdministrator = canManageAccess(actorRoles(actor));
-  const directoryRoles: PrCenterRole[] = isAdministrator
-    ? ["RTRDA_ADMIN"]
-    : actorHasRole(actor, "RTRDA_PR")
-      ? ["RTRDA_PR"]
-      : actorHasRole(actor, "RTRDA_BORD")
-        ? ["RTRDA_BORD"]
-        : [];
-  if (!isAdministrator && directoryRoles.length === 0)
+  const admin = roleDepartmentScopes(actor, ["RTRDA_ADMIN"]);
+  const directory = roleDepartmentScopes(actor, ["RTRDA_PR", "RTRDA_BORD"]);
+  if (
+    !admin.organizationWide &&
+    !admin.departmentIds.length &&
+    !directory.organizationWide &&
+    !directory.departmentIds.length
+  )
     throw new PrCenterError("You cannot view user directory", 403, "FORBIDDEN");
-  const directoryScope = roleDepartmentScopes(actor, directoryRoles);
-  return prisma.prCenterUser.findMany({
+  const scopeFor = (scope: typeof admin) =>
+    scope.organizationWide ? {} : { departmentId: { in: scope.departmentIds } };
+  const rows = await prisma.prCenterUser.findMany({
     where: {
       organizationId: actor.organizationId,
-      ...(!directoryScope.organizationWide
-        ? { departmentId: { in: directoryScope.departmentIds } }
-        : {}),
-      ...(!isAdministrator ? { active: true } : {}),
+      OR: [scopeFor(admin), { ...scopeFor(directory), active: true }],
     },
-    include: {
+    select: {
+      id: true,
+      displayName: true,
+      email: true,
+      departmentId: true,
+      active: true,
       department: { select: { id: true, name: true } },
       roles: {
-        ...(!isAdministrator
-          ? {
-              where: {
-                role: "RTRDA_BORD",
-                ...(directoryScope.organizationWide
-                  ? {}
-                  : {
-                      OR: [
-                        { departmentId: { in: directoryScope.departmentIds } },
-                        { departmentId: null },
-                      ],
-                    }),
-              },
-            }
-          : !directoryScope.organizationWide
-            ? {
-                where: {
-                  OR: [
-                    { departmentId: { in: directoryScope.departmentIds } },
-                    { departmentId: null },
-                  ],
-                },
-              }
-            : {}),
+        where: {
+          organizationId: actor.organizationId,
+          OR: [
+            ...(admin.organizationWide
+              ? [{}]
+              : [
+                  { departmentId: { in: admin.departmentIds } },
+                  ...(admin.departmentIds.length ? [{ departmentId: null }] : []),
+                ]),
+            {
+              role: "RTRDA_BORD",
+              ...(directory.organizationWide
+                ? {}
+                : {
+                    OR: [
+                      { departmentId: { in: directory.departmentIds } },
+                      { departmentId: null },
+                    ],
+                  }),
+            },
+          ],
+        },
         select: { id: true, role: true, departmentId: true },
       },
     },
     orderBy: { displayName: "asc" },
   });
+  // Relation authority follows each user row, not the actor's broadest role.
+  return rows.map((user) => ({
+    ...user,
+    roles: user.roles.filter((role) =>
+      canManageDepartmentScope(actor, user.departmentId)
+        ? canManageDepartmentScope(actor, role.departmentId) || role.departmentId === null
+        : role.role === "RTRDA_BORD" &&
+          (role.departmentId === null ||
+            directory.organizationWide ||
+            directory.departmentIds.includes(role.departmentId)),
+    ),
+  }));
 }
 
 function normalizeAccessAdminReason(reason: unknown): string {
@@ -5165,13 +5436,15 @@ export async function grantRole(
       "SELF_GRANT_BLOCKED",
     );
   const accessReason = normalizeAccessAdminReason(reason);
-  if (isAdministrator) assertCanManageDepartmentScope(actor, departmentId ?? null);
-  else if (
-    departmentId === null ||
-    !actorHasRoleInDepartment(actor, "RTRDA_PR", departmentId)
-  )
+  const adminGrantAllowed =
+    isAdministrator && canManageDepartmentScope(actor, departmentId);
+  const prGrantAllowed =
+    mayGrantBoardRole &&
+    departmentId !== null &&
+    actorHasRoleInDepartment(actor, "RTRDA_PR", departmentId);
+  if (!adminGrantAllowed && !prGrantAllowed)
     throw new PrCenterError(
-      "RTRDA_PR may grant RTRDA_BORD only within its department scope",
+      "Role grant is outside your authorized scope",
       403,
       "FORBIDDEN",
     );
@@ -5179,10 +5452,13 @@ export async function grantRole(
     where: { id: userId, organizationId: actor.organizationId },
   });
   if (!user) throw new PrCenterError("User not found", 404, "NOT_FOUND");
-  if (isAdministrator) assertCanManageUserScope(actor, user);
-  else if (user.departmentId !== departmentId || !user.active)
+  const adminUserAllowed =
+    adminGrantAllowed && canManageDepartmentScope(actor, user.departmentId);
+  const prUserAllowed =
+    prGrantAllowed && user.departmentId === departmentId && user.active;
+  if (!adminUserAllowed && !prUserAllowed)
     throw new PrCenterError(
-      "RTRDA_PR may grant RTRDA_BORD only to an active user in the granted department",
+      "Target user is outside your authorized scope or inactive",
       403,
       "FORBIDDEN",
     );
@@ -5427,9 +5703,11 @@ export async function listAccessAuditEvents(
 
 // ── Quarantine management (RTRDA_ADMIN + RTRDA_PR) ───────────
 
-export async function listQuarantinedFiles(actor: PrCenterActor, take = 50) {
+export async function listQuarantinedFiles(actor: PrCenterActor, take = 50, offset = 0) {
   if (!canManageQuarantine(actorRoles(actor)))
     throw new PrCenterError("You cannot review quarantined files", 403, "FORBIDDEN");
+  if (!Number.isSafeInteger(take) || !Number.isSafeInteger(offset) || offset < 0)
+    throw new PrCenterError("Invalid quarantine pagination", 422, "INVALID_PAGINATION");
   const limit = Math.min(Math.max(take, 1), 100);
   const scope = quarantinedFileScope(actor);
   return prisma.prFileObject.findMany({
@@ -5439,7 +5717,8 @@ export async function listQuarantinedFiles(actor: PrCenterActor, take = 50) {
       deletedAt: null,
       ...scope.fileWhere,
     },
-    include: {
+    select: {
+      ...quarantineFileSelect,
       attachments: {
         ...(scope.attachmentWhere ? { where: scope.attachmentWhere } : {}),
         select: {
@@ -5453,6 +5732,7 @@ export async function listQuarantinedFiles(actor: PrCenterActor, take = 50) {
     },
     orderBy: { createdAt: "desc" },
     take: limit,
+    skip: offset,
   });
 }
 
@@ -5488,9 +5768,26 @@ export async function reviewQuarantinedFile(
     throw new PrCenterError("A deletion reason is required", 422, "REASON_REQUIRED");
 
   return prisma.$transaction(async (tx) => {
-    const updated = await tx.prFileObject.update({
-      where: { id: fileId },
-      data: { deletedAt: new Date() },
+    const deletedAt = new Date();
+    const changed = await tx.prFileObject.updateMany({
+      where: {
+        id: fileId,
+        organizationId: actor.organizationId,
+        deletedAt: null,
+        scanStatus: fileObject.scanStatus,
+        ...scope.fileWhere,
+      },
+      data: { deletedAt },
+    });
+    if (changed.count !== 1)
+      throw new PrCenterError(
+        "File changed. Refresh and try again.",
+        409,
+        "STALE_UPDATE",
+      );
+    const updated = await tx.prFileObject.findFirstOrThrow({
+      where: { id: fileId, organizationId: actor.organizationId, ...scope.fileWhere },
+      select: quarantineFileSelect,
     });
     await tx.prAuditEvent.create({
       data: {
@@ -5537,9 +5834,33 @@ export async function rescanFile(
   const content = await readFileFromStorage(actor.organizationId, fileObject.storageKey);
   const scan = await scanFile(content);
   return prisma.$transaction(async (tx) => {
-    const updated = await tx.prFileObject.update({
-      where: { id: fileId },
+    const changed = await tx.prFileObject.updateMany({
+      where: {
+        id: fileId,
+        organizationId: actor.organizationId,
+        deletedAt: null,
+        scanStatus: fileObject.scanStatus,
+        scannedAt: fileObject.scannedAt,
+        storageKey: fileObject.storageKey,
+        checksum: fileObject.checksum,
+        ...scope.fileWhere,
+      },
       data: { scanStatus: scan.result, scannedAt: new Date() },
+    });
+    if (changed.count !== 1)
+      throw new PrCenterError(
+        "File changed. Refresh and try again.",
+        409,
+        "STALE_UPDATE",
+      );
+    const updated = await tx.prFileObject.findFirstOrThrow({
+      where: {
+        id: fileId,
+        organizationId: actor.organizationId,
+        deletedAt: null,
+        ...scope.fileWhere,
+      },
+      select: quarantineFileSelect,
     });
     await tx.prAuditEvent.create({
       data: {
