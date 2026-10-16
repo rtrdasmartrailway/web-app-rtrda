@@ -60,6 +60,11 @@ import { dispatchNotification } from "./notification-channels";
 import { normalizeCreateIdeaInput } from "./idea-input";
 import { isRootPrCenterAdministrator } from "./access-authority";
 import {
+  RequestSubmissionError,
+  validateRequestDraftBounds,
+  validateRequestSubmission,
+} from "./request-submission";
+import {
   latestReleaseEvidenceByGate,
   parseReleaseEvidenceInput,
   RELEASE_EVIDENCE_GATES,
@@ -356,6 +361,16 @@ type CreateRequestInput = {
     confirmed: boolean;
   };
 };
+
+function validateRequestInput(validate: () => void) {
+  try {
+    validate();
+  } catch (error) {
+    if (error instanceof RequestSubmissionError)
+      throw new PrCenterError(error.message, 422, error.code);
+    throw error;
+  }
+}
 
 function validatedPriority(value?: string) {
   const priority = value?.trim().toUpperCase() || "NORMAL";
@@ -822,6 +837,7 @@ export async function createRequest(
   if (!actor.departmentId)
     throw new PrCenterError("An active department is required", 403, "SCOPE_REQUIRED");
   const departmentId = actor.departmentId;
+  validateRequestInput(() => validateRequestDraftBounds(input));
   const title = input.title.trim();
   if (title.length < 3 || title.length > 300)
     throw new PrCenterError(
@@ -872,7 +888,11 @@ export async function createRequest(
         },
         sources: { create: sourceUrls.map((url) => ({ url })) },
       },
-      include: { revisions: true, sources: true, tasks: true },
+      include: {
+        revisions: { orderBy: { revisionNumber: "desc" } },
+        sources: true,
+        tasks: true,
+      },
     });
     const operationsRoles = await tx.prUserRole.findMany({
       where: {
@@ -1333,6 +1353,7 @@ export async function updateRequestDraft(
       409,
       "STALE_UPDATE",
     );
+  validateRequestInput(() => validateRequestDraftBounds(input));
   const title = input.title.trim();
   if (title.length < 3 || title.length > 300)
     throw new PrCenterError(
@@ -1466,7 +1487,11 @@ export async function updateRequestDraft(
     });
     return tx.prRequest.findUniqueOrThrow({
       where: { id: request.id },
-      include: { revisions: true, sources: true, tasks: true },
+      include: {
+        revisions: { orderBy: { revisionNumber: "desc" } },
+        sources: true,
+        tasks: true,
+      },
     });
   });
 }
@@ -1496,6 +1521,25 @@ export async function transitionRequest(
       409,
       "STALE_UPDATE",
     );
+  if (status === "SUBMITTED") {
+    const revision = request.revisions?.[0];
+    const allowedContentTypes = await allowedRequestContentTypes(actor.organizationId);
+    validateRequestInput(() =>
+      validateRequestSubmission(
+        {
+          type: request.type,
+          title: request.title,
+          requestedFor: request.requestedFor,
+          priorityReason: request.priorityReason,
+          sourceUrls: request.sources?.map((source) => source.url) ?? [],
+          objective: revision?.objective,
+          audience: revision?.audience,
+          details: revision?.offsiteDetails,
+        },
+        allowedContentTypes,
+      ),
+    );
+  }
   return prisma.$transaction(async (tx) => {
     const updated = await tx.prRequest.updateMany({
       where: { id: request.id, version: fromVersion },
@@ -4517,6 +4561,19 @@ export async function createAttachment(
     if (!task) throw new PrCenterError("Task not found", 404, "NOT_FOUND");
   }
   return prisma.$transaction(async (tx) => {
+    // Serialize retries for this file across API instances, not only this process.
+    // Scope and CLEAN-file checks above always run, including for a replay.
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${actor.organizationId}), hashtext(${input.fileId}))`;
+    const existing = await tx.prAttachment.findFirst({
+      where: {
+        fileId: input.fileId,
+        requestId: input.requestId || null,
+        taskId: input.taskId || null,
+        kind,
+      },
+      include: { file: true },
+    });
+    if (existing) return existing;
     // Auto-increment version when replacing evidence for same target+kind
     const where: Record<string, unknown> = { kind };
     if (input.taskId) where.taskId = input.taskId;
