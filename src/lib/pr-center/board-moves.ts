@@ -19,6 +19,8 @@ export function boardMove(
   column: BoardColumn,
   reviewEntry?: PrTaskStatus,
 ): BoardMove {
+  if (!(BOARD_COLUMNS as readonly string[]).includes(column))
+    return { action: "blocked", reason: "workflow" };
   if (requestStatus !== "APPROVED") return { action: "blocked", reason: "request" };
   if (column === "Scheduled")
     return from === "APPROVED"

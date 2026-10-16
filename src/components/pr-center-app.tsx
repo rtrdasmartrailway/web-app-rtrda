@@ -23,7 +23,21 @@ import {
   sortDirectionLabel,
   type TableSorting,
 } from "./pr-center-table-sorting";
+import {
+  createDraftPersistence,
+  createUploadCache,
+} from "@/lib/pr-center/draft-persistence";
+import {
+  getRequestFormIssue,
+  getRequestFormErrorMessage,
+} from "@/lib/pr-center/request-form-submission";
+import { OPERATION_COLUMNS } from "@/lib/pr-center/operation-columns";
 import { DEFAULT_LIST_SORT, listSortFields } from "@/lib/pr-center/list-sorting";
+import {
+  REQUESTER_PAGE_IDS,
+  canOpenPrCenterPage,
+  isPrCenterPageEnabled,
+} from "@/lib/pr-center/page-access";
 import type { CreateContentIdeaInput } from "@/lib/pr-center/idea-input";
 import { submitIdeaForm } from "@/lib/pr-center/idea-form";
 import {
@@ -713,28 +727,8 @@ const pages: { id: Page; th: string; en: string; icon: string }[] = [
   { id: "settings", th: "บันทึกการเข้าถึง", en: "Access Audit", icon: "⚙️" },
   { id: "system-data", th: "System Data", en: "System Data", icon: "🗄️" },
 ];
-const PHASE_1_PAGES = new Set<Page>([
-  "home",
-  "new-request",
-  "my-requests",
-  "requests",
-  "operations",
-  "calendar",
-  "approvals",
-  "notifications",
-  "history",
-  "directory",
-  "settings",
-]);
-const PHASE_2_PAGE_IDS = new Set<Page>(["library", "ideas", "message-house"]);
-const PHASE_2_PAGES = new Set<Page>(
-  (process.env.NEXT_PUBLIC_PR_CENTER_PHASE2_PAGES || "")
-    .split(",")
-    .map((page) => page.trim())
-    .filter((page): page is Page => PHASE_2_PAGE_IDS.has(page as Page)),
-);
 function isPageEnabled(page: Page) {
-  return PHASE_1_PAGES.has(page) || PHASE_2_PAGES.has(page);
+  return isPrCenterPageEnabled(page, process.env.NEXT_PUBLIC_PR_CENTER_PHASE2_PAGES);
 }
 
 const copy = {
@@ -884,17 +878,7 @@ const ROLE_PAGES: Record<Role, Page[]> = {
     "notifications",
     "help",
   ],
-  requester: [
-    "home",
-    "new-request",
-    "my-requests",
-    "operations",
-    "calendar",
-    "ideas",
-    "message-house",
-    "notifications",
-    "help",
-  ],
+  requester: [...REQUESTER_PAGE_IDS],
 };
 
 const DISPLAY_ROLE_BY_PR_ROLE: Record<PrCenterRoleCode, Role> = {
@@ -1487,6 +1471,12 @@ export function PrCenterApp({
 }) {
   const latestActorId = useRef(actor?.userId);
   const [page, setPage] = useState<Page>("home");
+  const [notificationFocus, setNotificationFocus] = useState<{
+    entity: string;
+    id: string;
+    sequence: number;
+  } | null>(null);
+  const notificationGeneration = useRef(0);
   const [state, setState] = useState<PrCenterState>(() =>
     actor ? createAuthenticatedState() : cloneDefaultState(),
   );
@@ -1502,6 +1492,10 @@ export function PrCenterApp({
   const [requestDraftSaving, setRequestDraftSaving] = useState(false);
   const [requestSubmitting, setRequestSubmitting] = useState(false);
   const requestSaveInFlight = useRef(false);
+  const requestDraftPersistence = useRef(createDraftPersistence());
+  const requestUploadCache = useRef(createUploadCache<File>());
+  const requestAutosaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const requestCreatedFromPartial = useRef(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const [requestSearch, setRequestSearch] = useState("");
   const [requestStatusFilter, setRequestStatusFilter] = useState("");
@@ -1803,7 +1797,20 @@ export function PrCenterApp({
     fetchIdeaPage(0, ideaSearch, ideaStatusFilter, controller.signal, ideaSort)
       .then((page) => {
         if (controller.signal.aborted) return;
-        setState((previous) => ({ ...previous, ideas: page.items.map(mapIdeaRecord) }));
+        setState((previous) => {
+          const items = page.items.map(mapIdeaRecord);
+          const pinned =
+            notificationFocus?.entity === "idea"
+              ? previous.ideas.find((idea) => idea.id === notificationFocus.id)
+              : undefined;
+          return {
+            ...previous,
+            ideas:
+              pinned && !items.some((idea) => idea.id === pinned.id)
+                ? [pinned, ...items]
+                : items,
+          };
+        });
         setIdeasOwnerId(actor.userId);
         setIdeaNextOffset(page.nextOffset);
         setIdeaListStatus("loaded");
@@ -1814,7 +1821,14 @@ export function PrCenterApp({
         setNotice("Unable to load Content Ideas");
       });
     return () => controller.abort();
-  }, [actor?.userId, ideaSearch, ideaStatusFilter, ideaSort]);
+  }, [
+    actor?.userId,
+    ideaSearch,
+    ideaStatusFilter,
+    ideaSort,
+    notificationFocus?.entity,
+    notificationFocus?.id,
+  ]);
   useEffect(() => {
     if (!actor?.userId) return;
     let disposed = false;
@@ -2040,9 +2054,15 @@ export function PrCenterApp({
   ];
   const hasUiRole = (...roles: Role[]) =>
     actorUiRoles.some((role) => roles.includes(role));
-  const visiblePages = pages.filter(
-    (item) => isPageEnabled(item.id) && visibleRolePages.includes(item.id),
-  );
+  const canOpenPage = (next: Page) =>
+    actor
+      ? canOpenPrCenterPage(
+          next,
+          actorRoleCodes,
+          process.env.NEXT_PUBLIC_PR_CENTER_PHASE2_PAGES,
+        )
+      : isPageEnabled(next) && visibleRolePages.includes(next);
+  const visiblePages = pages.filter((item) => canOpenPage(item.id));
   useEffect(() => {
     if (!actor?.userId || !requestOpen || requestEditId) return;
     let cancelled = false;
@@ -2089,44 +2109,51 @@ export function PrCenterApp({
     state.language,
   ]);
 
+  const persistRequestPartial = async (draft: RequestDraft, revision: number) => {
+    const payload = JSON.stringify(draft, (key, value) =>
+      key === "samples" ? undefined : value,
+    );
+    setRequestDraftSaving(true);
+    try {
+      await requestDraftPersistence.current.save(async () => {
+        const response = await fetch("/api/pr-center/drafts/REQUEST", {
+          method: "PUT",
+          credentials: "same-origin",
+          headers: { "Content-Type": "application/json" },
+          body: payload,
+        });
+        if (!response.ok) throw new Error("Request draft could not be saved");
+        if (revision === requestDraftRevision.current) requestDraftDirty.current = false;
+      });
+    } finally {
+      setRequestDraftSaving(false);
+    }
+  };
   useEffect(() => {
     if (
       !actor?.userId ||
       !requestOpen ||
       requestEditId ||
       !requestDraftHydrated ||
-      !requestDraftDirty.current
+      !requestDraftDirty.current ||
+      requestSaveInFlight.current
     )
       return;
     const revision = requestDraftRevision.current;
-    const timer = window.setTimeout(() => {
-      const payload = JSON.parse(
-        JSON.stringify(requestDraft, (key, value) =>
-          key === "samples" ? undefined : value,
+    requestAutosaveTimer.current = setTimeout(() => {
+      requestAutosaveTimer.current = null;
+      void persistRequestPartial(requestDraft, revision).catch(() =>
+        setNotice(
+          state.language === "th"
+            ? "บันทึกร่างไม่สำเร็จ กรุณาลองอีกครั้ง"
+            : "Draft save failed. Please retry.",
         ),
       );
-      setRequestDraftSaving(true);
-      void fetch("/api/pr-center/drafts/REQUEST", {
-        method: "PUT",
-        credentials: "same-origin",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      })
-        .then((response) => {
-          if (!response.ok) throw new Error("Request draft could not be saved");
-          if (revision === requestDraftRevision.current)
-            requestDraftDirty.current = false;
-        })
-        .catch(() => {
-          setNotice(
-            state.language === "th"
-              ? "บันทึกร่างคำขอไม่สำเร็จ กรุณาตรวจสอบการเชื่อมต่อ"
-              : "Request draft could not be saved. Check your connection.",
-          );
-        })
-        .finally(() => setRequestDraftSaving(false));
     }, 700);
-    return () => window.clearTimeout(timer);
+    return () => {
+      if (requestAutosaveTimer.current) clearTimeout(requestAutosaveTimer.current);
+      requestAutosaveTimer.current = null;
+    };
   }, [
     actor?.userId,
     requestDraft,
@@ -2135,6 +2162,40 @@ export function PrCenterApp({
     requestOpen,
     state.language,
   ]);
+  const closeRequest = async (draft = requestDraft) => {
+    if (requestSaveInFlight.current) return false;
+    if (
+      requestEditId &&
+      requestDraftDirty.current &&
+      !window.confirm(
+        state.language === "th"
+          ? "การแก้ไขยังไม่บันทึก ต้องการปิดโดยไม่บันทึกหรือไม่"
+          : "Discard unsaved changes?",
+      )
+    )
+      return;
+    requestSaveInFlight.current = true;
+    setRequestSubmitting(true);
+    if (requestAutosaveTimer.current) clearTimeout(requestAutosaveTimer.current);
+    requestAutosaveTimer.current = null;
+    try {
+      if (!requestEditId && requestDraftDirty.current)
+        await persistRequestPartial(draft, requestDraftRevision.current);
+      setRequestOpen(false);
+      setRequestEditId(null);
+      return true;
+    } catch {
+      setNotice(
+        state.language === "th"
+          ? "บันทึกร่างไม่สำเร็จ ยังไม่ปิดฟอร์ม กรุณาลองอีกครั้ง"
+          : "Draft save failed. The form remains open; please retry.",
+      );
+      return false;
+    } finally {
+      requestSaveInFlight.current = false;
+      setRequestSubmitting(false);
+    }
+  };
   const refreshRequests = async () => {
     const generation = ++canonicalRefreshGeneration.current;
     ++requestListGeneration.current;
@@ -2203,21 +2264,25 @@ export function PrCenterApp({
       setMessageHouseHistoryStatus("error");
     }
   };
-  const go = (next: Page) => {
-    if (!isPageEnabled(next) || !visibleRolePages.includes(next)) return;
+  const go = (next: Page, fromNotification = false) => {
+    if (!fromNotification) {
+      notificationGeneration.current += 1;
+      setNotificationFocus(null);
+    }
+    if (!canOpenPage(next)) return;
     setPage(next);
     if (next === "message-house") void loadMessageHouse();
     setSidebarOpen(false);
   };
-  const navigateFromNotification = (target: string) => {
+  const navigateFromNotification = async (target: string) => {
+    const generation = ++notificationGeneration.current;
     const match = /^(request|task|idea):(.+)$/.exec(target);
     if (!match) {
-      const page = target as Page;
-      go(isPageEnabled(page) && visibleRolePages.includes(page) ? page : "home");
+      go(canOpenPage(target as Page) ? (target as Page) : "home");
       return;
     }
     const [, entity, id] = match;
-    const page: Page =
+    const destination: Page =
       entity === "request"
         ? hasUiRole("pr", "admin")
           ? "requests"
@@ -2225,21 +2290,78 @@ export function PrCenterApp({
         : entity === "task"
           ? "operations"
           : "ideas";
-    if (!visibleRolePages.includes(page)) {
-      go("home");
+    if (!canOpenPage(destination)) {
+      setNotice(
+        state.language === "th"
+          ? "หน้านี้ยังไม่เปิดใช้งาน หรือคุณไม่มีสิทธิ์เข้าถึง"
+          : "This page is disabled or unavailable to your role.",
+      );
       return;
     }
-    setPage(page);
-    setSidebarOpen(false);
-    window.setTimeout(() => {
-      document.getElementById(`${entity}-${id}`)?.scrollIntoView({
-        behavior: "smooth",
-        block: "center",
-      });
-    }, 100);
+    setNotice(
+      state.language === "th"
+        ? "กำลังเปิดรายการจากการแจ้งเตือน…"
+        : "Opening notification target…",
+    );
+    try {
+      if (entity === "idea") {
+        let offset: number | null = 0;
+        let found: IdeaListRecord | undefined;
+        while (offset !== null) {
+          const result = await fetchIdeaPage(offset);
+          if (generation !== notificationGeneration.current) return;
+          found = result.items.find((item) => item.id === id);
+          if (found) break;
+          if (result.nextOffset !== null && result.nextOffset <= offset)
+            throw new Error("Invalid idea cursor");
+          offset = result.nextOffset;
+        }
+        if (!found) throw new Error("Target no longer available");
+        const mapped = mapIdeaRecord(found);
+        latestIdeaFilters.current = { search: "", status: "", sort: ideaSort };
+        setIdeaSearch("");
+        setIdeaStatusFilter("");
+        setState((previous) => ({
+          ...previous,
+          ideas: [mapped, ...previous.ideas.filter((item) => item.id !== id)],
+        }));
+      } else {
+        const records = await fetchScopedRequestRecords();
+        if (generation !== notificationGeneration.current) return;
+        if (
+          !records.some((record) =>
+            entity === "request"
+              ? record.id === id && !record.assignedTaskOnly
+              : record.tasks.some((task) => task.id === id),
+          )
+        )
+          throw new Error("Target no longer available");
+        setState((previous) => ({
+          ...previous,
+          requests: records
+            .filter((record) => !record.assignedTaskOnly)
+            .map(mapRequestRecord),
+          tasks: mapRequestTasks(records),
+        }));
+        if (entity === "request") changeRequestFilters("", "");
+      }
+      setNotificationFocus({ entity, id, sequence: generation });
+      go(destination, true);
+      setNotice(null);
+    } catch {
+      if (generation === notificationGeneration.current)
+        setNotice(
+          state.language === "th"
+            ? "เปิดรายการไม่สำเร็จ รายการอาจถูกเปลี่ยนแปลงหรืออยู่นอกสิทธิ์ กรุณาลองอีกครั้ง"
+            : "Unable to open this item. It may no longer be available in your scope. Retry.",
+        );
+    }
   };
 
   const openRequest = () => {
+    if (requestSaveInFlight.current) return;
+    requestCreatedFromPartial.current = true;
+    requestUploadCache.current = createUploadCache<File>();
     setRequestEditId(null);
     setRequestDraft(emptyRequestDraft(currentUser));
     requestDraftDirty.current = false;
@@ -2248,6 +2370,9 @@ export function PrCenterApp({
     setRequestOpen(true);
   };
   const editRequest = (request: Request) => {
+    if (requestSaveInFlight.current) return;
+    requestCreatedFromPartial.current = false;
+    requestUploadCache.current = createUploadCache<File>();
     setRequestEditId(request.id);
     setRequestDraftHydrated(true);
     requestDraftDirty.current = false;
@@ -2333,22 +2458,17 @@ export function PrCenterApp({
     submitAfterSave = false,
   ) => {
     if (requestSaveInFlight.current) return;
-    if (
-      !draft.confirmed ||
-      (draft.type === "pr" &&
-        (!draft.whyNow.trim() ||
-          draft.contentTypes.length === 0 ||
-          !draft.priority ||
-          !draft.objective.trim() ||
-          !draft.audience.trim())) ||
-      (draft.type === "offsite" &&
-        (!draft.startTime || !draft.endTime || draft.endTime <= draft.startTime))
-    ) {
-      announce(
-        state.language === "th"
-          ? "กรุณากรอกข้อมูลที่จำเป็นและยืนยันความถูกต้องก่อนบันทึก"
-          : "Complete the required fields and confirm the information before saving.",
-      );
+    const issue = getRequestFormIssue(draft, state.masterData.contentTypes);
+    if (issue) {
+      if (!submitAfterSave && !editId) {
+        requestDraftDirty.current = true;
+        if (await closeRequest(draft))
+          announce(
+            state.language === "th"
+              ? "บันทึกร่างข้อความแล้ว เปิดส่งคำขอใหม่เพื่อทำต่อ (ยังไม่สร้างเลขคำขอ; ไฟล์แนบต้องเลือกใหม่)"
+              : "Partial text draft saved. Choose New request to continue. No request number yet; reselect attachments.",
+          );
+      } else announce(getRequestFormErrorMessage(issue, state.language));
       return;
     }
     const priorStatus = editId
@@ -2356,6 +2476,8 @@ export function PrCenterApp({
       : undefined;
     requestSaveInFlight.current = true;
     setRequestSubmitting(true);
+    if (requestAutosaveTimer.current) clearTimeout(requestAutosaveTimer.current);
+    requestAutosaveTimer.current = null;
     try {
       const response = await fetch(
         editId ? `/api/pr-center/requests/${editId}` : "/api/pr-center/requests",
@@ -2444,28 +2566,31 @@ export function PrCenterApp({
       const uploadedSamples: NonNullable<Request["attachments"]> = [];
       for (const file of draft.samples) {
         try {
-          const bytes = new Uint8Array(await file.arrayBuffer());
-          let binary = "";
-          for (let offset = 0; offset < bytes.length; offset += 0x8000)
-            binary += String.fromCharCode(...bytes.subarray(offset, offset + 0x8000));
-          const uploadResponse = await fetch("/api/pr-center/files", {
-            method: "POST",
-            credentials: "same-origin",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              fileName: file.name,
-              mimeType: file.type || "application/octet-stream",
-              content: btoa(binary),
-            }),
+          const fileId = await requestUploadCache.current(file, async () => {
+            const bytes = new Uint8Array(await file.arrayBuffer());
+            let binary = "";
+            for (let offset = 0; offset < bytes.length; offset += 0x8000)
+              binary += String.fromCharCode(...bytes.subarray(offset, offset + 0x8000));
+            const uploadResponse = await fetch("/api/pr-center/files", {
+              method: "POST",
+              credentials: "same-origin",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                fileName: file.name,
+                mimeType: file.type || "application/octet-stream",
+                content: btoa(binary),
+              }),
+            });
+            if (!uploadResponse.ok) throw new Error("File upload failed");
+            const uploaded = (await uploadResponse.json()) as { id: string };
+            return uploaded.id;
           });
-          if (!uploadResponse.ok) throw new Error("File upload failed");
-          const uploaded = (await uploadResponse.json()) as { id: string };
           const attachResponse = await fetch("/api/pr-center/attachments", {
             method: "POST",
             credentials: "same-origin",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
-              fileId: uploaded.id,
+              fileId,
               requestId: updated.id,
               kind: "request-sample",
             }),
@@ -2475,37 +2600,6 @@ export function PrCenterApp({
         } catch {
           samplesUploaded = false;
           failedSamples.push(file);
-        }
-      }
-      let submitError: string | null = null;
-      if (submitAfterSave && samplesUploaded) {
-        try {
-          const submitResponse = await fetch(
-            `/api/pr-center/requests/${updated.id}/transitions`,
-            {
-              method: "POST",
-              credentials: "same-origin",
-              headers: {
-                "Content-Type": "application/json",
-                "If-Match": String(updated.version),
-              },
-              body: JSON.stringify({ to: "SUBMITTED" }),
-            },
-          );
-          if (!submitResponse.ok) {
-            const result = (await submitResponse.json().catch(() => null)) as {
-              message?: string;
-            } | null;
-            throw new Error(result?.message || "Submission rejected");
-          }
-          const submitted = (await submitResponse.json()) as {
-            status: Request["status"];
-            version: number;
-          };
-          updated.status = submitted.status;
-          updated.version = submitted.version;
-        } catch (error) {
-          submitError = error instanceof Error ? error.message : "Submission rejected";
         }
       }
       const mappedRequest: Request = {
@@ -2579,6 +2673,64 @@ export function PrCenterApp({
           ),
         ],
       }));
+      // Keep the durable identity even if cleanup fails; retry must never POST a duplicate.
+      setRequestEditId(updated.id);
+      setRequestDraft((previous) => ({ ...previous, samples: failedSamples }));
+      if (requestCreatedFromPartial.current) {
+        await requestDraftPersistence.current.clear(async () => {
+          const cleared = await fetch("/api/pr-center/drafts/REQUEST", {
+            method: "DELETE",
+            credentials: "same-origin",
+          });
+          if (!cleared.ok) throw new Error("Unable to clear the saved partial draft");
+        });
+        requestDraftDirty.current = false;
+        requestCreatedFromPartial.current = false;
+      }
+      let submitError: string | null = null;
+      if (submitAfterSave && samplesUploaded) {
+        try {
+          const submitResponse = await fetch(
+            `/api/pr-center/requests/${updated.id}/transitions`,
+            {
+              method: "POST",
+              credentials: "same-origin",
+              headers: {
+                "Content-Type": "application/json",
+                "If-Match": String(updated.version),
+              },
+              body: JSON.stringify({ to: "SUBMITTED" }),
+            },
+          );
+          if (!submitResponse.ok) {
+            const result = (await submitResponse.json().catch(() => null)) as {
+              message?: string;
+            } | null;
+            throw new Error(result?.message || "Submission rejected");
+          }
+          const submitted = (await submitResponse.json()) as {
+            status: Request["status"];
+            version: number;
+          };
+          updated.status = submitted.status;
+          updated.version = submitted.version;
+        } catch (error) {
+          submitError = error instanceof Error ? error.message : "Submission rejected";
+        }
+      }
+      setState((previous) => ({
+        ...previous,
+        requests: previous.requests.map((request) =>
+          request.id === updated.id
+            ? { ...request, status: updated.status, version: updated.version }
+            : request,
+        ),
+        tasks: previous.tasks.map((task) =>
+          task.requestId === updated.id
+            ? { ...task, requestStatus: updated.status }
+            : task,
+        ),
+      }));
       void refreshRequests();
       if (!samplesUploaded || submitError) {
         // The request is durable, but the requested workflow did not finish.
@@ -2594,13 +2746,6 @@ export function PrCenterApp({
             : `${state.language === "th" ? "บันทึกฉบับร่างแล้ว แต่ส่งไม่สำเร็จ" : "Draft saved but submission failed"}: ${submitError}`,
         );
         return;
-      }
-      if (!editId) {
-        await fetch("/api/pr-center/drafts/REQUEST", {
-          method: "DELETE",
-          credentials: "same-origin",
-        }).catch(() => undefined);
-        requestDraftDirty.current = false;
       }
       setRequestEditId(null);
       setRequestOpen(false);
@@ -3617,6 +3762,16 @@ export function PrCenterApp({
               onOpenRequest={openRequest}
               onEditRequest={editRequest}
               onSubmitRequest={submitRequest}
+              targetRequest={
+                notificationFocus?.entity === "request"
+                  ? state.requests.find((item) => item.id === notificationFocus.id)
+                  : undefined
+              }
+              key={
+                notificationFocus?.entity === "request"
+                  ? notificationFocus.sequence
+                  : "requests"
+              }
               onWithdrawRequest={withdrawRequest}
               mode="mine"
               sorting={tableSorting}
@@ -3644,6 +3799,16 @@ export function PrCenterApp({
               onOpenRequest={openRequest}
               onEditRequest={editRequest}
               onSubmitRequest={submitRequest}
+              targetRequest={
+                notificationFocus?.entity === "request"
+                  ? state.requests.find((item) => item.id === notificationFocus.id)
+                  : undefined
+              }
+              key={
+                notificationFocus?.entity === "request"
+                  ? notificationFocus.sequence
+                  : "requests"
+              }
               onWithdrawRequest={withdrawRequest}
               mode="all"
               sorting={tableSorting}
@@ -3666,6 +3831,14 @@ export function PrCenterApp({
           )}
           {page === "operations" && (
             <Operations
+              key={
+                notificationFocus?.entity === "task"
+                  ? notificationFocus.sequence
+                  : "operations"
+              }
+              targetId={
+                notificationFocus?.entity === "task" ? notificationFocus.id : undefined
+              }
               tasks={state.tasks}
               channels={state.masterData.channels}
               language={state.language}
@@ -3707,6 +3880,14 @@ export function PrCenterApp({
           {page === "library" && <Library language={state.language} />}
           {page === "ideas" && (
             <Ideas
+              key={
+                notificationFocus?.entity === "idea"
+                  ? notificationFocus.sequence
+                  : "ideas"
+              }
+              targetId={
+                notificationFocus?.entity === "idea" ? notificationFocus.id : undefined
+              }
               sorting={tableSorting}
               ideas={ideasOwnerId === actor?.userId ? state.ideas : []}
               currentUser={currentUser}
@@ -3784,7 +3965,12 @@ export function PrCenterApp({
             />
           )}
           {page === "help" && (
-            <Help role={currentUser.role} onNavigate={go} language={state.language} />
+            <Help
+              role={currentUser.role}
+              canNavigate={canOpenPage}
+              onNavigate={go}
+              language={state.language}
+            />
           )}
         </main>
       </section>
@@ -3800,16 +3986,13 @@ export function PrCenterApp({
           isEditing={requestEditId !== null}
           draft={requestDraft}
           onChange={(draft) => {
-            if (!requestDraftHydrated) return;
+            if (!requestDraftHydrated || requestSaveInFlight.current) return;
             setRequestDraft(draft);
-            if (!requestEditId) {
-              requestDraftDirty.current = true;
-              requestDraftRevision.current += 1;
-            }
+            requestDraftDirty.current = true;
+            requestDraftRevision.current += 1;
           }}
           onClose={() => {
-            setRequestOpen(false);
-            setRequestEditId(null);
+            void closeRequest();
           }}
           onSubmit={(event) => {
             event.preventDefault();
@@ -4677,6 +4860,7 @@ function NewRequest({
   );
 }
 function Requests({
+  targetRequest,
   sorting,
   t,
   language,
@@ -4699,6 +4883,7 @@ function Requests({
   error,
   onFiltersChange,
 }: {
+  targetRequest?: Request;
   sorting: TableSorting;
   t: (typeof copy)[Language];
   language: Language;
@@ -4729,12 +4914,17 @@ function Requests({
       : mode === "mine"
         ? "My Requests"
         : "All Requests";
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(targetRequest?.id ?? null);
   const visibleRequests =
     mode === "mine"
       ? requestItems.filter((request) => request.requesterId === currentUserId)
       : requestItems;
-  const selected = visibleRequests.find((request) => request.id === selectedId);
+  const selected =
+    visibleRequests.find((request) => request.id === selectedId) ??
+    (targetRequest?.id === selectedId &&
+    (mode === "all" || targetRequest.requesterId === currentUserId)
+      ? targetRequest
+      : undefined);
   return (
     <>
       <SectionHeading
@@ -5148,6 +5338,7 @@ function Requests({
   );
 }
 function Operations({
+  targetId,
   tasks: taskItems,
   channels,
   language,
@@ -5163,6 +5354,7 @@ function Operations({
   onFinalAssetAssigned,
   canViewPublishing,
 }: {
+  targetId?: string;
   tasks: Task[];
   channels: string[];
   language: Language;
@@ -5198,6 +5390,7 @@ function Operations({
   onFinalAssetAssigned: (taskId: string, fileId: string) => void;
   canViewPublishing: boolean;
 }) {
+  const initialTask = taskItems.find((task) => task.id === targetId);
   const [view, setView] = useState<"board" | "table" | "publishing">("board");
   const [approvalPolicy, setApprovalPolicy] = useState<ApprovalPolicy | null>(null);
   const [draggedId, setDraggedId] = useState<string | null>(null);
@@ -5213,21 +5406,29 @@ function Operations({
   const [scheduleError, setScheduleError] = useState("");
   const [status, setStatus] = useState<"all" | StatusId>("all");
   const [ownerId, setOwnerId] = useState("all");
-  const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [dueDate, setDueDate] = useState("");
-  const [planningKeyMessage, setPlanningKeyMessage] = useState("");
-  const [technicalReviewRequired, setTechnicalReviewRequired] = useState(false);
-  const [managementApprovalRequired, setManagementApprovalRequired] = useState(false);
+  const [selectedId, setSelectedId] = useState<string | null>(targetId ?? null);
+  const [dueDate, setDueDate] = useState(initialTask?.dueDate || "");
+  const [planningKeyMessage, setPlanningKeyMessage] = useState(
+    initialTask?.planningKeyMessage || "",
+  );
+  const [technicalReviewRequired, setTechnicalReviewRequired] = useState(
+    initialTask?.technicalReviewRequired === true,
+  );
+  const [managementApprovalRequired, setManagementApprovalRequired] = useState(
+    initialTask?.managementApprovalRequired === true,
+  );
   const [channel, setChannel] = useState("");
   const [evidenceChannel, setEvidenceChannel] = useState("");
   const [scheduledFor, setScheduledFor] = useState("");
   const [publishedUrl, setPublishedUrl] = useState("");
   const [publishedReference, setPublishedReference] = useState("");
-  const [revisionBody, setRevisionBody] = useState("");
-  const [revisionKeyMessage, setRevisionKeyMessage] = useState("");
+  const [revisionBody, setRevisionBody] = useState(initialTask?.contentBody || "");
+  const [revisionKeyMessage, setRevisionKeyMessage] = useState(
+    initialTask?.keyMessage || "",
+  );
   const [revisionSummary, setRevisionSummary] = useState("");
   const [savingRevision, setSavingRevision] = useState(false);
-  const [assigneeId, setAssigneeId] = useState("");
+  const [assigneeId, setAssigneeId] = useState(initialTask?.ownerId || "");
   const [assignableUsers, setAssignableUsers] = useState<
     { id: string; displayName: string; department?: { name: string } | null }[]
   >([]);
@@ -5357,21 +5558,7 @@ function Operations({
       (status === "all" || task.status === status) &&
       (ownerId === "all" || task.ownerId === ownerId),
   );
-  const columns: [string, StatusId[]][] = [
-    ["New request", ["draft", "waiting_for_information"]],
-    ["Planning", ["communication_planning"]],
-    ["In production", ["in_production", "revision_required"]],
-    [
-      "Review",
-      [
-        "source_fact_check",
-        "technical_review",
-        "pr_editorial_review",
-        "management_approval",
-      ],
-    ],
-    ["Scheduled", ["approved", "scheduled", "published", "closed"]],
-  ];
+  const columns = OPERATION_COLUMNS;
   const selected = visibleTasks.find((task) => task.id === selectedId);
   const currentActivity = activityTaskId === selected?.id ? activity : null;
   const openTask = (task: Task, schedule = false) => {
@@ -5641,11 +5828,14 @@ function Operations({
                                   void moveTask(task, event.target.value as BoardColumn);
                               }}
                             >
-                              {BOARD_COLUMNS.map((column) => (
+                              {columns.map(([column]) => (
                                 <option
                                   key={column}
                                   value={column}
-                                  disabled={taskMove(task, column).action === "blocked"}
+                                  disabled={
+                                    taskMove(task, column as BoardColumn).action ===
+                                    "blocked"
+                                  }
                                 >
                                   {column}
                                 </option>
@@ -8264,6 +8454,7 @@ function ideaChannelMark(channel: string): string {
 }
 
 function Ideas({
+  targetId,
   sorting,
   ideas,
   currentUser,
@@ -8283,6 +8474,7 @@ function Ideas({
   onRefresh,
   onFilters,
 }: {
+  targetId?: string;
   sorting: TableSorting;
   ideas: Idea[];
   currentUser: User;
@@ -8307,7 +8499,7 @@ function Ideas({
   const [status, setStatus] = useState<"all" | IdeaStatus>("all");
   const [priorityFilter, setPriorityFilter] = useState("");
   const [channelFilter, setChannelFilter] = useState("");
-  const [expandedIdeaId, setExpandedIdeaId] = useState<string | null>(null);
+  const [expandedIdeaId, setExpandedIdeaId] = useState<string | null>(targetId ?? null);
   const [title, setTitle] = useState("");
   const [summary, setSummary] = useState("");
   const [audience, setAudience] = useState("");
@@ -10143,7 +10335,9 @@ function Notifications({
               onRead(notifications.filter((item) => !item.read).map((item) => item.id))
             }
           >
-            Mark all read
+            {language === "th"
+              ? "ทำเครื่องหมายรายการที่แสดงว่าอ่านแล้ว"
+              : "Mark displayed notifications read"}
           </button>
         }
       />
@@ -11192,10 +11386,12 @@ function SystemData({
 }
 function Help({
   role,
+  canNavigate,
   onNavigate,
   language,
 }: {
   role: Role;
+  canNavigate: (page: Page) => boolean;
   onNavigate: (page: Page) => void;
   language: Language;
 }) {
@@ -11255,7 +11451,7 @@ function Help({
             </button>
             {guide === title && (
               <p>
-                {ROLE_PAGES[role].includes(guideTargets[index]) ? (
+                {canNavigate(guideTargets[index]) ? (
                   <button onClick={() => onNavigate(guideTargets[index])}>
                     {index === 0
                       ? "Open request form"
@@ -11349,12 +11545,17 @@ function RequestModal({
           <button
             type="button"
             onClick={onClose}
+            disabled={submitting}
             aria-label={thai ? "ปิดหน้าต่าง" : "Close dialog"}
           >
             ×
           </button>
         </header>
-        <div className={styles.requestModalBody}>
+        <fieldset
+          disabled={submitting}
+          className={styles.requestModalBody}
+          style={{ border: 0, margin: 0, minWidth: 0 }}
+        >
           <div className={styles.requestFormHint}>
             {thai
               ? "เลือกประเภทงานและกรอกข้อมูลที่จำเป็น ระบบจะแสดงช่องกรอกตามประเภทงาน"
@@ -11367,9 +11568,13 @@ function RequestModal({
                 ? thai
                   ? "กำลังบันทึกร่าง…"
                   : "Saving draft…"
-                : thai
-                  ? "บันทึกร่างอัตโนมัติแล้ว"
-                  : "Draft autosaves automatically."}
+                : isEditing
+                  ? thai
+                    ? "การแก้ไขยังไม่บันทึกจนกว่าจะกดบันทึก"
+                    : "Changes are not saved until you choose Save."
+                  : thai
+                    ? "ร่างข้อความจะบันทึกอัตโนมัติ ไฟล์แนบต้องเลือกใหม่เมื่อเปิดฟอร์มอีกครั้ง"
+                    : "Text drafts save automatically. Reselect attachments when reopening the form."}
           </div>
           <div className={styles.typePicker}>
             <button
@@ -11668,12 +11873,17 @@ function RequestModal({
                 : "I confirm the source information and documents are accurate, complete, and verifiable."}
             </label>
           </div>
-        </div>
+        </fieldset>
         <footer className={styles.requestModalFooter}>
           <button type="button" onClick={onClose} disabled={submitting}>
             {thai ? "ยกเลิก" : "Cancel"}
           </button>
-          <button type="submit" value="draft" disabled={draftLoading || submitting}>
+          <button
+            type="submit"
+            value="draft"
+            formNoValidate
+            disabled={draftLoading || submitting}
+          >
             {thai ? "บันทึกฉบับร่าง" : "Save draft"}
           </button>
           <button

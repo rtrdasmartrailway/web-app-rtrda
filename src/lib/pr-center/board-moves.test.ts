@@ -2,6 +2,19 @@ import { describe, expect, it } from "vitest";
 import { boardMove } from "./board-moves";
 
 describe("board column moves", () => {
+  it.each(["Revision required", "Not proceeding", "unknown"])(
+    "does not treat display-only %s as a review transition",
+    (column) => {
+      expect(
+        boardMove(
+          "IN_PRODUCTION",
+          "APPROVED",
+          column as Parameters<typeof boardMove>[2],
+          "SOURCE_FACT_CHECK",
+        ),
+      ).toEqual({ action: "blocked", reason: "workflow" });
+    },
+  );
   it("moves approved intake work through planning and production", () => {
     expect(boardMove("DRAFT", "APPROVED", "Planning")).toEqual({
       action: "transition",

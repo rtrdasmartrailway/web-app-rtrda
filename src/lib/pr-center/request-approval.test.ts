@@ -56,6 +56,17 @@ const requesterActor: PrCenterActor = {
   departmentId: "dept-1",
   role: "RTRDA_ALL_USER",
 };
+const submissionRevision = {
+  objective: "Explain project progress",
+  audience: "Public stakeholders",
+  offsiteDetails: {
+    projectOwner: "Project owner",
+    assigner: "Requester manager",
+    confirmed: true,
+    whyNow: "Project milestone",
+    contentTypes: ["Website News"],
+  },
+};
 const requestRecord = {
   id: "request-1",
   organizationId: "org-1",
@@ -63,6 +74,10 @@ const requestRecord = {
   requesterId: "requester-1",
   requestNumber: "PR-2026-00000001",
   title: "Test request",
+  type: "PR",
+  requestedFor: new Date("2026-11-20T00:00:00Z"),
+  sources: [{ url: "https://example.test/project" }],
+  revisions: [submissionRevision],
   status: "SUBMITTED",
   version: 2,
   tasks: [],
@@ -709,7 +724,15 @@ describe("request intake approval", () => {
       requestedFor: dueAt,
       status: "DRAFT",
       version: 3,
-      revisions: [{ offsiteDetails: { contentTypes: ["Website News", "Short Video"] } }],
+      revisions: [
+        {
+          ...submissionRevision,
+          offsiteDetails: {
+            ...submissionRevision.offsiteDetails,
+            contentTypes: ["Website News", "Short Video"],
+          },
+        },
+      ],
       tasks: [
         {
           id: "keep",
@@ -747,11 +770,17 @@ describe("request intake approval", () => {
       ...requestRecord,
       type: "PR",
       title: "Rail research update",
-      requestedFor: null,
+      requestedFor: requestRecord.requestedFor,
       status: "DRAFT",
       version: 1,
       revisions: [
-        { offsiteDetails: { contentTypes: ["Website News", "Facebook Post"] } },
+        {
+          ...submissionRevision,
+          offsiteDetails: {
+            ...submissionRevision.offsiteDetails,
+            contentTypes: ["Website News", "Facebook Post"],
+          },
+        },
       ],
       tasks: [],
     });
