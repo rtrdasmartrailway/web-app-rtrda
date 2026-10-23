@@ -9,6 +9,7 @@ import {
   publicDownloadPath,
 } from "./download-response";
 import { getStaticDownloadOverride } from "@/lib/wp/static-download-overrides";
+import { logDownloadResponse } from "@/lib/analytics/activity-store";
 
 export const dynamic = "force-dynamic";
 
@@ -57,10 +58,18 @@ async function responseForDownload(
 
 export async function GET(request: Request, context: RouteContext): Promise<Response> {
   const { id } = await context.params;
-  return responseForDownload(decodeURIComponent(id), true, isInlineRequest(request));
+  return logDownloadResponse(
+    request,
+    await responseForDownload(decodeURIComponent(id), true, isInlineRequest(request)),
+    `/sdc_download/${id}`,
+  );
 }
 
 export async function HEAD(request: Request, context: RouteContext): Promise<Response> {
   const { id } = await context.params;
-  return responseForDownload(decodeURIComponent(id), false, isInlineRequest(request));
+  return logDownloadResponse(
+    request,
+    await responseForDownload(decodeURIComponent(id), false, isInlineRequest(request)),
+    `/sdc_download/${id}`,
+  );
 }

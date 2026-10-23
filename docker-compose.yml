@@ -19,6 +19,8 @@ services:
       # Public origin for canonical URLs/sitemap; also defaulted in code.
       SITE_ORIGIN: https://test.rtrda.or.th
       ANALYTICS_ENV: test
+      ACTIVITY_LOGGING_ENABLED: "true"
+      ACTIVITY_RETENTION_ENABLED: "true"
       SURVEY_GOOGLE_TOKEN_FILE: /run/secrets/survey-google-token.json
       SURVEY_DASHBOARD_PASSWORD_FILE: /run/secrets/survey-dashboard-password
       ANALYTICS_HASH_SALT: ${ANALYTICS_HASH_SALT:?ANALYTICS_HASH_SALT is required}

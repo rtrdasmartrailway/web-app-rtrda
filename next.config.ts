@@ -68,6 +68,22 @@ const nextConfig: NextConfig = {
           ...SECURITY_HEADERS,
         ],
       },
+      ...[
+        "/api/analytics/reports",
+        "/rtrdaintranet/activity-log",
+        "/logged-files-internal/:path*",
+      ].map((source) => ({
+        source,
+        headers: [
+          { key: "Cache-Control", value: "private, no-store, max-age=0" },
+          { key: "CDN-Cache-Control", value: "no-store" },
+          { key: "X-Robots-Tag", value: "noindex, nofollow" },
+          ...SECURITY_HEADERS,
+          ...(source.startsWith("/logged-files-internal")
+            ? SAME_ORIGIN_FRAME_HEADERS
+            : []),
+        ],
+      })),
       {
         source: "/api/pr-center/:path*",
         headers: [{ key: "Cache-Control", value: "no-store" }, ...SECURITY_HEADERS],

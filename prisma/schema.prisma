@@ -12,6 +12,31 @@ datasource db {
   provider = "postgresql"
 }
 
+/// Dedicated, minimized access evidence. Legacy analytics and redirect tables are untouched.
+model WebActivityEvent {
+  eventId       String   @id @db.Uuid @map("event_id")
+  environment   String
+  eventType     String   @map("event_type")
+  path          String
+  targetPath    String?  @map("target_path")
+  source        String
+  channel       String
+  method        String?
+  status        Int?
+  outcome       String
+  responseBytes BigInt?  @map("response_bytes")
+  deviceType    String   @map("device_type")
+  isBot         Boolean  @default(false) @map("is_bot")
+  visitorKey    String?  @map("visitor_key")
+  sessionKey    String?  @map("session_key")
+  occurredAt    DateTime @default(now()) @db.Timestamptz(6) @map("occurred_at")
+
+  @@index([environment, occurredAt])
+  @@index([environment, eventType, occurredAt])
+  @@index([environment, path, occurredAt])
+  @@map("web_activity_events_v2")
+}
+
 model ContentRecord {
   id              String  @id
   wpId            String

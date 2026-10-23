@@ -3,78 +3,91 @@ import {
   createFixedWindowLimiter,
   type FixedWindowLimiter,
 } from "@/lib/security/rate-limit";
-import { isObviousBot, parseAnalyticsEvent } from "@/lib/analytics/event-contract";
+import { parseAnalyticsEvent } from "@/lib/analytics/event-contract";
 import { isSameOriginAnalyticsRequest } from "@/lib/analytics/origin-policy";
-import { anonymousHashes, storeAnalyticsEvent } from "@/lib/analytics/store";
+import {
+  activityEnabled,
+  activityHashes,
+  writeActivity,
+} from "@/lib/analytics/activity-store";
+import { publicActivityPath, SESSION_COOKIE } from "@/lib/analytics/activity-contract";
 
 export const dynamic = "force-dynamic";
-const MAX_BODY_BYTES = 4096;
-const globalRoute = globalThis as unknown as { analyticsLimiter?: FixedWindowLimiter };
-
-function limiter(): FixedWindowLimiter {
-  if (!globalRoute.analyticsLimiter)
-    globalRoute.analyticsLimiter = createFixedWindowLimiter({
-      limit: 120,
-      windowMs: 60_000,
-      maxKeys: 20_000,
-    });
-  return globalRoute.analyticsLimiter;
-}
-
-function first(value: string | null): string | null {
-  return value?.split(",")[0]?.trim() || null;
-}
-
-function requestIp(request: NextRequest): string | null {
-  return (
-    first(request.headers.get("cf-connecting-ip")) ||
-    first(request.headers.get("x-forwarded-for")) ||
-    first(request.headers.get("x-real-ip"))
-  );
-}
-
+const state = globalThis as unknown as { activityLimiter?: FixedWindowLimiter };
 export async function POST(request: NextRequest): Promise<NextResponse> {
-  if (!isSameOriginAnalyticsRequest(request))
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-  const declaredLength = Number(request.headers.get("content-length") || 0);
-  if (declaredLength > MAX_BODY_BYTES)
-    return NextResponse.json({ error: "Payload too large" }, { status: 413 });
-  const userAgent = request.headers.get("user-agent") || "";
-  if (isObviousBot(userAgent))
-    return NextResponse.json({ accepted: false, reason: "bot" }, { status: 202 });
+  const reply = (body: object, status: number) =>
+    NextResponse.json(body, { status, headers: { "Cache-Control": "no-store" } });
+  if (!isSameOriginAnalyticsRequest(request)) return reply({ error: "Forbidden" }, 403);
+  if (!activityEnabled()) return reply({ accepted: false, reason: "disabled" }, 202);
+  if (Number(request.headers.get("content-length") || 0) > 4096)
+    return reply({ error: "Payload too large" }, 413);
   let text: string;
   try {
     text = await request.text();
   } catch {
-    return NextResponse.json({ error: "Invalid body" }, { status: 400 });
+    return reply({ error: "Invalid body" }, 400);
   }
-  if (Buffer.byteLength(text, "utf8") > MAX_BODY_BYTES)
-    return NextResponse.json({ error: "Payload too large" }, { status: 413 });
+  if (Buffer.byteLength(text) > 4096) return reply({ error: "Payload too large" }, 413);
   let raw: unknown;
   try {
     raw = JSON.parse(text);
   } catch {
-    return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
+    return reply({ error: "Invalid JSON" }, 400);
   }
+  if (
+    !raw ||
+    typeof raw !== "object" ||
+    Object.keys(raw).some(
+      (key) =>
+        !["eventId", "eventType", "path", "targetPath", "sessionId", "source"].includes(
+          key,
+        ),
+    )
+  )
+    return reply({ error: "Invalid event" }, 400);
   const event = parseAnalyticsEvent(raw);
-  if (!event) return NextResponse.json({ error: "Invalid event" }, { status: 400 });
-  const ip = requestIp(request);
-  const key = anonymousHashes(ip, event.sessionId).visitorHash ?? "unknown";
-  if (!limiter().allow(key))
-    return NextResponse.json(
-      { accepted: false, reason: "rate_limited" },
-      { status: 202 },
-    );
+  if (
+    !event ||
+    !publicActivityPath(event.path) ||
+    (event.targetPath && !publicActivityPath(event.targetPath))
+  )
+    return reply({ error: "Invalid event" }, 400);
   try {
-    const inserted = await storeAnalyticsEvent({
-      event,
-      ip,
-      userAgent,
-      referrer: request.headers.get("referer"),
+    state.activityLimiter ??= createFixedWindowLimiter({
+      limit: 120,
+      windowMs: 60_000,
+      maxKeys: 20_000,
     });
-    return NextResponse.json({ accepted: inserted }, { status: 202 });
-  } catch (error) {
-    console.error("analytics event storage failed", error);
-    return NextResponse.json({ accepted: false }, { status: 202 });
+    if (
+      !state.activityLimiter.allow(
+        activityHashes(request.headers).visitorKey || "unknown",
+      )
+    )
+      return reply({ accepted: false, reason: "rate_limited" }, 202);
+    const inserted = await writeActivity(request.headers, {
+      eventId: event.eventId,
+      eventType: event.eventType === "download" ? "download_click" : event.eventType,
+      path: event.path,
+      targetPath: event.targetPath,
+      sessionId: event.sessionId,
+      source: event.source,
+      channel: "client",
+      outcome:
+        event.eventType === "download"
+          ? "click_not_confirmed_download"
+          : "browser_observed",
+    });
+    const response = reply({ accepted: inserted }, 202);
+    response.cookies.set(SESSION_COOKIE, event.sessionId, {
+      httpOnly: true,
+      secure: true,
+      sameSite: "lax",
+      maxAge: 1800,
+      path: "/",
+    });
+    return response;
+  } catch {
+    console.warn("activity collector temporarily unavailable");
+    return reply({ accepted: false, reason: "unavailable" }, 202);
   }
 }

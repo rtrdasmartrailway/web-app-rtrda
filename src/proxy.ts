@@ -2,6 +2,12 @@ import { NextResponse, type NextRequest } from "next/server";
 import { INTRO_RETURN_COOKIE, introHomepageUrl } from "@/lib/intro-flow";
 import { middleware } from "@/lib/request-policy";
 import { checkSurveyAccess, surveyPrivateHeaders } from "@/lib/survey/survey-private";
+import { activityEnabled, logActivityLater } from "@/lib/analytics/activity-store";
+import {
+  activityPath,
+  isPageRequest,
+  isPublicDocumentPath,
+} from "@/lib/analytics/activity-contract";
 
 export async function proxy(request: NextRequest) {
   const path = request.nextUrl.pathname;
@@ -13,6 +19,31 @@ export async function proxy(request: NextRequest) {
     if (denied) return denied;
   }
   const response = middleware(request);
+  if (activityEnabled() && (request.method === "GET" || request.method === "HEAD")) {
+    const normalized = activityPath(path);
+    if (
+      normalized &&
+      isPublicDocumentPath(normalized) &&
+      response.headers.get("x-middleware-next") === "1"
+    ) {
+      const destination = new URL(`/logged-files-internal${path}`, request.url);
+      destination.search = "";
+      const download = NextResponse.rewrite(destination);
+      download.headers.set("cache-control", "private, no-store");
+      return download;
+    }
+    if (normalized && isPageRequest(normalized, request.headers)) {
+      const forwarded = response.headers.get("x-middleware-next") === "1";
+      logActivityLater(request, {
+        eventType: "page_request",
+        path: normalized,
+        channel: "server",
+        method: request.method,
+        status: forwarded ? null : response.status,
+        outcome: forwarded ? "forwarded_status_unobserved" : "proxy_response",
+      });
+    }
+  }
   if (isSurvey) {
     for (const [key, value] of Object.entries(surveyPrivateHeaders))
       response.headers.set(key, value);

@@ -11,6 +11,7 @@ import {
   verifyDownloadCaptcha,
 } from "@/lib/security/download-captcha";
 import { issueDocumentPreviewToken } from "@/lib/security/document-preview";
+import { logDownloadResponse } from "@/lib/analytics/activity-store";
 import {
   RECAPTCHA_DOWNLOAD_ACTION,
   RECAPTCHA_PREVIEW_ACTION,
@@ -102,15 +103,23 @@ export async function POST(request: Request): Promise<Response> {
   try {
     const filePath = protectedDocumentPath(payload.documentId);
     const [file, fileStat] = await Promise.all([readFile(filePath), stat(filePath)]);
-    return new Response(new Uint8Array(file), {
-      headers: {
-        "Cache-Control": "no-store",
-        "Content-Disposition": `attachment; filename="${document.fileName}"`,
-        "Content-Length": String(fileStat.size),
-        "Content-Type": "application/pdf",
-      },
-    });
+    return logDownloadResponse(
+      request,
+      new Response(new Uint8Array(file), {
+        headers: {
+          "Cache-Control": "no-store",
+          "Content-Disposition": `attachment; filename="${document.fileName}"`,
+          "Content-Length": String(fileStat.size),
+          "Content-Type": "application/pdf",
+        },
+      }),
+      `/documents/${document.fileName}`,
+    );
   } catch {
-    return new Response("Not found", { status: 404 });
+    return logDownloadResponse(
+      request,
+      new Response("Not found", { status: 404 }),
+      `/documents/${document.fileName}`,
+    );
   }
 }

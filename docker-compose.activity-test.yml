@@ -1,0 +1,10 @@
+# Use with the existing DGT compose file and project directory. App service only.
+# The primary checkout may have unrelated edits: this override selects the reviewed image.
+services:
+  web-app-rtrda-test:
+    image: ${RTRDA_ACTIVITY_IMAGE:?Reviewed staging image is required}
+    labels:
+      org.opencontainers.image.revision: ${RTRDA_RELEASE_SHA:?Reviewed commit is required}
+    environment:
+      ACTIVITY_LOGGING_ENABLED: "true"
+      ACTIVITY_RETENTION_ENABLED: "true"

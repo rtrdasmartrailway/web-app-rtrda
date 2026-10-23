@@ -5,6 +5,7 @@ import {
   protectedDocumentPath,
 } from "@/lib/documents/protected-documents";
 import { hasDocumentPreviewToken } from "@/lib/security/document-preview";
+import { logDownloadResponse } from "@/lib/analytics/activity-store";
 
 export const dynamic = "force-dynamic";
 
@@ -12,7 +13,10 @@ type RouteContext = {
   params: Promise<{ document: string }>;
 };
 
-export async function GET(request: Request, context: RouteContext): Promise<Response> {
+async function documentResponse(
+  request: Request,
+  context: RouteContext,
+): Promise<Response> {
   const { document } = await context.params;
   const documentId = document.replace(/\.pdf$/, "");
   if (!isProtectedDocumentId(documentId))
@@ -37,4 +41,13 @@ export async function GET(request: Request, context: RouteContext): Promise<Resp
   } catch {
     return new Response("Not found", { status: 404 });
   }
+}
+
+export async function GET(request: Request, context: RouteContext): Promise<Response> {
+  const { document } = await context.params;
+  return logDownloadResponse(
+    request,
+    await documentResponse(request, context),
+    `/documents/${document}`,
+  );
 }

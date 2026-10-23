@@ -1,6 +1,7 @@
 import { createHash, randomUUID } from "node:crypto";
 import { Pool } from "pg";
 import { NextRequest, NextResponse } from "next/server";
+import { activityEnabled, logActivityLater } from "@/lib/analytics/activity-store";
 import {
   createFixedWindowLimiter,
   type FixedWindowLimiter,
@@ -99,6 +100,20 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
 
   if (!target) {
     return NextResponse.json({ error: "Unknown redirect campaign" }, { status: 404 });
+  }
+
+  if (activityEnabled()) {
+    const response = NextResponse.redirect(target.targetUrl, { status: 302 });
+    logActivityLater(request, {
+      eventType: "redirect_response",
+      path: `/r/${slug}`,
+      targetPath: `/campaign/${target.campaign}`,
+      channel: "server",
+      method: "GET",
+      status: 302,
+      outcome: "redirect_issued_not_submission",
+    });
+    return response;
   }
 
   const clickId = randomUUID();
