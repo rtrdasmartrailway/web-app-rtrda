@@ -54,7 +54,11 @@ export function isPublicDocumentPath(path: string): boolean {
 }
 
 export function isPageRequest(path: string, headers: Headers): boolean {
+  const localHealthCheck =
+    /^(localhost|127\.0\.0\.1|\[::1\])(?::\d+)?$/i.test(headers.get("host") || "") &&
+    /^(node|undici)$/i.test(headers.get("user-agent") || "");
   return (
+    !localHealthCheck &&
     publicActivityPath(path) &&
     !/\.[a-z0-9]{1,8}$/i.test(path) &&
     !path.startsWith("/sdc_download/") &&

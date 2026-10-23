@@ -34,6 +34,9 @@ describe("minimized activity evidence", () => {
   });
   it("separates document requests and excludes RSC/prefetch traffic from page requests", () => {
     expect(isPageRequest("/news", new Headers())).toBe(true);
+    expect(
+      isPageRequest("/", new Headers({ host: "127.0.0.1:3000", "user-agent": "node" })),
+    ).toBe(false);
     expect(isPageRequest("/news", new Headers({ rsc: "1" }))).toBe(false);
     expect(isPageRequest("/news", new Headers({ "next-router-prefetch": "1" }))).toBe(
       false,

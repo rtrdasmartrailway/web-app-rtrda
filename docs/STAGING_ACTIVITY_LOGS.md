@@ -10,7 +10,7 @@ does not gain access. No new account, password, or access grant is created.
 ## Evidence semantics
 
 - `page_request`: origin navigation request, including identifiable bot traffic;
-  RSC/prefetch/static assets and private routes are excluded. Downstream page
+  RSC/prefetch/static assets, private routes, and local Node/undici container health probes are excluded. Downstream page
   status cannot be observed by Next proxy and is explicitly left unknown.
 - `page_view`: browser-observed initial render or client-side route navigation.
   React duplicate effects are suppressed; returning A → B → A remains two A views.
