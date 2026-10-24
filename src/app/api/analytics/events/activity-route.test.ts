@@ -61,4 +61,30 @@ describe("activity collector isolation", () => {
     );
     expect(mocks.write).not.toHaveBeenCalled();
   });
+  it("accepts only safe form identifiers from the staff portal and preserves an existing file/session journey", async () => {
+    const body = {
+      ...valid,
+      eventType: "outbound_form_click",
+      path: "/rtrdaintranet",
+      targetPath: "/outbound-form/short/cA3FjxyvkR1pKy5k6",
+    };
+    const req = request(body);
+    req.headers.set(
+      "cookie",
+      "rtrda_activity_session=cccccccc-cccc-4ccc-8ccc-cccccccccccc",
+    );
+    expect((await POST(req)).status).toBe(202);
+    expect(mocks.write.mock.calls[0][1]).toMatchObject({
+      eventType: "outbound_form_click",
+      sessionId: "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
+      outcome: "outbound_click_not_form_submission",
+    });
+    expect(
+      (await POST(request({ ...body, targetPath: body.targetPath + "?entry.1=secret" })))
+        .status,
+    ).toBe(400);
+    expect(
+      (await POST(request({ ...body, path: "/rtrdaintranet/prcenter" }))).status,
+    ).toBe(400);
+  });
 });

@@ -1,4 +1,11 @@
-export const ANALYTICS_EVENT_TYPES = ["page_view", "link_click", "download"] as const;
+import { outboundSourceAllowed, validatedFormTarget } from "./outbound-form";
+
+export const ANALYTICS_EVENT_TYPES = [
+  "page_view",
+  "link_click",
+  "download",
+  "outbound_form_click",
+] as const;
 export type AnalyticsEventType = (typeof ANALYTICS_EVENT_TYPES)[number];
 
 export type AnalyticsEventPayload = {
@@ -74,10 +81,18 @@ export function parseAnalyticsEvent(value: unknown): AnalyticsEventPayload | nul
   if (!(["direct", "internal", "external"] as const).includes(raw.source as never))
     return null;
   const path = normalizeAnalyticsPath(raw.path);
-  if (!path || !isTrackablePath(path)) return null;
-  const targetPath =
-    raw.targetPath == null ? null : normalizeAnalyticsPath(raw.targetPath);
-  if (raw.targetPath != null && (!targetPath || !isTrackablePath(targetPath)))
+  const outbound = raw.eventType === "outbound_form_click";
+  if (!path || !(outbound ? outboundSourceAllowed(path) : isTrackablePath(path)))
+    return null;
+  const targetPath = outbound
+    ? validatedFormTarget(raw.targetPath)
+    : raw.targetPath == null
+      ? null
+      : normalizeAnalyticsPath(raw.targetPath);
+  if (
+    raw.targetPath != null &&
+    (!targetPath || (!outbound && !isTrackablePath(targetPath)))
+  )
     return null;
   if (raw.eventType !== "page_view" && !targetPath) return null;
   return {

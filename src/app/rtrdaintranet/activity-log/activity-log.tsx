@@ -14,10 +14,17 @@ type Row = {
   response_bytes: string | null;
   is_bot: boolean;
   session_key: string | null;
+  visitor_key: string | null;
 };
 type Report = {
   rows: Row[];
-  summary: { events: number; sessions: number; ip_days: number; bot_events: number };
+  summary: {
+    events: number;
+    sessions: number;
+    ip_days: number;
+    bot_events: number;
+    files_served: number;
+  };
   types: { event_type: string; count: number }[];
   page: number;
   pageSize: number;
@@ -31,6 +38,7 @@ const names: Record<string, string> = {
   download_click: "คลิกดาวน์โหลด",
   download_response: "การตอบกลับไฟล์",
   redirect_response: "ส่งต่อแบบฟอร์ม",
+  outbound_form_click: "คลิกไป Google Form",
 };
 const time = (value: string) =>
   new Intl.DateTimeFormat("th-TH", {
@@ -45,6 +53,8 @@ export default function ActivityLog() {
     path: "",
     type: "",
     bots: "all",
+    session: "",
+    visitor: "",
   });
   const [query, setQuery] = useState("page=1");
   const [report, setReport] = useState<Report | null>(null);
@@ -87,6 +97,16 @@ export default function ActivityLog() {
     params.set("page", "1");
     setQuery(params.toString());
   }
+  function journey(key: "session" | "visitor", value: string) {
+    setLoading(true);
+    setError("");
+    setRevision((current) => current + 1);
+    const params = new URLSearchParams(query);
+    params.set(key, value);
+    params.set("page", "1");
+    setFilters((current) => ({ ...current, [key]: value }));
+    setQuery(params.toString());
+  }
   function page(value: number) {
     setLoading(true);
     setError("");
@@ -116,7 +136,8 @@ export default function ActivityLog() {
       <div className="activity-notice">
         จำนวนคำขอ การเปิดหน้า คลิกดาวน์โหลด และการตอบกลับไฟล์เป็นคนละเหตุการณ์
         จึงไม่ควรนำมารวมเป็นจำนวนคนหรือจำนวนดาวน์โหลดสำเร็จ การตอบกลับไฟล์ 200/206
-        ไม่ยืนยันว่าผู้ใช้รับไฟล์ครบแล้ว เริ่มเก็บข้อมูลหลังเปิดใช้งานเท่านั้น
+        ไม่ยืนยันว่าผู้ใช้รับไฟล์ครบแล้ว คลิก Google Form ไม่ใช่การส่งคำตอบ
+        เริ่มเก็บข้อมูลหลังเปิดใช้งานเท่านั้น
       </div>
       <form
         className="activity-filters"
@@ -147,6 +168,22 @@ export default function ActivityLog() {
             value={filters.path}
             placeholder="/เกี่ยวกับ-สทร"
             onChange={(e) => setFilters({ ...filters, path: e.target.value })}
+          />
+        </label>
+        <label>
+          รหัสเซสชัน
+          <input
+            value={filters.session}
+            placeholder="รหัสนามแฝง 16 ตัว"
+            onChange={(e) => setFilters({ ...filters, session: e.target.value })}
+          />
+        </label>
+        <label>
+          กลุ่ม IP ต่อวัน
+          <input
+            value={filters.visitor}
+            placeholder="รหัสนามแฝง 16 ตัว"
+            onChange={(e) => setFilters({ ...filters, visitor: e.target.value })}
           />
         </label>
         <label>
@@ -185,6 +222,7 @@ export default function ActivityLog() {
           ["เซสชันนามแฝง", report?.summary.sessions],
           ["กลุ่ม IP ต่อวัน", report?.summary.ip_days],
           ["เหตุการณ์บอต", report?.summary.bot_events],
+          ["ไฟล์ไม่ซ้ำ (GET 200/206)", report?.summary.files_served],
         ].map(([label, value]) => (
           <div key={String(label)}>
             <span>{label}</span>
@@ -196,7 +234,8 @@ export default function ActivityLog() {
       </div>
       <p className="activity-caption">
         เซสชันหมดอายุเมื่อไม่มีกิจกรรม 30 นาที · กลุ่ม IP เปลี่ยนนามแฝงทุกวัน
-        ไม่ใช่จำนวนบุคคล · ไม่เก็บ IP จริง ข้อความในแบบฟอร์ม หรือพารามิเตอร์ URL
+        ไม่ใช่จำนวนบุคคล · ไฟล์ไม่ซ้ำนับตามเส้นทางไฟล์ ไม่รวม HEAD และไม่เพิ่มตามจำนวน
+        range requests · ไม่เก็บ IP จริง ข้อความในแบบฟอร์ม หรือพารามิเตอร์ URL
       </p>
       <div className="activity-types">
         {report?.types.map((type) => (
@@ -215,6 +254,7 @@ export default function ActivityLog() {
               <th>HTTP</th>
               <th>ผลที่สังเกตได้</th>
               <th>บอต</th>
+              <th>เส้นทางการใช้งานนามแฝง</th>
             </tr>
           </thead>
           <tbody>
@@ -243,11 +283,31 @@ export default function ActivityLog() {
                   )}
                 </td>
                 <td>{row.is_bot ? "ตรวจพบ" : "ไม่พบชัดเจน"}</td>
+                <td>
+                  {row.session_key && (
+                    <button
+                      type="button"
+                      className="activity-journey"
+                      onClick={() => journey("session", row.session_key!)}
+                    >
+                      เซสชัน {row.session_key}
+                    </button>
+                  )}
+                  {row.visitor_key && (
+                    <button
+                      type="button"
+                      className="activity-journey"
+                      onClick={() => journey("visitor", row.visitor_key!)}
+                    >
+                      IP-day {row.visitor_key}
+                    </button>
+                  )}
+                </td>
               </tr>
             ))}
             {report?.rows.length === 0 && (
               <tr>
-                <td colSpan={6}>ยังไม่มีเหตุการณ์ตรงกับตัวกรองนี้</td>
+                <td colSpan={7}>ยังไม่มีเหตุการณ์ตรงกับตัวกรองนี้</td>
               </tr>
             )}
           </tbody>

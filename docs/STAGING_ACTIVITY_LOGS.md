@@ -20,6 +20,15 @@ does not gain access. No new account, password, or access grant is created.
   distinguish GET, HEAD, 200, 206, 404 and 416. No claim of recipient completion.
   A PDF viewer may make multiple range requests for one document.
 - `redirect_response`: a known campaign redirect issued; not a form submission.
+- `outbound_form_click`: activation of a Google Forms responder link on the site,
+  including contact, complaints, recruitment and explicitly allowed staff portal
+  menu routes. This records departure intent, never an answer, submission or
+  completion. HTTPS `docs.google.com/forms/.../viewform` and `forms.gle` only;
+  query/prefill values and fragments are discarded in the browser. The database
+  stores a stable SHA-256 prefix of the public responder identity, not its URL.
+  Normal click, keyboard Enter, Ctrl/Meta/new-tab and middle-click are supported.
+  The handler never prevents navigation. Beacon/keepalive transport is best effort;
+  blockers, offline browsers, crashes and leaving before hydration can lose events.
 
 Do not add requests, pageviews, clicks and file responses together as downloads,
 visitors or EIT people. JavaScript-disabled visitors have origin request evidence
@@ -36,6 +45,11 @@ The daily IP-group key is an HMAC with the existing protected analytics salt and
 is not a person. A browser/tab session rolls over after 30 idle minutes. The
 collector sets only a dedicated Secure/HttpOnly/SameSite=Lax pseudonymous session
 cookie for server-download correlation, separate from authentication cookies.
+Direct file and campaign responses now establish/refresh that same cookie too.
+The collector prefers it over a tab UUID, so subsequent page/file/form observations
+share a session even when the first request is a direct PDF. A first simultaneous
+request before a cookie exists can remain uncorrelated. Cookie expiry is refreshed
+by observed events; it is not a persistent identity or fingerprint.
 
 ## Retention and existing logs
 
@@ -55,8 +69,13 @@ No scheduled deletion of existing real historical logs is activated.
 
 ## Review and export
 
-Bangkok date filters (end date inclusive), exact page/file path, event type, and bot
-filter; 50 rows per page; grouped event counts; anonymous sessions and daily IP groups.
+Bangkok date filters (end date inclusive), exact page/file path, event type, bot,
+session and daily IP-group filters; 50 rows per page. Row journey buttons filter
+the existing 16-hex pseudonym prefix. These are pseudonymous groups, not names.
+The distinct-file summary counts canonical target paths with GET 200/206 only,
+excluding HEAD, failures and repeat range requests for the same file. It measures
+distinct observed file paths in the selected window, not download completions or
+distinct download attempts. SDC aliases resolve to the same target as direct files.
 CSV uses the same authorization/filters, excludes raw identifiers, neutralizes
 spreadsheet formula prefixes, and caps each export page at 5,000 rows. Query `page`
 for further export pages; `X-Export-Has-More` signals truncation. Data responses are

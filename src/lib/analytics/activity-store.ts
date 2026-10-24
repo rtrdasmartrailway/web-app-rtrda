@@ -1,13 +1,22 @@
-import { createHmac, randomUUID } from "node:crypto";
+import { createHash, createHmac, randomUUID } from "node:crypto";
 import { Pool } from "pg";
 import { after } from "next/server";
 import { detectAnalyticsDevice, isObviousBot } from "./event-contract";
 import {
   activityPath,
+  activitySessionId,
   SESSION_COOKIE,
   UUID,
   type ActivityType,
 } from "./activity-contract";
+import { validatedFormTarget } from "./outbound-form";
+
+export function storedFormTarget(value: unknown): string | null {
+  const target = validatedFormTarget(value);
+  if (!target) return null;
+  const kind = target.split("/")[2];
+  return `/outbound-form/${kind}/${createHash("sha256").update(target).digest("hex").slice(0, 32)}`;
+}
 
 const state = globalThis as unknown as {
   activityPool?: Pool;
@@ -57,18 +66,8 @@ export function activityHashes(
     .split(",")[0]
     .trim();
   const day = new Date(now.getTime() + 7 * 3600000).toISOString().slice(0, 10);
-  const cookie = headers
-    .get("cookie")
-    ?.split(";")
-    .map((part) => part.trim())
-    .find((part) => part.startsWith(`${SESSION_COOKIE}=`))
-    ?.slice(SESSION_COOKIE.length + 1);
   const session =
-    sessionId && UUID.test(sessionId)
-      ? sessionId
-      : cookie && UUID.test(cookie)
-        ? cookie
-        : null;
+    activitySessionId(headers) || (sessionId && UUID.test(sessionId) ? sessionId : null);
   return {
     visitorKey: ip ? hash(`visitor:${day}:${ip}`) : null,
     sessionKey: session ? hash(`session:${session}`) : null,
@@ -93,7 +92,12 @@ export async function writeActivity(
 ): Promise<boolean> {
   if (!activityEnabled()) return false;
   const path = activityPath(input.path);
-  const target = input.targetPath ? activityPath(input.targetPath) : null;
+  const target =
+    input.eventType === "outbound_form_click"
+      ? storedFormTarget(input.targetPath)
+      : input.targetPath
+        ? activityPath(input.targetPath)
+        : null;
   if (!path || (input.targetPath && !target)) return false;
   const keys = activityHashes(headers, input.sessionId);
   const ua = headers.get("user-agent") || "";
@@ -144,12 +148,15 @@ export function logDownloadResponse(
   request: Request,
   response: Response,
   filePath: string,
+  sourcePath = new URL(request.url).pathname,
 ): Response {
+  const sessionId = correlateActivityResponse(request, response);
   logActivityLater(request, {
     eventType: "download_response",
-    path: new URL(request.url).pathname,
+    path: sourcePath,
     targetPath: filePath,
     channel: "server",
+    sessionId,
     method: request.method,
     status: response.status,
     outcome: response.ok
@@ -163,4 +170,18 @@ export function logDownloadResponse(
           : null,
   });
   return response;
+}
+
+/** Dedicated analytics cookie only; never reuse or persist an authentication cookie. */
+export function correlateActivityResponse(
+  request: Request,
+  response: Response,
+): string | null {
+  if (!activityEnabled()) return null;
+  const session = activitySessionId(request.headers) || randomUUID();
+  response.headers.append(
+    "Set-Cookie",
+    `${SESSION_COOKIE}=${session}; Path=/; Max-Age=1800; HttpOnly; Secure; SameSite=Lax`,
+  );
+  return session;
 }

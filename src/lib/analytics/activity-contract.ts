@@ -7,11 +7,21 @@ export const ACTIVITY_TYPES = [
   "download_click",
   "download_response",
   "redirect_response",
+  "outbound_form_click",
 ] as const;
 export type ActivityType = (typeof ACTIVITY_TYPES)[number];
 export const SESSION_COOKIE = "rtrda_activity_session";
 export const UUID =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+export function activitySessionId(headers: Headers): string | null {
+  const value = headers
+    .get("cookie")
+    ?.split(";")
+    .map((part) => part.trim())
+    .find((part) => part.startsWith(`${SESSION_COOKIE}=`))
+    ?.slice(SESSION_COOKIE.length + 1);
+  return value && UUID.test(value) ? value : null;
+}
 export const DOCUMENT_EXTENSION = /\.(pdf|docx?|xlsx?|pptx?|csv|zip|rar|7z|txt)$/i;
 
 export function activityPath(value: unknown): string | null {

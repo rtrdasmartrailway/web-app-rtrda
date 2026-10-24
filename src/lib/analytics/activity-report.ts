@@ -12,6 +12,8 @@ export type ReportFilter = {
   until: Date;
   path: string | null;
   type: ActivityType | null;
+  session: string | null;
+  visitor: string | null;
   bots: "all" | "exclude" | "only";
   page: number;
   format: "json" | "csv";
@@ -31,7 +33,18 @@ function dateBoundary(value: string | null, fallback: Date, end = false): Date {
 export function reportFilter(search: URLSearchParams, now = new Date()): ReportFilter {
   if (
     [...search.keys()].some(
-      (key) => !["from", "to", "path", "type", "bots", "page", "format"].includes(key),
+      (key) =>
+        ![
+          "from",
+          "to",
+          "path",
+          "type",
+          "bots",
+          "page",
+          "format",
+          "session",
+          "visitor",
+        ].includes(key),
     )
   )
     throw new Error("Unknown filter");
@@ -40,11 +53,15 @@ export function reportFilter(search: URLSearchParams, now = new Date()): ReportF
   const until = dateBoundary(search.get("to"), now, true);
   const type = search.get("type") || null;
   const bots = search.get("bots") || "all";
+  const session = search.get("session") || null;
+  const visitor = search.get("visitor") || null;
   const page = Number(search.get("page") || 1);
   const format = search.get("format") || "json";
   const path = search.get("path") ? activityPath(search.get("path")) : null;
   if (
     (type && !ACTIVITY_TYPES.includes(type as ActivityType)) ||
+    (session && !/^[a-f0-9]{16}$/.test(session)) ||
+    (visitor && !/^[a-f0-9]{16}$/.test(visitor)) ||
     !["all", "exclude", "only"].includes(bots) ||
     !["json", "csv"].includes(format) ||
     !Number.isInteger(page) ||
@@ -58,6 +75,8 @@ export function reportFilter(search: URLSearchParams, now = new Date()): ReportF
     from: from < cutoff ? cutoff : from,
     until: until > now ? now : until,
     path,
+    session,
+    visitor,
     type: type as ActivityType | null,
     bots: bots as ReportFilter["bots"],
     page,
@@ -70,6 +89,14 @@ export function reportWhere(filter: ReportFilter): { sql: string; values: unknow
   if (filter.path) {
     values.push(filter.path);
     clauses.push(`(path = $${values.length} OR target_path = $${values.length})`);
+  }
+  if (filter.session) {
+    values.push(filter.session);
+    clauses.push(`left(session_key,16) = $${values.length}`);
+  }
+  if (filter.visitor) {
+    values.push(filter.visitor);
+    clauses.push(`left(visitor_key,16) = $${values.length}`);
   }
   if (filter.type) {
     values.push(filter.type);
@@ -92,7 +119,7 @@ export async function activityReport(filter: ReportFilter) {
     [...values, limit, offset],
   );
   const summary = await pool.query(
-    `SELECT count(*)::int AS events,count(DISTINCT session_key)::int AS sessions,count(DISTINCT visitor_key)::int AS ip_days,count(*) FILTER(WHERE is_bot)::int AS bot_events,min(occurred_at) AS first_event,max(occurred_at) AS last_event FROM web_activity_events_v2 WHERE ${sql}`,
+    `SELECT count(*)::int AS events,count(DISTINCT session_key)::int AS sessions,count(DISTINCT visitor_key)::int AS ip_days,count(*) FILTER(WHERE is_bot)::int AS bot_events,count(DISTINCT target_path) FILTER(WHERE event_type='download_response' AND method='GET' AND status IN (200,206))::int AS files_served,min(occurred_at) AS first_event,max(occurred_at) AS last_event FROM web_activity_events_v2 WHERE ${sql}`,
     values,
   );
   const types = await pool.query(

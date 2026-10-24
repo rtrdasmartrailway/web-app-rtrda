@@ -1,7 +1,11 @@
 import { createHash, randomUUID } from "node:crypto";
 import { Pool } from "pg";
 import { NextRequest, NextResponse } from "next/server";
-import { activityEnabled, logActivityLater } from "@/lib/analytics/activity-store";
+import {
+  activityEnabled,
+  correlateActivityResponse,
+  logActivityLater,
+} from "@/lib/analytics/activity-store";
 import {
   createFixedWindowLimiter,
   type FixedWindowLimiter,
@@ -104,8 +108,10 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
 
   if (activityEnabled()) {
     const response = NextResponse.redirect(target.targetUrl, { status: 302 });
+    const sessionId = correlateActivityResponse(request, response);
     logActivityLater(request, {
       eventType: "redirect_response",
+      sessionId,
       path: `/r/${slug}`,
       targetPath: `/campaign/${target.campaign}`,
       channel: "server",

@@ -25,17 +25,22 @@ async function responseForDownload(
   id: string,
   includeBody: boolean,
   inline: boolean,
+  request: Request,
 ): Promise<Response> {
+  let targetPath = `/sdc_download/${id}`;
+  const finish = (response: Response) =>
+    logDownloadResponse(request, response, targetPath);
   const download = await findDownload(id);
   if (!download) {
-    return new Response("Not found", { status: 404 });
+    return finish(new Response("Not found", { status: 404 }));
   }
 
   const filePath = publicDownloadPath(download);
   if (!filePath) {
-    return new Response("Not found", { status: 404 });
+    return finish(new Response("Not found", { status: 404 }));
   }
 
+  targetPath = download.localPath;
   try {
     const fileStat = await stat(/*turbopackIgnore: true*/ filePath);
     const headers = new Headers({
@@ -46,30 +51,32 @@ async function responseForDownload(
     });
 
     if (!includeBody) {
-      return new Response(null, { headers });
+      return finish(new Response(null, { headers }));
     }
 
     const file = await readFile(/*turbopackIgnore: true*/ filePath);
-    return new Response(new Uint8Array(file), { headers });
+    return finish(new Response(new Uint8Array(file), { headers }));
   } catch {
-    return new Response("Not found", { status: 404 });
+    return finish(new Response("Not found", { status: 404 }));
   }
 }
 
 export async function GET(request: Request, context: RouteContext): Promise<Response> {
   const { id } = await context.params;
-  return logDownloadResponse(
+  return responseForDownload(
+    decodeURIComponent(id),
+    true,
+    isInlineRequest(request),
     request,
-    await responseForDownload(decodeURIComponent(id), true, isInlineRequest(request)),
-    `/sdc_download/${id}`,
   );
 }
 
 export async function HEAD(request: Request, context: RouteContext): Promise<Response> {
   const { id } = await context.params;
-  return logDownloadResponse(
+  return responseForDownload(
+    decodeURIComponent(id),
+    false,
+    isInlineRequest(request),
     request,
-    await responseForDownload(decodeURIComponent(id), false, isInlineRequest(request)),
-    `/sdc_download/${id}`,
   );
 }

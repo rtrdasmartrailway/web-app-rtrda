@@ -196,3 +196,17 @@
     min-width: 100%;
   }
 }
+
+.activity-journey {
+  display: block;
+  border: 0;
+  background: transparent;
+  color: #18599f;
+  font: inherit;
+  font-size: 11px;
+  padding: 4px 0;
+  cursor: pointer;
+  white-space: nowrap;
+  text-align: left;
+  text-decoration: underline;
+}

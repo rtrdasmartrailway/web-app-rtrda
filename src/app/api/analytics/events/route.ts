@@ -10,7 +10,12 @@ import {
   activityHashes,
   writeActivity,
 } from "@/lib/analytics/activity-store";
-import { publicActivityPath, SESSION_COOKIE } from "@/lib/analytics/activity-contract";
+import {
+  activitySessionId,
+  publicActivityPath,
+  SESSION_COOKIE,
+} from "@/lib/analytics/activity-contract";
+import { outboundSourceAllowed } from "@/lib/analytics/outbound-form";
 
 export const dynamic = "force-dynamic";
 const state = globalThis as unknown as { activityLimiter?: FixedWindowLimiter };
@@ -48,7 +53,9 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   const event = parseAnalyticsEvent(raw);
   if (
     !event ||
-    !publicActivityPath(event.path) ||
+    !(event.eventType === "outbound_form_click"
+      ? outboundSourceAllowed(event.path)
+      : publicActivityPath(event.path)) ||
     (event.targetPath && !publicActivityPath(event.targetPath))
   )
     return reply({ error: "Invalid event" }, 400);
@@ -64,21 +71,24 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       )
     )
       return reply({ accepted: false, reason: "rate_limited" }, 202);
+    const sessionId = activitySessionId(request.headers) || event.sessionId;
     const inserted = await writeActivity(request.headers, {
       eventId: event.eventId,
       eventType: event.eventType === "download" ? "download_click" : event.eventType,
       path: event.path,
       targetPath: event.targetPath,
-      sessionId: event.sessionId,
+      sessionId,
       source: event.source,
       channel: "client",
       outcome:
         event.eventType === "download"
           ? "click_not_confirmed_download"
-          : "browser_observed",
+          : event.eventType === "outbound_form_click"
+            ? "outbound_click_not_form_submission"
+            : "browser_observed",
     });
     const response = reply({ accepted: inserted }, 202);
-    response.cookies.set(SESSION_COOKIE, event.sessionId, {
+    response.cookies.set(SESSION_COOKIE, sessionId, {
       httpOnly: true,
       secure: true,
       sameSite: "lax",
