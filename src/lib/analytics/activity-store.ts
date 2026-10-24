@@ -1,4 +1,5 @@
 import { createHash, createHmac, randomUUID } from "node:crypto";
+import { readFileSync } from "node:fs";
 import { Pool } from "pg";
 import { after } from "next/server";
 import { detectAnalyticsDevice, isObviousBot } from "./event-contract";
@@ -22,12 +23,53 @@ const state = globalThis as unknown as {
   activityPool?: Pool;
   activityCleanupTimer?: ReturnType<typeof setInterval>;
 };
-export function activityEnabled(): boolean {
-  return (
-    process.env.ACTIVITY_LOGGING_ENABLED === "true" &&
+function activitySalt(): string | null {
+  if (!process.env.ANALYTICS_HASH_SALT_FILE)
+    return process.env.ANALYTICS_HASH_SALT || null;
+  try {
+    const text = readFileSync(process.env.ANALYTICS_HASH_SALT_FILE, "utf8").trim();
+    return /^ANALYTICS_HASH_SALT=[A-Za-z0-9_./:@-]+$/.test(text)
+      ? text.slice("ANALYTICS_HASH_SALT=".length)
+      : null;
+  } catch {
+    return null;
+  }
+}
+export function activityEnvironment(): "test" | "production" | null {
+  if (process.env.ACTIVITY_LOGGING_ENABLED !== "true") return null;
+  if (
     process.env.ANALYTICS_ENV === "test" &&
     process.env.SITE_ORIGIN === "https://test.rtrda.or.th"
-  );
+  )
+    return "test";
+  if (
+    process.env.ANALYTICS_ENV === "production" &&
+    process.env.SITE_ORIGIN === "https://rtrda.or.th" &&
+    (process.env.ACTIVITY_RECORDING_HOST === "cloud" ||
+      process.env.ACTIVITY_RECORDING_HOST === "rtrda02") &&
+    process.env.ACTIVITY_RETENTION_ENABLED === "true" &&
+    (activitySalt()?.length ?? 0) >= 32 &&
+    !/^(change.?me|placeholder|test|example)/i.test(activitySalt() ?? "")
+  )
+    return "production";
+  return null;
+}
+export function activityEnabled(): boolean {
+  return activityEnvironment() !== null;
+}
+/** Only public authorities or the known local proxy hop with a public forwarded authority. */
+export function activityHostAllowed(headers: Headers): boolean {
+  if (activityEnvironment() !== "production") return true;
+  const allowed = new Set(["rtrda.or.th", "www.rtrda.or.th"]);
+  const host = headers.get("host")?.toLowerCase();
+  const forwarded = headers.get("x-forwarded-host")?.toLowerCase();
+  if (host && allowed.has(host)) return !forwarded || forwarded === host;
+  const internal = new Set([
+    "localhost:3000",
+    "127.0.0.1:3000",
+    "web-app-rtrda-production:3000",
+  ]);
+  return !!host && internal.has(host) && !!forwarded && allowed.has(forwarded);
 }
 export function activityPool(): Pool {
   return (state.activityPool ??= new Pool({
@@ -37,10 +79,11 @@ export function activityPool(): Pool {
     statement_timeout: 5000,
   }));
 }
-export const RETENTION_SQL = `DELETE FROM web_activity_events_v2 WHERE environment = 'test' AND occurred_at < ((CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Bangkok' - INTERVAL '3 months') AT TIME ZONE 'Asia/Bangkok')`;
+export const RETENTION_SQL = `DELETE FROM web_activity_events_v2 WHERE environment = $1 AND occurred_at < ((CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Bangkok' - INTERVAL '3 months') AT TIME ZONE 'Asia/Bangkok')`;
 export async function cleanupActivityEvents(): Promise<number> {
-  if (!activityEnabled() || process.env.ACTIVITY_RETENTION_ENABLED !== "true") return 0;
-  return (await activityPool().query(RETENTION_SQL)).rowCount ?? 0;
+  const environment = activityEnvironment();
+  if (!environment || process.env.ACTIVITY_RETENTION_ENABLED !== "true") return 0;
+  return (await activityPool().query(RETENTION_SQL, [environment])).rowCount ?? 0;
 }
 function startCleanup() {
   if (state.activityCleanupTimer || process.env.ACTIVITY_RETENTION_ENABLED !== "true")
@@ -59,7 +102,7 @@ export function activityHashes(
   sessionId?: string | null,
   now = new Date(),
 ) {
-  const salt = process.env.ANALYTICS_HASH_SALT;
+  const salt = activitySalt();
   if (!salt) throw new Error("Activity hashing unavailable");
   const hash = (text: string) => createHmac("sha256", salt).update(text).digest("hex");
   const ip = (headers.get("cf-connecting-ip") || headers.get("x-forwarded-for") || "")
@@ -90,7 +133,8 @@ export async function writeActivity(
   headers: Headers,
   input: ActivityInput,
 ): Promise<boolean> {
-  if (!activityEnabled()) return false;
+  const environment = activityEnvironment();
+  if (!environment || !activityHostAllowed(headers)) return false;
   const path = activityPath(input.path);
   const target =
     input.eventType === "outbound_form_click"
@@ -102,9 +146,10 @@ export async function writeActivity(
   const keys = activityHashes(headers, input.sessionId);
   const ua = headers.get("user-agent") || "";
   const result = await activityPool().query(
-    `INSERT INTO web_activity_events_v2 (event_id,environment,event_type,path,target_path,source,channel,method,status,outcome,response_bytes,device_type,is_bot,visitor_key,session_key) VALUES ($1,'test',$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14) ON CONFLICT (event_id) DO NOTHING`,
+    `INSERT INTO web_activity_events_v2 (event_id,environment,event_type,path,target_path,source,channel,method,status,outcome,response_bytes,device_type,is_bot,visitor_key,session_key) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15) ON CONFLICT (event_id) DO NOTHING`,
     [
       input.eventId || randomUUID(),
+      environment,
       input.eventType,
       path,
       target,
@@ -125,9 +170,15 @@ export async function writeActivity(
 }
 /** Capture safe metadata now; never retain Request objects, bodies, raw headers or query strings. */
 export function logActivityLater(request: Request, input: ActivityInput): void {
-  if (!activityEnabled()) return;
+  if (!activityEnabled() || !activityHostAllowed(request.headers)) return;
   const safe = new Headers();
-  for (const key of ["cf-connecting-ip", "x-forwarded-for", "user-agent"]) {
+  for (const key of [
+    "cf-connecting-ip",
+    "x-forwarded-for",
+    "user-agent",
+    "host",
+    "x-forwarded-host",
+  ]) {
     const value = request.headers.get(key);
     if (value) safe.set(key, value);
   }
@@ -177,7 +228,7 @@ export function correlateActivityResponse(
   request: Request,
   response: Response,
 ): string | null {
-  if (!activityEnabled()) return null;
+  if (!activityEnabled() || !activityHostAllowed(request.headers)) return null;
   const session = activitySessionId(request.headers) || randomUUID();
   response.headers.append(
     "Set-Cookie",

@@ -17,6 +17,7 @@ type Row = {
   visitor_key: string | null;
 };
 type Report = {
+  recordingSource?: string;
   rows: Row[];
   summary: {
     events: number;
@@ -46,7 +47,11 @@ const time = (value: string) =>
     timeStyle: "medium",
     timeZone: "Asia/Bangkok",
   }).format(new Date(value));
-export default function ActivityLog() {
+export default function ActivityLog({
+  productionMode = false,
+}: {
+  productionMode?: boolean;
+}) {
   const [filters, setFilters] = useState({
     from: "",
     to: "",
@@ -73,9 +78,13 @@ export default function ActivityLog() {
         if (!response.ok)
           throw new Error(
             response.status === 401
-              ? "กรุณาเข้าสู่ระบบ PR Center อีกครั้ง"
+              ? productionMode
+                ? "กรุณาเข้าสู่ระบบรายงานกิจกรรมอีกครั้ง"
+                : "กรุณาเข้าสู่ระบบ PR Center อีกครั้ง"
               : response.status === 403
-                ? "บัญชีนี้ไม่มีสิทธิ์ผู้ดูแลระบบส่วนกลาง"
+                ? productionMode
+                  ? "บัญชีนี้ไม่มีสิทธิ์ดูรายงานกิจกรรม"
+                  : "บัญชีนี้ไม่มีสิทธิ์ผู้ดูแลระบบส่วนกลาง"
                 : "ยังไม่สามารถโหลดบันทึกได้ กรุณาลองใหม่",
           );
         setReport(await response.json());
@@ -87,7 +96,7 @@ export default function ActivityLog() {
         if (!controller.signal.aborted) setLoading(false);
       });
     return () => controller.abort();
-  }, [query, revision]);
+  }, [query, revision, productionMode]);
   function apply() {
     setLoading(true);
     setError("");
@@ -118,12 +127,18 @@ export default function ActivityLog() {
   const exportParams = new URLSearchParams(query);
   exportParams.set("format", "csv");
   exportParams.set("page", "1");
+  const production = productionMode;
   return (
     <section className="activity-log">
       <div className="activity-heading">
         <div>
-          <span className="activity-badge">TEST · เฉพาะผู้ดูแลระบบ</span>
+          <span className="activity-badge">
+            {production ? "RTRDA · เฉพาะผู้ดูรายงานกิจกรรม" : "TEST · เฉพาะผู้ดูแลระบบ"}
+          </span>
           <h1>บันทึกการใช้งานเว็บไซต์</h1>
+          {report && (
+            <p>แหล่งบันทึก: {report.recordingSource} (ข้อมูลแต่ละโฮสต์แยกกัน)</p>
+          )}
           <p>หลักฐานการเข้าถึงและการตอบกลับไฟล์ · เก็บย้อนหลัง 3 เดือนปฏิทิน · เวลาไทย</p>
         </div>
         <a
@@ -133,6 +148,13 @@ export default function ActivityLog() {
           ส่งออก CSV (สูงสุด 5,000 แถว)
         </a>
       </div>
+      {production && (
+        <form method="post" action="/api/analytics/activity-auth/logout">
+          <button className="activity-button secondary" type="submit">
+            ออกจากระบบรายงาน
+          </button>
+        </form>
+      )}
       <div className="activity-notice">
         จำนวนคำขอ การเปิดหน้า คลิกดาวน์โหลด และการตอบกลับไฟล์เป็นคนละเหตุการณ์
         จึงไม่ควรนำมารวมเป็นจำนวนคนหรือจำนวนดาวน์โหลดสำเร็จ การตอบกลับไฟล์ 200/206

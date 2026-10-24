@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   outboundFormTarget,
   outboundSourceAllowed,
@@ -9,6 +9,7 @@ import { storedFormTarget } from "./activity-store";
 import { parseAnalyticsEvent } from "./event-contract";
 import { reportFilter, reportWhere } from "./activity-report";
 
+afterEach(() => vi.unstubAllEnvs());
 const contact =
   "https://docs.google.com/forms/d/e/1FAIpQLSd8nY4Dt-vjvl6Ag4Jnwq_Ko5zEUT7FgKH8DB-wql74KAVe5w/viewform";
 const event = {
@@ -83,6 +84,9 @@ describe("outbound form evidence", () => {
     expect(supportedActivation({ type: "auxclick", button: 2 })).toBe(false);
   });
   it("supports parameterized pseudonymous journey filters without accepting identity or arbitrary input", () => {
+    vi.stubEnv("ACTIVITY_LOGGING_ENABLED", "true");
+    vi.stubEnv("ANALYTICS_ENV", "test");
+    vi.stubEnv("SITE_ORIGIN", "https://test.rtrda.or.th");
     const filter = reportFilter(
       new URLSearchParams({ session: "abcdef0123456789", visitor: "0123456789abcdef" }),
     );

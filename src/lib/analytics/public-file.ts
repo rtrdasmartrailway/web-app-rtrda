@@ -40,12 +40,12 @@ export async function servePublicDocument(
     return new Response("Not found", { status: 404 });
   try {
     const [realRoot, file] = await Promise.all([
-      realpath(root),
-      realpath(path.resolve(root, `.${requestedPath}`)),
+      realpath(/* turbopackIgnore: true */ root),
+      realpath(/* turbopackIgnore: true */ path.resolve(root, `.${requestedPath}`)),
     ]);
     if (!file.startsWith(`${realRoot}${path.sep}`))
       return new Response("Not found", { status: 404 });
-    const info = await stat(file);
+    const info = await stat(/* turbopackIgnore: true */ file);
     if (!info.isFile()) return new Response("Not found", { status: 404 });
     const range = byteRange(request.headers.get("range"), info.size);
     const headers = new Headers({
@@ -85,7 +85,7 @@ export async function servePublicDocument(
     if (range) headers.set("Content-Range", `bytes ${start}-${end}/${info.size}`);
     let stream: ReadStream | null = null;
     if (request.method !== "HEAD" && info.size > 0)
-      stream = createReadStream(file, { start, end });
+      stream = createReadStream(/* turbopackIgnore: true */ file, { start, end });
     const body = stream ? (Readable.toWeb(stream) as ReadableStream<Uint8Array>) : null;
     return new Response(body, { status: range ? 206 : 200, headers });
   } catch {

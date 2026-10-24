@@ -14,7 +14,16 @@ import { requireActivityAdmin } from "./activity-auth";
 import { browserSession } from "./browser-session";
 import { byteRange, servePublicDocument } from "./public-file";
 import { reportCsv, reportFilter, reportWhere } from "./activity-report";
-import { activityEnabled, activityHashes, RETENTION_SQL } from "./activity-store";
+import {
+  activityEnabled,
+  activityEnvironment,
+  activityHostAllowed,
+  activityHashes,
+  cleanupActivityEvents,
+  writeActivity,
+  RETENTION_SQL,
+} from "./activity-store";
+import { activityReport } from "./activity-report";
 
 afterEach(() => vi.unstubAllEnvs());
 describe("minimized activity evidence", () => {
@@ -113,7 +122,7 @@ describe("existing admin authorization and safe reports", () => {
       }),
     );
     expect((await requireActivityAdmin(cookie, fetcher))?.status).toBe(403);
-    fetcher.mockResolvedValue(Response.json({ isRootAdministrator: true }));
+    fetcher.mockImplementation(async () => Response.json({ isRootAdministrator: true }));
     expect(await requireActivityAdmin(cookie, fetcher)).toBeNull();
     expect(fetcher.mock.calls.at(-1)?.[1].headers.cookie).toBe(
       "rtrda_pr_center_oidc_session=synthetic",
@@ -142,6 +151,9 @@ describe("existing admin authorization and safe reports", () => {
     ).toBe(401);
   });
   it("validates Bangkok dates, strips query data, and parameterizes route filters", () => {
+    vi.stubEnv("ACTIVITY_LOGGING_ENABLED", "true");
+    vi.stubEnv("ANALYTICS_ENV", "test");
+    vi.stubEnv("SITE_ORIGIN", "https://test.rtrda.or.th");
     const f = reportFilter(
       new URLSearchParams({
         from: "2026-10-01",
@@ -222,6 +234,243 @@ describe("file response semantics", () => {
         expect((await serve("GET", file)).status).toBe(404);
     } finally {
       await rm(root, { recursive: true, force: true });
+    }
+  });
+});
+
+describe("production viewer auth selection", () => {
+  it("retains Test PR Center authorization but never trusts that cookie in production", async () => {
+    const pr = new Headers({ cookie: "rtrda_pr_center_oidc_session=synthetic" });
+    const viewer = new Headers({
+      cookie: "rtrda_activity_oidc_session=synthetic0000000000000000000000",
+    });
+    const fetcher = vi
+      .fn()
+      .mockImplementation(async () => Response.json({ isRootAdministrator: true }));
+    vi.stubEnv("ANALYTICS_ENV", "test");
+    expect(await requireActivityAdmin(pr, fetcher)).toBeNull();
+    expect(fetcher.mock.calls[0][0]).toBe("http://pr-center-api:3100/session");
+    fetcher.mockClear();
+    vi.stubEnv("ANALYTICS_ENV", "production");
+    expect((await requireActivityAdmin(pr, fetcher))?.status).toBe(401);
+    expect(fetcher).not.toHaveBeenCalled();
+    expect((await requireActivityAdmin(viewer, fetcher))?.status).toBe(403);
+    fetcher.mockResolvedValue(Response.json({ authorized: true }));
+    expect(await requireActivityAdmin(viewer, fetcher)).toBeNull();
+    expect(fetcher.mock.calls.at(-1)?.[0]).toBe(
+      "http://activity-report-auth:3101/session",
+    );
+    expect(fetcher.mock.calls.at(-1)?.[1].headers.cookie).toBe(
+      "rtrda_activity_oidc_session=synthetic0000000000000000000000",
+    );
+  });
+});
+
+describe("protected production salt", () => {
+  it("reads the mounted salt instead of the environment and fails closed when unreadable", async () => {
+    const root = await mkdtemp(path.join(os.tmpdir(), "activity-salt-"));
+    const file = path.join(root, "salt.env");
+    try {
+      await writeFile(
+        file,
+        "ANALYTICS_HASH_SALT=synthetic-protected-salt-with-adequate-length\n",
+        { mode: 0o600 },
+      );
+      vi.stubEnv("ACTIVITY_LOGGING_ENABLED", "true");
+      vi.stubEnv("ACTIVITY_RETENTION_ENABLED", "true");
+      vi.stubEnv("ANALYTICS_ENV", "production");
+      vi.stubEnv("SITE_ORIGIN", "https://rtrda.or.th");
+      vi.stubEnv("ACTIVITY_RECORDING_HOST", "cloud");
+      vi.stubEnv("ANALYTICS_HASH_SALT_FILE", file);
+      vi.stubEnv("ANALYTICS_HASH_SALT", "wrong-env-salt");
+      expect(activityEnvironment()).toBe("production");
+      expect(
+        activityHashes(new Headers({ "cf-connecting-ip": "192.0.2.1" })).visitorKey,
+      ).toMatch(/^[a-f0-9]{64}$/);
+      await writeFile(file, "invalid");
+      expect(activityEnvironment()).toBeNull();
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+});
+
+describe("production V2 environment isolation", () => {
+  const production = () => {
+    vi.stubEnv("ACTIVITY_LOGGING_ENABLED", "true");
+    vi.stubEnv("ACTIVITY_RETENTION_ENABLED", "true");
+    vi.stubEnv("ANALYTICS_ENV", "production");
+    vi.stubEnv("SITE_ORIGIN", "https://rtrda.or.th");
+    vi.stubEnv("ANALYTICS_HASH_SALT", "synthetic-production-salt-with-sufficient-length");
+    vi.stubEnv("ACTIVITY_RECORDING_HOST", "cloud");
+  };
+  it("requires all explicit production flags, origin and non-placeholder salt", () => {
+    production();
+    expect(activityEnvironment()).toBe("production");
+    for (const [name, value] of [
+      ["ACTIVITY_RETENTION_ENABLED", "false"],
+      ["SITE_ORIGIN", "https://test.rtrda.or.th"],
+      ["ANALYTICS_HASH_SALT", ""],
+      ["ANALYTICS_HASH_SALT", "change-me"],
+      ["ANALYTICS_ENV", "test"],
+    ]) {
+      vi.stubEnv(name, value);
+      expect(activityEnvironment()).toBeNull();
+      production();
+    }
+  });
+  it("fails closed for missing or invalid recording host before V2 writes, retention or reports", async () => {
+    production();
+    const { activityPool } = await import("./activity-store");
+    const query = vi.spyOn(activityPool(), "query");
+    try {
+      for (const host of ["", "other", "Cloud", "cloud,rtrda02"]) {
+        vi.stubEnv("ACTIVITY_RECORDING_HOST", host);
+        expect(activityEnvironment()).toBeNull();
+        expect(
+          await writeActivity(new Headers({ host: "rtrda.or.th" }), {
+            eventType: "page_view",
+            path: "/news",
+            channel: "client",
+            outcome: "browser_observed",
+          }),
+        ).toBe(false);
+        expect(await cleanupActivityEvents()).toBe(0);
+        await expect(
+          activityReport(reportFilter(new URLSearchParams())),
+        ).rejects.toThrow();
+      }
+      expect(query).not.toHaveBeenCalled();
+    } finally {
+      query.mockRestore();
+    }
+  });
+  it("accepts a known internal reverse-proxy Host only with a single public forwarded authority", () => {
+    production();
+    for (const internal of [
+      "localhost:3000",
+      "127.0.0.1:3000",
+      "web-app-rtrda-production:3000",
+    ]) {
+      expect(
+        activityHostAllowed(
+          new Headers({ host: internal, "x-forwarded-host": "rtrda.or.th" }),
+        ),
+      ).toBe(true);
+      expect(activityHostAllowed(new Headers({ host: internal }))).toBe(false);
+    }
+    expect(activityHostAllowed(new Headers({ host: "www.rtrda.or.th" }))).toBe(true);
+    expect(
+      activityHostAllowed(
+        new Headers({ host: "rtrda.or.th", "x-forwarded-host": "www.rtrda.or.th" }),
+      ),
+    ).toBe(false);
+    for (const forwarded of [
+      "evil.example",
+      "rtrda.or.th, evil.example",
+      "rtrda.or.th:443",
+      "rtrda.or.th.evil.example",
+      "https://rtrda.or.th",
+      "rtrda.or.th;evil",
+    ]) {
+      expect(
+        activityHostAllowed(
+          new Headers({ host: "localhost:3000", "x-forwarded-host": forwarded }),
+        ),
+      ).toBe(false);
+    }
+    expect(
+      activityHostAllowed(
+        new Headers({ host: "evil.example", "x-forwarded-host": "rtrda.or.th" }),
+      ),
+    ).toBe(false);
+  });
+  it("denies unknown or conflicting production hosts before storage", async () => {
+    production();
+    const event = {
+      eventType: "page_view" as const,
+      path: "/news",
+      channel: "client" as const,
+      outcome: "browser_observed",
+    };
+    for (const headers of [
+      new Headers({ host: "evil.example" }),
+      new Headers({ host: "rtrda.or.th", "x-forwarded-host": "evil.example" }),
+      new Headers(),
+    ])
+      expect(await writeActivity(headers, event)).toBe(false);
+  });
+  it("segregates inserts, retention and reports by parameterized environment", async () => {
+    production();
+    const { activityPool } = await import("./activity-store");
+    const pool = activityPool();
+    const query = vi
+      .spyOn(pool, "query")
+      .mockResolvedValue({ rowCount: 1, rows: [{ events: 1 }] } as never);
+    try {
+      expect(
+        await writeActivity(new Headers({ host: "www.rtrda.or.th" }), {
+          eventType: "page_view",
+          path: "/news",
+          channel: "client",
+          outcome: "browser_observed",
+        }),
+      ).toBe(true);
+      expect(query.mock.calls[0][0]).toContain("web_activity_events_v2");
+      expect(query.mock.calls[0][1]).toContain("production");
+      await cleanupActivityEvents();
+      expect(
+        query.mock.calls.some(
+          ([sql, values]) =>
+            String(sql).startsWith("DELETE") && (values as unknown[])[0] === "production",
+        ),
+      ).toBe(true);
+      const filter = reportFilter(
+        new URLSearchParams(),
+        new Date("2026-10-24T00:00:00Z"),
+      );
+      expect(reportWhere(filter).values[0]).toBe("production");
+      expect((await activityReport(filter)).recordingSource).toBe(
+        "cloud production database",
+      );
+      expect(
+        query.mock.calls
+          .filter(([sql]) => String(sql).startsWith("SELECT"))
+          .every(([, values]) => (values as unknown[])[0] === "production"),
+      ).toBe(true);
+      vi.stubEnv("ANALYTICS_ENV", "test");
+      vi.stubEnv("SITE_ORIGIN", "https://test.rtrda.or.th");
+      expect(reportWhere(filter).values[0]).toBe("test");
+      await cleanupActivityEvents();
+      expect(query.mock.calls.at(-1)?.[1]).toContain("test");
+    } finally {
+      query.mockRestore();
+    }
+  });
+  it("requires an explicit recording host before querying production reports", async () => {
+    production();
+    vi.stubEnv("ACTIVITY_RECORDING_HOST", "");
+    const { activityPool } = await import("./activity-store");
+    const query = vi.spyOn(activityPool(), "query");
+    try {
+      await expect(activityReport(reportFilter(new URLSearchParams()))).rejects.toThrow(
+        "Recording host unavailable",
+      );
+      expect(query).not.toHaveBeenCalled();
+    } finally {
+      query.mockRestore();
+    }
+  });
+  it("denies disabled reports without issuing queries", async () => {
+    production();
+    vi.stubEnv("ANALYTICS_HASH_SALT", "");
+    const { activityPool } = await import("./activity-store");
+    const query = vi.spyOn(activityPool(), "query");
+    try {
+      await expect(activityReport(reportFilter(new URLSearchParams()))).rejects.toThrow();
+      expect(query).not.toHaveBeenCalled();
+    } finally {
+      query.mockRestore();
     }
   });
 });

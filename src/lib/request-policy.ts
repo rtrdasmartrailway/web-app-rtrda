@@ -15,6 +15,7 @@ const ALLOWED_METHODS = "GET, HEAD, OPTIONS";
 const ANALYTICS_METHODS = "POST, OPTIONS";
 const DOWNLOAD_CAPTCHA_METHODS = "GET, POST, OPTIONS";
 const ANALYTICS_EVENT_PATH = "/api/analytics/events";
+const ACTIVITY_LOGOUT_PATH = "/api/analytics/activity-auth/logout";
 const DOWNLOAD_CAPTCHA_PATH = "/api/download-captcha";
 const PR_CENTER_API_PREFIX = "/api/pr-center/";
 const HEALTH_PATHS = new Set(["/healthz", "/api/health"]);
@@ -48,7 +49,7 @@ function httpsRedirect(request: NextRequest): NextResponse | null {
 
 function methodPolicy(request: NextRequest): NextResponse | null {
   const path = new URL(request.url).pathname;
-  const analyticsRequest = path === ANALYTICS_EVENT_PATH;
+  const analyticsRequest = path === ANALYTICS_EVENT_PATH || path === ACTIVITY_LOGOUT_PATH;
   const downloadCaptchaRequest = path === DOWNLOAD_CAPTCHA_PATH;
   const prCenterApiRequest = path.startsWith(PR_CENTER_API_PREFIX);
 
@@ -68,7 +69,9 @@ function methodPolicy(request: NextRequest): NextResponse | null {
   }
 
   if (
-    (analyticsRequest || downloadCaptchaRequest || prCenterApiRequest) &&
+    (path === ACTIVITY_LOGOUT_PATH
+      ? request.method === "POST"
+      : analyticsRequest || downloadCaptchaRequest || prCenterApiRequest) &&
     (request.method === "POST" ||
       request.method === "PATCH" ||
       request.method === "DELETE")

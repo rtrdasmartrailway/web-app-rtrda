@@ -2,7 +2,11 @@ import { NextResponse, type NextRequest } from "next/server";
 import { INTRO_RETURN_COOKIE, introHomepageUrl } from "@/lib/intro-flow";
 import { middleware } from "@/lib/request-policy";
 import { checkSurveyAccess, surveyPrivateHeaders } from "@/lib/survey/survey-private";
-import { activityEnabled, logActivityLater } from "@/lib/analytics/activity-store";
+import {
+  activityEnabled,
+  activityHostAllowed,
+  logActivityLater,
+} from "@/lib/analytics/activity-store";
 import {
   activityPath,
   isPageRequest,
@@ -23,14 +27,19 @@ export async function proxy(request: NextRequest) {
   // Runtime gated: production keeps its existing behavior until an approved rollout.
   if (
     activityEnabled() &&
-    ["/api/analytics/events", "/sdc_download", "/r"].some(
+    activityHostAllowed(request.headers) &&
+    ["/api/analytics/events", "/api/analytics/reports", "/sdc_download", "/r"].some(
       (base) => path === base || path.startsWith(`${base}/`),
     )
   ) {
     response.headers.set("cache-control", "private, no-store, max-age=0");
     response.headers.set("cdn-cache-control", "no-store");
   }
-  if (activityEnabled() && (request.method === "GET" || request.method === "HEAD")) {
+  if (
+    activityEnabled() &&
+    activityHostAllowed(request.headers) &&
+    (request.method === "GET" || request.method === "HEAD")
+  ) {
     const normalized = activityPath(path);
     if (
       normalized &&
@@ -38,6 +47,7 @@ export async function proxy(request: NextRequest) {
       response.headers.get("x-middleware-next") === "1"
     ) {
       const destination = new URL(`/logged-files-internal${path}`, request.url);
+      if (process.env.ANALYTICS_ENV === "production") destination.protocol = "http:";
       destination.search = "";
       const download = NextResponse.rewrite(destination);
       download.headers.set("cache-control", "private, no-store");

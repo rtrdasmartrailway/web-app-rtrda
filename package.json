@@ -19,7 +19,8 @@
     "format": "prettier --write .",
     "format:check": "git ls-files -z | xargs -0 prettier --check --ignore-unknown",
     "security:audit": "npm audit --omit=dev --audit-level=high",
-    "test": "vitest run"
+    "test": "vitest run",
+    "activity-auth:api": "tsx src/activity-report-auth/server.ts"
   },
   "dependencies": {
     "@prisma/adapter-pg": "^7.9.0",

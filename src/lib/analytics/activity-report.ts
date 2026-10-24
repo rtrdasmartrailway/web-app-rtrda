@@ -5,7 +5,7 @@ import {
   retentionCutoff,
   type ActivityType,
 } from "./activity-contract";
-import { activityPool } from "./activity-store";
+import { activityEnvironment, activityPool } from "./activity-store";
 
 export type ReportFilter = {
   from: Date;
@@ -84,8 +84,10 @@ export function reportFilter(search: URLSearchParams, now = new Date()): ReportF
   };
 }
 export function reportWhere(filter: ReportFilter): { sql: string; values: unknown[] } {
-  const values: unknown[] = [filter.from, filter.until];
-  const clauses = ["environment = 'test'", "occurred_at >= $1", "occurred_at < $2"];
+  const environment = activityEnvironment();
+  if (!environment) throw new Error("Activity logging disabled");
+  const values: unknown[] = [environment, filter.from, filter.until];
+  const clauses = ["environment = $1", "occurred_at >= $2", "occurred_at < $3"];
   if (filter.path) {
     values.push(filter.path);
     clauses.push(`(path = $${values.length} OR target_path = $${values.length})`);
@@ -108,7 +110,16 @@ export function reportWhere(filter: ReportFilter): { sql: string; values: unknow
 }
 const COLUMNS =
   "occurred_at,event_type,channel,path,target_path,method,status,outcome,response_bytes::text,device_type,is_bot,left(visitor_key,16) AS visitor_key,left(session_key,16) AS session_key";
+export function activityRecordingSource(): string {
+  const environment = activityEnvironment();
+  if (environment === "test") return "test database";
+  const host = process.env.ACTIVITY_RECORDING_HOST;
+  if (environment === "production" && (host === "cloud" || host === "rtrda02"))
+    return `${host} production database`;
+  throw new Error("Recording host unavailable");
+}
 export async function activityReport(filter: ReportFilter) {
+  const recordingSource = activityRecordingSource();
   const { sql, values } = reportWhere(filter);
   const pool = activityPool();
   const limit = filter.format === "csv" ? 5000 : 50;
@@ -131,6 +142,7 @@ export async function activityReport(filter: ReportFilter) {
     values,
   );
   return {
+    recordingSource,
     rows: rows.rows,
     summary: summary.rows[0],
     types: types.rows,

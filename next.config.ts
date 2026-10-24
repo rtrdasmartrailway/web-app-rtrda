@@ -70,6 +70,7 @@ const nextConfig: NextConfig = {
       },
       ...[
         "/api/analytics/reports",
+        "/api/analytics/reports/:path*",
         "/rtrdaintranet/activity-log",
         "/logged-files-internal/:path*",
       ].map((source) => ({
