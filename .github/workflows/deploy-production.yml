@@ -8,6 +8,16 @@ on:
         description: "Exact verified main merge SHA to deploy"
         required: true
         type: string
+      activity_stage:
+        description: "Opt in to private activity auth staging (protected target files required)"
+        required: false
+        default: false
+        type: boolean
+      activity_activate:
+        description: "Separately approved V2 logging activation; requires activity_stage"
+        required: false
+        default: false
+        type: boolean
 
 concurrency:
   group: web-app-rtrda-production
@@ -27,8 +37,14 @@ jobs:
         id: resolve
         env:
           INPUT_REF: ${{ github.event.inputs.ref || '' }}
+          ACTIVITY_STAGE: ${{ inputs.activity_stage || false }}
+          ACTIVITY_ACTIVATE: ${{ inputs.activity_activate || false }}
         run: |
           set -euo pipefail
+          if [ "$ACTIVITY_ACTIVATE" = true ] && [ "$ACTIVITY_STAGE" != true ]; then
+            echo '::error::V2 activation requires explicit staging opt-in'
+            exit 1
+          fi
           SOURCE_PATH=/srv/workspace/web-app-rtrda-production-source
           if [ ! -d "$SOURCE_PATH/.git" ]; then
             git clone https://github.com/rtrdasmartrailway/web-app-rtrda.git "$SOURCE_PATH"
@@ -92,6 +108,7 @@ jobs:
         run: |
           set -euo pipefail
           cd "$SOURCE_PATH"
+          python3 .github/scripts/test_activity_overlay.py
           npm test
           npm run lint
           npm run typecheck
@@ -126,6 +143,7 @@ jobs:
           SOURCE_PATH: ${{ steps.resolve.outputs.source_path }}
           DEPLOY_SHA: ${{ steps.resolve.outputs.deploy_sha }}
           GITHUB_SHA: ${{ steps.resolve.outputs.deploy_sha }}
+          ACTIVITY_DEPLOY_MODE: ${{ inputs.activity_activate && 'active' || inputs.activity_stage && 'stage' || 'off' }}
         run: |
           set -euo pipefail
           cd "$SOURCE_PATH"
@@ -149,6 +167,7 @@ jobs:
         env:
           SOURCE_PATH: ${{ steps.resolve.outputs.source_path }}
           GITHUB_SHA: ${{ steps.resolve.outputs.deploy_sha }}
+          ACTIVITY_DEPLOY_MODE: ${{ inputs.activity_activate && 'active' || inputs.activity_stage && 'stage' || 'off' }}
         run: |
           set -euo pipefail
           cd "$SOURCE_PATH"

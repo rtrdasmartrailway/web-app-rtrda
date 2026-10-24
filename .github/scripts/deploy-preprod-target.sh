@@ -16,6 +16,9 @@ set -euo pipefail
 SSH_OPTS=(-i "$SSH_KEY" -o BatchMode=yes -o StrictHostKeyChecking=accept-new -o ConnectTimeout=10)
 REMOTE="${TARGET_USER}@${TARGET_HOST}"
 REMOTE_SCRIPT="/tmp/rtrda-deploy-preprod-remote-${TARGET_NAME}.sh"
+REMOTE_OVERLAY_SCRIPT="/tmp/rtrda-activity-production-overlay-${TARGET_NAME}.py"
+ACTIVITY_DEPLOY_MODE="${ACTIVITY_DEPLOY_MODE:-off}"
+case "$ACTIVITY_DEPLOY_MODE" in off|stage|active) ;; *) echo '::error::invalid activity deployment mode'; exit 1 ;; esac
 
 SOURCE_PATH="${SOURCE_PATH:-/srv/workspace/web-app-rtrda}"
 cd "$SOURCE_PATH"
@@ -32,5 +35,7 @@ rsync -az --chmod=Du=rwx,Dgo=rx,Fu=rw,Fgo=r --info=stats2 -e "ssh ${SSH_OPTS[*]}
 echo "== ${TARGET_NAME}: deploy ${GITHUB_SHA} =="
 rsync -az -e "ssh ${SSH_OPTS[*]}" \
   .github/scripts/deploy-preprod-remote.sh "${REMOTE}:${REMOTE_SCRIPT}"
+rsync -az -e "ssh ${SSH_OPTS[*]}" \
+  .github/scripts/activity-production-overlay.py "${REMOTE}:${REMOTE_OVERLAY_SCRIPT}"
 ssh "${SSH_OPTS[@]}" "$REMOTE" \
-  "chmod +x '$REMOTE_SCRIPT' && TARGET_NAME='$TARGET_NAME' TARGET_PATH='$TARGET_PATH' COMPOSE_FILE='$COMPOSE_FILE' APP_SERVICE='$APP_SERVICE' DB_SERVICE='$DB_SERVICE' DB_HOST_PORT='$DB_HOST_PORT' DIRECT_HEALTH_URL='$DIRECT_HEALTH_URL' DEPLOY_SHA='$GITHUB_SHA' '$REMOTE_SCRIPT'"
+  "chmod +x '$REMOTE_SCRIPT' && TARGET_NAME='$TARGET_NAME' TARGET_PATH='$TARGET_PATH' COMPOSE_FILE='$COMPOSE_FILE' APP_SERVICE='$APP_SERVICE' DB_SERVICE='$DB_SERVICE' DB_HOST_PORT='$DB_HOST_PORT' DIRECT_HEALTH_URL='$DIRECT_HEALTH_URL' DEPLOY_SHA='$GITHUB_SHA' ACTIVITY_DEPLOY_MODE='$ACTIVITY_DEPLOY_MODE' ACTIVITY_OVERLAY_SCRIPT='$REMOTE_OVERLAY_SCRIPT' '$REMOTE_SCRIPT'"

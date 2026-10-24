@@ -22,6 +22,17 @@ if [ ! -f "$COMPOSE_FILE" ]; then
 fi
 
 mkdir -p .deploy-state
+ACTIVITY_DEPLOY_MODE="${ACTIVITY_DEPLOY_MODE:-off}"
+ACTIVITY_RELEASE_SHA="$DEPLOY_SHA"
+export ACTIVITY_DEPLOY_MODE ACTIVITY_RELEASE_SHA
+ACTIVITY_OVERLAY=".deploy-state/activity-overlay.yml"
+PREVIOUS_OVERLAY="/tmp/rtrda-${TARGET_NAME}-previous-activity-overlay.yml"
+if [ -f "$ACTIVITY_OVERLAY" ]; then cp "$ACTIVITY_OVERLAY" "$PREVIOUS_OVERLAY"; else rm -f "$PREVIOUS_OVERLAY"; fi
+# The two independent protected sources live only on each target, outside Git.
+ACTIVITY_OIDC_ENV_FILE="$TARGET_PATH/.activity-secrets/oidc.env"
+ACTIVITY_SALT_ENV_FILE="$TARGET_PATH/.activity-secrets/analytics-salt.env"
+export ACTIVITY_OIDC_ENV_FILE ACTIVITY_SALT_ENV_FILE
+python3 "${ACTIVITY_OVERLAY_SCRIPT:?activity overlay generator required}" "$TARGET_NAME" "$APP_SERVICE" "$DB_SERVICE" "$COMPOSE_FILE" "$ACTIVITY_OVERLAY"
 PREVIOUS_SHA=""
 PREVIOUS_COMPOSE="/tmp/rtrda-${TARGET_NAME}-previous-compose.yml"
 if [ -f .deploy-state/preprod-release ]; then
@@ -77,6 +88,11 @@ fi
 chmod 600 .env.cicd-preprod
 cp .env.cicd-preprod .env
 
+COMPOSE_ARGS=(--env-file .env.cicd-preprod -f "$COMPOSE_FILE")
+if [ -f "$ACTIVITY_OVERLAY" ]; then COMPOSE_ARGS+=(-f "$ACTIVITY_OVERLAY"); fi
+# Do not dump config: Compose materializes env_file values in its output.
+docker compose "${COMPOSE_ARGS[@]}" config --quiet
+
 run_node() {
   if command -v npm >/dev/null 2>&1; then
     "$@"
@@ -121,6 +137,20 @@ wait_for_health() {
   return 1
 }
 
+rollback_activity_overlay() {
+  if [ -f "$ACTIVITY_OVERLAY" ] && [ ! -f "$PREVIOUS_OVERLAY" ]; then
+    # Remove only the new private service; never tear down the database/network.
+    docker compose "${COMPOSE_ARGS[@]}" rm -sf activity-report-auth || true
+  fi
+  if [ -f "$PREVIOUS_OVERLAY" ]; then
+    cp "$PREVIOUS_OVERLAY" "$ACTIVITY_OVERLAY"
+    COMPOSE_ARGS=(--env-file .env.cicd-preprod -f "$COMPOSE_FILE" -f "$ACTIVITY_OVERLAY")
+  else
+    rm -f "$ACTIVITY_OVERLAY"
+    COMPOSE_ARGS=(--env-file .env.cicd-preprod -f "$COMPOSE_FILE")
+  fi
+}
+
 rollback_previous_release() {
   if [ -z "$PREVIOUS_SHA" ] || [ ! -f "$PREVIOUS_COMPOSE" ]; then
     echo "::error::no previous release is available for rollback"
@@ -131,7 +161,11 @@ rollback_previous_release() {
   git checkout -f -B preprod "$PREVIOUS_SHA"
   git reset --hard "$PREVIOUS_SHA"
   cp "$PREVIOUS_COMPOSE" "$COMPOSE_FILE"
-  docker compose --env-file .env.cicd-preprod -f "$COMPOSE_FILE" up -d --no-build "$APP_SERVICE"
+  rollback_activity_overlay
+  if [ -f "$ACTIVITY_OVERLAY" ]; then
+    docker compose "${COMPOSE_ARGS[@]}" up -d --no-build activity-report-auth
+  fi
+  docker compose "${COMPOSE_ARGS[@]}" up -d --no-build "$APP_SERVICE"
   if wait_for_health 30; then
     echo "::warning::${TARGET_NAME}: restored previous healthy release ${PREVIOUS_SHA}"
     return 0
@@ -141,16 +175,48 @@ rollback_previous_release() {
   return 1
 }
 
-# Build the immutable SHA-tagged image while the current container remains up.
-docker compose --env-file .env.cicd-preprod -f "$COMPOSE_FILE" build "$APP_SERVICE"
+# Build SHA-tagged images while the old container remains up.
+if [ -f "$ACTIVITY_OVERLAY" ]; then
+  if ! docker compose "${COMPOSE_ARGS[@]}" build activity-report-auth; then
+    rollback_previous_release || true
+    exit 1
+  fi
+fi
+if ! docker compose "${COMPOSE_ARGS[@]}" build "$APP_SERVICE"; then
+  rollback_previous_release || true
+  exit 1
+fi
+# The dependency must become healthy before replacement; /session without a
+# signed-in cookie must deny access. No host port is published for the API.
+if [ -f "$ACTIVITY_OVERLAY" ]; then
+  if ! docker compose "${COMPOSE_ARGS[@]}" up -d --no-build activity-report-auth; then
+    rollback_previous_release || true
+    exit 1
+  fi
+  auth_denies_anonymous=false
+  for attempt in $(seq 1 20); do
+    if docker compose "${COMPOSE_ARGS[@]}" exec -T activity-report-auth node -e "fetch('http://127.0.0.1:3101/session').then(r=>process.exit(r.status===401?0:1)).catch(()=>process.exit(1))" >/dev/null 2>&1; then
+      auth_denies_anonymous=true
+      break
+    fi
+    sleep 2
+  done
+  if [ "$auth_denies_anonymous" != true ]; then
+    rollback_previous_release || true
+    exit 1
+  fi
+fi
 # Replacement is now a short container swap; never rebuild while the old service is stopped.
-if ! docker compose --env-file .env.cicd-preprod -f "$COMPOSE_FILE" up -d --no-build "$APP_SERVICE"; then
+if ! docker compose "${COMPOSE_ARGS[@]}" up -d --no-build "$APP_SERVICE"; then
   echo "::error::${TARGET_NAME}: container replacement command failed"
   rollback_previous_release || true
   exit 1
 fi
 
 if wait_for_health 50; then
+  if [ ! -f "$ACTIVITY_OVERLAY" ] && [ -f "$PREVIOUS_OVERLAY" ]; then
+    docker compose --env-file .env.cicd-preprod -f "$COMPOSE_FILE" -f "$PREVIOUS_OVERLAY" rm -sf activity-report-auth
+  fi
   echo "$DEPLOY_SHA" > .deploy-state/preprod-release
   printf '%s %s %s\n' "$(date -Is)" "$TARGET_NAME" "$DEPLOY_SHA" >> .deploy-state/preprod-releases.log
   rm -f "$PREVIOUS_COMPOSE"
