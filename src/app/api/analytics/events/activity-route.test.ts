@@ -25,12 +25,16 @@ const valid = {
   targetPath: null,
   source: "direct",
 };
-function request(body: unknown, origin = "https://test.rtrda.or.th") {
-  return new NextRequest("https://test.rtrda.or.th/api/analytics/events", {
+function request(
+  body: unknown,
+  origin = "https://test.rtrda.or.th",
+  host = "test.rtrda.or.th",
+) {
+  return new NextRequest(`${origin}/api/analytics/events`, {
     method: "POST",
     headers: {
       origin,
-      host: "test.rtrda.or.th",
+      host,
       "sec-fetch-site": "same-origin",
       "content-type": "application/json",
     },
@@ -106,8 +110,9 @@ describe("activity collector isolation", () => {
 it("keeps the legacy collector writing when V2 is disabled", async () => {
   mocks.enabled.mockReturnValue(false);
   vi.stubEnv("ANALYTICS_ENV", "production");
+  vi.stubEnv("SITE_ORIGIN", "https://rtrda.or.th");
   vi.stubEnv("ACTIVITY_LOGGING_ENABLED", "false");
-  const response = await POST(request(valid));
+  const response = await POST(request(valid, "https://rtrda.or.th", "rtrda.or.th"));
   expect(response.status).toBe(202);
   expect(await response.json()).toEqual({ accepted: true });
   expect(mocks.legacy).toHaveBeenCalledOnce();
@@ -117,6 +122,7 @@ it("keeps the legacy collector writing when V2 is disabled", async () => {
 it("ignores V2-only outbound clicks without touching the constrained legacy table while keeping page views live", async () => {
   mocks.enabled.mockReturnValue(false);
   vi.stubEnv("ANALYTICS_ENV", "production");
+  vi.stubEnv("SITE_ORIGIN", "https://rtrda.or.th");
   vi.stubEnv("ACTIVITY_LOGGING_ENABLED", "false");
   const form = {
     ...valid,
@@ -124,25 +130,76 @@ it("ignores V2-only outbound clicks without touching the constrained legacy tabl
     path: "/rtrdaintranet",
     targetPath: "/outbound-form/short/cA3FjxyvkR1pKy5k6",
   };
-  const response = await POST(request(form));
+  const response = await POST(request(form, "https://rtrda.or.th", "rtrda.or.th"));
   expect(response.status).toBe(202);
   expect(await response.json()).toEqual({ accepted: false, reason: "unsupported_event" });
   expect(mocks.legacy).not.toHaveBeenCalled();
   expect(mocks.write).not.toHaveBeenCalled();
   const sensitive = await POST(
-    request({ ...form, targetPath: form.targetPath + "?entry.1=private" }),
+    request(
+      { ...form, targetPath: form.targetPath + "?entry.1=private" },
+      "https://rtrda.or.th",
+      "rtrda.or.th",
+    ),
   );
   expect(sensitive.status).toBe(400);
   expect(mocks.legacy).not.toHaveBeenCalled();
-  const page = await POST(request(valid));
+  const page = await POST(request(valid, "https://rtrda.or.th", "rtrda.or.th"));
   expect(await page.json()).toEqual({ accepted: true });
   expect(mocks.legacy).toHaveBeenCalledOnce();
   expect(mocks.legacy.mock.calls[0][0].event.eventType).toBe("page_view");
 });
 
+it("stores default-off Production page views but rejects V2-only outbound clicks", async () => {
+  mocks.enabled.mockReturnValue(false);
+  vi.stubEnv("SITE_ORIGIN", "https://rtrda.or.th");
+  vi.stubEnv("ANALYTICS_ENV", undefined);
+  vi.stubEnv("ACTIVITY_LOGGING_ENABLED", undefined);
+  const origin = "https://rtrda.or.th";
+  const page = await POST(request(valid, origin, "rtrda.or.th"));
+  expect(page.status).toBe(202);
+  expect(await page.json()).toEqual({ accepted: true });
+  expect(mocks.legacy).toHaveBeenCalledOnce();
+  expect(mocks.legacy.mock.calls[0][0].event.eventType).toBe("page_view");
+  const outbound = await POST(
+    request(
+      {
+        ...valid,
+        eventType: "outbound_form_click",
+        path: "/rtrdaintranet",
+        targetPath: "/outbound-form/short/cA3FjxyvkR1pKy5k6",
+      },
+      origin,
+      "rtrda.or.th",
+    ),
+  );
+  expect(outbound.status).toBe(202);
+  expect(await outbound.json()).toEqual({ accepted: false, reason: "unsupported_event" });
+  expect(mocks.legacy).toHaveBeenCalledOnce();
+  expect(mocks.write).not.toHaveBeenCalled();
+});
+
+it.each([
+  ["test origin", "https://test.rtrda.or.th", undefined],
+  ["missing origin", undefined, undefined],
+  ["malformed origin", "https://rtrda.or.th/extra", undefined],
+  ["explicit test environment", "https://rtrda.or.th", "test"],
+  ["unexpected environment", "https://rtrda.or.th", "prod"],
+])("leaves legacy disabled for %s", async (_label, siteOrigin, analyticsEnv) => {
+  mocks.enabled.mockReturnValue(false);
+  vi.stubEnv("SITE_ORIGIN", siteOrigin);
+  vi.stubEnv("ANALYTICS_ENV", analyticsEnv);
+  vi.stubEnv("ACTIVITY_LOGGING_ENABLED", undefined);
+  const response = await POST(request(valid));
+  expect(response.status).toBe(202);
+  expect(await response.json()).toEqual({ accepted: false, reason: "disabled" });
+  expect(mocks.legacy).not.toHaveBeenCalled();
+});
+
 it("does not resurrect the legacy collector when staging V2 is disabled", async () => {
   mocks.enabled.mockReturnValue(false);
   vi.stubEnv("ANALYTICS_ENV", "test");
+  vi.stubEnv("SITE_ORIGIN", "https://test.rtrda.or.th");
   vi.stubEnv("ACTIVITY_LOGGING_ENABLED", "false");
   const response = await POST(request(valid));
   expect(response.status).toBe(202);
@@ -154,6 +211,8 @@ it("does not resurrect the legacy collector when staging V2 is disabled", async 
 it("does not fall back to legacy when production V2 is requested but its gate fails", async () => {
   mocks.enabled.mockReturnValue(false);
   vi.stubEnv("ACTIVITY_LOGGING_ENABLED", "true");
+  vi.stubEnv("SITE_ORIGIN", "https://rtrda.or.th");
+  vi.stubEnv("ANALYTICS_ENV", undefined);
   const response = await POST(request(valid));
   expect(response.status).toBe(503);
   expect(mocks.legacy).not.toHaveBeenCalled();

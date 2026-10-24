@@ -29,7 +29,9 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
   if (!activityEnabled())
     return process.env.ACTIVITY_LOGGING_ENABLED === "true"
       ? reply({ error: "Activity logging unavailable" }, 503)
-      : process.env.ANALYTICS_ENV === "production"
+      : process.env.SITE_ORIGIN === "https://rtrda.or.th" &&
+          (process.env.ANALYTICS_ENV === undefined ||
+            process.env.ANALYTICS_ENV === "production")
         ? legacyPOST(request)
         : reply({ accepted: false, reason: "disabled" }, 202);
   if (!activityHostAllowed(request.headers)) return reply({ error: "Forbidden" }, 403);
