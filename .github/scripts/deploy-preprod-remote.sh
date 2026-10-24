@@ -66,7 +66,7 @@ wait_for_health() {
 }
 
 rollback_activity_overlay() {
-  if [ -f "$ACTIVITY_OVERLAY" ] && [ ! -f "$PREVIOUS_OVERLAY" ]; then
+  if [ -f "$ACTIVITY_OVERLAY" ] && grep -q '^  activity-report-auth:' "$ACTIVITY_OVERLAY" && { [ ! -f "$PREVIOUS_OVERLAY" ] || ! grep -q '^  activity-report-auth:' "$PREVIOUS_OVERLAY"; }; then
     # Remove only the new private service; never tear down the database/network.
     docker compose "${COMPOSE_ARGS[@]}" rm -sf activity-report-auth || true
   fi
@@ -95,7 +95,7 @@ rollback_previous_release() {
     if [ -f "$snapshot" ]; then cp -p "$snapshot" "$destination"; else rm -f "$destination"; fi
   done
   rollback_activity_overlay
-  if [ "${AUTH_SWAP_STARTED:-false}" = true ] && [ -f "$ACTIVITY_OVERLAY" ]; then
+  if [ -f "$ACTIVITY_OVERLAY" ] && grep -q '^  activity-report-auth:' "$ACTIVITY_OVERLAY" && { [ "${AUTH_SWAP_STARTED:-false}" = true ] || [ "${APP_SWAP_STARTED:-false}" = true ]; }; then
     docker compose "${COMPOSE_ARGS[@]}" up -d --no-build activity-report-auth
   fi
   if [ "${APP_SWAP_STARTED:-false}" = true ]; then
@@ -213,7 +213,7 @@ else
 fi
 
 # Build SHA-tagged images while the old container remains up.
-if [ -f "$ACTIVITY_OVERLAY" ]; then
+if [ -f "$ACTIVITY_OVERLAY" ] && grep -q '^  activity-report-auth:' "$ACTIVITY_OVERLAY"; then
   if ! docker compose "${COMPOSE_ARGS[@]}" build activity-report-auth; then
     rollback_previous_release || true
     exit 1
@@ -225,7 +225,7 @@ if ! docker compose "${COMPOSE_ARGS[@]}" build "$APP_SERVICE"; then
 fi
 # The dependency must become healthy before replacement; /session without a
 # signed-in cookie must deny access. No host port is published for the API.
-if [ -f "$ACTIVITY_OVERLAY" ]; then
+if [ -f "$ACTIVITY_OVERLAY" ] && grep -q '^  activity-report-auth:' "$ACTIVITY_OVERLAY"; then
   AUTH_SWAP_STARTED=true
   if ! docker compose "${COMPOSE_ARGS[@]}" up -d --no-build activity-report-auth; then
     rollback_previous_release || true
@@ -258,8 +258,11 @@ if [ -f "$ACTIVITY_OVERLAY" ] && ! docker compose "${COMPOSE_ARGS[@]}" exec -T "
   exit 1
 fi
 if wait_for_health 50; then
-  if [ ! -f "$ACTIVITY_OVERLAY" ] && [ -f "$PREVIOUS_OVERLAY" ]; then
-    docker compose --env-file .env.cicd-preprod -f "$COMPOSE_FILE" -f "$PREVIOUS_OVERLAY" rm -sf activity-report-auth
+  if { [ ! -f "$ACTIVITY_OVERLAY" ] || ! grep -q '^  activity-report-auth:' "$ACTIVITY_OVERLAY"; } && [ -f "$PREVIOUS_OVERLAY" ] && grep -q '^  activity-report-auth:' "$PREVIOUS_OVERLAY"; then
+    if ! docker compose --env-file .env.cicd-preprod -f "$COMPOSE_FILE" -f "$PREVIOUS_OVERLAY" rm -sf activity-report-auth; then
+      rollback_previous_release || true
+      exit 1
+    fi
   fi
   echo "$DEPLOY_SHA" > .deploy-state/preprod-release
   printf '%s %s %s\n' "$(date -Is)" "$TARGET_NAME" "$DEPLOY_SHA" >> .deploy-state/preprod-releases.log

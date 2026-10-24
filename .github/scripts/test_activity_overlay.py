@@ -47,6 +47,43 @@ class OverlayTests(unittest.TestCase):
         self.assertFalse(self.overlay.exists())
         self.assertNotIn('synthetic', result.stdout + result.stderr)
 
+    def test_collect_requires_only_protected_salt_and_never_starts_auth(self):
+        import json
+        self.oidc.unlink()
+        result = self.run_overlay(enabled='collect')
+        self.assertEqual(result.returncode, 0, result.stderr)
+        text = self.overlay.read_text()
+        self.assertNotIn('activity-report-auth:', text)
+        self.assertNotIn('ACTIVITY_OIDC_FILE', text)
+        self.assertIn('ACTIVITY_LOGGING_ENABLED: "true"', text)
+        self.assertIn('ACTIVITY_RETENTION_ENABLED: "true"', text)
+        self.assertIn('ACTIVITY_RECORDING_HOST: cloud', text)
+        config = subprocess.run(['docker', 'compose', '-f', str(self.base), '-f', str(self.overlay), 'config', '--format', 'json'],
+            env=dict(os.environ, POSTGRES_PASSWORD='synthetic-db'), capture_output=True, text=True)
+        self.assertEqual(config.returncode, 0, config.stderr)
+        services = json.loads(config.stdout)['services']
+        self.assertNotIn('activity-report-auth', services)
+        app = services['web-app-rtrda-preprod-cloud']
+        self.assertNotIn('activity-report-auth', app.get('depends_on', {}))
+        self.assertEqual(app['environment']['ACTIVITY_LOGGING_ENABLED'], 'true')
+        self.assertEqual(app['environment']['ACTIVITY_RETENTION_ENABLED'], 'true')
+        self.assertNotIn('s' * 48, json.dumps(services))
+
+    def test_collect_fails_closed_with_missing_or_invalid_salt(self):
+        self.oidc.unlink()
+        self.salt.unlink()
+        self.assertNotEqual(self.run_overlay(enabled='collect').returncode, 0)
+        self.write(self.salt, 'ANALYTICS_HASH_SALT=' + 's'*48 + '\n', mode=0o644)
+        self.assertNotEqual(self.run_overlay(enabled='collect').returncode, 0)
+        self.write(self.salt, 'ANALYTICS_HASH_SALT=placeholder\n')
+        self.assertNotEqual(self.run_overlay(enabled='collect').returncode, 0)
+
+    def test_collect_is_an_explicit_preservable_mode(self):
+        workflow = (SCRIPT.parents[2] / '.github/workflows/deploy-production.yml').read_text()
+        resolver = SCRIPT.with_name('resolve-activity-mode.sh').read_text()
+        self.assertIn('          - collect', workflow)
+        self.assertIn('preserve|off|collect|stage|active', resolver)
+
     def test_opt_in_requires_both_protected_regular_0600_files(self):
         for missing in (self.oidc, self.salt):
             with self.subTest(missing=missing.name):
@@ -225,7 +262,7 @@ class OverlayTests(unittest.TestCase):
         docker.write_text('#!/bin/sh\nprintf "%s\\n" "$*" >> "$DOCKER_LOG"\n')
         docker.chmod(0o755)
         log = self.root / 'docker.log'
-        self.overlay.write_text('new overlay')
+        self.overlay.write_text('services:\n  activity-report-auth:\n')
         env = dict(os.environ, PATH=f'{fakebin}:{os.environ["PATH"]}', DOCKER_LOG=str(log))
         shell = f'''set -eu
 ACTIVITY_OVERLAY={self.overlay}
@@ -239,10 +276,10 @@ rollback_activity_overlay
         result = subprocess.run(['bash', '-c', shell], env=env, capture_output=True, text=True)
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn('rm -sf activity-report-auth', log.read_text())
-        self.overlay.write_text('new overlay')
-        (self.root / 'previous.yml').write_text('previous overlay')
+        self.overlay.write_text('services:\n  activity-report-auth:\n')
+        (self.root / 'previous.yml').write_text('services:\n  activity-report-auth:\n# previous overlay\n')
         log.unlink()
-        result = subprocess.run(['bash', '-c', shell.replace('[ ! -e "$ACTIVITY_OVERLAY" ]', '[ "$(cat "$ACTIVITY_OVERLAY")" = "previous overlay" ]')], env=env, capture_output=True, text=True)
+        result = subprocess.run(['bash', '-c', shell.replace('[ ! -e "$ACTIVITY_OVERLAY" ]', '[ "$(cat "$ACTIVITY_OVERLAY" | tail -1)" = "# previous overlay" ]')], env=env, capture_output=True, text=True)
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertFalse(log.exists(), 'existing auth service must not be removed on rollback')
 
@@ -256,7 +293,9 @@ rollback_activity_overlay
         docker.write_text("""#!/usr/bin/env python3
 import json, os, sys
 args=sys.argv[1:]
-if 'ps' in args:
+if args[0] == 'ps':
+    print('auth-id' if os.environ.get('ORPHAN_AUTH') else '')
+elif 'ps' in args:
     print('auth-id' if args[-1] == 'activity-report-auth' else 'app-id')
 elif args[0] == 'inspect':
     auth = args[-1] == 'auth-id'
@@ -264,7 +303,7 @@ elif args[0] == 'inspect':
     source = os.environ['TARGET_PATH'] + ('/.activity-secrets/oidc.env' if auth else '/.activity-secrets/analytics-salt.env')
     if os.environ.get('BAD_MOUNT') == ('auth' if auth else 'app'): destination = '/wrong'
     if os.environ.get('BAD_SOURCE') == ('auth' if auth else 'app'): source = '/wrong/source'
-    print(json.dumps([{'Config': {'Env': ['ACTIVITY_OIDC_FILE=/run/secrets/activity-oidc.env'] if auth else ['ACTIVITY_LOGGING_ENABLED=' + ('true' if os.environ.get('EXPECTED_MODE') == 'active' else 'false'), 'ACTIVITY_RETENTION_ENABLED=' + ('true' if os.environ.get('EXPECTED_MODE') == 'active' else 'false'), 'ACTIVITY_RECORDING_HOST=cloud', 'ANALYTICS_HASH_SALT_FILE=/run/secrets/analytics-salt.env'], 'Image': 'synthetic'}, 'State': {'Health': {'Status': 'healthy'}}, 'Mounts': [{'Destination': destination, 'Source': source, 'RW': os.environ.get('WRITABLE') == ('auth' if auth else 'app'), 'Type': 'bind'}]}]))
+    print(json.dumps([{'Config': {'Env': ['ACTIVITY_OIDC_FILE=/run/secrets/activity-oidc.env'] if auth else ['ACTIVITY_LOGGING_ENABLED=' + ('true' if os.environ.get('EXPECTED_MODE') in ('collect', 'active') else 'false'), 'ACTIVITY_RETENTION_ENABLED=' + ('true' if os.environ.get('EXPECTED_MODE') in ('collect', 'active') else 'false'), 'ACTIVITY_REPORT_ENABLED=' + ('true' if os.environ.get('EXPECTED_MODE') in ('stage', 'active') else 'false'), 'ACTIVITY_RECORDING_HOST=cloud', 'ANALYTICS_HASH_SALT_FILE=/run/secrets/analytics-salt.env'], 'Image': 'synthetic', 'Labels': {'com.docker.compose.project': 'synthetic'}}, 'State': {'Health': {'Status': 'healthy'}}, 'Mounts': [{'Destination': destination, 'Source': source, 'RW': os.environ.get('WRITABLE') == ('auth' if auth else 'app'), 'Type': 'bind'}]}]))
 elif 'exec' in args:
     sys.exit(1 if os.environ.get('UNREADABLE') == ('auth' if args[-4] == 'activity-report-auth' else 'app') else 0)
 """)
@@ -273,11 +312,14 @@ elif 'exec' in args:
         git.write_text('#!/bin/sh\nprintf "%s\n" "' + 'a'*40 + '"\n')
         git.chmod(0o755)
         env = dict(os.environ, PATH=f'{fakebin}:{os.environ["PATH"]}', TARGET_PATH=str(target), APP_SERVICE='web-app-rtrda-preprod-cloud', TARGET_NAME='cloud', REQUIRE_PROTECTED='1')
-        for mode in ('stage', 'active'):
-            (target / '.deploy-state/activity-overlay.yml').write_text(f'ACTIVITY_LOGGING_ENABLED: "{str(mode == "active").lower()}"\nACTIVITY_RETENTION_ENABLED: "{str(mode == "active").lower()}"\n')
+        for mode in ('stage', 'active', 'collect'):
+            auth_line = '  activity-report-auth:\n' if mode != 'collect' else ''
+            (target / '.deploy-state/activity-overlay.yml').write_text(f'services:\n{auth_line}ACTIVITY_LOGGING_ENABLED: "{str(mode in ("active", "collect")).lower()}"\nACTIVITY_RETENTION_ENABLED: "{str(mode in ("active", "collect")).lower()}"\n')
             # Mock runtime mode must track overlay.
             env['EXPECTED_MODE'] = mode
-            for fault in ({}, {'BAD_MOUNT': 'auth'}, {'BAD_MOUNT': 'app'}, {'BAD_SOURCE': 'auth'}, {'BAD_SOURCE': 'app'}, {'WRITABLE': 'app'}, {'WRITABLE': 'auth'}, {'UNREADABLE': 'app'}, {'UNREADABLE': 'auth'}):
+            faults = ({}, {'BAD_MOUNT': 'app'}, {'BAD_SOURCE': 'app'}, {'WRITABLE': 'app'}, {'UNREADABLE': 'app'})
+            faults += (({'ORPHAN_AUTH': '1'},) if mode == 'collect' else ({'BAD_MOUNT': 'auth'}, {'BAD_SOURCE': 'auth'}, {'WRITABLE': 'auth'}, {'UNREADABLE': 'auth'}))
+            for fault in faults:
                 result = subprocess.run(['bash', str(script)], env=dict(env, **fault), capture_output=True, text=True)
                 self.assertEqual(result.returncode == 0, not fault, (mode, fault, result.stderr))
                 self.assertNotIn('synthetic-secret', result.stdout + result.stderr)

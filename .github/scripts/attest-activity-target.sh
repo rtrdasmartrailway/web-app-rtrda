@@ -11,7 +11,8 @@ app, target = sys.argv[1:]
 overlay = pathlib.Path('.deploy-state/activity-overlay.yml')
 text = overlay.read_text() if overlay.exists() else ''
 if not text: mode = 'off'
-elif 'ACTIVITY_LOGGING_ENABLED: "true"' in text and 'ACTIVITY_RETENTION_ENABLED: "true"' in text: mode = 'active'
+elif 'ACTIVITY_LOGGING_ENABLED: "true"' in text and 'ACTIVITY_RETENTION_ENABLED: "true"' in text:
+    mode = 'active' if '  activity-report-auth:' in text else 'collect'
 elif 'ACTIVITY_LOGGING_ENABLED: "false"' in text and 'ACTIVITY_RETENTION_ENABLED: "false"' in text: mode = 'stage'
 else: raise SystemExit('invalid overlay mode')
 def inspect(name):
@@ -28,8 +29,10 @@ container = service(app)
 env = dict(line.split('=', 1) for line in container['Config']['Env'] if '=' in line)
 logging = env.get('ACTIVITY_LOGGING_ENABLED', 'false')
 retention = env.get('ACTIVITY_RETENTION_ENABLED', 'false')
-if logging != ('true' if mode == 'active' else 'false') or retention != logging:
+if logging != ('true' if mode in ('collect', 'active') else 'false') or retention != logging:
     raise SystemExit('runtime mode mismatch')
+if env.get('ACTIVITY_REPORT_ENABLED', 'false') != ('true' if mode in ('stage', 'active') else 'false'):
+    raise SystemExit('report gate mismatch')
 if mode != 'off' and (env.get('ACTIVITY_RECORDING_HOST') != target or env.get('ANALYTICS_HASH_SALT_FILE') != '/run/secrets/analytics-salt.env'):
     raise SystemExit('runtime host or protected file mismatch')
 def protected_mount(info, service_name, source_name, destination):
@@ -44,13 +47,20 @@ image = container['Config']['Image']
 health = container['State'].get('Health', {}).get('Status')
 if health != 'healthy': raise SystemExit('app unhealthy')
 auth_image = None
-if mode != 'off':
+if mode in ('stage', 'active'):
     auth = service('activity-report-auth')
     if auth['State'].get('Health', {}).get('Status') != 'healthy': raise SystemExit('auth unhealthy')
     auth_env = dict(line.split('=', 1) for line in auth['Config']['Env'] if '=' in line)
     if auth_env.get('ACTIVITY_OIDC_FILE') != '/run/secrets/activity-oidc.env': raise SystemExit('auth file mismatch')
     protected_mount(auth, 'activity-report-auth', 'oidc.env', '/run/secrets/activity-oidc.env')
     auth_image = auth['Config']['Image']
+elif mode == 'collect':
+    labels = container.get('Config', {}).get('Labels') or {}
+    project = labels.get('com.docker.compose.project')
+    if not project: raise SystemExit('compose project missing')
+    running = subprocess.check_output(['docker', 'ps', '-q', '--filter', f'label=com.docker.compose.project={project}',
+                                       '--filter', 'label=com.docker.compose.service=activity-report-auth'], text=True).strip()
+    if running: raise SystemExit('unexpected running auth service')
 print(json.dumps(dict(mode=mode, host=target, image=image, authImage=auth_image, health=health,
                       sha=pathlib.Path('.deploy-state/preprod-release').read_text().strip() if pathlib.Path('.deploy-state/preprod-release').exists() else None,
                       checkout=subprocess.check_output(['git', 'rev-parse', 'HEAD'], text=True).strip()), sort_keys=True))

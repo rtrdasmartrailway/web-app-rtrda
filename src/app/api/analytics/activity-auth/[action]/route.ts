@@ -95,8 +95,12 @@ async function proxy(request: Request, action: string, method: "GET" | "POST") {
   }
 }
 export async function GET(request: Request, context: Ctx) {
+  if (process.env.ACTIVITY_REPORT_ENABLED === "false")
+    return new Response(null, { status: 404, headers: PRIVATE_HEADERS });
   return proxy(request, (await context.params).action, "GET");
 }
 export async function POST(request: Request, context: Ctx) {
+  if (process.env.ACTIVITY_REPORT_ENABLED === "false")
+    return new Response(null, { status: 404, headers: PRIVATE_HEADERS });
   return proxy(request, (await context.params).action, "POST");
 }

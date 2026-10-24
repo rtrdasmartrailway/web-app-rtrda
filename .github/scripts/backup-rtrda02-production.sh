@@ -68,7 +68,7 @@ cp "$COMPOSE_FILE" "$BACKUP_DIR/compose.yml"
 if [ -f .deploy-state/activity-overlay.yml ]; then
   cp .deploy-state/activity-overlay.yml "$BACKUP_DIR/activity-overlay.yml"
   if grep -q 'ACTIVITY_LOGGING_ENABLED: "true"' "$BACKUP_DIR/activity-overlay.yml"; then
-    ACTIVITY_MODE=active
+    if grep -q '^  activity-report-auth:' "$BACKUP_DIR/activity-overlay.yml"; then ACTIVITY_MODE=active; else ACTIVITY_MODE=collect; fi
   elif grep -q 'ACTIVITY_LOGGING_ENABLED: "false"' "$BACKUP_DIR/activity-overlay.yml"; then
     ACTIVITY_MODE=stage
   else

@@ -63,3 +63,32 @@ it("rejects cross-origin logout", async () => {
   expect(response.status).toBe(403);
   expect(fetch).not.toHaveBeenCalled();
 });
+
+it("collector-only mode hides login and logout without contacting auth service", async () => {
+  process.env.ACTIVITY_REPORT_ENABLED = "false";
+  const fetcher = vi.fn();
+  vi.stubGlobal("fetch", fetcher);
+  try {
+    expect(
+      (
+        await GET(
+          new Request("https://rtrda.or.th/api/analytics/activity-auth/login"),
+          ctx("login"),
+        )
+      ).status,
+    ).toBe(404);
+    expect(
+      (
+        await POST(
+          new Request("https://rtrda.or.th/api/analytics/activity-auth/logout", {
+            method: "POST",
+          }),
+          ctx("logout"),
+        )
+      ).status,
+    ).toBe(404);
+    expect(fetcher).not.toHaveBeenCalled();
+  } finally {
+    delete process.env.ACTIVITY_REPORT_ENABLED;
+  }
+});

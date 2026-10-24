@@ -2,7 +2,7 @@
 # Manual workflow only. preserve reads both live targets before any deployment.
 set -euo pipefail
 requested="${1:?mode required}"
-case "$requested" in preserve|off|stage|active) ;; *) exit 1 ;; esac
+case "$requested" in preserve|off|collect|stage|active) ;; *) exit 1 ;; esac
 : "${SOURCE_PATH:?}"
 read_target() {
   local key="$1" remote="$2" path="$3" app="$4" name="$5"
