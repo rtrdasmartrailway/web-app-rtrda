@@ -6,50 +6,43 @@ const PRIVATE_HEADERS = {
 };
 export { PRIVATE_HEADERS };
 
-/** Resolve authority through the existing server-side SSO session, never browser claims. */
+/** Never forward PR Center cookies or trust browser-supplied roles. */
 export async function requireActivityAdmin(
   headers: Headers,
   fetcher: typeof fetch = fetch,
 ): Promise<Response | null> {
-  const cookie = headers
+  const session = headers
     .get("cookie")
     ?.split(";")
-    .map((part) => part.trim())
-    .find((part) => part.startsWith("rtrda_pr_center_oidc_session="));
-  if (!cookie)
+    .map((x) => x.trim())
+    .find((x) => /^rtrda_activity_oidc_session=[A-Za-z0-9_-]{16,}$/.test(x));
+  if (!session)
     return Response.json(
-      { error: "Sign in to PR Center, then return to this page." },
+      { error: "Sign in required" },
       { status: 401, headers: PRIVATE_HEADERS },
     );
   try {
-    const response = await fetcher("http://pr-center-api:3100/session", {
-      headers: { cookie },
+    const response = await fetcher("http://activity-report-auth:3101/session", {
+      headers: { cookie: session },
       cache: "no-store",
       redirect: "error",
       signal: AbortSignal.timeout(5000),
     });
     if (!response.ok)
       return Response.json(
+        { error: "Authentication denied or unavailable" },
         {
-          error:
-            response.status === 401 ? "Sign in required" : "Authentication unavailable",
+          status: response.status === 401 ? 401 : response.status === 403 ? 403 : 503,
+          headers: PRIVATE_HEADERS,
         },
-        { status: response.status === 401 ? 401 : 503, headers: PRIVATE_HEADERS },
       );
-    const session = await response.json();
-    if (
-      session.isRootAdministrator === true ||
-      (Array.isArray(session.roleGrants) &&
-        session.roleGrants.some(
-          (grant: { role?: string; departmentId?: string | null }) =>
-            grant.role === "RTRDA_ADMIN" && grant.departmentId === null,
-        ))
-    )
-      return null;
-    return Response.json(
-      { error: "Global administrator access required" },
-      { status: 403, headers: PRIVATE_HEADERS },
-    );
+    const result = await response.json();
+    return result?.authorized === true
+      ? null
+      : Response.json(
+          { error: "Activity viewer role required" },
+          { status: 403, headers: PRIVATE_HEADERS },
+        );
   } catch {
     return Response.json(
       { error: "Authentication unavailable" },

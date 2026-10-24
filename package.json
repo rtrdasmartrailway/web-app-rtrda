@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "next dev",
     "pr-center:api": "tsx src/pr-center-api/server.ts",
+    "activity-auth:api": "tsx src/activity-report-auth/server.ts",
     "import:wordpress": "node scripts/import-wordpress.mjs",
     "audit:parity": "node scripts/audit-parity.mjs",
     "audit:divergence": "node scripts/audit-divergence.mjs",

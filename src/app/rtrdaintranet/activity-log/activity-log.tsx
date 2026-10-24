@@ -74,9 +74,9 @@ export default function ActivityLog() {
         if (!response.ok)
           throw new Error(
             response.status === 401
-              ? "กรุณาเข้าสู่ระบบ PR Center อีกครั้ง"
+              ? "กรุณาเข้าสู่ระบบรายงานกิจกรรมอีกครั้ง"
               : response.status === 403
-                ? "บัญชีนี้ไม่มีสิทธิ์ผู้ดูแลระบบส่วนกลาง"
+                ? "บัญชีนี้ไม่มีสิทธิ์ดูรายงานกิจกรรม"
                 : "ยังไม่สามารถโหลดบันทึกได้ กรุณาลองใหม่",
           );
         setReport(await response.json());
@@ -123,7 +123,7 @@ export default function ActivityLog() {
     <section className="activity-log">
       <div className="activity-heading">
         <div>
-          <span className="activity-badge">RTRDA · เฉพาะผู้ดูแลระบบ</span>
+          <span className="activity-badge">RTRDA · เฉพาะผู้ดูรายงานกิจกรรม</span>
           <h1>บันทึกการใช้งานเว็บไซต์</h1>
           {report && (
             <p>แหล่งบันทึก: {report.recordingSource} (ข้อมูลแต่ละโฮสต์แยกกัน)</p>
@@ -137,6 +137,11 @@ export default function ActivityLog() {
           ส่งออก CSV (สูงสุด 5,000 แถว)
         </a>
       </div>
+      <form method="post" action="/api/analytics/activity-auth/logout">
+        <button className="activity-button secondary" type="submit">
+          ออกจากระบบรายงาน
+        </button>
+      </form>
       <div className="activity-notice">
         จำนวนคำขอ การเปิดหน้า คลิกดาวน์โหลด และการตอบกลับไฟล์เป็นคนละเหตุการณ์
         จึงไม่ควรนำมารวมเป็นจำนวนคนหรือจำนวนดาวน์โหลดสำเร็จ การตอบกลับไฟล์ 200/206

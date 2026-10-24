@@ -106,48 +106,44 @@ describe("minimized activity evidence", () => {
   });
 });
 
-describe("existing admin authorization and safe reports", () => {
+describe("dedicated viewer authorization and safe reports", () => {
   const cookie = new Headers({
-    cookie: "unrelated=private; rtrda_pr_center_oidc_session=synthetic",
+    cookie:
+      "unrelated=private; rtrda_activity_oidc_session=synthetic0000000000000000000000",
   });
-  it("requires existing SSO and global admin authority", async () => {
-    const fetcher = vi.fn();
-    expect((await requireActivityAdmin(new Headers(), fetcher))?.status).toBe(401);
-    expect(fetcher).not.toHaveBeenCalled();
-    fetcher.mockResolvedValue(
-      Response.json({
-        roles: ["RTRDA_ADMIN"],
-        roleGrants: [{ role: "RTRDA_ADMIN", departmentId: "department" }],
-      }),
-    );
-    expect((await requireActivityAdmin(cookie, fetcher))?.status).toBe(403);
-    fetcher.mockResolvedValue(Response.json({ isRootAdministrator: true }));
-    expect(await requireActivityAdmin(cookie, fetcher)).toBeNull();
-    expect(fetcher.mock.calls.at(-1)?.[1].headers.cookie).toBe(
-      "rtrda_pr_center_oidc_session=synthetic",
-    );
-    fetcher.mockResolvedValue(
-      Response.json({ roleGrants: [{ role: "RTRDA_ADMIN", departmentId: null }] }),
-    );
-    expect(await requireActivityAdmin(cookie, fetcher)).toBeNull();
-  });
-  it("fails closed when session verification fails", async () => {
+  it("rejects PR Center cookies and permits only a verified viewer session", async () => {
+    const fetcher = vi.fn().mockResolvedValue(Response.json({ authorized: true }));
     expect(
       (
         await requireActivityAdmin(
-          cookie,
-          vi.fn().mockRejectedValue(new Error("offline")),
-        )
-      )?.status,
-    ).toBe(503);
-    expect(
-      (
-        await requireActivityAdmin(
-          cookie,
-          vi.fn().mockResolvedValue(new Response(null, { status: 401 })),
+          new Headers({ cookie: "rtrda_pr_center_oidc_session=synthetic" }),
+          fetcher,
         )
       )?.status,
     ).toBe(401);
+    expect(fetcher).not.toHaveBeenCalled();
+    expect(await requireActivityAdmin(cookie, fetcher)).toBeNull();
+    expect(fetcher.mock.calls.at(-1)?.[0]).toBe(
+      "http://activity-report-auth:3101/session",
+    );
+    expect(fetcher.mock.calls.at(-1)?.[1].headers.cookie).toBe(
+      "rtrda_activity_oidc_session=synthetic0000000000000000000000",
+    );
+    fetcher.mockResolvedValue(Response.json({ isRootAdministrator: true }));
+    expect((await requireActivityAdmin(cookie, fetcher))?.status).toBe(403);
+  });
+  it("fails closed for forged, expired or unavailable sessions", async () => {
+    for (const status of [401, 403, 503]) {
+      const response = await requireActivityAdmin(
+        cookie,
+        vi.fn().mockResolvedValue(new Response(null, { status })),
+      );
+      expect(response?.status).toBe(status);
+    }
+    expect(
+      (await requireActivityAdmin(cookie, vi.fn().mockRejectedValue(Error("offline"))))
+        ?.status,
+    ).toBe(503);
   });
   it("validates Bangkok dates, strips query data, and parameterizes route filters", () => {
     vi.stubEnv("ACTIVITY_LOGGING_ENABLED", "true");

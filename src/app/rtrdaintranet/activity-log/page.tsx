@@ -13,14 +13,14 @@ export default async function ActivityLogPage() {
   if (denied)
     return (
       <section className="activity-log">
-        <span className="activity-badge">RTRDA · ผู้ดูแลระบบ</span>
+        <span className="activity-badge">RTRDA · ผู้ดูรายงาน</span>
         <h1>บันทึกการใช้งานเว็บไซต์</h1>
         <p>
           {denied.status === 403
-            ? "ต้องใช้สิทธิ์ผู้ดูแลระบบส่วนกลาง"
-            : "กรุณาเข้าสู่ระบบ PR Center ด้วยบัญชีผู้ดูแลระบบ แล้วกลับมาที่หน้านี้"}
+            ? "บัญชีนี้ไม่มีสิทธิ์ดูรายงานกิจกรรม"
+            : "กรุณาเข้าสู่ระบบเพื่อดูรายงานกิจกรรม"}
         </p>
-        <Link href="/rtrdaintranet/prcenter">เข้าสู่ระบบ PR Center</Link>
+        <Link href="/api/analytics/activity-auth/login">เข้าสู่ระบบรายงานกิจกรรม</Link>
       </section>
     );
   return <ActivityLog />;
