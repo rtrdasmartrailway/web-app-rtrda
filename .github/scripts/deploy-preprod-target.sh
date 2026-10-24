@@ -18,7 +18,7 @@ REMOTE="${TARGET_USER}@${TARGET_HOST}"
 REMOTE_SCRIPT="/tmp/rtrda-deploy-preprod-remote-${TARGET_NAME}.sh"
 REMOTE_OVERLAY_SCRIPT="/tmp/rtrda-activity-production-overlay-${TARGET_NAME}.py"
 ACTIVITY_DEPLOY_MODE="${ACTIVITY_DEPLOY_MODE:-off}"
-case "$ACTIVITY_DEPLOY_MODE" in off|stage|active) ;; *) echo '::error::invalid activity deployment mode'; exit 1 ;; esac
+case "$ACTIVITY_DEPLOY_MODE" in off|collect|stage|active) ;; *) echo '::error::invalid activity deployment mode'; exit 1 ;; esac
 
 SOURCE_PATH="${SOURCE_PATH:-/srv/workspace/web-app-rtrda}"
 cd "$SOURCE_PATH"

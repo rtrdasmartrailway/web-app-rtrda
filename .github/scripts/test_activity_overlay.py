@@ -84,6 +84,10 @@ class OverlayTests(unittest.TestCase):
         self.assertIn('          - collect', workflow)
         self.assertIn('preserve|off|collect|stage|active', resolver)
 
+    def test_deploy_target_accepts_explicit_collect_mode(self):
+        script = SCRIPT.with_name('deploy-preprod-target.sh').read_text()
+        self.assertIn('case "$ACTIVITY_DEPLOY_MODE" in off|collect|stage|active)', script)
+
     def test_opt_in_requires_both_protected_regular_0600_files(self):
         for missing in (self.oidc, self.salt):
             with self.subTest(missing=missing.name):
