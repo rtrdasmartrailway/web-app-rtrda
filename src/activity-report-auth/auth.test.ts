@@ -137,7 +137,7 @@ describe("isolated activity report sign-in", () => {
 });
 
 describe("protected OIDC source", () => {
-  it("reads only the mounted file when configured, and fails closed for an invalid file", () => {
+  it("reads only the mounted file when configured, and fails closed for an invalid file", async () => {
     const root = mkdtempSync(join(tmpdir(), "activity-oidc-"));
     const file = join(root, "oidc.env");
     const tenant = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
@@ -150,7 +150,29 @@ describe("protected OIDC source", () => {
       vi.stubEnv("ACTIVITY_OIDC_FILE", file);
       vi.stubEnv("ACTIVITY_OIDC_CLIENT_SECRET", "wrong-env-secret");
       expect(activitySettings()?.clientSecret).toBe("synthetic-secret");
+      const valid = `# synthetic OIDC source\n\nACTIVITY_OIDC_TENANT_ID=${tenant}\nACTIVITY_OIDC_CLIENT_ID=synthetic-app\nACTIVITY_OIDC_CLIENT_SECRET=synthetic-secret\nACTIVITY_OIDC_ISSUER=https://login.microsoftonline.com/${tenant}/v2.0\nACTIVITY_OIDC_REDIRECT_URI=https://rtrda.or.th/api/analytics/activity-auth/callback\n`;
+      writeFileSync(file, valid);
+      expect(activitySettings()?.clientSecret).toBe("synthetic-secret");
+      for (const invalid of [
+        valid + "ACTIVITY_OIDC_CLIENT_ID=duplicate\n",
+        valid + "UNKNOWN=synthetic\n",
+        valid.replace("synthetic-secret", "bad value"),
+        valid.replace("/callback", "/callback/"),
+        valid.replace(tenant, "common"),
+        valid.replace("ACTIVITY_OIDC_CLIENT_ID=synthetic-app\n", ""),
+      ]) {
+        writeFileSync(file, invalid);
+        expect(activitySettings()).toBeNull();
+      }
+
       writeFileSync(file, "broken=secret=extra\n");
+      writeFileSync(file, valid);
+      const app = buildActivityAuthApi(createActivityAuth(cfg, gateway()));
+      expect((await app.inject({ method: "GET", url: "/healthz" })).statusCode).toBe(200);
+      writeFileSync(file, valid.replace("/callback", "/wrong"));
+      expect((await app.inject({ method: "GET", url: "/healthz" })).statusCode).toBe(503);
+      await app.close();
+
       expect(activitySettings()).toBeNull();
     } finally {
       vi.unstubAllEnvs();

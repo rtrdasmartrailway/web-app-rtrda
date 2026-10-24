@@ -53,14 +53,31 @@ export function activitySettings(): Settings | null {
   } = process.env.ACTIVITY_OIDC_FILE
     ? (() => {
         try {
-          const lines = readFileSync(process.env.ACTIVITY_OIDC_FILE!, "utf8")
-            .trim()
-            .split("\n");
-          const entries = lines.map((line) => line.split("="));
-          if (entries.some((entry) => entry.length !== 2)) return {};
-          const values = Object.fromEntries(entries);
-          if (Object.keys(values).length !== entries.length) return {};
-          return values;
+          const keys = new Set([
+            "ACTIVITY_OIDC_TENANT_ID",
+            "ACTIVITY_OIDC_CLIENT_ID",
+            "ACTIVITY_OIDC_CLIENT_SECRET",
+            "ACTIVITY_OIDC_ISSUER",
+            "ACTIVITY_OIDC_REDIRECT_URI",
+          ]);
+          const values: Record<string, string> = {};
+          for (const line of readFileSync(process.env.ACTIVITY_OIDC_FILE!, "utf8").split(
+            /\r?\n/,
+          )) {
+            if (!line || line.startsWith("#")) continue;
+            const separator = line.indexOf("=");
+            const key = line.slice(0, separator);
+            const entry = line.slice(separator + 1);
+            if (
+              separator < 0 ||
+              !keys.has(key) ||
+              key in values ||
+              !/^[A-Za-z0-9_./:@-]+$/.test(entry)
+            )
+              return {};
+            values[key] = entry;
+          }
+          return Object.keys(values).length === keys.size ? values : {};
         } catch {
           return {};
         }
@@ -72,24 +89,12 @@ export function activitySettings(): Settings | null {
     !clientSecret ||
     !issuer ||
     !redirectUri ||
-    !/^[0-9a-f-]{36}$/i.test(tenantId)
+    !/^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(tenantId)
   )
     return null;
   if (issuer !== `https://login.microsoftonline.com/${tenantId}/v2.0`) return null;
-  try {
-    const uri = new URL(redirectUri);
-    if (
-      uri.protocol !== "https:" ||
-      uri.hostname !== "rtrda.or.th" ||
-      uri.port ||
-      uri.pathname !== "/api/analytics/activity-auth/callback" ||
-      uri.search ||
-      uri.hash
-    )
-      return null;
-  } catch {
+  if (redirectUri !== "https://rtrda.or.th/api/analytics/activity-auth/callback")
     return null;
-  }
   return { tenantId, clientId, clientSecret, issuer, redirectUri };
 }
 export function entraGateway(settings: Settings): Gateway {
@@ -223,7 +228,9 @@ export function buildActivityAuthApi(auth: ReturnType<typeof createActivityAuth>
       .status(error instanceof AuthDenied ? error.statusCode : 503)
       .send({ error: "Authentication unavailable or denied" }),
   );
-  app.get("/healthz", async () => ({ ok: true }));
+  app.get("/healthz", async (_request, reply) =>
+    activitySettings() ? { ok: true } : reply.status(503).send({ ok: false }),
+  );
   app.get("/auth/login", async (_request, reply) => {
     const start = await auth.begin();
     return reply.header("Set-Cookie", start.cookie).redirect(start.url);

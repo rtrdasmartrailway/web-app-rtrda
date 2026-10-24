@@ -33,6 +33,7 @@ ACTIVITY_OIDC_ENV_FILE="$TARGET_PATH/.activity-secrets/oidc.env"
 ACTIVITY_SALT_ENV_FILE="$TARGET_PATH/.activity-secrets/analytics-salt.env"
 export ACTIVITY_OIDC_ENV_FILE ACTIVITY_SALT_ENV_FILE
 PREVIOUS_SHA=""
+PREVIOUS_RELEASE_KNOWN=false
 PREVIOUS_COMPOSE=".deploy-state/previous-compose.yml"
 PREVIOUS_ENV=".deploy-state/previous-env"
 PREVIOUS_CICD_ENV=".deploy-state/previous-cicd-env"
@@ -42,6 +43,7 @@ for pair in ".env:$PREVIOUS_ENV" ".env.cicd-preprod:$PREVIOUS_CICD_ENV"; do
 done
 if [ -f .deploy-state/preprod-release ]; then
   PREVIOUS_SHA="$(tr -d '[:space:]' < .deploy-state/preprod-release)"
+  if [ -n "$PREVIOUS_SHA" ]; then PREVIOUS_RELEASE_KNOWN=true; fi
 fi
 if [ -z "$PREVIOUS_SHA" ]; then PREVIOUS_SHA="$(git rev-parse HEAD)"; fi
 if ! git cat-file -e "${PREVIOUS_SHA}^{commit}" 2>/dev/null; then
@@ -108,8 +110,8 @@ rollback_previous_release() {
   return 1
 }
 
-# Errors from checkout, dependency install, migrations and seed all restore release state.
-# Database migrations are additive and are NOT automatically reversed.
+# Errors from checkout, dependency install, migrations and seed restore checkout/container state only.
+# Database migrations and destructive seed changes are NOT automatically reversed.
 on_deploy_failure() {
   trap - ERR
   rollback_previous_release || true
@@ -194,8 +196,21 @@ for attempt in $(seq 1 40); do
   fi
 done
 
+seed_required() {
+  # Compare the frozen manifest bytes, not a tree/SHA approximation. An absent
+  # prior release or unreadable prior blob falls back to the existing seed path.
+  [ "$PREVIOUS_RELEASE_KNOWN" != true ] ||
+    ! git show "${PREVIOUS_SHA}:src/data/wp-content.json" | cmp -s - src/data/wp-content.json
+}
 run_node npm run db:migrate
-run_node npm run db:seed
+if seed_required; then
+  # A changed manifest still runs the destructive seed. Before Production
+  # promotion require a protected DB backup and verified rollback gate: source
+  # checkout rollback does NOT restore truncated content tables.
+  run_node npm run db:seed
+else
+  echo "${TARGET_NAME}: frozen content manifest unchanged; skipping db:seed"
+fi
 
 # Build SHA-tagged images while the old container remains up.
 if [ -f "$ACTIVITY_OVERLAY" ]; then

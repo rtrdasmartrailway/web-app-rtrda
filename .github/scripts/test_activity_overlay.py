@@ -149,9 +149,9 @@ class OverlayTests(unittest.TestCase):
         remote = (SCRIPT.parents[2] / '.github/scripts/deploy-preprod-remote.sh').read_text()
         self.assertIn('git rev-parse HEAD', remote)
         self.assertIn('on_deploy_failure', remote)
-        self.assertIn('Database migrations are additive', remote)
+        self.assertIn('Database migrations and destructive seed changes are NOT automatically reversed', remote)
         attest = (SCRIPT.parents[2] / '.github/scripts/attest-activity-target.sh').read_text()
-        self.assertIn('REQUIRE_PROTECTED', attest)
+        self.assertIn('protected_mount(container, app', attest)
         self.assertIn("else None", attest)
 
     def test_preserve_resolver_keeps_active_and_rejects_disagreement(self):
@@ -245,6 +245,64 @@ rollback_activity_overlay
         result = subprocess.run(['bash', '-c', shell.replace('[ ! -e "$ACTIVITY_OVERLAY" ]', '[ "$(cat "$ACTIVITY_OVERLAY")" = "previous overlay" ]')], env=env, capture_output=True, text=True)
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertFalse(log.exists(), 'existing auth service must not be removed on rollback')
+
+    def test_attestation_checks_live_protected_mounts_and_readability(self):
+        script = SCRIPT.with_name('attest-activity-target.sh')
+        target = self.root / 'attest'; target.mkdir()
+        (target / '.deploy-state').mkdir()
+        (target / '.deploy-state/activity-overlay.yml').write_text('ACTIVITY_LOGGING_ENABLED: "false"\nACTIVITY_RETENTION_ENABLED: "false"\n')
+        fakebin = self.root / 'attest-bin'; fakebin.mkdir()
+        docker = fakebin / 'docker'
+        docker.write_text("""#!/usr/bin/env python3
+import json, os, sys
+args=sys.argv[1:]
+if 'ps' in args:
+    print('auth-id' if args[-1] == 'activity-report-auth' else 'app-id')
+elif args[0] == 'inspect':
+    auth = args[-1] == 'auth-id'
+    destination = '/run/secrets/activity-oidc.env' if auth else '/run/secrets/analytics-salt.env'
+    source = os.environ['TARGET_PATH'] + ('/.activity-secrets/oidc.env' if auth else '/.activity-secrets/analytics-salt.env')
+    if os.environ.get('BAD_MOUNT') == ('auth' if auth else 'app'): destination = '/wrong'
+    if os.environ.get('BAD_SOURCE') == ('auth' if auth else 'app'): source = '/wrong/source'
+    print(json.dumps([{'Config': {'Env': ['ACTIVITY_OIDC_FILE=/run/secrets/activity-oidc.env'] if auth else ['ACTIVITY_LOGGING_ENABLED=' + ('true' if os.environ.get('EXPECTED_MODE') == 'active' else 'false'), 'ACTIVITY_RETENTION_ENABLED=' + ('true' if os.environ.get('EXPECTED_MODE') == 'active' else 'false'), 'ACTIVITY_RECORDING_HOST=cloud', 'ANALYTICS_HASH_SALT_FILE=/run/secrets/analytics-salt.env'], 'Image': 'synthetic'}, 'State': {'Health': {'Status': 'healthy'}}, 'Mounts': [{'Destination': destination, 'Source': source, 'RW': os.environ.get('WRITABLE') == ('auth' if auth else 'app'), 'Type': 'bind'}]}]))
+elif 'exec' in args:
+    sys.exit(1 if os.environ.get('UNREADABLE') == ('auth' if args[-4] == 'activity-report-auth' else 'app') else 0)
+""")
+        docker.chmod(0o755)
+        git = fakebin / 'git'
+        git.write_text('#!/bin/sh\nprintf "%s\n" "' + 'a'*40 + '"\n')
+        git.chmod(0o755)
+        env = dict(os.environ, PATH=f'{fakebin}:{os.environ["PATH"]}', TARGET_PATH=str(target), APP_SERVICE='web-app-rtrda-preprod-cloud', TARGET_NAME='cloud', REQUIRE_PROTECTED='1')
+        for mode in ('stage', 'active'):
+            (target / '.deploy-state/activity-overlay.yml').write_text(f'ACTIVITY_LOGGING_ENABLED: "{str(mode == "active").lower()}"\nACTIVITY_RETENTION_ENABLED: "{str(mode == "active").lower()}"\n')
+            # Mock runtime mode must track overlay.
+            env['EXPECTED_MODE'] = mode
+            for fault in ({}, {'BAD_MOUNT': 'auth'}, {'BAD_MOUNT': 'app'}, {'BAD_SOURCE': 'auth'}, {'BAD_SOURCE': 'app'}, {'WRITABLE': 'app'}, {'WRITABLE': 'auth'}, {'UNREADABLE': 'app'}, {'UNREADABLE': 'auth'}):
+                result = subprocess.run(['bash', str(script)], env=dict(env, **fault), capture_output=True, text=True)
+                self.assertEqual(result.returncode == 0, not fault, (mode, fault, result.stderr))
+                self.assertNotIn('synthetic-secret', result.stdout + result.stderr)
+
+    def test_manifest_seed_gate_compares_previous_release_bytes(self):
+        remote = SCRIPT.with_name('deploy-preprod-remote.sh').read_text()
+        self.assertIn('seed_required() {', remote)
+        function = remote[remote.index('seed_required() {'):remote.index('\nrun_node npm run db:migrate')]
+        repo = self.root / 'manifest'; repo.mkdir()
+        (repo / 'src/data').mkdir(parents=True)
+        (repo / 'src/data/wp-content.json').write_bytes(b'previous bytes\n')
+        fakebin = self.root / 'seed-bin'; fakebin.mkdir()
+        git = fakebin / 'git'
+        git.write_text('#!/bin/sh\nif [ "$1" = show ]; then printf "previous bytes\n"; fi\n')
+        git.chmod(0o755)
+        env = dict(os.environ, PATH=f'{fakebin}:{os.environ["PATH"]}')
+        def check(known):
+            return subprocess.run(['bash', '-c', 'PREVIOUS_RELEASE_KNOWN=' + known + '; PREVIOUS_SHA=' + 'a'*40 + '; ' + function + '\nseed_required'], cwd=repo, env=env).returncode
+        self.assertNotEqual(check('true'), 0, 'identical previous release skips seed')
+        self.assertIn('if seed_required; then', remote)
+        self.assertIn('run_node npm run db:seed', remote)
+        (repo / 'src/data/wp-content.json').write_bytes(b'changed bytes\n')
+        self.assertEqual(check('true'), 0, 'changed content keeps seed')
+        (repo / 'src/data/wp-content.json').write_bytes(b'previous bytes\n')
+        self.assertEqual(check('false'), 0, 'unknown previous release keeps seed')
 
     def test_activation_separate_flag_and_target_binding(self):
         result = self.run_overlay(enabled='active')
