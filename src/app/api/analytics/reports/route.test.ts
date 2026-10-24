@@ -34,3 +34,13 @@ it("denies a mismatched public host before querying the database", async () => {
   expect(response.status).toBe(503);
   expect(mocks.report).not.toHaveBeenCalled();
 });
+
+it("collector-only mode does not query or expose reports even with an apparent admin cookie", async () => {
+  process.env.ACTIVITY_REPORT_ENABLED = "false";
+  try {
+    const response = await GET(new Request("https://rtrda.or.th/api/analytics/reports", { headers: { cookie: "rtrda_activity_oidc_session=abcdefghijklmnop" } }));
+    expect(response.status).toBe(404);
+    expect(mocks.admin).not.toHaveBeenCalled();
+    expect(mocks.report).not.toHaveBeenCalled();
+  } finally { delete process.env.ACTIVITY_REPORT_ENABLED; }
+});

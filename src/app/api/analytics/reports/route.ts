@@ -3,6 +3,7 @@ import { activityEnabled, activityHostAllowed } from "@/lib/analytics/activity-s
 import { activityRecordingSource, activityReport, reportCsv, reportFilter } from "@/lib/analytics/activity-report";
 export const dynamic = "force-dynamic";
 export async function GET(request: Request): Promise<Response> {
+  if (process.env.ACTIVITY_REPORT_ENABLED === "false") return Response.json({ error: "Report unavailable" }, { status: 404, headers: PRIVATE_HEADERS });
   const denied = await requireActivityAdmin(request.headers);
   if (denied) return denied;
   if (!activityEnabled() || !activityHostAllowed(request.headers)) return Response.json({ error: "Activity logging is disabled" }, { status: 503, headers: PRIVATE_HEADERS });

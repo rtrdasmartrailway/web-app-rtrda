@@ -1,5 +1,6 @@
 import { headers } from "next/headers";
 import Link from "next/link";
+import { notFound } from "next/navigation";
 import { requireActivityAdmin } from "@/lib/analytics/activity-auth";
 import ActivityLog from "./activity-log";
 import "./activity-log.css";
@@ -9,6 +10,7 @@ export const metadata = {
   robots: { index: false, follow: false },
 };
 export default async function ActivityLogPage() {
+  if (process.env.ACTIVITY_REPORT_ENABLED === "false") notFound();
   const production = process.env.ANALYTICS_ENV === "production";
   const denied = await requireActivityAdmin(await headers());
   if (denied)

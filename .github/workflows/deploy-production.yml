@@ -9,13 +9,14 @@ on:
         required: true
         type: string
       activity_mode:
-        description: "Owner-approved mode change: preserve keeps live mode; off/stage/active explicitly change it"
+        description: "Owner-approved mode change: preserve keeps live mode; off/collect/stage/active explicitly change it"
         required: true
         default: preserve
         type: choice
         options:
           - preserve
           - "off"
+          - collect
           - stage
           - active
 
@@ -214,7 +215,7 @@ jobs:
               assert record['sha'] == record['checkout'] == sha
               assert record['mode'] == mode and record['host'] == target and record['health'] == 'healthy'
               assert record['image'] == f'web-app-rtrda:preprod-{target}-{sha}'
-              if mode != 'off': assert record['authImage'] == f'activity-report-auth:{target}-{sha}'
+              if mode in ('stage', 'active'): assert record['authImage'] == f'activity-report-auth:{target}-{sha}'
               else: assert record['authImage'] is None
           assert cloud['mode'] == fallback['mode']
           PY
