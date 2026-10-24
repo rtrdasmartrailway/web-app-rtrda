@@ -42,7 +42,11 @@ def protected_mount(info, service_name, source_name, destination):
         raise SystemExit('protected mount mismatch')
     result = subprocess.run(compose + ['exec', '-T', service_name, 'test', '-r', destination], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     if result.returncode: raise SystemExit('protected file unreadable')
-if mode != 'off': protected_mount(container, app, 'analytics-salt.env', '/run/secrets/analytics-salt.env')
+if mode != 'off':
+    protected_mount(container, app, 'analytics-salt.env', '/run/secrets/analytics-salt.env')
+    salt_check = 'const fs=require("node:fs");const m=/^ANALYTICS_HASH_SALT=([A-Za-z0-9_./:@-]{32,})$/.exec(fs.readFileSync("/run/secrets/analytics-salt.env","utf8").trim());if(!m||/^(change.?me|placeholder|test|example)/i.test(m[1]))process.exit(1)'
+    result = subprocess.run(compose + ['exec', '-T', app, 'node', '-e', salt_check], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    if result.returncode: raise SystemExit('protected salt invalid in app')
 image = container['Config']['Image']
 health = container['State'].get('Health', {}).get('Status')
 if health != 'healthy': raise SystemExit('app unhealthy')

@@ -252,8 +252,8 @@ if ! docker compose "${COMPOSE_ARGS[@]}" up -d --no-build "$APP_SERVICE"; then
   exit 1
 fi
 
-if [ -f "$ACTIVITY_OVERLAY" ] && ! docker compose "${COMPOSE_ARGS[@]}" exec -T "$APP_SERVICE" test -r /run/secrets/analytics-salt.env; then
-  echo "::error::${TARGET_NAME}: protected salt unreadable by app runner" >&2
+if [ -f "$ACTIVITY_OVERLAY" ] && ! docker compose "${COMPOSE_ARGS[@]}" exec -T "$APP_SERVICE" node -e 'const fs=require("node:fs");const m=/^ANALYTICS_HASH_SALT=([A-Za-z0-9_./:@-]{32,})$/.exec(fs.readFileSync("/run/secrets/analytics-salt.env","utf8").trim());if(!m||/^(change.?me|placeholder|test|example)/i.test(m[1]))process.exit(1)'; then
+  echo "::error::${TARGET_NAME}: protected salt invalid or unreadable by app runner" >&2
   rollback_previous_release || true
   exit 1
 fi
