@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
@@ -8,10 +8,33 @@ import { proxy } from "./proxy";
 let directory = "";
 const original = process.env.SURVEY_DASHBOARD_PASSWORD_FILE;
 afterEach(async () => {
+  vi.unstubAllEnvs();
   if (original === undefined) delete process.env.SURVEY_DASHBOARD_PASSWORD_FILE;
   else process.env.SURVEY_DASHBOARD_PASSWORD_FILE = original;
   if (directory) await rm(directory, { recursive: true, force: true });
   directory = "";
+});
+
+describe("staging activity correlation privacy", () => {
+  it("overrides broad shared-cache headers only while Test logging is enabled", async () => {
+    vi.stubEnv("ACTIVITY_LOGGING_ENABLED", "true");
+    vi.stubEnv("ANALYTICS_ENV", "test");
+    vi.stubEnv("SITE_ORIGIN", "https://test.rtrda.or.th");
+    for (const path of [
+      "/api/analytics/events",
+      "/sdc_download/example",
+      "/r/mot-5440",
+    ]) {
+      const response = await proxy(new NextRequest(`https://test.rtrda.or.th${path}`));
+      expect(response.headers.get("cache-control")).toBe("private, no-store, max-age=0");
+      expect(response.headers.get("cdn-cache-control")).toBe("no-store");
+    }
+    vi.stubEnv("ANALYTICS_ENV", "production");
+    const response = await proxy(new NextRequest("https://test.rtrda.or.th/r/mot-5440"));
+    expect(response.headers.get("cache-control")).not.toBe(
+      "private, no-store, max-age=0",
+    );
+  });
 });
 
 describe("survey page/API proxy", () => {

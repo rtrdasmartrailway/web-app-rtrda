@@ -19,6 +19,17 @@ export async function proxy(request: NextRequest) {
     if (denied) return denied;
   }
   const response = middleware(request);
+  // Correlation cookies and event-specific outcomes must never be shared by a cache.
+  // Runtime gated: production keeps its existing behavior until an approved rollout.
+  if (
+    activityEnabled() &&
+    ["/api/analytics/events", "/sdc_download", "/r"].some(
+      (base) => path === base || path.startsWith(`${base}/`),
+    )
+  ) {
+    response.headers.set("cache-control", "private, no-store, max-age=0");
+    response.headers.set("cdn-cache-control", "no-store");
+  }
   if (activityEnabled() && (request.method === "GET" || request.method === "HEAD")) {
     const normalized = activityPath(path);
     if (
