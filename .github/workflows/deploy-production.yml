@@ -8,6 +8,17 @@ on:
         description: "Exact verified main merge SHA to deploy"
         required: true
         type: string
+      activity_mode:
+        description: "Owner-approved mode change: preserve keeps live mode; off/collect/stage/active explicitly change it"
+        required: true
+        default: preserve
+        type: choice
+        options:
+          - preserve
+          - "off"
+          - collect
+          - stage
+          - active
 
 concurrency:
   group: web-app-rtrda-production
@@ -92,11 +103,22 @@ jobs:
         run: |
           set -euo pipefail
           cd "$SOURCE_PATH"
+          python3 .github/scripts/test_activity_overlay.py
           npm test
           npm run lint
           npm run typecheck
           npm run format:check
           npm run security:audit
+
+      - name: Resolve and attest activity mode before deployment
+        id: activity
+        env:
+          SOURCE_PATH: ${{ steps.resolve.outputs.source_path }}
+          REQUESTED_MODE: ${{ inputs.activity_mode }}
+        run: |
+          set -euo pipefail
+          mode=$(bash "$SOURCE_PATH/.github/scripts/resolve-activity-mode.sh" "$REQUESTED_MODE")
+          echo "mode=$mode" >> "$GITHUB_OUTPUT"
 
       - name: Backup current RTRDA02 production
         id: backup
@@ -126,6 +148,7 @@ jobs:
           SOURCE_PATH: ${{ steps.resolve.outputs.source_path }}
           DEPLOY_SHA: ${{ steps.resolve.outputs.deploy_sha }}
           GITHUB_SHA: ${{ steps.resolve.outputs.deploy_sha }}
+          ACTIVITY_DEPLOY_MODE: ${{ steps.activity.outputs.mode }}
         run: |
           set -euo pipefail
           cd "$SOURCE_PATH"
@@ -149,6 +172,7 @@ jobs:
         env:
           SOURCE_PATH: ${{ steps.resolve.outputs.source_path }}
           GITHUB_SHA: ${{ steps.resolve.outputs.deploy_sha }}
+          ACTIVITY_DEPLOY_MODE: ${{ steps.activity.outputs.mode }}
         run: |
           set -euo pipefail
           cd "$SOURCE_PATH"
@@ -170,6 +194,7 @@ jobs:
         env:
           DEPLOY_SHA: ${{ steps.resolve.outputs.deploy_sha }}
           SOURCE_PATH: ${{ steps.resolve.outputs.source_path }}
+          EXPECTED_MODE: ${{ steps.activity.outputs.mode }}
         run: |
           set -euo pipefail
           cloud_sha=$(ssh -i ~/.ssh/rtrda-cloud-preprod-sync_ed25519 -o BatchMode=yes ubuntu@100.77.64.92 'cd /home/ubuntu/rtrda-preprod/web-app-rtrda && git rev-parse HEAD && cat .deploy-state/preprod-release')
@@ -180,6 +205,20 @@ jobs:
           test "$(printf '%s\n' "$rtrda02_sha" | sort -u | wc -l)" -eq 1
           test "$(printf '%s\n' "$cloud_sha" | head -1)" = "$DEPLOY_SHA"
           test "$(printf '%s\n' "$rtrda02_sha" | head -1)" = "$DEPLOY_SHA"
+          cloud_activity=$(ssh -i ~/.ssh/rtrda-cloud-preprod-sync_ed25519 -o BatchMode=yes ubuntu@100.77.64.92 "TARGET_PATH=/home/ubuntu/rtrda-preprod/web-app-rtrda APP_SERVICE=web-app-rtrda-preprod-cloud TARGET_NAME=cloud REQUIRE_PROTECTED=1 bash -s" < "$SOURCE_PATH/.github/scripts/attest-activity-target.sh")
+          fallback_activity=$(ssh -i ~/.ssh/rtrda02_prod_preview_sync_ed25519 -o BatchMode=yes rtrda@100.91.174.121 "TARGET_PATH=/srv/apps/web-app-rtrda-preprod-rtrda02 APP_SERVICE=web-app-rtrda-preprod-rtrda02 TARGET_NAME=rtrda02 REQUIRE_PROTECTED=1 bash -s" < "$SOURCE_PATH/.github/scripts/attest-activity-target.sh")
+          python3 - "$cloud_activity" "$fallback_activity" "$DEPLOY_SHA" "$EXPECTED_MODE" <<'PY'
+          import json, sys
+          cloud, fallback = (json.loads(s) for s in sys.argv[1:3])
+          sha, mode = sys.argv[3:]
+          for record, target in ((cloud, 'cloud'), (fallback, 'rtrda02')):
+              assert record['sha'] == record['checkout'] == sha
+              assert record['mode'] == mode and record['host'] == target and record['health'] == 'healthy'
+              assert record['image'] == f'web-app-rtrda:preprod-{target}-{sha}'
+              if mode in ('stage', 'active'): assert record['authImage'] == f'activity-report-auth:{target}-{sha}'
+              else: assert record['authImage'] is None
+          assert cloud['mode'] == fallback['mode']
+          PY
           curl -fsS http://100.77.64.92:3021/healthz
           curl -fsS http://100.91.174.121:3021/healthz
           curl -fsS https://rtrda.or.th/healthz

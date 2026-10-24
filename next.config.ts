@@ -5,6 +5,9 @@ import {
   SECURITY_HEADERS,
 } from "./src/lib/security/headers";
 
+// Build-time switch: an enabled release must not serve cached evidence-producing pages.
+const activityNoStore = process.env.ACTIVITY_LOGGING_ENABLED === "true";
+
 const nextConfig: NextConfig = {
   output: "standalone",
   reactCompiler: true,
@@ -35,8 +38,11 @@ const nextConfig: NextConfig = {
         headers: [
           {
             key: "Cache-Control",
-            value: "public, max-age=0, s-maxage=60, stale-while-revalidate=300",
+            value: activityNoStore
+              ? "private, no-store, max-age=0"
+              : "public, max-age=0, s-maxage=60, stale-while-revalidate=300",
           },
+          ...(activityNoStore ? [{ key: "CDN-Cache-Control", value: "no-store" }] : []),
           ...SECURITY_HEADERS,
         ],
       },
@@ -50,7 +56,13 @@ const nextConfig: NextConfig = {
       ].map((source) => ({
         source,
         headers: [
-          { key: "Cache-Control", value: "public, max-age=14400, s-maxage=86400" },
+          {
+            key: "Cache-Control",
+            value: activityNoStore
+              ? "private, no-store, max-age=0"
+              : "public, max-age=14400, s-maxage=86400",
+          },
+          ...(activityNoStore ? [{ key: "CDN-Cache-Control", value: "no-store" }] : []),
           ...SAME_ORIGIN_FRAME_HEADERS,
         ],
       })),
@@ -59,6 +71,14 @@ const nextConfig: NextConfig = {
         headers: [
           { key: "Cache-Control", value: "no-store" },
           ...SAME_ORIGIN_FRAME_HEADERS,
+        ],
+      },
+      {
+        source: "/api/analytics/reports/:path*",
+        headers: [
+          { key: "Cache-Control", value: "private, no-store" },
+          { key: "CDN-Cache-Control", value: "no-store" },
+          ...SECURITY_HEADERS,
         ],
       },
       {

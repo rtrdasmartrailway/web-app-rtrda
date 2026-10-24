@@ -65,6 +65,18 @@ cp -al public/sdc-downloads "$BACKUP_DIR/public/sdc-downloads"
   sha256sum -c public-assets.SHA256SUMS >/dev/null
 )
 cp "$COMPOSE_FILE" "$BACKUP_DIR/compose.yml"
+if [ -f .deploy-state/activity-overlay.yml ]; then
+  cp .deploy-state/activity-overlay.yml "$BACKUP_DIR/activity-overlay.yml"
+  if grep -q 'ACTIVITY_LOGGING_ENABLED: "true"' "$BACKUP_DIR/activity-overlay.yml"; then
+    if grep -q '^  activity-report-auth:' "$BACKUP_DIR/activity-overlay.yml"; then ACTIVITY_MODE=active; else ACTIVITY_MODE=collect; fi
+  elif grep -q 'ACTIVITY_LOGGING_ENABLED: "false"' "$BACKUP_DIR/activity-overlay.yml"; then
+    ACTIVITY_MODE=stage
+  else
+    echo '::error::invalid activity overlay mode' >&2; exit 1
+  fi
+else
+  ACTIVITY_MODE=off
+fi
 
 CONTAINER_ID="$("${COMPOSE[@]}" ps -q "$APP_SERVICE")"
 test -n "$CONTAINER_ID"
@@ -79,10 +91,12 @@ if [ -z "$REVISION" ] || [ "$REVISION" = "<no value>" ]; then
 fi
 test "$REVISION" = "$SOURCE_SHA"
 
-python3 - "$BACKUP_DIR/release-manifest.json" "$SOURCE_SHA" "$TARGET_SHA" "$STAMP" "$IMAGE_ID" "$IMAGE_REF" "$REVISION" <<'PY'
+python3 - "$BACKUP_DIR/release-manifest.json" "$SOURCE_SHA" "$TARGET_SHA" "$STAMP" "$IMAGE_ID" "$IMAGE_REF" "$REVISION" "$ACTIVITY_MODE" <<'PY'
 import json, os, sys
-path, source, target, stamp, image_id, image_ref, revision = sys.argv[1:]
+path, source, target, stamp, image_id, image_ref, revision, activity_mode = sys.argv[1:]
 artifacts = ["database.dump", "compose.yml", "public-assets.SHA256SUMS"]
+overlay = os.path.join(os.path.dirname(path), "activity-overlay.yml")
+if os.path.isfile(overlay): artifacts.append("activity-overlay.yml")
 manifest = {
     "schemaVersion": 1,
     "sourceProductionSha": source,
@@ -92,6 +106,8 @@ manifest = {
     "imageRef": image_ref,
     "imageRevision": revision,
     "assetSnapshot": "public",
+    "activityMode": activity_mode,
+    "overlaySha256": __import__("hashlib").sha256(open(overlay, "rb").read()).hexdigest() if os.path.isfile(overlay) else None,
     "artifacts": [{"name": name, "size": os.path.getsize(os.path.join(os.path.dirname(path), name))} for name in artifacts],
 }
 with open(path, "w", encoding="utf-8") as fh:
@@ -101,7 +117,9 @@ PY
 
 (
   cd "$BACKUP_DIR"
-  sha256sum database.dump compose.yml public-assets.SHA256SUMS release-manifest.json > SHA256SUMS
+  files=(database.dump compose.yml public-assets.SHA256SUMS release-manifest.json)
+  if [ -f activity-overlay.yml ]; then files+=(activity-overlay.yml); fi
+  sha256sum "${files[@]}" > SHA256SUMS
   sha256sum -c SHA256SUMS >/dev/null
 )
 
