@@ -10,12 +10,17 @@ CALLBACK = 'https://rtrda.or.th/api/analytics/activity-auth/callback'
 KEYS = ('ACTIVITY_OIDC_TENANT_ID', 'ACTIVITY_OIDC_CLIENT_ID', 'ACTIVITY_OIDC_CLIENT_SECRET', 'ACTIVITY_OIDC_ISSUER', 'ACTIVITY_OIDC_REDIRECT_URI')
 
 
-def protected(path, keys):
+def protected_metadata(path):
     info = path.lstat()  # refuse symlinks (including directory components below)
     if not stat.S_ISREG(info.st_mode) or stat.S_IMODE(info.st_mode) != 0o600:
         raise ValueError('protected source must be a regular 0600 file')
     if any(part.is_symlink() for part in list(path.parents)[:-1]):
         raise ValueError('protected parent must not be a symlink')
+    return info
+
+
+def protected(path, keys):
+    protected_metadata(path)
     values = {}
     for line in path.read_text().splitlines():
         if not line or line.startswith('#'):
@@ -46,8 +51,17 @@ def main():
     salt_path = Path(os.environ['ACTIVITY_SALT_ENV_FILE'])
     if not salt_path.is_absolute() or not re.fullmatch(r'/[A-Za-z0-9_./-]+', str(salt_path)):
         raise ValueError('invalid protected salt path')
-    if len(protected(salt_path, ('ANALYTICS_HASH_SALT',))['ANALYTICS_HASH_SALT']) < 32:
-        raise ValueError('invalid salt')
+    salt_owner = protected_metadata(salt_path).st_uid
+    if salt_owner == 1001:
+        # The deploy account cannot read UID1001's 0600 file. The app validates
+        # its contents after mount and rolls back on any invalid salt.
+        pass
+    elif salt_owner == os.getuid():
+        salt = protected(salt_path, ('ANALYTICS_HASH_SALT',))['ANALYTICS_HASH_SALT']
+        if len(salt) < 32 or re.match(r'^(change.?me|placeholder|test|example)', salt, re.I):
+            raise ValueError('invalid salt')
+    else:
+        raise ValueError('unexpected protected salt owner')
     oidc_path = None
     if mode in ('stage', 'active'):
         oidc_path = Path(os.environ['ACTIVITY_OIDC_ENV_FILE'])
