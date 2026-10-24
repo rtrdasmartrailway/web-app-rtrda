@@ -64,9 +64,10 @@ def main():
         raise ValueError('invalid release SHA')
     contents = f'''services:
   {app}:
-    env_file:
-      - {salt_path}
+    volumes:
+      - {salt_path}:/run/secrets/analytics-salt.env:ro
     environment:
+      ANALYTICS_HASH_SALT_FILE: /run/secrets/analytics-salt.env
       ACTIVITY_LOGGING_ENABLED: "{'true' if mode == 'active' else 'false'}"
       ACTIVITY_RETENTION_ENABLED: "{'true' if mode == 'active' else 'false'}"
       ANALYTICS_ENV: production
@@ -84,8 +85,8 @@ def main():
       dockerfile: Dockerfile
       target: activity-report-auth
     image: activity-report-auth:{target}-{release_sha}
-    env_file:
-      - {oidc_path}
+    environment:
+      ACTIVITY_OIDC_FILE: /run/secrets/activity-oidc.env
     volumes:
       - {oidc_path}:/run/secrets/activity-oidc.env:ro
     healthcheck:

@@ -94,6 +94,115 @@ class OverlayTests(unittest.TestCase):
         self.assertEqual(services['web-app-rtrda-preprod-cloud']['environment']['DATABASE_URL'], 'postgresql://rtrda:synthetic-db@db-preprod-cloud:5432/rtrda')
         self.assertNotIn('ACTIVITY_OIDC_CLIENT_SECRET', services['web-app-rtrda-preprod-cloud']['environment'])
 
+    def test_compose_and_inspect_never_contain_protected_values(self):
+        import json
+        result = self.run_overlay()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        config = subprocess.run(['docker', 'compose', '-f', str(self.base), '-f', str(self.overlay), 'config', '--format', 'json'], env=dict(os.environ, POSTGRES_PASSWORD='synthetic-db'), capture_output=True, text=True)
+        self.assertEqual(config.returncode, 0, config.stderr)
+        services = json.loads(config.stdout)['services']
+        for service in (services['activity-report-auth'], services['web-app-rtrda-preprod-cloud']):
+            self.assertNotIn('synthetic-secret', json.dumps(service))
+            self.assertNotIn('s' * 48, json.dumps(service))
+            self.assertNotIn('env_file', service)
+            self.assertNotIn('ACTIVITY_OIDC_CLIENT_SECRET', service.get('environment', {}))
+            self.assertNotIn('ANALYTICS_HASH_SALT', service.get('environment', {}))
+        self.assertNotIn('synthetic-secret', config.stdout)
+        self.assertNotIn('s' * 48, config.stdout)
+        self.assertIn('/run/secrets/activity-oidc.env', json.dumps(services['activity-report-auth']['volumes']))
+        self.assertIn('/run/secrets/analytics-salt.env', json.dumps(services['web-app-rtrda-preprod-cloud']['volumes']))
+
+    def test_preswap_failures_restore_git_compose_overlay_and_env(self):
+        remote = (SCRIPT.parents[2] / '.github/scripts/deploy-preprod-remote.sh').read_text()
+        self.assertIn('trap on_deploy_failure ERR', remote)
+        self.assertIn('rollback_previous_release', remote)
+        self.assertIn('PREVIOUS_ENV', remote)
+        self.assertIn('PREVIOUS_SHA', remote)
+        self.assertIn('git checkout -f -B preprod "$PREVIOUS_SHA"', remote)
+        self.assertIn('cp "$PREVIOUS_COMPOSE" "$COMPOSE_FILE"', remote)
+        self.assertIn('rollback_activity_overlay', remote)
+        self.assertIn('run_node npm ci', remote)
+        self.assertIn('run_node npm run db:migrate', remote)
+        self.assertIn('run_node npm run db:seed', remote)
+        self.assertIn('test -r /run/secrets/analytics-salt.env', remote)
+
+    def test_backup_manifest_includes_mode_and_overlay_integrity(self):
+        backup = (SCRIPT.parents[2] / '.github/scripts/backup-rtrda02-production.sh').read_text()
+        self.assertIn('activity-overlay.yml', backup)
+        self.assertIn('activityMode', backup)
+        self.assertIn('files=(database.dump compose.yml', backup)
+        self.assertIn('overlaySha256', backup)
+
+    def test_release_preserves_active_mode_and_parity_attests_both(self):
+        workflow = (SCRIPT.parents[2] / '.github/workflows/deploy-production.yml').read_text()
+        self.assertIn('activity_mode:', workflow)
+        self.assertIn('preserve', workflow)
+        self.assertIn('resolve-activity-mode.sh', workflow)
+        self.assertNotIn("inputs.activity_activate && 'active'", workflow)
+        self.assertIn('attest-activity-target.sh', workflow)
+        self.assertIn('activity-report-auth', workflow)
+
+    def test_runner_uid_can_read_protected_salt_and_missing_prior_release_is_off(self):
+        result = self.run_overlay()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn('ANALYTICS_HASH_SALT_FILE', self.overlay.read_text())
+        remote = (SCRIPT.parents[2] / '.github/scripts/deploy-preprod-remote.sh').read_text()
+        self.assertIn('git rev-parse HEAD', remote)
+        self.assertIn('on_deploy_failure', remote)
+        self.assertIn('Database migrations are additive', remote)
+        attest = (SCRIPT.parents[2] / '.github/scripts/attest-activity-target.sh').read_text()
+        self.assertIn('REQUIRE_PROTECTED', attest)
+        self.assertIn("else None", attest)
+
+    def test_preserve_resolver_keeps_active_and_rejects_disagreement(self):
+        import json
+        resolver = SCRIPT.with_name('resolve-activity-mode.sh')
+        fakebin = self.root / 'fakebin'; fakebin.mkdir()
+        ssh = fakebin / 'ssh'
+        ssh.write_text('#!/bin/bash\nif [[ "$*" == *"ubuntu@"* ]]; then printf "%s\n" "$CLOUD"; else printf "%s\n" "$FALLBACK"; fi\n')
+        ssh.chmod(0o755)
+        record = lambda mode: json.dumps(dict(mode=mode, sha='a'*40))
+        env = dict(os.environ, PATH=f'{fakebin}:{os.environ["PATH"]}', SOURCE_PATH=str(SCRIPT.parents[2]), CLOUD=record('active'), FALLBACK=record('active'))
+        result = subprocess.run(['bash', str(resolver), 'preserve'], env=env, capture_output=True, text=True)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.stdout.strip(), 'active')
+        env['FALLBACK'] = record('off')
+        result = subprocess.run(['bash', str(resolver), 'preserve'], env=env, capture_output=True, text=True)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertNotIn('active', result.stdout)
+
+    def test_npm_failure_restores_preswap_checkout_compose_overlay_and_env(self):
+        for failing in ('ci', 'db:migrate', 'db:seed'):
+            with self.subTest(failing=failing):
+                target = self.root / failing.replace(':', '-'); target.mkdir()
+            (target / '.git').mkdir(); (target / '.deploy-state').mkdir()
+            base = target / 'base.yml'
+            original = 'services:\n  web-app-rtrda-preprod-cloud:\n    image: busybox\n  db-preprod-cloud:\n    image: busybox\n'
+            base.write_text(original)
+            (target / '.deploy-state/preprod-release').write_text('a'*40)
+            (target / '.deploy-state/activity-overlay.yml').write_text('old overlay')
+            (target / '.env').write_text('POSTGRES_PASSWORD=synthetic-db\n')
+            (target / '.env.cicd-preprod').write_text('old generated env\n')
+            fakebin = self.root / 'bin'; fakebin.mkdir(exist_ok=True)
+            for name, body in {
+                'git': '#!/bin/bash\nif [ "$1" = rev-parse ]; then printf "%s\n" "' + 'a'*40 + '"; fi\nexit 0\n',
+                'npm': '#!/bin/bash\nif [[ "$*" == *"$FAIL_AT"* ]]; then exit 7; fi\nexit 0\n',
+                'npx': '#!/bin/bash\nexit 0\n',
+                'curl': '#!/bin/bash\nexit 0\n',
+                'docker': '#!/bin/bash\nexit 0\n',
+            }.items():
+                file = fakebin / name; file.write_text(body); file.chmod(0o755)
+            # Fail at npm ci after Git/Compose/overlay changes, without touching real targets.
+            overlay_script = self.root / 'overlay.py'
+            overlay_script.write_text('#!/usr/bin/env python3\nimport pathlib,sys\npathlib.Path(sys.argv[-1]).write_text("new overlay")\n')
+            env = dict(os.environ, PATH=f'{fakebin}:{os.environ["PATH"]}', TARGET_NAME='cloud', TARGET_PATH=str(target), COMPOSE_FILE='base.yml', APP_SERVICE='web-app-rtrda-preprod-cloud', DB_SERVICE='db-preprod-cloud', DB_HOST_PORT='5436', DIRECT_HEALTH_URL='http://127.0.0.1/healthz', DEPLOY_SHA='b'*40, ACTIVITY_DEPLOY_MODE='off', ACTIVITY_OVERLAY_SCRIPT=str(overlay_script), FAIL_AT=failing)
+            result = subprocess.run(['bash', str(SCRIPT.with_name('deploy-preprod-remote.sh'))], env=env, capture_output=True, text=True, timeout=15)
+            self.assertNotEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertEqual(base.read_text(), original)
+            self.assertEqual((target / '.deploy-state/activity-overlay.yml').read_text(), 'old overlay')
+            self.assertEqual((target / '.env').read_text(), 'POSTGRES_PASSWORD=synthetic-db\n')
+            self.assertEqual((target / '.env.cicd-preprod').read_text(), 'old generated env\n')
+
     def test_canonical_deploy_wires_opt_in_and_rollback(self):
         root = SCRIPT.parents[2]
         target = (root / '.github/scripts/deploy-preprod-target.sh').read_text()
@@ -111,7 +220,7 @@ class OverlayTests(unittest.TestCase):
     def test_rollback_removes_new_service_and_restores_previous_overlay(self):
         remote = (SCRIPT.parents[2] / '.github/scripts/deploy-preprod-remote.sh').read_text()
         function = remote[remote.index('rollback_activity_overlay() {'):remote.index('\nrollback_previous_release() {')]
-        fakebin = self.root / 'bin'; fakebin.mkdir()
+        fakebin = self.root / 'bin'; fakebin.mkdir(exist_ok=True)
         docker = fakebin / 'docker'
         docker.write_text('#!/bin/sh\nprintf "%s\\n" "$*" >> "$DOCKER_LOG"\n')
         docker.chmod(0o755)

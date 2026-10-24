@@ -1,3 +1,6 @@
+import { mkdtempSync, writeFileSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   activitySettings,
@@ -130,6 +133,29 @@ describe("isolated activity report sign-in", () => {
     expect(JSON.stringify(response.json())).not.toMatch(/forged|secret|synthetic/);
     expect(log).not.toHaveBeenCalled();
     await app.close();
+  });
+});
+
+describe("protected OIDC source", () => {
+  it("reads only the mounted file when configured, and fails closed for an invalid file", () => {
+    const root = mkdtempSync(join(tmpdir(), "activity-oidc-"));
+    const file = join(root, "oidc.env");
+    const tenant = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+    try {
+      writeFileSync(
+        file,
+        `ACTIVITY_OIDC_TENANT_ID=${tenant}\nACTIVITY_OIDC_CLIENT_ID=synthetic-app\nACTIVITY_OIDC_CLIENT_SECRET=synthetic-secret\nACTIVITY_OIDC_ISSUER=https://login.microsoftonline.com/${tenant}/v2.0\nACTIVITY_OIDC_REDIRECT_URI=https://rtrda.or.th/api/analytics/activity-auth/callback\n`,
+        { mode: 0o600 },
+      );
+      vi.stubEnv("ACTIVITY_OIDC_FILE", file);
+      vi.stubEnv("ACTIVITY_OIDC_CLIENT_SECRET", "wrong-env-secret");
+      expect(activitySettings()?.clientSecret).toBe("synthetic-secret");
+      writeFileSync(file, "broken=secret=extra\n");
+      expect(activitySettings()).toBeNull();
+    } finally {
+      vi.unstubAllEnvs();
+      rmSync(root, { recursive: true, force: true });
+    }
   });
 });
 

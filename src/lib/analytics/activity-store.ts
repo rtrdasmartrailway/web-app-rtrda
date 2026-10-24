@@ -1,4 +1,5 @@
 import { createHash, createHmac, randomUUID } from "node:crypto";
+import { readFileSync } from "node:fs";
 import { Pool } from "pg";
 import { after } from "next/server";
 import { detectAnalyticsDevice, isObviousBot } from "./event-contract";
@@ -22,6 +23,18 @@ const state = globalThis as unknown as {
   activityPool?: Pool;
   activityCleanupTimer?: ReturnType<typeof setInterval>;
 };
+function activitySalt(): string | null {
+  if (!process.env.ANALYTICS_HASH_SALT_FILE)
+    return process.env.ANALYTICS_HASH_SALT || null;
+  try {
+    const text = readFileSync(process.env.ANALYTICS_HASH_SALT_FILE, "utf8").trim();
+    return /^ANALYTICS_HASH_SALT=[A-Za-z0-9_./:@-]+$/.test(text)
+      ? text.slice("ANALYTICS_HASH_SALT=".length)
+      : null;
+  } catch {
+    return null;
+  }
+}
 export function activityEnvironment(): "test" | "production" | null {
   if (process.env.ACTIVITY_LOGGING_ENABLED !== "true") return null;
   if (
@@ -35,9 +48,8 @@ export function activityEnvironment(): "test" | "production" | null {
     (process.env.ACTIVITY_RECORDING_HOST === "cloud" ||
       process.env.ACTIVITY_RECORDING_HOST === "rtrda02") &&
     process.env.ACTIVITY_RETENTION_ENABLED === "true" &&
-    typeof process.env.ANALYTICS_HASH_SALT === "string" &&
-    process.env.ANALYTICS_HASH_SALT.length >= 32 &&
-    !/^(change.?me|placeholder|test|example)/i.test(process.env.ANALYTICS_HASH_SALT)
+    (activitySalt()?.length ?? 0) >= 32 &&
+    !/^(change.?me|placeholder|test|example)/i.test(activitySalt() ?? "")
   )
     return "production";
   return null;
@@ -90,7 +102,7 @@ export function activityHashes(
   sessionId?: string | null,
   now = new Date(),
 ) {
-  const salt = process.env.ANALYTICS_HASH_SALT;
+  const salt = activitySalt();
   if (!salt) throw new Error("Activity hashing unavailable");
   const hash = (text: string) => createHmac("sha256", salt).update(text).digest("hex");
   const ip = (headers.get("cf-connecting-ip") || headers.get("x-forwarded-for") || "")

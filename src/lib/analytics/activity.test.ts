@@ -233,6 +233,35 @@ describe("file response semantics", () => {
   });
 });
 
+describe("protected production salt", () => {
+  it("reads the mounted salt instead of the environment and fails closed when unreadable", async () => {
+    const root = await mkdtemp(path.join(os.tmpdir(), "activity-salt-"));
+    const file = path.join(root, "salt.env");
+    try {
+      await writeFile(
+        file,
+        "ANALYTICS_HASH_SALT=synthetic-protected-salt-with-adequate-length\n",
+        { mode: 0o600 },
+      );
+      vi.stubEnv("ACTIVITY_LOGGING_ENABLED", "true");
+      vi.stubEnv("ACTIVITY_RETENTION_ENABLED", "true");
+      vi.stubEnv("ANALYTICS_ENV", "production");
+      vi.stubEnv("SITE_ORIGIN", "https://rtrda.or.th");
+      vi.stubEnv("ACTIVITY_RECORDING_HOST", "cloud");
+      vi.stubEnv("ANALYTICS_HASH_SALT_FILE", file);
+      vi.stubEnv("ANALYTICS_HASH_SALT", "wrong-env-salt");
+      expect(activityEnvironment()).toBe("production");
+      expect(
+        activityHashes(new Headers({ "cf-connecting-ip": "192.0.2.1" })).visitorKey,
+      ).toMatch(/^[a-f0-9]{64}$/);
+      await writeFile(file, "invalid");
+      expect(activityEnvironment()).toBeNull();
+    } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+});
+
 describe("production V2 environment isolation", () => {
   const production = () => {
     vi.stubEnv("ACTIVITY_LOGGING_ENABLED", "true");

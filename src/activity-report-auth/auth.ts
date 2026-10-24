@@ -1,4 +1,5 @@
 import { randomBytes } from "node:crypto";
+import { readFileSync } from "node:fs";
 import Fastify from "fastify";
 import * as oidc from "openid-client";
 export const ACTIVITY_VIEWER_ROLE = "RTRDA_ACTIVITY_REPORT_VIEWER";
@@ -49,7 +50,22 @@ export function activitySettings(): Settings | null {
     ACTIVITY_OIDC_CLIENT_SECRET: clientSecret,
     ACTIVITY_OIDC_ISSUER: issuer,
     ACTIVITY_OIDC_REDIRECT_URI: redirectUri,
-  } = process.env;
+  } = process.env.ACTIVITY_OIDC_FILE
+    ? (() => {
+        try {
+          const lines = readFileSync(process.env.ACTIVITY_OIDC_FILE!, "utf8")
+            .trim()
+            .split("\n");
+          const entries = lines.map((line) => line.split("="));
+          if (entries.some((entry) => entry.length !== 2)) return {};
+          const values = Object.fromEntries(entries);
+          if (Object.keys(values).length !== entries.length) return {};
+          return values;
+        } catch {
+          return {};
+        }
+      })()
+    : process.env;
   if (
     !tenantId ||
     !clientId ||

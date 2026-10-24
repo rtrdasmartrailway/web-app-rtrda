@@ -1,6 +1,6 @@
 # Private activity-report sign-in (source only)
 
-This service is **not deployed or wired into Production Compose**. Until it is separately provisioned and reachable as `activity-report-auth:3101` from each web container, reports deny access (503 for a presented session; otherwise 401). The production logging flags and DB remain independently gated.
+This service is source-controlled but **not deployed to Production**. An opt-in private Compose overlay is prepared for each target; it requires separate provisioning and owner approval. Until it is separately provisioned and reachable as `activity-report-auth:3101` from each web container, reports deny access (503 for a presented session; otherwise 401). The production logging flags and DB remain independently gated.
 
 ## Entra registration (owner/security team)
 
@@ -11,3 +11,11 @@ Service runtime variables (secure injection, never commit values): `ACTIVITY_OID
 The login flow uses openid-client discovery and authorization-code grant with state, PKCE S256, nonce, and ID-token verification. It additionally checks the exact tenant, issuer, audience, expiry, stable subject, and app role before issuing an opaque, HttpOnly Secure SameSite=Strict `rtrda_activity_oidc_session` cookie. Its state cookie is Lax and short-lived for the cross-site Entra callback. Sessions are short-lived (up to 30 minutes), server-side and revoked on logout; each host has independent state, so failover requires a **fresh sign-in**. Service restart also invalidates sessions. No tokens, claims, user identifiers, credentials, or raw authorization codes are logged or returned in session responses. `rtrda_activity_session` is a separate public analytics pseudonym cookie, never an auth credential.
 
 Required before any production activation: owner-approved app registration/assignments and exact release SHA; secure per-host configuration; Compose wiring to the isolated service on both hosts; and real Entra/browser sign-in, role denial, callback, logout, failover and report/CSV checks. Synthetic tests cannot verify live Microsoft configuration or failover infrastructure.
+
+## Protected-file deployment boundary
+
+The per-target activity overlay bind-mounts `0600` protected files from `.activity-secrets/oidc.env` into the auth service at `/run/secrets/activity-oidc.env`, and `.activity-secrets/analytics-salt.env` into the app at `/run/secrets/analytics-salt.env`. Compose receives only paths (`ACTIVITY_OIDC_FILE` and `ANALYTICS_HASH_SALT_FILE`), not secret values; each process parses its own file. The auth image runs as root, but the app runner runs as UID **1001**. The owner must provision the salt source readable by UID 1001 while retaining `0600` and ensuring the parent directory is traversable. No credentials are provisioned by this repository. On a failed read the logger stays disabled. Do not print `docker compose config` for unrelated database secrets.
+
+Manual production dispatch defaults to `preserve`: both targets must attest the same previous mode; absent activity overlay means `off`. Only an owner-approved manual input `off`, `stage`, or `active` changes it. After each release, both targets attest mode, host label, exact app/auth image SHA, protected-file wiring, and container health before public checks. `off` does not require protected files. Backups checksum the overlay if present and record the prior mode and overlay digest.
+
+On pre-swap failure, deployment restores the prior Git checkout, base Compose, overlay and generated environment files; a started auth service is also restored. Additive database migrations are **not** automatically reversed, even if code/containers roll back. Never dispatch without explicit exact candidate SHA approval and separately provisioned credentials.
