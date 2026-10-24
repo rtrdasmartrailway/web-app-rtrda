@@ -64,7 +64,8 @@ export function activitySettings(): Settings | null {
     const uri = new URL(redirectUri);
     if (
       uri.protocol !== "https:" ||
-      !["rtrda.or.th", "www.rtrda.or.th"].includes(uri.hostname) ||
+      uri.hostname !== "rtrda.or.th" ||
+      uri.port ||
       uri.pathname !== "/api/analytics/activity-auth/callback" ||
       uri.search ||
       uri.hash

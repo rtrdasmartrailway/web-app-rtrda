@@ -26,6 +26,7 @@ const ALLOWED_METHODS = "GET, HEAD, OPTIONS";
 const ANALYTICS_METHODS = "POST, OPTIONS";
 const DOWNLOAD_CAPTCHA_METHODS = "GET, POST, OPTIONS";
 const ANALYTICS_EVENT_PATH = "/api/analytics/events";
+const ACTIVITY_LOGOUT_PATH = "/api/analytics/activity-auth/logout";
 const DOWNLOAD_CAPTCHA_PATH = "/api/download-captcha";
 const PR_CENTER_API_PREFIX = "/api/pr-center/";
 const HEALTH_PATHS = new Set(["/healthz", "/api/health"]);
@@ -60,6 +61,7 @@ function httpsRedirect(request: NextRequest): NextResponse | null {
 function methodPolicy(request: NextRequest): NextResponse | null {
   const path = new URL(request.url).pathname;
   const analyticsRequest = path === ANALYTICS_EVENT_PATH;
+  const activityLogoutRequest = path === ACTIVITY_LOGOUT_PATH;
   const downloadCaptchaRequest = path === DOWNLOAD_CAPTCHA_PATH;
   const prCenterApiRequest = path.startsWith(PR_CENTER_API_PREFIX);
 
@@ -67,22 +69,25 @@ function methodPolicy(request: NextRequest): NextResponse | null {
     return new NextResponse(null, {
       status: 204,
       headers: {
-        Allow: prCenterApiRequest
-          ? "GET, POST, PATCH, DELETE, OPTIONS"
-          : analyticsRequest
-            ? ANALYTICS_METHODS
-            : downloadCaptchaRequest
-              ? DOWNLOAD_CAPTCHA_METHODS
-              : ALLOWED_METHODS,
+        Allow: activityLogoutRequest
+          ? ANALYTICS_METHODS
+          : prCenterApiRequest
+            ? "GET, POST, PATCH, DELETE, OPTIONS"
+            : analyticsRequest
+              ? ANALYTICS_METHODS
+              : downloadCaptchaRequest
+                ? DOWNLOAD_CAPTCHA_METHODS
+                : ALLOWED_METHODS,
       },
     });
   }
 
   if (
-    (analyticsRequest || downloadCaptchaRequest || prCenterApiRequest) &&
-    (request.method === "POST" ||
-      request.method === "PATCH" ||
-      request.method === "DELETE")
+    (activityLogoutRequest && request.method === "POST") ||
+    ((analyticsRequest || downloadCaptchaRequest || prCenterApiRequest) &&
+      (request.method === "POST" ||
+        request.method === "PATCH" ||
+        request.method === "DELETE"))
   )
     return null;
 
@@ -92,13 +97,15 @@ function methodPolicy(request: NextRequest): NextResponse | null {
       {
         status: 405,
         headers: {
-          Allow: prCenterApiRequest
-            ? "GET, POST, PATCH, DELETE, OPTIONS"
-            : analyticsRequest
-              ? ANALYTICS_METHODS
-              : downloadCaptchaRequest
-                ? DOWNLOAD_CAPTCHA_METHODS
-                : ALLOWED_METHODS,
+          Allow: activityLogoutRequest
+            ? ANALYTICS_METHODS
+            : prCenterApiRequest
+              ? "GET, POST, PATCH, DELETE, OPTIONS"
+              : analyticsRequest
+                ? ANALYTICS_METHODS
+                : downloadCaptchaRequest
+                  ? DOWNLOAD_CAPTCHA_METHODS
+                  : ALLOWED_METHODS,
         },
       },
     );
