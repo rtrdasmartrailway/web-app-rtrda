@@ -8,17 +8,23 @@ import {
   normalizeAnalyticsPath,
   type AnalyticsEventType,
 } from "@/lib/analytics/event-contract";
+import { browserSession } from "@/lib/analytics/browser-session";
+import { activityPath, publicActivityPath } from "@/lib/analytics/activity-contract";
+import {
+  outboundFormTarget,
+  outboundSourceAllowed,
+  supportedActivation,
+} from "@/lib/analytics/outbound-form";
 
 const ENDPOINT = "/api/analytics/events";
 let lastPagePath: string | null = null;
 
 function sessionId(): string {
-  const key = "rtrda_analytics_session";
-  const existing = sessionStorage.getItem(key);
-  if (existing) return existing;
-  const created = crypto.randomUUID();
-  sessionStorage.setItem(key, created);
-  return created;
+  try {
+    return browserSession(sessionStorage);
+  } catch {
+    return browserSession({ getItem: () => null, setItem: () => {} });
+  }
 }
 
 function source(): "direct" | "internal" | "external" {
@@ -61,13 +67,20 @@ export function WebAnalyticsTracker() {
 
   useEffect(() => {
     const path = normalizeAnalyticsPath(pathname);
-    if (!path || !isTrackablePath(path) || lastPagePath === path) return;
+    if (!path || !isTrackablePath(path) || !publicActivityPath(path)) {
+      lastPagePath = null;
+      return;
+    }
+    if (lastPagePath === path) return;
     lastPagePath = path;
     send("page_view", path);
   }, [pathname]);
 
   useEffect(() => {
+    const observed = new WeakSet<Event>();
     function onClick(event: MouseEvent) {
+      if (!supportedActivation(event) || observed.has(event)) return;
+      observed.add(event);
       const anchor =
         event.target instanceof Element ? event.target.closest("a[href]") : null;
       if (!(anchor instanceof HTMLAnchorElement)) return;
@@ -77,15 +90,31 @@ export function WebAnalyticsTracker() {
       } catch {
         return;
       }
+      const current = activityPath(location.pathname);
+      const form = outboundFormTarget(url);
+      if (form && current && outboundSourceAllowed(current)) {
+        send("outbound_form_click", current, form);
+        return;
+      }
       if (url.origin !== location.origin) return;
-      const current = normalizeAnalyticsPath(location.pathname);
       const target = normalizeAnalyticsPath(url.pathname);
-      if (!current || !target || !isTrackablePath(current) || !isTrackablePath(target))
+      if (
+        !current ||
+        !target ||
+        !isTrackablePath(current) ||
+        !isTrackablePath(target) ||
+        !publicActivityPath(current) ||
+        !publicActivityPath(target)
+      )
         return;
       send(classifyTarget(target), current, target);
     }
     document.addEventListener("click", onClick, { capture: true });
-    return () => document.removeEventListener("click", onClick, { capture: true });
+    document.addEventListener("auxclick", onClick, { capture: true });
+    return () => {
+      document.removeEventListener("click", onClick, { capture: true });
+      document.removeEventListener("auxclick", onClick, { capture: true });
+    };
   }, []);
 
   return null;

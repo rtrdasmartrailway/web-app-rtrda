@@ -1,6 +1,6 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
-import { middleware } from "./middleware";
+import { proxy as middleware } from "./proxy";
 
 function request(
   url: string,
@@ -148,5 +148,60 @@ describe("Intro root behind a reverse proxy", () => {
     );
     expect(response.status).toBe(307);
     expect(response.headers.get("location")).toBe("https://www.rtrda.or.th/intro");
+  });
+});
+
+describe("Production request policy with activity interception", () => {
+  beforeEach(() => {
+    vi.stubEnv("ANALYTICS_ENV", "production");
+    vi.stubEnv("ACTIVITY_LOGGING_ENABLED", "true");
+    vi.stubEnv("ACTIVITY_RETENTION_ENABLED", "true");
+    vi.stubEnv("SITE_ORIGIN", "https://rtrda.or.th");
+    vi.stubEnv("ANALYTICS_HASH_SALT", "synthetic-production-salt-with-sufficient-length");
+    vi.stubEnv("ACTIVITY_RECORDING_HOST", "cloud");
+  });
+  afterEach(() => vi.unstubAllEnvs());
+  it("leaves the legacy public file path untouched when V2 is disabled", () => {
+    vi.stubEnv("ACTIVITY_LOGGING_ENABLED", "false");
+    const response = middleware(
+      request("https://rtrda.or.th/wp-content/uploads/guide.pdf", {
+        headers: { host: "rtrda.or.th" },
+      }),
+    );
+    expect(response.headers.get("x-middleware-next")).toBe("1");
+    expect(response.headers.get("x-middleware-rewrite")).toBeNull();
+  });
+  it("denies an untrusted Host to activity interception", () => {
+    const response = middleware(
+      request("https://evil.example/wp-content/uploads/guide.pdf", {
+        headers: { host: "evil.example", "x-forwarded-host": "rtrda.or.th" },
+      }),
+    );
+    expect(response.headers.get("x-middleware-rewrite")).toBeNull();
+  });
+  it("rewrites a public PDF GET to private file delivery", () => {
+    const response = middleware(
+      request("https://rtrda.or.th/wp-content/uploads/guide.pdf", {
+        headers: { host: "rtrda.or.th" },
+      }),
+    );
+    expect(response.headers.get("x-middleware-rewrite")).toContain(
+      "/logged-files-internal/wp-content/uploads/guide.pdf",
+    );
+    expect(response.headers.get("cache-control")).toContain("no-store");
+  });
+  it("preserves method denial before activity interception", () => {
+    const response = middleware(
+      request("https://rtrda.or.th/wp-content/uploads/guide.pdf", { method: "POST" }),
+    );
+    expect(response.status).toBe(405);
+  });
+  it("preserves the legacy O10 rewrite when activity is on", () => {
+    const response = middleware(
+      request(
+        "https://rtrda.or.th/wp-content/uploads/ita2569/O10/o10-%25E0%25B8%2584%25E0%25B8%25B9%2520%2520%25E0%25B9%2588%25E0%25B8%25A1%25E0%25B%2520%25208%25B7%25E0%25B8%25AD%25E0%25B8%2581%2520%2520%25E0%25B8%25B2%25E0%25B8%25A3%25E%2520%25200%25B9%2583%25E0%25B8%25AB%25E0%25B9%258%2520%25209%25E0%25B8%259A%25E0%25B8%25A3%25E0%2520%2520%25B8%25B4%25E0%25B8%2581%25E0%25B8%2520%2520%25B2%25E0%25B8%25A3-E-Service.pdf",
+      ),
+    );
+    expect(response.headers.get("x-middleware-rewrite")).toContain("E-Service.pdf");
   });
 });
