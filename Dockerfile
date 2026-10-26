@@ -7,7 +7,9 @@ RUN apt-get update \
   && rm -rf /var/lib/apt/lists/*
 
 COPY package.json package-lock.json ./
-RUN npm ci
+# Reuse verified Prisma engine downloads without changing build networking.
+RUN --mount=type=cache,id=rtrda-prisma-engine-cache,target=/root/.cache/prisma \
+    npm ci --no-audit --no-fund
 # Generate the Prisma client (reads prisma/schema.prisma); needed for typecheck/build.
 # `prisma generate` doesn't connect, but the config resolves DATABASE_URL — pass
 # a throwaway value so it loads. The real URL is injected at runtime by compose.
