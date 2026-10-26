@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { SAME_ORIGIN_FRAME_HEADERS } from "@/lib/security/headers";
 import { INTRO_RETURN_COOKIE, introHomepageUrl } from "@/lib/intro-flow";
 import {
   activityEnabled,
@@ -158,6 +159,8 @@ export function proxy(request: NextRequest) {
         const response = NextResponse.rewrite(destination);
         response.headers.set("Cache-Control", "private, no-store, max-age=0");
         response.headers.set("CDN-Cache-Control", "no-store");
+        for (const { key, value } of SAME_ORIGIN_FRAME_HEADERS)
+          response.headers.set(key, value);
         return response;
       }
       if (isPageRequest(normalized, request.headers))
