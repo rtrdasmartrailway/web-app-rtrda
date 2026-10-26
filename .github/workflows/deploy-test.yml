@@ -85,6 +85,12 @@ jobs:
             npm run db:seed
           fi
 
+      - name: Apply idempotent recruitment notice to imported page
+        run: |
+          set -euo pipefail
+          cd /srv/workspace/web-app-rtrda
+          node scripts/apply-recruitment-notice.mjs
+
       - name: Run validation gates
         run: |
           set -euo pipefail

@@ -211,6 +211,7 @@ if seed_required; then
 else
   echo "${TARGET_NAME}: frozen content manifest unchanged; skipping db:seed"
 fi
+run_node node scripts/apply-recruitment-notice.mjs
 
 # Build SHA-tagged images while the old container remains up.
 if [ -f "$ACTIVITY_OVERLAY" ] && grep -q '^  activity-report-auth:' "$ACTIVITY_OVERLAY"; then
