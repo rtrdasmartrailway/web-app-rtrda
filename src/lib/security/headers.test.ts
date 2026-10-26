@@ -67,6 +67,7 @@ describe("security headers", () => {
       "/wp-content/uploads/:path*",
       "/sdc-downloads/:path*",
       "/risk-reports/:path*",
+      "/recruitment-documents/:path*",
     ]) {
       const routeIndex = routes?.findIndex((route) => route.source === source) ?? -1;
       expect(routeIndex).toBeGreaterThan(globalIndex);
