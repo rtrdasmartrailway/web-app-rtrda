@@ -36,7 +36,8 @@
     "react-dom": "19.2.4",
     "sanitize-html": "2.18.1",
     "sharp": "0.35.5",
-    "undici": "^7.30.1"
+    "undici": "^7.30.1",
+    "tsx": "^4.23.13"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
@@ -52,9 +53,8 @@
     "prettier": "3.8.4",
     "prisma": "^7.9.0",
     "tailwindcss": "^4",
-    "tsx": "^4.23.13",
     "typescript": "^5",
-    "vitest": "^4.1.8"
+    "vitest": "4.1.12"
   },
   "overrides": {
     "postcss": "8.5.26",
@@ -62,6 +62,10 @@
     "find-my-way": "9.7.0",
     "valibot": "1.4.2",
     "deepmerge-ts": "8.0.1",
-    "mysql2": "3.24.3"
+    "mysql2": "3.24.3",
+    "brace-expansion@1": "1.1.21",
+    "brace-expansion@5": "5.0.12",
+    "vite": "8.1.6",
+    "zod": "4.6.6"
   }
 }

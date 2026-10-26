@@ -30,6 +30,8 @@ FROM deps AS pr-center-api
 WORKDIR /app
 COPY . .
 RUN DATABASE_URL="postgresql://build:build@localhost:5432/build" npx prisma generate
+# tsx is a runtime dependency; discard test/lint tooling after client generation.
+RUN npm prune --omit=dev --ignore-scripts --no-audit --no-fund
 ENV NODE_ENV=production
 ENV PR_CENTER_API_HOST=0.0.0.0
 ENV PR_CENTER_API_PORT=3100
