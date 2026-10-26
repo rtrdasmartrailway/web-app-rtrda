@@ -1,14 +1,24 @@
 import { load } from "cheerio";
 
 const FORM_URL = "https://forms.gle/z3abJcX9QRk8zGGA7";
-const PDF_URL = "/recruitment-documents/recruitment-policy-planning-support-2569.pdf";
-const POSITION_TITLE =
+const PREVIOUS_PDF_URL =
+  "/recruitment-documents/recruitment-policy-planning-support-2569.pdf";
+const PDF_URL = "/recruitment-documents/recruitment-staff-selection-2-2569.pdf";
+const PREVIOUS_POSITION_TITLE =
   "ประกาศเปิดรับสมัครงาน ตำแหน่ง เจ้าหน้าที่สนับสนุนงานนโยบายและแผน (จ้างเหมาบริการ)";
+const POSITION_TITLE =
+  "ประกาศสถาบันวิจัยและพัฒนาเทคโนโลยีระบบราง (องค์การมหาชน) เรื่อง รับสมัครบุคคลเพื่อคัดเลือกและบรรจุแต่งตั้งเป็นเจ้าหน้าที่ ครั้งที่ 2/2569";
 
-const NOTICE_ROW = `<tr><td class="has-text-align-center col-0 col-align-center" data-align="center">1</td><td class="has-text-align-center col-1 col-align-center" data-align="center">28 กันยายน 2569</td><td class="has-text-align-left col-2 col-align-left" data-align="left">${POSITION_TITLE}</td><td class="has-text-align-center col-3 col-align-center" data-align="center">1</td><td class="has-text-align-center col-4 col-align-left" data-align="left"><a href="${FORM_URL}" target="_blank" rel="noreferrer noopener">สมัครงาน</a></td><td class="has-text-align-center col-5 col-align-center" data-align="center"><a href="${PDF_URL}" target="_blank" rel="noreferrer noopener">PDF</a></td></tr>`;
+const NOTICE_ROW = `<tr><td class="has-text-align-center col-0 col-align-center" data-align="center">1</td><td class="has-text-align-center col-1 col-align-center" data-align="center">26 ตุลาคม 2569</td><td class="has-text-align-left col-2 col-align-left" data-align="left">${POSITION_TITLE}</td><td class="has-text-align-center col-3 col-align-center" data-align="center">10</td><td class="has-text-align-center col-4 col-align-left" data-align="left">–</td><td class="has-text-align-center col-5 col-align-center" data-align="center"><a href="${PDF_URL}" target="_blank" rel="noreferrer noopener">PDF</a></td></tr>`;
+const PREVIOUS_NOTICE_ROW = `<tr><td class="has-text-align-center col-0 col-align-center" data-align="center">2</td><td class="has-text-align-center col-1 col-align-center" data-align="center">28 กันยายน 2569</td><td class="has-text-align-left col-2 col-align-left" data-align="left">${PREVIOUS_POSITION_TITLE}</td><td class="has-text-align-center col-3 col-align-center" data-align="center">1</td><td class="has-text-align-center col-4 col-align-left" data-align="left"><a href="${FORM_URL}" target="_blank" rel="noreferrer noopener">สมัครงาน</a></td><td class="has-text-align-center col-5 col-align-center" data-align="center"><a href="${PREVIOUS_PDF_URL}" target="_blank" rel="noreferrer noopener">PDF</a></td></tr>`;
 
 export function addRecruitmentNotice(contentHtml) {
-  if (contentHtml.includes(FORM_URL)) return contentHtml;
+  if (contentHtml.includes(PDF_URL)) return contentHtml;
+  const hasPreviousNotice = contentHtml.includes(FORM_URL);
+  const rowsToAdd = hasPreviousNotice
+    ? NOTICE_ROW
+    : `${NOTICE_ROW}${PREVIOUS_NOTICE_ROW}`;
+  const numberOffset = hasPreviousNotice ? 1 : 2;
 
   let foundTableBody = false;
   const updated = contentHtml.replace(
@@ -19,10 +29,10 @@ export function addRecruitmentNotice(contentHtml) {
         row.replace(
           /(<td\b[^>]*>)(\s*)(\d+)(\s*)(<\/td>)/i,
           (_cell, start, before, number, after, end) =>
-            `${start}${before}${Number(number) + 1}${after}${end}`,
+            `${start}${before}${Number(number) + numberOffset}${after}${end}`,
         ),
       );
-      return `${open}${NOTICE_ROW}${renumberedRows}${close}`;
+      return `${open}${rowsToAdd}${renumberedRows}${close}`;
     },
   );
 
