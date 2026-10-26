@@ -47,6 +47,7 @@ const nextConfig: NextConfig = {
         "/wp-content/uploads/:path*",
         "/sdc-downloads/:path*",
         "/risk-reports/:path*",
+        "/recruitment-documents/:path*",
       ].map((source) => ({
         source,
         headers: [

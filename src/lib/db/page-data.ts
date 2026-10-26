@@ -43,6 +43,7 @@ import {
   railStrategyPublicationGroups,
 } from "@/lib/wp/rail-strategy-publication";
 import { getMoralityReportPage } from "@/lib/wp/morality-report-documents";
+import { getStandalonePdfPage } from "@/lib/wp/standalone-pdf-pages";
 import { CERTIFICATION_LABEL, certificationPages } from "@/lib/wp/certification";
 import { applyProcurementPlanOverride } from "@/lib/wp/procurement-plan";
 import { applyProcurementTableOverrides } from "@/lib/wp/procurement-table-overrides";
@@ -360,6 +361,7 @@ export const getPageData = cache(async (path: string): Promise<PageData | null> 
     const supplementalPage = getSupplementalKnowledgePage(path);
     const landingGuidePage = getLandingGuidePage(path);
     const moralityReportPage = getMoralityReportPage(path);
+    const standalonePdfPage = getStandalonePdfPage(path);
     const certificationPage = certificationPages.find(
       (page) =>
         normalizeRoutePath(path).normalize("NFC") ===
@@ -369,6 +371,7 @@ export const getPageData = cache(async (path: string): Promise<PageData | null> 
       !supplementalPage &&
       !landingGuidePage &&
       !moralityReportPage &&
+      !standalonePdfPage &&
       !certificationPage
     ) {
       return null;
@@ -411,23 +414,35 @@ export const getPageData = cache(async (path: string): Promise<PageData | null> 
               parentPath: "/" + CERTIFICATION_LABEL,
               idPrefix: "certification",
             }
-          : {
-              slug: moralityReportPage!.slug,
-              path: moralityReportPage!.path,
-              title: moralityReportPage!.title,
-              groups: moralityReportPage!.groups,
-              contentHtml: moralityReportPage!.contentHtml ?? "",
-              parentTitle: "เอกสารเผยแพร่",
-              parentPath: "/เอกสารเผยแพร่",
-              idPrefix: "morality-report",
-            };
+          : standalonePdfPage
+            ? {
+                slug: standalonePdfPage.slug,
+                path: standalonePdfPage.path,
+                title: standalonePdfPage.title,
+                groups: null,
+                contentHtml: standalonePdfPage.contentHtml,
+                parentTitle: "สมัครงาน",
+                parentPath: "/ข่าวสาร-กิจกรรม/ร่วมงานกับ-สทร/สมัครงาน",
+                idPrefix: "standalone-pdf",
+              }
+            : {
+                slug: moralityReportPage!.slug,
+                path: moralityReportPage!.path,
+                title: moralityReportPage!.title,
+                groups: moralityReportPage!.groups,
+                contentHtml: moralityReportPage!.contentHtml ?? "",
+                parentTitle: "เอกสารเผยแพร่",
+                parentPath: "/เอกสารเผยแพร่",
+                idPrefix: "morality-report",
+              };
 
-    const syntheticPdfReaderTargets = moralityReportPage
-      ? await buildPdfReaderTargets(syntheticPage.contentHtml, {
-          resolveDownload: async () => null,
-          resolveFlipbookPdf: async () => null,
-        })
-      : [];
+    const syntheticPdfReaderTargets =
+      moralityReportPage || standalonePdfPage
+        ? await buildPdfReaderTargets(syntheticPage.contentHtml, {
+            resolveDownload: async () => null,
+            resolveFlipbookPdf: async () => null,
+          })
+        : [];
 
     const shell = await buildShellData(path);
     const now = new Date().toISOString();
