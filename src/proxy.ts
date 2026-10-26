@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { SAME_ORIGIN_FRAME_HEADERS } from "@/lib/security/headers";
 import { INTRO_RETURN_COOKIE, introHomepageUrl } from "@/lib/intro-flow";
 import { middleware } from "@/lib/request-policy";
 import { checkSurveyAccess, surveyPrivateHeaders } from "@/lib/survey/survey-private";
@@ -51,6 +52,8 @@ export async function proxy(request: NextRequest) {
       destination.search = "";
       const download = NextResponse.rewrite(destination);
       download.headers.set("cache-control", "private, no-store");
+      for (const { key, value } of SAME_ORIGIN_FRAME_HEADERS)
+        download.headers.set(key, value);
       return download;
     }
     if (normalized && isPageRequest(normalized, request.headers)) {
