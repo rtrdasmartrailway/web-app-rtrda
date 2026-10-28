@@ -57,9 +57,12 @@ export function publicActivityPath(path: string): boolean {
 export function isPublicDocumentPath(path: string): boolean {
   if (!DOCUMENT_EXTENSION.test(path)) return false;
   return (
-    ["/wp-content/uploads/", "/sdc-downloads/", "/risk-reports/"].some((base) =>
-      path.startsWith(base),
-    ) || path.slice(1).indexOf("/") === -1
+    [
+      "/wp-content/uploads/",
+      "/sdc-downloads/",
+      "/risk-reports/",
+      "/recruitment-documents/",
+    ].some((base) => path.startsWith(base)) || path.slice(1).indexOf("/") === -1
   );
 }
 

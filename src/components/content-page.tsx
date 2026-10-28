@@ -87,6 +87,18 @@ export function contentRouteClass(path: string): string {
   return "";
 }
 
+export function inlineMobilePdfTarget(
+  pagePath: string,
+  targets: import("@/lib/wp/pdf-reader").PdfReaderTarget[],
+) {
+  return targets.find(
+    (target) =>
+      target.sourceHref.startsWith("/risk-reports/") ||
+      (pagePath === "/Recruitment_Announcement_rtrda_1" &&
+        target.sourceHref.startsWith("/recruitment-documents/")),
+  );
+}
+
 export function ContentPage({ data }: { data: PageData }) {
   const {
     record,
@@ -99,8 +111,9 @@ export function ContentPage({ data }: { data: PageData }) {
   } = data;
   const isHome = record.path === "/" || record.path === "/en";
   const isCategory = record.kind === "category";
-  const inlineRiskReportTarget = data.pdfReaderTargets.find((target) =>
-    target.sourceHref.startsWith("/risk-reports/"),
+  const inlineRiskReportTarget = inlineMobilePdfTarget(
+    record.path,
+    data.pdfReaderTargets,
   );
   const dateText = formatDate(record.date, record.language);
   const routeClass = contentRouteClass(record.path);
