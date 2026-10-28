@@ -2,7 +2,9 @@ import { describe, expect, it } from "vitest";
 import { addRecruitmentNotice } from "./recruitment-notice-override.mjs";
 
 const FORM_URL = "https://forms.gle/z3abJcX9QRk8zGGA7";
-const PDF_URL = "/recruitment-documents/recruitment-staff-selection-2-2569.pdf";
+const PDF_URL =
+  "/recruitment-documents/recruitment-staff-selection-2-2569.pdf?v=20261028-65fb0227";
+const PDF_PATH = "/recruitment-documents/recruitment-staff-selection-2-2569.pdf";
 const PREVIOUS_PDF_URL =
   "/recruitment-documents/recruitment-policy-planning-support-2569.pdf";
 
@@ -37,6 +39,19 @@ describe("recruitment notice database override", () => {
     const once = addRecruitmentNotice(html);
 
     expect(addRecruitmentNotice(once)).toBe(once);
+  });
+
+  it("refreshes the existing announcement link without adding a duplicate row", () => {
+    const title =
+      "ประกาศสถาบันวิจัยและพัฒนาเทคโนโลยีระบบราง (องค์การมหาชน) เรื่อง รับสมัครบุคคลเพื่อคัดเลือกและบรรจุแต่งตั้งเป็นเจ้าหน้าที่ ครั้งที่ 2/2569";
+    const html = `<table><tbody><tr><td>1</td><td>${title}</td><td><a href="${PDF_PATH}">PDF</a></td></tr><tr><td>2</td><td>รายการเดิม</td></tr></tbody></table>`;
+
+    const result = addRecruitmentNotice(html);
+
+    expect(result).toContain(`href="${PDF_URL}"`);
+    expect(result.match(/ครั้งที่ 2\/2569/g)).toHaveLength(1);
+    expect(result).toContain(">2</td><td>รายการเดิม");
+    expect(addRecruitmentNotice(result)).toBe(result);
   });
 
   it("adds only the new notice when the previous override is already present", () => {
