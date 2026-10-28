@@ -209,9 +209,14 @@ export async function buildPdfReaderTargets(
     }
 
     if (link.kind === "upload") {
+      // Revision must apply to the embedded request, not only the download link.
+      const revision =
+        link.href === "/recruitment-documents/recruitment-staff-selection-2-2569.pdf"
+          ? "&v=65fb02272563f018"
+          : "";
       targets.push({
         sourceHref: link.href,
-        inlineHref: `${link.href}?inline=1`,
+        inlineHref: `${link.href}?inline=1${revision}`,
         downloadHref: link.href,
         title: link.text || fallbackPdfTitle(link.href, "PDF"),
         kind: "upload",
