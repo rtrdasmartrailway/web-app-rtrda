@@ -3,7 +3,7 @@ import { addRecruitmentNotice } from "./recruitment-notice-override.mjs";
 
 const FORM_URL = "https://forms.gle/z3abJcX9QRk8zGGA7";
 const PDF_URL =
-  "/recruitment-documents/recruitment-staff-selection-2-2569.pdf?v=20261028-65fb0227";
+  "/recruitment-documents/recruitment-staff-selection-2-2569.pdf?v=20261028-65fb0227-inline-v2";
 const PDF_PATH = "/recruitment-documents/recruitment-staff-selection-2-2569.pdf";
 const PREVIOUS_PDF_URL =
   "/recruitment-documents/recruitment-policy-planning-support-2569.pdf";

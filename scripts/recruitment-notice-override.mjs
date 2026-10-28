@@ -4,7 +4,7 @@ const FORM_URL = "https://forms.gle/z3abJcX9QRk8zGGA7";
 const PREVIOUS_PDF_URL =
   "/recruitment-documents/recruitment-policy-planning-support-2569.pdf";
 const PDF_PATH = "/recruitment-documents/recruitment-staff-selection-2-2569.pdf";
-const PDF_URL = `${PDF_PATH}?v=20261028-65fb0227`;
+const PDF_URL = `${PDF_PATH}?v=20261028-65fb0227-inline-v2`;
 const PREVIOUS_POSITION_TITLE =
   "ประกาศเปิดรับสมัครงาน ตำแหน่ง เจ้าหน้าที่สนับสนุนงานนโยบายและแผน (จ้างเหมาบริการ)";
 const POSITION_TITLE =

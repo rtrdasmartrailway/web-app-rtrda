@@ -17,10 +17,10 @@ describe("standalone PDF pages", () => {
     expect(page?.title).toBe(recruitmentAnnouncementTitle);
     expect(page?.contentHtml).toContain('<div class="standalone-pdf-page">');
     expect(page?.contentHtml).toContain(
-      'href="/recruitment-documents/recruitment-staff-selection-2-2569.pdf?v=20261028-65fb0227"',
+      'href="/recruitment-documents/recruitment-staff-selection-2-2569.pdf?v=20261028-65fb0227-inline-v2"',
     );
     expect(page?.contentHtml).toContain(
-      'src="/recruitment-documents/recruitment-staff-selection-2-2569.pdf?v=20261028-65fb0227#toolbar=1',
+      'src="/recruitment-documents/recruitment-staff-selection-2-2569.pdf?v=20261028-65fb0227-inline-v2#toolbar=1',
     );
   });
 
