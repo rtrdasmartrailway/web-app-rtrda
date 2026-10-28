@@ -134,7 +134,11 @@ export function InlineRiskReportPdf({
   }, [isMobile, allWidths, target.inlineHref]);
 
   return (
-    <section className="inline-risk-report" aria-label={title}>
+    <section
+      className="inline-risk-report"
+      aria-label={title}
+      style={allWidths ? { display: "grid" } : undefined}
+    >
       <div className="inline-risk-report-toolbar">
         <span>{title}</span>
         <a href={target.downloadHref} target="_blank" rel="noreferrer">

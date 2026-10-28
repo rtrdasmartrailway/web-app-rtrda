@@ -14,6 +14,7 @@ describe("standalone recruitment reader", () => {
       "utf8",
     );
     expect(source.replace(/\s+/g, " ")).toContain("allWidths = false");
+    expect(source).toContain('style={allWidths ? { display: "grid" } : undefined}');
     expect(source.replace(/\s+/g, " ")).toContain("(!isMobile && !allWidths)");
     expect(source.replace(/\s+/g, " ")).toContain(
       "[isMobile, allWidths, target.inlineHref]",
