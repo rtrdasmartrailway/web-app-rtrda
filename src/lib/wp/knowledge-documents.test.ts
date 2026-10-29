@@ -28,11 +28,12 @@ describe("knowledge document parser", () => {
     const updated = applyAnnualReportDocumentOverride(groups, "th");
 
     expect(updated[0]?.documents.map((document) => document.title)).toEqual([
-      "รายงานประจำปี 2568 [PDF 1]",
+      "รายงานประจำปี 2568",
       "รายงานประจำปี 2567",
       "รายงานประจำปี 2566",
     ]);
     expect(updated[0]?.documents[0]).toMatchObject({
+      coverImage: "/wp-content/uploads/2026/08/RTRDA-Annual-Report-2025-cover.png",
       previewHref: "/wp-content/uploads/2026/08/RTRDA-Annual-Report-2025.pdf",
       downloadHref: "/wp-content/uploads/2026/08/RTRDA-Annual-Report-2025.pdf",
       hasUsableTarget: true,

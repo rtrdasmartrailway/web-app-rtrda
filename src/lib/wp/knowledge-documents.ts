@@ -353,12 +353,10 @@ export function applyAnnualReportDocumentOverride(
   }
 
   const currentReport = {
-    title:
-      language === "th" ? "รายงานประจำปี 2568 [PDF 1]" : "Annual Report 2025 [PDF 1]",
+    title: language === "th" ? "รายงานประจำปี 2568" : "Annual Report 2025",
     description: "PDF",
-    coverImage: null,
-    coverAlt:
-      language === "th" ? "ไฟล์ PDF รายงานประจำปี 2568" : "Annual Report 2025 PDF",
+    coverImage: "/wp-content/uploads/2026/08/RTRDA-Annual-Report-2025-cover.png",
+    coverAlt: language === "th" ? "ปกรายงานประจำปี 2568" : "Cover of Annual Report 2025",
     previewHref: "/wp-content/uploads/2026/08/RTRDA-Annual-Report-2025.pdf",
     downloadHref: "/wp-content/uploads/2026/08/RTRDA-Annual-Report-2025.pdf",
     hasUsableTarget: true,
