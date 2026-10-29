@@ -339,3 +339,40 @@ export function buildKnowledgeDocumentGroups(
 
   return groups;
 }
+
+/** Add the current annual report and keep annual-report cards newest first. */
+export function applyAnnualReportDocumentOverride(
+  groups: KnowledgeDocumentGroup[],
+  language: "th" | "en",
+): KnowledgeDocumentGroup[] {
+  const annualReportGroup = groups.find((group) =>
+    /^(รายงานประจำปี|annual report)$/i.test(group.title.trim()),
+  );
+  if (!annualReportGroup) {
+    return groups;
+  }
+
+  const currentReport = {
+    title:
+      language === "th" ? "รายงานประจำปี 2568 [PDF 1]" : "Annual Report 2025 [PDF 1]",
+    description: "PDF",
+    coverImage: null,
+    coverAlt:
+      language === "th" ? "ไฟล์ PDF รายงานประจำปี 2568" : "Annual Report 2025 PDF",
+    previewHref: "/wp-content/uploads/2026/08/RTRDA-Annual-Report-2025.pdf",
+    downloadHref: "/wp-content/uploads/2026/08/RTRDA-Annual-Report-2025.pdf",
+    hasUsableTarget: true,
+  } satisfies KnowledgeDocument;
+
+  const historicalReports = annualReportGroup.documents
+    .filter((document) => !/^รายงาน…$/.test(document.title.trim()))
+    .sort((left, right) => {
+      const year = (title: string) => Number(title.match(/(?:25|20)\d{2}/)?.[0] ?? 0);
+      return year(right.title) - year(left.title);
+    });
+
+  const documents = [currentReport, ...historicalReports];
+  return groups.map((group) =>
+    group === annualReportGroup ? { ...group, documents } : group,
+  );
+}

@@ -22,6 +22,7 @@ import {
   isRailStandardsPath,
 } from "@/lib/wp/high-speed-rail-standards";
 import {
+  applyAnnualReportDocumentOverride,
   buildKnowledgeDocumentGroups,
   isKnowledgeDocumentPath,
   type KnowledgeDocumentGroup,
@@ -560,14 +561,17 @@ export const getPageData = cache(async (path: string): Promise<PageData | null> 
     knowledgeDocuments: railStrategyPublication
       ? railStrategyPublicationGroups
       : isKnowledgeDocuments
-        ? buildKnowledgeDocumentGroups(recordWithOverrides.contentHtml, {
-            validDownloadIds: new Set(downloadIds),
-            compact: isPublicHearingPath(recordWithOverrides.path),
-            excludedGroupTitles:
-              recordWithOverrides.path === "/คลังความรู้"
-                ? new Set(["มาตรฐานระบบราง สทร.", "ร่างมาตรฐานระบบราง สทร."])
-                : undefined,
-          })
+        ? applyAnnualReportDocumentOverride(
+            buildKnowledgeDocumentGroups(recordWithOverrides.contentHtml, {
+              validDownloadIds: new Set(downloadIds),
+              compact: isPublicHearingPath(recordWithOverrides.path),
+              excludedGroupTitles:
+                recordWithOverrides.path === "/คลังความรู้"
+                  ? new Set(["มาตรฐานระบบราง สทร.", "ร่างมาตรฐานระบบราง สทร."])
+                  : undefined,
+            }),
+            recordWithOverrides.language,
+          )
         : null,
     boardExecutivePresentation: buildBoardExecutivePresentation(
       recordWithOverrides.path,
