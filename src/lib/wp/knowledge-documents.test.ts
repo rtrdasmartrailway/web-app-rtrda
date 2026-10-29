@@ -33,6 +33,7 @@ describe("knowledge document parser", () => {
       "รายงานประจำปี 2566",
     ]);
     expect(updated[0]?.documents[0]).toMatchObject({
+      description: "",
       coverImage: "/wp-content/uploads/2026/08/RTRDA-Annual-Report-2025-cover.png",
       previewHref: "/wp-content/uploads/2026/08/RTRDA-Annual-Report-2025.pdf",
       downloadHref: "/wp-content/uploads/2026/08/RTRDA-Annual-Report-2025.pdf",
