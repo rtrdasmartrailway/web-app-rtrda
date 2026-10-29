@@ -1,11 +1,46 @@
 import { readFile } from "node:fs/promises";
 import { describe, expect, it } from "vitest";
 import type { WpImportManifest } from "./types";
-import { buildKnowledgeDocumentGroups } from "./knowledge-documents";
+import {
+  applyAnnualReportDocumentOverride,
+  buildKnowledgeDocumentGroups,
+} from "./knowledge-documents";
 
 const validDownloads = new Set(["5540", "5544", "5552"]);
 
 describe("knowledge document parser", () => {
+  it("adds the latest annual report PDF and sorts the annual reports newest first", () => {
+    const groups = buildKnowledgeDocumentGroups(`
+      <div class="lightweight-accordion">
+        <details>
+          <summary class="lightweight-accordion-title">รายงานประจำปี</summary>
+          <div class="lightweight-accordion-body">
+            <div class="wp-block-columns">
+              <div class="wp-block-column"><h6>รายงานประจำปี 2566</h6></div>
+              <div class="wp-block-column"><h6>รายงานประจำปี 2567</h6></div>
+              <div class="wp-block-column"><h6>รายงาน…</h6></div>
+            </div>
+          </div>
+        </details>
+      </div>
+    `);
+
+    const updated = applyAnnualReportDocumentOverride(groups, "th");
+
+    expect(updated[0]?.documents.map((document) => document.title)).toEqual([
+      "รายงานประจำปี 2568",
+      "รายงานประจำปี 2567",
+      "รายงานประจำปี 2566",
+    ]);
+    expect(updated[0]?.documents[0]).toMatchObject({
+      description: "",
+      coverImage: "/wp-content/uploads/2026/08/RTRDA-Annual-Report-2025-cover.png",
+      previewHref: "/wp-content/uploads/2026/08/RTRDA-Annual-Report-2025.pdf",
+      downloadHref: "/wp-content/uploads/2026/08/RTRDA-Annual-Report-2025.pdf",
+      hasUsableTarget: true,
+    });
+  });
+
   it("uses a valid download as preview fallback when the read-more href is empty", () => {
     const groups = buildKnowledgeDocumentGroups(
       `
