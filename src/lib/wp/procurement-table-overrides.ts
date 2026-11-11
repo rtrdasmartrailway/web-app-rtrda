@@ -8,6 +8,7 @@ interface TableRowSpec {
   matchText: string;
   cells: string[];
   href: string;
+  linkLabel?: string;
 }
 
 const YEAR_2569 = "ปี 2569";
@@ -136,7 +137,18 @@ const procurementDraftRows2570: TableRowSpec[] = [
 
 const procurementInvitationRows2570: TableRowSpec[] = [
   {
-    matchText: "รถตู้โดยสารขนาด 12 ที่นั่ง) จำนวน 1 คัน",
+    matchText: "สทร.02/2570",
+    cells: [
+      "10 พฤศจิกายน 2569",
+      "การเช่าเช่ายานพาหนะ (รถตู้โดยสารขนาด 12 ที่นั่ง) จำนวน 1 คัน ตามประกาศ สถาบันวิจัยและพัฒนาเทคโนโลยีระบบราง (องค์การมหาชน)",
+      "1,485,000.00",
+      "สทร.02/2570",
+    ],
+    href: "/procurement-invitation-van-rental-2570-25691110.pdf",
+    linkLabel: "PDF 1",
+  },
+  {
+    matchText: "ประกวดราคาเช่ายานพาหนะ (รถตู้โดยสารขนาด 12 ที่นั่ง) จำนวน 1 คัน",
     cells: [
       "1 ตุลาคม 2569",
       "ประกวดราคาเช่ายานพาหนะ (รถตู้โดยสารขนาด 12 ที่นั่ง) จำนวน 1 คัน ด้วยวิธีประกวดราคาอิเล็กทรอนิกส์ (e-bidding)",
@@ -477,7 +489,7 @@ function buildRow($: cheerio.CheerioAPI, row: TableRowSpec): Cheerio<AnyNode> {
       .attr("href", row.href)
       .attr("target", "_blank")
       .attr("rel", "noreferrer noopener")
-      .text("PDF"),
+      .text(row.linkLabel ?? "PDF"),
   );
   tr.append(linkCell);
   return tr;
@@ -558,6 +570,10 @@ function upsertRows(
         }
       });
       const link = existing.find("td").last().find("a").first();
+      if (spec.linkLabel && link.text() !== spec.linkLabel) {
+        link.text(spec.linkLabel);
+        changed = true;
+      }
       if (link.attr("href") !== spec.href) {
         link
           .attr("href", spec.href)

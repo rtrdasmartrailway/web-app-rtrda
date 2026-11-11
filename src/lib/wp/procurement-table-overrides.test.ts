@@ -168,6 +168,14 @@ describe("applyProcurementTableOverrides", () => {
     expect(rowsForYear(updated.contentHtml, "ปี 2570")).toEqual([
       [
         "1",
+        "10 พฤศจิกายน 2569",
+        "การเช่าเช่ายานพาหนะ (รถตู้โดยสารขนาด 12 ที่นั่ง) จำนวน 1 คัน ตามประกาศ สถาบันวิจัยและพัฒนาเทคโนโลยีระบบราง (องค์การมหาชน)",
+        "1,485,000.00",
+        "สทร.02/2570",
+        "PDF 1",
+      ],
+      [
+        "2",
         "1 ตุลาคม 2569",
         "ประกวดราคาเช่ายานพาหนะ (รถตู้โดยสารขนาด 12 ที่นั่ง) จำนวน 1 คัน ด้วยวิธีประกวดราคาอิเล็กทรอนิกส์ (e-bidding)",
         "1,485,000.00",
@@ -177,6 +185,9 @@ describe("applyProcurementTableOverrides", () => {
     ]);
     expect(updated.contentHtml).toContain(
       'href="/procurement-invitation-van-rental-12-seat-2570-25691001.pdf"',
+    );
+    expect(updated.contentHtml).toContain(
+      'href="/procurement-invitation-van-rental-2570-25691110.pdf"',
     );
     expect(rowsForYear(updated.contentHtml, "ปี 2569")).toEqual([
       ["1", "4 มิถุนายน 2569", "ประกาศเดิม", "2,000,000.00", "–", "PDF"],
