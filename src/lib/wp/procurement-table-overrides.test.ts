@@ -343,7 +343,7 @@ describe("applyProcurementTableOverrides", () => {
     expect(applyProcurementTableOverrides(updated).contentHtml).toBe(updated.contentHtml);
   });
 
-  it("adds the September, August, July, and June monthly procurement summary rows in reverse chronological order", () => {
+  it("adds the October through June monthly procurement summary rows in reverse chronological order", () => {
     const source = record(
       "/จัดซื้อจัดจ้าง/ประกาศจดซอจดจางตามแบบส",
       yearTableHtml(
@@ -352,22 +352,30 @@ describe("applyProcurementTableOverrides", () => {
     );
     const updatedRows = rows(applyProcurementTableOverrides(source).contentHtml);
 
-    expect(updatedRows.map((row) => row[0])).toEqual(["1", "2", "3", "4", "5", "6"]);
-    expect(updatedRows[0]?.[1]).toBe("9 ตุลาคม 2569");
-    expect(updatedRows[0]?.[2]).toBe(
+    expect(updatedRows.map((row) => row[0])).toEqual(["1", "2", "3", "4", "5", "6", "7"]);
+    expect(updatedRows[0]?.slice(1, 4)).toEqual([
+      "9 พฤศจิกายน 2569",
+      "สรุปผลการดำเนินการจัดซื้อจัดจ้างในรอบเดือน ตุลาคม 2569",
+      "เผยแพร่ขึ้นเว็บ",
+    ]);
+    expect(updatedRows[1]?.[1]).toBe("9 ตุลาคม 2569");
+    expect(updatedRows[1]?.[2]).toBe(
       "สรุปผลการดำเนินการจัดซื้อจัดจ้างในรอบเดือน กันยายน 2569",
     );
-    expect(updatedRows[1]?.[1]).toBe("2 กันยายน 2569");
-    expect(updatedRows[1]?.[2]).toBe(
+    expect(updatedRows[2]?.[1]).toBe("2 กันยายน 2569");
+    expect(updatedRows[2]?.[2]).toBe(
       "สรุปผลการดำเนินการจัดซื้อจัดจ้างในรอบเดือน สิงหาคม 2569",
     );
-    expect(updatedRows[2]?.[1]).toBe("5 สิงหาคม 2569");
-    expect(updatedRows[2]?.[2]).toBe(
+    expect(updatedRows[3]?.[1]).toBe("5 สิงหาคม 2569");
+    expect(updatedRows[3]?.[2]).toBe(
       "สรุปผลการดำเนินการจัดซื้อจัดจ้างในรอบเดือน กรกฎาคม 2569",
     );
-    expect(updatedRows[3]?.[1]).toBe("3 กรกฎาคม 2569");
-    expect(updatedRows[4]?.[1]).toBe("11 มิถุนายน 2569");
-    expect(updatedRows[5]?.[1]).toBe("14 พฤษภาคม 2569");
+    expect(updatedRows[4]?.[1]).toBe("3 กรกฎาคม 2569");
+    expect(updatedRows[5]?.[1]).toBe("11 มิถุนายน 2569");
+    expect(updatedRows[6]?.[1]).toBe("14 พฤษภาคม 2569");
+    expect(applyProcurementTableOverrides(source).contentHtml).toContain(
+      "/procurement-documents/procurement-summary-october-2569-20261109.pdf",
+    );
     expect(applyProcurementTableOverrides(source).contentHtml).toContain(
       "/procurement-documents/procurement-summary-september-2569-20261009.pdf",
     );
