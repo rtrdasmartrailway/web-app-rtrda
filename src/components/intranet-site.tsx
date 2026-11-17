@@ -58,7 +58,7 @@ function IconGrid({ items, eager }: { items: IconItem[]; eager?: boolean }) {
           <figure className="intranet-icon-figure">
             <Image
               src={item.img}
-              alt={item.caption || ""}
+              alt={item.alt || item.caption || ""}
               width={150}
               height={150}
               className="intranet-icon-img"
@@ -106,9 +106,14 @@ export function IntranetShell({ children }: { children: React.ReactNode }) {
 }
 
 export function IntranetHome() {
+  const items = ICON_ROWS.flat();
+  const rows = Array.from({ length: Math.ceil(items.length / 3) }, (_, index) =>
+    items.slice(index * 3, index * 3 + 3),
+  );
+
   return (
     <div className="intranet-content">
-      {ICON_ROWS.map((row, i) => (
+      {rows.map((row, i) => (
         <section key={i} className="intranet-section">
           <IconGrid items={row} eager={i === 0} />
         </section>
