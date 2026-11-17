@@ -1,6 +1,6 @@
 export type NavItem = { label: string; href: string };
 export type NavGroup = { label: string; href: string; children: NavItem[] };
-export type IconItem = { img: string; href: string; caption: string };
+export type IconItem = { img: string; href: string; caption: string; alt?: string };
 
 export const NAV: NavGroup[] = [
   {
@@ -94,6 +94,12 @@ export const NAV: NavGroup[] = [
 export const ICON_ROWS: IconItem[][] = [
   // Section 1 — quick-access (no captions)
   [
+    {
+      img: "/intranet/icons/rtrda-digital-help.webp",
+      href: "https://forms.cloud.microsoft/r/v57wEzjWsK?origin=lprLink",
+      caption: "",
+      alt: "ศูนย์ช่วยเหลือดิจิทัล สทร. (RTRDA Digital Help)",
+    },
     {
       img: "/intranet/icons/Icon-Intranet-04.png",
       href: "https://calendar.google.com/calendar/u/0/embed?src=e4ad80ff82a957047892b2298c2e8af11074d7cbc908b4424d40c204543a958e@group.calendar.google.com&ctz=Asia/Bangkok",
