@@ -84,10 +84,6 @@ export const NAV: NavGroup[] = [
         href: "https://forms.cloud.microsoft/r/v57wEzjWsK?origin=lprLink",
       },
       { label: "ภาพรวมผลสำรวจ", href: "/rtrdaintranet/survey-dashboard" },
-      {
-        label: "Report Helpdesk",
-        href: "https://docs.google.com/forms/d/e/1FAIpQLSeeAC917cMzuJ6u8cdCMoy1hYe0a8rn5OUrAYPL2oEc2jTqEQ/viewform?usp=dialog",
-      },
     ],
   },
 ];
