@@ -46,7 +46,7 @@ describe("applyJobApplicationNoticeOverride", () => {
     expect($(rows[0]).find("td").eq(5).find("a").attr("href")).toBe(
       "/recruitment-documents/eligible-candidates-engineer-25691118.pdf",
     );
-    expect($(rows[0]).find("td").eq(5).find("a").text()).toBe("PDF 1");
+    expect($(rows[0]).find("td").eq(5).find("a").text()).toBe("PDF");
     expect(notice.find("td").eq(1).text()).toBe("1 ตุลาคม 2569");
     expect(notice.find("td").eq(2).text()).toBe(
       "ประกาศเปิดรับสมัครงาน ตำแหน่ง เจ้าหน้าที่สนับสนุนงานนโยบายและแผน (จ้างเหมาบริการ)",

@@ -122,7 +122,7 @@ export function applyJobApplicationNoticeOverride(
           )
           .attr("target", "_blank")
           .attr("rel", "noreferrer noopener")
-          .text("PDF 1"),
+          .text("PDF"),
       ),
   );
   tbody.prepend(row);
