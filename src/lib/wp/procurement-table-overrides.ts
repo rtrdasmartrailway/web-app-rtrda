@@ -503,7 +503,11 @@ function buildRow($: cheerio.CheerioAPI, row: TableRowSpec): Cheerio<AnyNode> {
 }
 
 function rowText($: cheerio.CheerioAPI, row: AnyNode): string {
-  return $(row).text().replace(/\s+/g, " ").trim();
+  return $(row)
+    .find("td")
+    .toArray()
+    .map((cell) => $(cell).text().replace(/\s+/g, " ").trim())
+    .join(" ");
 }
 
 function renumberRows(
@@ -640,19 +644,6 @@ function sortRowsByThaiDateDescending(
   return changed;
 }
 
-function applyYearTableRows(
-  record: WpContentRecord,
-  rows: TableRowSpec[],
-  options: { createYear?: boolean; numberBottomUp?: boolean } = {},
-): WpContentRecord {
-  const $ = cheerio.load(record.contentHtml, null, false);
-  const tbody = options.createYear
-    ? ensureYearTable($, YEAR_2569)
-    : findYearTable($, YEAR_2569);
-  const changed = upsertRows($, tbody, rows, options);
-  return changed ? { ...record, contentHtml: $.html() } : record;
-}
-
 function applyProcurementPriceRows(record: WpContentRecord): WpContentRecord {
   const $ = cheerio.load(record.contentHtml, null, false);
   const sourceTbody = findYearTable($, YEAR_2569);
@@ -683,6 +674,46 @@ function applyProcurementPriceRows(record: WpContentRecord): WpContentRecord {
   }
 
   changed = renumberRows($, sourceTbody) || changed;
+  return changed ? { ...record, contentHtml: $.html() } : record;
+}
+
+function applyProcurementSummaryRows(record: WpContentRecord): WpContentRecord {
+  const $ = cheerio.load(record.contentHtml, null, false);
+  const previousYear = findYearTable($, YEAR_2569);
+  if (previousYear.length === 0) return record;
+
+  const hasYear2570 = findYearTable($, YEAR_2570).length > 0;
+  const currentYear = ensureYearTable($, YEAR_2570);
+  const [latest, ...previousRows] = summaryRows;
+  let changed = !hasYear2570;
+  const misplaced = previousYear
+    .find("tr")
+    .filter(
+      (_, row) =>
+        $(row).find("td").eq(1).text().trim() === latest.cells[0] &&
+        $(row).find("td").eq(2).text().trim() === latest.cells[1],
+    );
+  if (misplaced.length) {
+    misplaced.remove();
+    changed = true;
+  }
+  changed = upsertRows($, previousYear, previousRows) || changed;
+  const current = currentYear
+    .find("tr")
+    .filter(
+      (_, row) =>
+        $(row).find("td").eq(1).text().trim() === latest.cells[0] &&
+        $(row).find("td").eq(2).text().trim() === latest.cells[1],
+    );
+  if (current.length) {
+    if (current.find("td").last().find("a").attr("href") !== latest.href) {
+      current.find("td").last().find("a").attr("href", latest.href);
+      changed = true;
+    }
+    changed = renumberRows($, currentYear) || changed;
+  } else {
+    changed = upsertRows($, currentYear, [latest]) || changed;
+  }
   return changed ? { ...record, contentHtml: $.html() } : record;
 }
 
@@ -1144,7 +1175,7 @@ export function applyProcurementTableOverrides(record: WpContentRecord): WpConte
     return applyProcurementInvitationYearTable(record);
   }
   if (path === PROCUREMENT_SUMMARY_PATH || path === `/en${PROCUREMENT_SUMMARY_PATH}`) {
-    return applyYearTableRows(record, summaryRows);
+    return applyProcurementSummaryRows(record);
   }
   if (path === PROCUREMENT_WINNER_PATH || path === `/en${PROCUREMENT_WINNER_PATH}`) {
     return applyWinnerRows(record);
