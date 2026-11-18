@@ -127,7 +127,10 @@ export function applyJobApplicationNoticeOverride(
   );
   tbody.prepend(row);
   tbody.find("tr").each((index, element) => {
-    $(element).find("td").first().text(String(index + 1));
+    $(element)
+      .find("td")
+      .first()
+      .text(String(index + 1));
   });
   return { ...previous, contentHtml: $.html() };
 }
