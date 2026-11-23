@@ -6,10 +6,6 @@ const PROCUREMENT_PLAN_PATH = "/จัดซื้อจัดจ้าง/แ�
 const PROCUREMENT_PLAN_YEAR = "ปี 2569";
 const PROCUREMENT_PLAN_ROWS_2570 = [
   {
-    date: "20 พฤศจิกายน พ.ศ. 2569",
-    href: "/procurement-documents/procurement-plan-2570-25691120.pdf",
-  },
-  {
     date: "30 ตุลาคม 2569",
     href: "/procurement-documents/procurement-plan-2570-25691030.pdf",
   },
