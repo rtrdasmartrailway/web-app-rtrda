@@ -8,6 +8,11 @@ const JOB_APPLICATION_PATH = "/ข่าวสาร-กิจกรรม/ร�
 const PREVIOUS_NOTICE_DATE = "28 กันยายน 2569";
 const TARGET_POSITION = "เจ้าหน้าที่สนับสนุนงานนโยบายและแผน";
 const NOTICE_DOCUMENT_URL = "/job-application-policy-planning-support-25691001.pdf";
+const ELIGIBLE_CANDIDATES_DATE = "23 พฤศจิกายน 2569";
+const ELIGIBLE_CANDIDATES_TITLE =
+  "ประกาศรายชื่อผู้มีสิทธิ์เข้ารับการสอบคัดเลือกเป็นเจ้าหน้าที่ของสถาบันฯ ครั้งที่ 2/2569";
+const ELIGIBLE_CANDIDATES_DOCUMENT_URL =
+  "/recruitment-documents/eligible-candidates-staff-selection-2-25691123.pdf";
 
 function isJobApplicationPath(path: string): boolean {
   return normalizeRoutePath(path).replace(/^\/en(?=\/)/, "") === JOB_APPLICATION_PATH;
@@ -79,7 +84,7 @@ function applyPreviousJobApplicationNoticeOverride(
   return changed ? { ...record, contentHtml: $.html() } : record;
 }
 
-export function applyJobApplicationNoticeOverride(
+function applyExistingJobApplicationNoticesOverride(
   record: WpContentRecord,
 ): WpContentRecord {
   const previous = applyPreviousJobApplicationNoticeOverride(record);
@@ -133,4 +138,105 @@ export function applyJobApplicationNoticeOverride(
       .text(String(index + 1));
   });
   return { ...previous, contentHtml: $.html() };
+}
+
+export function applyJobApplicationNoticeOverride(
+  record: WpContentRecord,
+): WpContentRecord {
+  const previous = applyExistingJobApplicationNoticesOverride(record);
+  if (!isJobApplicationPath(previous.path)) return previous;
+
+  const $ = cheerio.load(previous.contentHtml, null, false);
+  const tbody = $("tbody")
+    .filter((_, element) => $(element).find("tr td").length >= 6)
+    .first();
+  if (!tbody.length) return previous;
+
+  let changed = previous !== record;
+  let row: Cheerio<AnyNode> = tbody
+    .find("tr")
+    .filter(
+      (_, element) =>
+        $(element).find("td").eq(2).text().replace(/\s+/g, " ").trim() ===
+        ELIGIBLE_CANDIDATES_TITLE,
+    )
+    .first();
+
+  if (row.length && row.find("td").length < 6) {
+    row.remove();
+    row = $("<tr></tr>");
+    changed = true;
+  }
+  if (!row.length || !row.find("td").length) {
+    row = $("<tr></tr>");
+    ["", ELIGIBLE_CANDIDATES_DATE, ELIGIBLE_CANDIDATES_TITLE, "–", "–"].forEach(
+      (text) => {
+        row.append(
+          $("<td></td>")
+            .addClass("has-text-align-center")
+            .attr("data-align", "center")
+            .text(text),
+        );
+      },
+    );
+    row.append(
+      $("<td></td>").addClass("has-text-align-center").attr("data-align", "center"),
+    );
+    tbody.prepend(row);
+    changed = true;
+  }
+
+  if (row.get(0) !== tbody.find("tr").first().get(0)) {
+    tbody.prepend(row);
+    changed = true;
+  }
+
+  const cells = row.find("td");
+  const setCellText = (index: number, text: string) => {
+    const cell = cells.eq(index);
+    if (cell.text().replace(/\s+/g, " ").trim() !== text) {
+      cell.text(text);
+      changed = true;
+    }
+  };
+  setCellText(1, ELIGIBLE_CANDIDATES_DATE);
+  setCellText(2, ELIGIBLE_CANDIDATES_TITLE);
+  setCellText(3, "–");
+  setCellText(4, "–");
+
+  const documentCell = cells.eq(5);
+  let documentLink: Cheerio<AnyNode> = documentCell.find("a").first();
+  if (!documentLink.length) {
+    documentCell.empty();
+    documentLink = $("<a></a>").text("PDF");
+    documentCell.append(documentLink);
+    changed = true;
+  }
+  if (documentLink.attr("href") !== ELIGIBLE_CANDIDATES_DOCUMENT_URL) {
+    documentLink.attr("href", ELIGIBLE_CANDIDATES_DOCUMENT_URL);
+    changed = true;
+  }
+  if (documentLink.text().trim() !== "PDF") {
+    documentLink.text("PDF");
+    changed = true;
+  }
+  if (documentLink.attr("target") !== "_blank") {
+    documentLink.attr("target", "_blank");
+    changed = true;
+  }
+  if (documentLink.attr("rel") !== "noreferrer noopener") {
+    documentLink.attr("rel", "noreferrer noopener");
+    changed = true;
+  }
+
+  tbody.find("tr").each((index, element) => {
+    const numberCell = $(element).find("td").first();
+    const number = String(index + 1);
+    if (numberCell.text().trim() !== number) {
+      numberCell.text(number);
+      changed = true;
+    }
+  });
+
+  return changed ? { ...previous, contentHtml: $.html() } : previous;
 }

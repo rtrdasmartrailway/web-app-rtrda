@@ -36,17 +36,40 @@ describe("applyJobApplicationNoticeOverride", () => {
     const updated = applyJobApplicationNoticeOverride(source);
     const $ = cheerio.load(updated.contentHtml, null, false);
     const rows = $("tbody tr").toArray();
-    const notice = $(rows[1]);
+    const eligibleCandidatesNotice = $(rows[0]);
+    const notice = $(rows[2]);
 
-    expect($("tbody tr")).toHaveLength(3);
-    expect($(rows[0]).find("td").eq(1).text()).toBe("18 พฤศจิกายน 2569");
-    expect($(rows[0]).find("td").eq(2).text()).toContain(
+    expect($("tbody tr")).toHaveLength(4);
+    expect(rows.map((row) => $(row).find("td").first().text())).toEqual([
+      "1",
+      "2",
+      "3",
+      "4",
+    ]);
+    expect(eligibleCandidatesNotice.find("td").eq(1).text()).toBe("23 พฤศจิกายน 2569");
+    expect(eligibleCandidatesNotice.find("td").eq(2).text()).toBe(
+      "ประกาศรายชื่อผู้มีสิทธิ์เข้ารับการสอบคัดเลือกเป็นเจ้าหน้าที่ของสถาบันฯ ครั้งที่ 2/2569",
+    );
+    expect(eligibleCandidatesNotice.find("td").eq(3).text()).toBe("–");
+    expect(eligibleCandidatesNotice.find("td").eq(4).text()).toBe("–");
+    expect(eligibleCandidatesNotice.find("td").eq(5).find("a").attr("href")).toBe(
+      "/recruitment-documents/eligible-candidates-staff-selection-2-25691123.pdf",
+    );
+    expect(eligibleCandidatesNotice.find("td").eq(5).find("a").attr("target")).toBe(
+      "_blank",
+    );
+    expect(eligibleCandidatesNotice.find("td").eq(5).find("a").attr("rel")).toBe(
+      "noreferrer noopener",
+    );
+    expect(eligibleCandidatesNotice.find("td").eq(5).find("a").text()).toBe("PDF");
+
+    expect($(rows[1]).find("td").eq(1).text()).toBe("18 พฤศจิกายน 2569");
+    expect($(rows[1]).find("td").eq(2).text()).toContain(
       "นักวิเคราะห์วิชาการ / อาวุโส (วิศวกร)",
     );
-    expect($(rows[0]).find("td").eq(5).find("a").attr("href")).toBe(
+    expect($(rows[1]).find("td").eq(5).find("a").attr("href")).toBe(
       "/recruitment-documents/eligible-candidates-engineer-25691118.pdf",
     );
-    expect($(rows[0]).find("td").eq(5).find("a").text()).toBe("PDF");
     expect(notice.find("td").eq(1).text()).toBe("1 ตุลาคม 2569");
     expect(notice.find("td").eq(2).text()).toBe(
       "ประกาศเปิดรับสมัครงาน ตำแหน่ง เจ้าหน้าที่สนับสนุนงานนโยบายและแผน (จ้างเหมาบริการ)",
@@ -58,8 +81,8 @@ describe("applyJobApplicationNoticeOverride", () => {
       "/job-application-policy-planning-support-25691001.pdf",
     );
     expect(notice.find("td").eq(5).find("a").text()).toBe("PDF");
-    expect($(rows[2]).find("td").eq(1).text()).toBe("23 เมษายน 2569");
-    expect($(rows[2]).find("td").eq(4).find("a").attr("href")).toBe("/older-form");
+    expect($(rows[3]).find("td").eq(1).text()).toBe("23 เมษายน 2569");
+    expect($(rows[3]).find("td").eq(4).find("a").attr("href")).toBe("/older-form");
     expect(applyJobApplicationNoticeOverride(updated)).toBe(updated);
   });
 
