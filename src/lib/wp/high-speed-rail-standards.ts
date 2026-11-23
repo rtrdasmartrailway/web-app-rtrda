@@ -172,6 +172,7 @@ export function extractRailStandardsCards(html: string): {
   const $ = load(html, null, false);
   const cardAccordions = $(".rtrda-rail-standards-files")
     .closest(".lightweight-accordion")
+    .not(".rtrda-rail-safety-standards")
     .toArray();
   const cardsHtml = cardAccordions.map((accordion) => $.html(accordion)).join("");
   cardAccordions.forEach((accordion) => $(accordion).remove());
