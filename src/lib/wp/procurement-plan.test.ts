@@ -55,24 +55,32 @@ function firstColumnValues(html: string, accordionIndex: number): string[] {
 }
 
 describe("applyProcurementPlanOverride", () => {
-  it("adds the 2570 table with the 30 October announcement and its PDF", () => {
+  it("adds the 2570 announcements newest first with their respective PDFs", () => {
     const updated = applyProcurementPlanOverride(record({}));
     const $ = cheerio.load(updated.contentHtml, null, false);
     const accordion = $(".lightweight-accordion").first();
     expect(accordion.find("summary").text()).toContain("ปี 2570");
+    const rows = accordion.find("tbody tr");
+    expect(rows).toHaveLength(2);
     expect(
-      accordion
-        .find("tbody tr td")
+      rows
+        .first()
+        .find("td")
         .map((_, cell) => $(cell).text().trim())
         .get(),
     ).toEqual([
       "1",
-      "30 ตุลาคม 2569",
+      "20 พฤศจิกายน พ.ศ. 2569",
       "เผยแพร่แผนการจัดซื้อจัดจ้าง ประจำปีงบประมาณ พ.ศ. 2570",
       "เผยแพร่ขึ้นเว็บ",
       "PDF",
     ]);
-    expect(accordion.find("tbody a").attr("href")).toBe(
+    expect(rows.first().find("a").attr("href")).toBe(
+      "/procurement-documents/procurement-plan-2570-25691120.pdf",
+    );
+    expect(rows.last().find("td").first().text()).toBe("2");
+    expect(rows.last().find("td").eq(1).text()).toBe("30 ตุลาคม 2569");
+    expect(rows.last().find("a").attr("href")).toBe(
       "/procurement-documents/procurement-plan-2570-25691030.pdf",
     );
   });
