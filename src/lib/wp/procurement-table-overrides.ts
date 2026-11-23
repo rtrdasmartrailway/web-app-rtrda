@@ -1076,7 +1076,7 @@ function buildRailStandardsCard(
       $("<a></a>")
         .addClass("simple-download-counter-link")
         .attr("data-pdf-reader-ignore", "true")
-        .attr("download", "")
+        .attr("download", document.href.split("/").pop() ?? "")
         .attr("href", document.href)
         .text("ดาวน์โหลดไฟล์"),
     );
