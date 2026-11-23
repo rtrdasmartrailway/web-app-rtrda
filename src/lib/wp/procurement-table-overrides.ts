@@ -1178,7 +1178,11 @@ function applyRailSafetyStandards(record: WpContentRecord): WpContentRecord {
 
   const welding = byTitle("มาตรฐานงานเชื่อม").first();
   if (welding.length === 0) return record;
-  welding.before(buildRailStandardsAccordion($, railSafetyTitle, railSafetyDocuments));
+  welding.before(
+    buildRailStandardsAccordion($, railSafetyTitle, railSafetyDocuments).addClass(
+      "rtrda-rail-safety-standards",
+    ),
+  );
   return { ...record, contentHtml: $.html() };
 }
 
