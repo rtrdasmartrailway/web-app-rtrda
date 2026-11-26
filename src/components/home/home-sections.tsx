@@ -100,60 +100,6 @@ function SectionHeading({ id, children }: { id: string; children: React.ReactNod
   );
 }
 
-function HomeSatisfactionSurveyQr({ language }: { language: WpLanguage }) {
-  const title =
-    language === "th"
-      ? "แบบสำรวจความพึงพอใจของหน่วยงานในสังกัดกระทรวงคมนาคม ประจำปีงบประมาณ พ.ศ. 2569"
-      : "Satisfaction Survey Fiscal Year 2026";
-  const description =
-    language === "th"
-      ? "ขอเชิญผู้รับบริการและผู้มีส่วนได้ส่วนเสีย ร่วมตอบแบบสำรวจความพึงพอใจต่อคุณภาพการให้บริการของหน่วยงานในสังกัดกระทรวงคมนาคม เพื่อนำข้อมูลไปปรับปรุงและพัฒนาการดำเนินงานให้มีประสิทธิภาพยิ่งขึ้น"
-      : "Service users and stakeholders are invited to complete the Ministry of Transport satisfaction survey to support service improvement.";
-
-  return (
-    <section
-      className="home-section home-survey-qr"
-      aria-labelledby="home-survey-qr-title"
-    >
-      <div className="home-survey-qr-copy">
-        <p className="home-survey-qr-eyebrow">
-          {language === "th" ? "ประชาสัมพันธ์แบบสำรวจ" : "Survey announcement"}
-        </p>
-        <h2 id="home-survey-qr-title">{title}</h2>
-        <p>{description}</p>
-        <dl className="home-survey-qr-meta">
-          <div>
-            <dt>{language === "th" ? "ตอบแบบสำรวจภายใน" : "Open until"}</dt>
-            <dd>24 ก.ค. 2569</dd>
-          </div>
-        </dl>
-        <Link className="home-survey-qr-button" href="/r/mot-5440?src=landing_page">
-          {language === "th" ? "ตอบแบบสำรวจ" : "Open survey"}
-          <span aria-hidden="true" className="section-all-arrow" />
-        </Link>
-      </div>
-      <Link
-        className="home-survey-qr-image-card"
-        href="/r/mot-5440?src=landing_qr"
-        aria-label={language === "th" ? "เปิดแบบสำรวจจาก QR Code" : "Open survey QR code"}
-      >
-        <Image
-          src="/qr/mot-5440.png"
-          alt={
-            language === "th"
-              ? "QR Code แบบสำรวจความพึงพอใจของหน่วยงานในสังกัดกระทรวงคมนาคม ประจำปีงบประมาณ พ.ศ. 2569"
-              : "Satisfaction survey QR Code"
-          }
-          width={410}
-          height={410}
-          unoptimized
-        />
-        <span>{language === "th" ? "สแกน QR Code" : "Scan QR Code"}</span>
-      </Link>
-    </section>
-  );
-}
-
 function HomeServiceBannerMockup({ language }: { language: WpLanguage }) {
   return (
     <section
@@ -259,8 +205,6 @@ export function HomeSections({
           <EventsCalendar days={home.calendarDays} language={language} />
         </section>
       </div>
-
-      <HomeSatisfactionSurveyQr language={language} />
 
       <HomeServiceBannerMockup language={language} />
 

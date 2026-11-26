@@ -7,14 +7,9 @@ const source = readFileSync(
   "utf8",
 );
 
-describe("HomeSatisfactionSurveyQr", () => {
-  it("uses the full Ministry of Transport satisfaction survey wording", () => {
-    const newTitle =
-      "แบบสำรวจความพึงพอใจของหน่วยงานในสังกัดกระทรวงคมนาคม ประจำปีงบประมาณ พ.ศ. 2569";
-    const oldTitle = "แบบสำรวจความพึงพอใจ ประจำปีงบประมาณ พ.ศ. 2569";
-
-    expect(source).toContain(newTitle);
-    expect(source).not.toContain(`? "${oldTitle}"`);
-    expect(source).not.toContain(`? "QR Code ${oldTitle}"`);
+describe("home survey QR section", () => {
+  it("is not rendered on the home page", () => {
+    expect(source).not.toContain("home-survey-qr");
+    expect(source).not.toContain("mot-5440");
   });
 });
