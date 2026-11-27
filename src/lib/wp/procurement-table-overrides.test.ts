@@ -400,7 +400,26 @@ describe("applyProcurementTableOverrides", () => {
       .get();
 
     expect(years.slice(0, 2)).toEqual(["ปี 2570", "ปี 2569"]);
+    expect(rowsForYear(updated.contentHtml, "ปี 2570")[0]).toEqual([
+      "6",
+      "26 พฤศจิกายน 2569",
+      "ประกาศผู้ชนะการเสนอราคา ขออนุมัติรายงานผลการพิจารณาจัดซื้อวัสดุสำนักงานและวัสดุคอมพิวเตอร์จำนวน 18 รายการ โดยวิธีเฉพาะเจาะจง",
+      "107,770.40",
+      "–",
+      "PDF",
+    ]);
+    expect(updated.contentHtml).toContain(
+      'href="/procurement-documents/procurement-winner-office-and-computer-supplies-25691126.pdf"',
+    );
     expect(rowsForYear(updated.contentHtml, "ปี 2570")).toEqual([
+      [
+        "6",
+        "26 พฤศจิกายน 2569",
+        "ประกาศผู้ชนะการเสนอราคา ขออนุมัติรายงานผลการพิจารณาจัดซื้อวัสดุสำนักงานและวัสดุคอมพิวเตอร์จำนวน 18 รายการ โดยวิธีเฉพาะเจาะจง",
+        "107,770.40",
+        "–",
+        "PDF",
+      ],
       [
         "5",
         "30 กันยายน 2569",
