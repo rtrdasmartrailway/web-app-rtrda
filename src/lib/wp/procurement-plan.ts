@@ -14,10 +14,16 @@ const PROCUREMENT_PLAN_ROWS_2570 = [
     href: "/procurement-documents/procurement-plan-2570-25691030.pdf",
   },
 ];
-const PROCUREMENT_PLAN_ROWS_2569 = [
+const PROCUREMENT_PLAN_ROWS_2569: Array<{
+  date: string;
+  project: string;
+  href: string;
+  previousProject?: string;
+}> = [
   {
     date: "3 กันยายน 2569",
-    project: "เผยแพร่แผนการจัดซื้อจัดจ้าง ประจำปีงบประมาณ พ.ศ. 2570",
+    project: "เช่ายานพาหนะ (รถตู้โดยสารขนาด 12 ที่นั่ง) จำนวน 1 คัน",
+    previousProject: "เผยแพร่แผนการจัดซื้อจัดจ้าง ประจำปีงบประมาณ พ.ศ. 2570",
     href: "/wp-content/uploads/2026/09/procurement-plan-fiscal-year-2570-25690903.pdf",
   },
   {
@@ -91,9 +97,22 @@ export function applyProcurementPlanOverride(record: WpContentRecord): WpContent
   }
   for (const plan of [...PROCUREMENT_PLAN_ROWS_2569].reverse()) {
     const existingRow = rows
-      .filter((_, row) => $(row).text().includes(plan.project))
+      .filter((_, row) => {
+        const text = $(row).text();
+        return (
+          text.includes(plan.project) ||
+          Boolean(plan.previousProject && text.includes(plan.previousProject))
+        );
+      })
       .first();
-    if (existingRow.length > 0) continue;
+    if (existingRow.length > 0) {
+      const projectCell = existingRow.find("td").eq(2);
+      if (projectCell.text().trim() !== plan.project) {
+        projectCell.text(plan.project);
+        changed = true;
+      }
+      continue;
+    }
 
     const row = $("<tr></tr>");
     row.append($("<td></td>"));

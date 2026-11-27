@@ -85,24 +85,32 @@ describe("applyProcurementPlanOverride", () => {
   });
 
   it("prepends the 3 September 2569 procurement plan row with its PDF", () => {
-    const updated = applyProcurementPlanOverride(record({}));
+    const source = record({});
+    const sourceHtml = cheerio.load(source.contentHtml, null, false);
+    sourceHtml("tbody").first().prepend(`
+      <tr><td>1</td><td>3 กันยายน 2569</td><td>เผยแพร่แผนการจัดซื้อจัดจ้าง ประจำปีงบประมาณ พ.ศ. 2570</td><td>เผยแพร่ขึ้นเว็บ</td><td><a href="/wp-content/uploads/2026/09/procurement-plan-fiscal-year-2570-25690903.pdf">PDF</a></td></tr>
+    `);
+    source.contentHtml = sourceHtml.html();
+    const updated = applyProcurementPlanOverride(source);
     const $ = cheerio.load(updated.contentHtml, null, false);
-    const firstRowCells = $(".lightweight-accordion")
+    const dateRows = $(".lightweight-accordion")
       .eq(1)
       .find("tbody tr")
-      .first()
-      .find("td");
+      .filter((_, row) => $(row).find("td").eq(1).text().trim() === "3 กันยายน 2569");
+    expect(dateRows).toHaveLength(1);
+    const firstRowCells = dateRows.find("td");
 
     expect(firstRowCells.map((_, cell) => $(cell).text().trim()).get()).toEqual([
-      "1",
+      "3",
       "3 กันยายน 2569",
-      "เผยแพร่แผนการจัดซื้อจัดจ้าง ประจำปีงบประมาณ พ.ศ. 2570",
+      "เช่ายานพาหนะ (รถตู้โดยสารขนาด 12 ที่นั่ง) จำนวน 1 คัน",
       "เผยแพร่ขึ้นเว็บ",
       "PDF",
     ]);
     expect(firstRowCells.last().find("a").attr("href")).toBe(
       "/wp-content/uploads/2026/09/procurement-plan-fiscal-year-2570-25690903.pdf",
     );
+    expect(applyProcurementPlanOverride(updated)).toBe(updated);
   });
 
   it("renumbers only the 2569 procurement plan table from top to bottom", () => {
