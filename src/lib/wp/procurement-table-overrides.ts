@@ -306,6 +306,16 @@ const winnerRows2570: TableRowSpec[] = [
     href: "/procurement-documents/procurement-winner-office-and-computer-supplies-25691126.pdf",
   },
   {
+    matchText: "เช่ายานพาหนะ (รถตู้โดยสาร ขนาด 12 ที่นั่ง) จำนวน 1 คัน ระยะเวลาเช่า 5 ปี",
+    cells: [
+      "26 พฤศจิกายน 2569",
+      "ประกาศผู้ชนะการเสนอราคา เช่ายานพาหนะ (รถตู้โดยสาร ขนาด 12 ที่นั่ง) จำนวน 1 คัน ระยะเวลาเช่า 5 ปี โดยวิธีประกวดราคาอิเล็กทรอนิกส์ (e-bidding)",
+      "1,341,138.00",
+      "–",
+    ],
+    href: "/procurement-documents/procurement-winner-passenger-van-rental-5-years-25691126.pdf",
+  },
+  {
     matchText: "ขออนุมัติเช่าเครื่องถ่ายเอกสารประจำปี งบประมาณ 2570 จำนวน 1 เครื่อง",
     cells: [
       "30 กันยายน 2569",
