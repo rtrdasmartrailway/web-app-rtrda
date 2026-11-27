@@ -7,17 +7,26 @@ const PROCUREMENT_PLAN_YEAR = "ปี 2569";
 const PROCUREMENT_PLAN_ROWS_2570 = [
   {
     date: "23 พฤศจิกายน 2569",
+    project: "เช่ารถยนต์ไฟฟ้า จำนวน 1 คัน",
     href: "/procurement-documents/procurement-plan-2570-25691123.pdf",
   },
   {
     date: "30 ตุลาคม 2569",
+    project:
+      "เช่าพื้นที่อาคารสถานที่สำนักงานสถาบันวิจัยและพัฒนาเทคโนโลยีระบบราง(องค์การมหาชน)",
     href: "/procurement-documents/procurement-plan-2570-25691030.pdf",
   },
 ];
-const PROCUREMENT_PLAN_ROWS_2569 = [
+const PROCUREMENT_PLAN_ROWS_2569: Array<{
+  date: string;
+  project: string;
+  href: string;
+  previousProject?: string;
+}> = [
   {
     date: "3 กันยายน 2569",
-    project: "เผยแพร่แผนการจัดซื้อจัดจ้าง ประจำปีงบประมาณ พ.ศ. 2570",
+    project: "เช่ายานพาหนะ (รถตู้โดยสารขนาด 12 ที่นั่ง) จำนวน 1 คัน",
+    previousProject: "เผยแพร่แผนการจัดซื้อจัดจ้าง ประจำปีงบประมาณ พ.ศ. 2570",
     href: "/wp-content/uploads/2026/09/procurement-plan-fiscal-year-2570-25690903.pdf",
   },
   {
@@ -65,14 +74,9 @@ export function applyProcurementPlanOverride(record: WpContentRecord): WpContent
     const newAccordion = accordion.clone();
     newAccordion.find("summary h1").first().text("ปี 2570");
     const body = newAccordion.find("tbody").first().empty();
-    PROCUREMENT_PLAN_ROWS_2570.forEach(({ date, href }, index) => {
+    PROCUREMENT_PLAN_ROWS_2570.forEach(({ date, project, href }, index) => {
       const row = $("<tr></tr>");
-      for (const value of [
-        String(index + 1),
-        date,
-        "เผยแพร่แผนการจัดซื้อจัดจ้าง ประจำปีงบประมาณ พ.ศ. 2570",
-        "เผยแพร่ขึ้นเว็บ",
-      ]) {
+      for (const value of [String(index + 1), date, project, "เผยแพร่ขึ้นเว็บ"]) {
         row.append($("<td></td>").text(value));
       }
       row.append(
@@ -88,12 +92,42 @@ export function applyProcurementPlanOverride(record: WpContentRecord): WpContent
     });
     accordion.before(newAccordion);
     changed = true;
+  } else {
+    const year2570 = $(".lightweight-accordion")
+      .filter((_, element) =>
+        $(element).find("summary").first().text().trim().includes("ปี 2570"),
+      )
+      .first();
+    for (const { date, project } of PROCUREMENT_PLAN_ROWS_2570) {
+      const existingRow = year2570
+        .find("tbody tr")
+        .filter((_, row) => $(row).find("td").eq(1).text().trim() === date)
+        .first();
+      const projectCell = existingRow.find("td").eq(2);
+      if (projectCell.length > 0 && projectCell.text().trim() !== project) {
+        projectCell.text(project);
+        changed = true;
+      }
+    }
   }
   for (const plan of [...PROCUREMENT_PLAN_ROWS_2569].reverse()) {
     const existingRow = rows
-      .filter((_, row) => $(row).text().includes(plan.project))
+      .filter((_, row) => {
+        const text = $(row).text();
+        return (
+          text.includes(plan.project) ||
+          Boolean(plan.previousProject && text.includes(plan.previousProject))
+        );
+      })
       .first();
-    if (existingRow.length > 0) continue;
+    if (existingRow.length > 0) {
+      const projectCell = existingRow.find("td").eq(2);
+      if (projectCell.text().trim() !== plan.project) {
+        projectCell.text(plan.project);
+        changed = true;
+      }
+      continue;
+    }
 
     const row = $("<tr></tr>");
     row.append($("<td></td>"));

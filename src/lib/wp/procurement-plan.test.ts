@@ -55,7 +55,7 @@ function firstColumnValues(html: string, accordionIndex: number): string[] {
 }
 
 describe("applyProcurementPlanOverride", () => {
-  it("shows the 23 November announcement before the 30 October announcement", () => {
+  it("shows the 23 November and 30 October announcements with their project titles", () => {
     const updated = applyProcurementPlanOverride(record({}));
     const $ = cheerio.load(updated.contentHtml, null, false);
     const accordion = $(".lightweight-accordion").first();
@@ -71,7 +71,7 @@ describe("applyProcurementPlanOverride", () => {
     ).toEqual([
       "1",
       "23 พฤศจิกายน 2569",
-      "เผยแพร่แผนการจัดซื้อจัดจ้าง ประจำปีงบประมาณ พ.ศ. 2570",
+      "เช่ารถยนต์ไฟฟ้า จำนวน 1 คัน",
       "เผยแพร่ขึ้นเว็บ",
       "PDF",
     ]);
@@ -79,30 +79,67 @@ describe("applyProcurementPlanOverride", () => {
       "/procurement-documents/procurement-plan-2570-25691123.pdf",
     );
     expect(rows.eq(1).find("td").eq(1).text().trim()).toBe("30 ตุลาคม 2569");
+    expect(rows.eq(1).find("td").eq(2).text().trim()).toBe(
+      "เช่าพื้นที่อาคารสถานที่สำนักงานสถาบันวิจัยและพัฒนาเทคโนโลยีระบบราง(องค์การมหาชน)",
+    );
     expect(rows.eq(1).find("a").attr("href")).toBe(
       "/procurement-documents/procurement-plan-2570-25691030.pdf",
     );
   });
 
+  it("updates project titles in an existing year 2570 table without changing PDF links", () => {
+    const source = record({});
+    const $ = cheerio.load(source.contentHtml, null, false);
+    const previousYear = $(".lightweight-accordion").first();
+    const year2570 = previousYear.clone();
+    year2570.find("summary h1").first().text("ปี 2570");
+    year2570.find("tbody").first().html(`
+      <tr><td>1</td><td>23 พฤศจิกายน 2569</td><td>เผยแพร่แผนการจัดซื้อจัดจ้าง ประจำปีงบประมาณ พ.ศ. 2570</td><td>เผยแพร่ขึ้นเว็บ</td><td><a href="/november.pdf">PDF</a></td></tr>
+      <tr><td>2</td><td>30 ตุลาคม 2569</td><td>เผยแพร่แผนการจัดซื้อจัดจ้าง ประจำปีงบประมาณ พ.ศ. 2570</td><td>เผยแพร่ขึ้นเว็บ</td><td><a href="/october.pdf">PDF</a></td></tr>
+    `);
+    previousYear.before(year2570);
+    source.contentHtml = $.html();
+
+    const updated = applyProcurementPlanOverride(source);
+    const updated$ = cheerio.load(updated.contentHtml, null, false);
+    const rows = updated$(".lightweight-accordion").first().find("tbody tr");
+
+    expect(rows.eq(0).find("td").eq(2).text().trim()).toBe("เช่ารถยนต์ไฟฟ้า จำนวน 1 คัน");
+    expect(rows.eq(0).find("a").attr("href")).toBe("/november.pdf");
+    expect(rows.eq(1).find("td").eq(2).text().trim()).toBe(
+      "เช่าพื้นที่อาคารสถานที่สำนักงานสถาบันวิจัยและพัฒนาเทคโนโลยีระบบราง(องค์การมหาชน)",
+    );
+    expect(rows.eq(1).find("a").attr("href")).toBe("/october.pdf");
+    expect(applyProcurementPlanOverride(updated)).toBe(updated);
+  });
+
   it("prepends the 3 September 2569 procurement plan row with its PDF", () => {
-    const updated = applyProcurementPlanOverride(record({}));
+    const source = record({});
+    const sourceHtml = cheerio.load(source.contentHtml, null, false);
+    sourceHtml("tbody").first().prepend(`
+      <tr><td>1</td><td>3 กันยายน 2569</td><td>เผยแพร่แผนการจัดซื้อจัดจ้าง ประจำปีงบประมาณ พ.ศ. 2570</td><td>เผยแพร่ขึ้นเว็บ</td><td><a href="/wp-content/uploads/2026/09/procurement-plan-fiscal-year-2570-25690903.pdf">PDF</a></td></tr>
+    `);
+    source.contentHtml = sourceHtml.html();
+    const updated = applyProcurementPlanOverride(source);
     const $ = cheerio.load(updated.contentHtml, null, false);
-    const firstRowCells = $(".lightweight-accordion")
+    const dateRows = $(".lightweight-accordion")
       .eq(1)
       .find("tbody tr")
-      .first()
-      .find("td");
+      .filter((_, row) => $(row).find("td").eq(1).text().trim() === "3 กันยายน 2569");
+    expect(dateRows).toHaveLength(1);
+    const firstRowCells = dateRows.find("td");
 
     expect(firstRowCells.map((_, cell) => $(cell).text().trim()).get()).toEqual([
-      "1",
+      "3",
       "3 กันยายน 2569",
-      "เผยแพร่แผนการจัดซื้อจัดจ้าง ประจำปีงบประมาณ พ.ศ. 2570",
+      "เช่ายานพาหนะ (รถตู้โดยสารขนาด 12 ที่นั่ง) จำนวน 1 คัน",
       "เผยแพร่ขึ้นเว็บ",
       "PDF",
     ]);
     expect(firstRowCells.last().find("a").attr("href")).toBe(
       "/wp-content/uploads/2026/09/procurement-plan-fiscal-year-2570-25690903.pdf",
     );
+    expect(applyProcurementPlanOverride(updated)).toBe(updated);
   });
 
   it("renumbers only the 2569 procurement plan table from top to bottom", () => {
