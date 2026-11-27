@@ -4,8 +4,7 @@ import { buildKnowledgeDocumentGroups } from "./knowledge-documents";
 import type { WpContentRecord } from "./types";
 import {
   applyPublicHearingDocumentsOverride,
-  PUBLIC_HEARING_COVER_IMAGE,
-  PUBLIC_HEARING_DOCUMENT_HREF,
+  PUBLIC_HEARING_DOCUMENTS,
 } from "./public-hearing-documents";
 
 function record(overrides: Partial<WpContentRecord> = {}): WpContentRecord {
@@ -29,7 +28,7 @@ function record(overrides: Partial<WpContentRecord> = {}): WpContentRecord {
 }
 
 describe("public hearing document card", () => {
-  it("renders the 2569 document as a knowledge-style card with preview and download", async () => {
+  it("renders the three 2569 draft documents in order with preview and download", async () => {
     const updated = applyPublicHearingDocumentsOverride(record({}));
     const groups = buildKnowledgeDocumentGroups(updated.contentHtml, { compact: true });
     const targets = await buildPdfReaderTargets(updated.contentHtml, {
@@ -39,25 +38,38 @@ describe("public hearing document card", () => {
 
     expect(groups).toHaveLength(1);
     expect(groups[0]).toMatchObject({ title: "2569", compact: true });
-    expect(groups[0].documents[0]).toMatchObject({
-      title: "(ร่าง) สทร.-SS-1001:2569",
-      description:
-        "(ร่าง) มาตรฐานว่าด้วยการอพยพผู้ใช้บริการขนส่งทางราง กรณีเกิดเหตุอัคคีภัยหรือกรณีฉุกเฉิน",
-      coverImage: PUBLIC_HEARING_COVER_IMAGE,
-      coverAlt: expect.stringContaining("สทร.-SS-1001:2569"),
-      previewHref: PUBLIC_HEARING_DOCUMENT_HREF,
-      downloadHref: PUBLIC_HEARING_DOCUMENT_HREF,
-      hasUsableTarget: true,
-    });
-    expect(targets).toEqual([
-      {
-        sourceHref: PUBLIC_HEARING_DOCUMENT_HREF,
-        inlineHref: `${PUBLIC_HEARING_DOCUMENT_HREF}?inline=1`,
-        downloadHref: PUBLIC_HEARING_DOCUMENT_HREF,
+    expect(groups[0].documents).toHaveLength(3);
+    expect(
+      groups[0].documents.map(
+        ({ title, description, coverImage, previewHref, downloadHref }) => ({
+          title,
+          description,
+          coverImage,
+          previewHref,
+          downloadHref,
+        }),
+      ),
+    ).toEqual(
+      PUBLIC_HEARING_DOCUMENTS.map(({ code, title, href, coverImage }) => ({
+        title: `(ร่าง) ${code}`,
+        description: `(ร่าง) ${title}`,
+        coverImage,
+        previewHref: href,
+        downloadHref: href,
+      })),
+    );
+    expect(groups[0].documents.every(({ hasUsableTarget }) => hasUsableTarget)).toBe(
+      true,
+    );
+    expect(targets).toEqual(
+      PUBLIC_HEARING_DOCUMENTS.map(({ href }) => ({
+        sourceHref: href,
+        inlineHref: `${href}?inline=1`,
+        downloadHref: href,
         title: "อ่านเพิ่มเติม",
         kind: "upload",
-      },
-    ]);
+      })),
+    );
   });
 
   it("is idempotent and leaves other pages unchanged", () => {
