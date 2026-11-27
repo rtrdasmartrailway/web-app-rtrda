@@ -10,16 +10,19 @@ export const PUBLIC_HEARING_DOCUMENTS = [
     code: "สทร. RS-6005:2569",
     title: "มาตรฐานการทดสอบระบบปรับอากาศของรถไฟโดยสารทางไกล",
     href: "/public-hearing-documents/rs-6005-2569-air-conditioning.pdf",
+    coverImage: "/public-hearing-documents/rs-6005-2569-air-conditioning.png",
   },
   {
     code: "สทร. RS-6006:2569",
     title: "มาตรฐานการทดสอบเบาะและเก้าอี้ผู้โดยสารสำหรับรถไฟโดยสาร",
     href: "/public-hearing-documents/rs-6006-2569-seats.pdf",
+    coverImage: "/public-hearing-documents/rs-6006-2569-seats.png",
   },
   {
     code: "สทร. RS-6008:2569",
     title: "มาตรฐานการทดสอบจอแสดงข้อมูลสำหรับผู้โดยสารบนตัวรถไฟ",
     href: "/public-hearing-documents/rs-6008-2569-display.pdf",
+    coverImage: "/public-hearing-documents/rs-6008-2569-display.png",
   },
 ] as const;
 
@@ -45,57 +48,40 @@ export function applyPublicHearingDocumentsOverride(
     return record;
   }
 
-  const table = body.find("table").first();
-  const hasAllRows = PUBLIC_HEARING_DOCUMENTS.every(
-    ({ href }) => table.find(`a[href="${href}"]`).length > 0,
+  const hasAllCards = PUBLIC_HEARING_DOCUMENTS.every(
+    ({ href, coverImage }) =>
+      columns.find(`a[href="${href}"]`).length > 0 &&
+      columns.find(`img[src="${coverImage}"]`).length > 0,
   );
-  if (hasAllRows) return record;
+  if (hasAllCards) return record;
 
-  const tableFigure = $(
-    '<figure class="wp-block-table is-style-vk-table-border-stripes"></figure>',
-  );
-  const replacementTable = $("<table></table>");
-  replacementTable.append(
-    $("<thead></thead>").append(
-      $("<tr></tr>")
-        .append($('<th scope="col"></th>').text("ลำดับ"))
-        .append($('<th scope="col"></th>').text("รายการร่างมาตรฐาน"))
-        .append($('<th scope="col"></th>').text("เอกสาร")),
-    ),
-  );
-
-  const rows = $("<tbody></tbody>");
-  PUBLIC_HEARING_DOCUMENTS.forEach(({ code, title, href }, index) => {
-    const row = $("<tr></tr>");
-    row.append($("<td></td>").text(String(index + 1)));
-    row.append(
-      $("<td></td>")
-        .append($("<p></p>").text(`(ร่าง) ${code}`))
-        .append($("<p></p>").text(`(ร่าง) ${title}`)),
+  columns.empty();
+  for (const { code, title, href, coverImage } of PUBLIC_HEARING_DOCUMENTS) {
+    const card = $('<div class="wp-block-column"></div>');
+    card.append(
+      $("<figure></figure>").append(
+        $("<img />")
+          .attr("src", coverImage)
+          .attr("alt", `หน้าปก (ร่าง) ${code} (ร่าง) ${title}`),
+      ),
     );
-    row.append(
-      $("<td></td>")
-        .append(
-          $("<p></p>").append($("<a></a>").attr("href", href).text("อ่านเพิ่มเติม")),
-        )
-        .append(
-          $("<p></p>").append(
-            $("<a></a>")
-              .attr("href", href)
-              .attr("download", href.split("/").pop() ?? "document.pdf")
-              .text("ดาวน์โหลดไฟล์"),
-          ),
-        ),
+    card.append($(`<h6></h6>`).text(`(ร่าง) ${code}`));
+    card.append($(`<p></p>`).text(`(ร่าง) ${title}`));
+    card.append(
+      $('<div class="wp-block-button detail-btn"></div>').append(
+        $("<a></a>").attr("href", href).text("อ่านเพิ่มเติม"),
+      ),
     );
-    rows.append(row);
-  });
-
-  replacementTable.append(rows);
-  tableFigure.append(replacementTable);
-  columns.replaceWith(tableFigure);
-
-  // Remove any legacy SS-1001 table in the same year accordion.
-  body.find("table").not(replacementTable).remove();
+    card.append(
+      $("<p></p>").append(
+        $("<a></a>")
+          .attr("href", href)
+          .attr("download", href.split("/").pop() ?? "document.pdf")
+          .text("ดาวน์โหลดไฟล์"),
+      ),
+    );
+    columns.append(card);
+  }
 
   return { ...record, contentHtml: $.html() };
 }

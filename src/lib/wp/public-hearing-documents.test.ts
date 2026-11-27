@@ -1,5 +1,4 @@
 import { describe, expect, it } from "vitest";
-import * as cheerio from "cheerio";
 import { sanitizeContentHtml } from "@/lib/security/sanitize-content";
 import { buildPdfReaderTargets } from "./pdf-reader";
 import { buildKnowledgeDocumentGroups } from "./knowledge-documents";
@@ -29,53 +28,42 @@ function record(overrides: Partial<WpContentRecord> = {}): WpContentRecord {
   };
 }
 
-describe("public hearing document table", () => {
-  it("renders three ordered draft rows with preview and download links", async () => {
+describe("public hearing document cards", () => {
+  it("renders three ordered draft cards using the standard knowledge grid", async () => {
     const updated = applyPublicHearingDocumentsOverride(record({}));
     const sanitizedHtml = sanitizeContentHtml(updated.contentHtml);
-    const $ = cheerio.load(sanitizedHtml);
-    const table = $(".lightweight-accordion")
-      .find("summary")
-      .filter((_, element) => $(element).text().includes("2569"))
-      .closest("details")
-      .find(".wp-block-table table");
+    const groups = buildKnowledgeDocumentGroups(sanitizedHtml);
     const targets = await buildPdfReaderTargets(sanitizedHtml, {
       resolveDownload: async () => null,
       resolveFlipbookPdf: async () => null,
     });
 
+    expect(groups).toHaveLength(1);
+    expect(groups[0]).toMatchObject({ title: "2569", open: false });
+    expect(groups[0].compact).not.toBe(true);
+    expect(groups[0].documents).toHaveLength(3);
     expect(
-      table
-        .find("thead th")
-        .map((_, element) => $(element).text())
-        .get(),
-    ).toEqual(["ลำดับ", "รายการร่างมาตรฐาน", "เอกสาร"]);
-    expect(table.find("tbody tr")).toHaveLength(3);
-    expect(
-      table
-        .find("tbody tr")
-        .toArray()
-        .map((element) =>
-          $(element)
-            .find("td")
-            .eq(1)
-            .find("p")
-            .toArray()
-            .map((paragraph) => $(paragraph).text()),
-        ),
+      groups[0].documents.map(
+        ({ title, description, coverImage, previewHref, downloadHref }) => ({
+          title,
+          description,
+          coverImage,
+          previewHref,
+          downloadHref,
+        }),
+      ),
     ).toEqual(
-      PUBLIC_HEARING_DOCUMENTS.map(({ code, title }) => [
-        `(ร่าง) ${code}`,
-        `(ร่าง) ${title}`,
-      ]),
+      PUBLIC_HEARING_DOCUMENTS.map(({ code, title, href, coverImage }) => ({
+        title: `(ร่าง) ${code}`,
+        description: `(ร่าง) ${title}`,
+        coverImage,
+        previewHref: href,
+        downloadHref: href,
+      })),
     );
-    expect(
-      table
-        .find("a[download]")
-        .map((_, element) => $(element).attr("href"))
-        .get(),
-    ).toEqual(PUBLIC_HEARING_DOCUMENTS.map(({ href }) => href));
-    expect(buildKnowledgeDocumentGroups(sanitizedHtml)).toEqual([]);
+    expect(groups[0].documents.every(({ hasUsableTarget }) => hasUsableTarget)).toBe(
+      true,
+    );
     expect(updated.contentHtml).not.toContain("SS-1001");
     expect(targets).toEqual(
       PUBLIC_HEARING_DOCUMENTS.map(({ href }) => ({
