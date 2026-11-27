@@ -558,21 +558,23 @@ export const getPageData = cache(async (path: string): Promise<PageData | null> 
     newsCards,
     categoryPagination,
     home,
-    knowledgeDocuments: railStrategyPublication
-      ? railStrategyPublicationGroups
-      : isKnowledgeDocuments
-        ? applyAnnualReportDocumentOverride(
-            buildKnowledgeDocumentGroups(recordWithOverrides.contentHtml, {
-              validDownloadIds: new Set(downloadIds),
-              compact: isPublicHearingPath(recordWithOverrides.path),
-              excludedGroupTitles:
-                recordWithOverrides.path === "/คลังความรู้"
-                  ? new Set(["มาตรฐานระบบราง สทร.", "ร่างมาตรฐานระบบราง สทร."])
-                  : undefined,
-            }),
-            recordWithOverrides.language,
-          )
-        : null,
+    knowledgeDocuments: isPublicHearingPath(recordWithOverrides.path)
+      ? null
+      : railStrategyPublication
+        ? railStrategyPublicationGroups
+        : isKnowledgeDocuments
+          ? applyAnnualReportDocumentOverride(
+              buildKnowledgeDocumentGroups(recordWithOverrides.contentHtml, {
+                validDownloadIds: new Set(downloadIds),
+                compact: isPublicHearingPath(recordWithOverrides.path),
+                excludedGroupTitles:
+                  recordWithOverrides.path === "/คลังความรู้"
+                    ? new Set(["มาตรฐานระบบราง สทร.", "ร่างมาตรฐานระบบราง สทร."])
+                    : undefined,
+              }),
+              recordWithOverrides.language,
+            )
+          : null,
     boardExecutivePresentation: buildBoardExecutivePresentation(
       recordWithOverrides.path,
       recordWithOverrides.contentHtml,

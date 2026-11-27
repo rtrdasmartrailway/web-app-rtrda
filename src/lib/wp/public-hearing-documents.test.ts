@@ -1,4 +1,6 @@
 import { describe, expect, it } from "vitest";
+import * as cheerio from "cheerio";
+import { sanitizeContentHtml } from "@/lib/security/sanitize-content";
 import { buildPdfReaderTargets } from "./pdf-reader";
 import { buildKnowledgeDocumentGroups } from "./knowledge-documents";
 import type { WpContentRecord } from "./types";
@@ -17,7 +19,7 @@ function record(overrides: Partial<WpContentRecord> = {}): WpContentRecord {
     sourceUrl: "https://www.rtrda.or.th/ประชาพิจารณ์",
     title: "ประชาพิจารณ์",
     excerpt: "",
-    contentHtml: `<div class="lightweight-accordion"><details><summary class="lightweight-accordion-title"><strong>2569</strong></summary><div class="lightweight-accordion-body"><div class="wp-block-columns"><div class="wp-block-column"></div></div></div></details></div>`,
+    contentHtml: `<div class="lightweight-accordion"><details><summary class="lightweight-accordion-title"><strong>2569</strong></summary><div class="lightweight-accordion-body"><div class="wp-block-columns"><div class="wp-block-column"><h6>(ร่าง) สทร.-SS-1001:2569</h6><p>มาตรฐานเดิม</p><a href="/public-hearing-documents/ss-1001-2569-evacuation.pdf">ดาวน์โหลดไฟล์</a></div></div></div></details></div>`,
     modified: "2026-09-29T00:00:00",
     date: "2026-09-29T00:00:00",
     parentPath: null,
@@ -27,40 +29,54 @@ function record(overrides: Partial<WpContentRecord> = {}): WpContentRecord {
   };
 }
 
-describe("public hearing document card", () => {
-  it("renders the three 2569 draft documents in order with preview and download", async () => {
+describe("public hearing document table", () => {
+  it("renders three ordered draft rows with preview and download links", async () => {
     const updated = applyPublicHearingDocumentsOverride(record({}));
-    const groups = buildKnowledgeDocumentGroups(updated.contentHtml, { compact: true });
-    const targets = await buildPdfReaderTargets(updated.contentHtml, {
+    const sanitizedHtml = sanitizeContentHtml(updated.contentHtml);
+    const $ = cheerio.load(sanitizedHtml);
+    const table = $(".lightweight-accordion")
+      .find("summary")
+      .filter((_, element) => $(element).text().includes("2569"))
+      .closest("details")
+      .find(".wp-block-table table");
+    const targets = await buildPdfReaderTargets(sanitizedHtml, {
       resolveDownload: async () => null,
       resolveFlipbookPdf: async () => null,
     });
 
-    expect(groups).toHaveLength(1);
-    expect(groups[0]).toMatchObject({ title: "2569", compact: true });
-    expect(groups[0].documents).toHaveLength(3);
     expect(
-      groups[0].documents.map(
-        ({ title, description, coverImage, previewHref, downloadHref }) => ({
-          title,
-          description,
-          coverImage,
-          previewHref,
-          downloadHref,
-        }),
-      ),
+      table
+        .find("thead th")
+        .map((_, element) => $(element).text())
+        .get(),
+    ).toEqual(["ลำดับ", "รายการร่างมาตรฐาน", "เอกสาร"]);
+    expect(table.find("tbody tr")).toHaveLength(3);
+    expect(
+      table
+        .find("tbody tr")
+        .toArray()
+        .map((element) =>
+          $(element)
+            .find("td")
+            .eq(1)
+            .find("p")
+            .toArray()
+            .map((paragraph) => $(paragraph).text()),
+        ),
     ).toEqual(
-      PUBLIC_HEARING_DOCUMENTS.map(({ code, title, href, coverImage }) => ({
-        title: `(ร่าง) ${code}`,
-        description: `(ร่าง) ${title}`,
-        coverImage,
-        previewHref: href,
-        downloadHref: href,
-      })),
+      PUBLIC_HEARING_DOCUMENTS.map(({ code, title }) => [
+        `(ร่าง) ${code}`,
+        `(ร่าง) ${title}`,
+      ]),
     );
-    expect(groups[0].documents.every(({ hasUsableTarget }) => hasUsableTarget)).toBe(
-      true,
-    );
+    expect(
+      table
+        .find("a[download]")
+        .map((_, element) => $(element).attr("href"))
+        .get(),
+    ).toEqual(PUBLIC_HEARING_DOCUMENTS.map(({ href }) => href));
+    expect(buildKnowledgeDocumentGroups(sanitizedHtml)).toEqual([]);
+    expect(updated.contentHtml).not.toContain("SS-1001");
     expect(targets).toEqual(
       PUBLIC_HEARING_DOCUMENTS.map(({ href }) => ({
         sourceHref: href,
