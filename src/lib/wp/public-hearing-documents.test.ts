@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vitest";
+import { sanitizeContentHtml } from "@/lib/security/sanitize-content";
 import { buildPdfReaderTargets } from "./pdf-reader";
 import { buildKnowledgeDocumentGroups } from "./knowledge-documents";
 import type { WpContentRecord } from "./types";
 import {
   applyPublicHearingDocumentsOverride,
-  PUBLIC_HEARING_COVER_IMAGE,
-  PUBLIC_HEARING_DOCUMENT_HREF,
+  PUBLIC_HEARING_DOCUMENTS,
 } from "./public-hearing-documents";
 
 function record(overrides: Partial<WpContentRecord> = {}): WpContentRecord {
@@ -18,7 +18,7 @@ function record(overrides: Partial<WpContentRecord> = {}): WpContentRecord {
     sourceUrl: "https://www.rtrda.or.th/ประชาพิจารณ์",
     title: "ประชาพิจารณ์",
     excerpt: "",
-    contentHtml: `<div class="lightweight-accordion"><details><summary class="lightweight-accordion-title"><strong>2569</strong></summary><div class="lightweight-accordion-body"><div class="wp-block-columns"><div class="wp-block-column"></div></div></div></details></div>`,
+    contentHtml: `<div class="lightweight-accordion"><details><summary class="lightweight-accordion-title"><strong>2569</strong></summary><div class="lightweight-accordion-body"><div class="wp-block-columns"><div class="wp-block-column"><h6>(ร่าง) สทร.-SS-1001:2569</h6><p>มาตรฐานเดิม</p><a href="/public-hearing-documents/ss-1001-2569-evacuation.pdf">ดาวน์โหลดไฟล์</a></div></div></div></details></div>`,
     modified: "2026-09-29T00:00:00",
     date: "2026-09-29T00:00:00",
     parentPath: null,
@@ -28,36 +28,52 @@ function record(overrides: Partial<WpContentRecord> = {}): WpContentRecord {
   };
 }
 
-describe("public hearing document card", () => {
-  it("renders the 2569 document as a knowledge-style card with preview and download", async () => {
+describe("public hearing document cards", () => {
+  it("renders three ordered draft cards using the standard knowledge grid", async () => {
     const updated = applyPublicHearingDocumentsOverride(record({}));
-    const groups = buildKnowledgeDocumentGroups(updated.contentHtml, { compact: true });
-    const targets = await buildPdfReaderTargets(updated.contentHtml, {
+    const sanitizedHtml = sanitizeContentHtml(updated.contentHtml);
+    const groups = buildKnowledgeDocumentGroups(sanitizedHtml);
+    const targets = await buildPdfReaderTargets(sanitizedHtml, {
       resolveDownload: async () => null,
       resolveFlipbookPdf: async () => null,
     });
 
     expect(groups).toHaveLength(1);
-    expect(groups[0]).toMatchObject({ title: "2569", compact: true });
-    expect(groups[0].documents[0]).toMatchObject({
-      title: "(ร่าง) สทร.-SS-1001:2569",
-      description:
-        "(ร่าง) มาตรฐานว่าด้วยการอพยพผู้ใช้บริการขนส่งทางราง กรณีเกิดเหตุอัคคีภัยหรือกรณีฉุกเฉิน",
-      coverImage: PUBLIC_HEARING_COVER_IMAGE,
-      coverAlt: expect.stringContaining("สทร.-SS-1001:2569"),
-      previewHref: PUBLIC_HEARING_DOCUMENT_HREF,
-      downloadHref: PUBLIC_HEARING_DOCUMENT_HREF,
-      hasUsableTarget: true,
-    });
-    expect(targets).toEqual([
-      {
-        sourceHref: PUBLIC_HEARING_DOCUMENT_HREF,
-        inlineHref: `${PUBLIC_HEARING_DOCUMENT_HREF}?inline=1`,
-        downloadHref: PUBLIC_HEARING_DOCUMENT_HREF,
+    expect(groups[0]).toMatchObject({ title: "2569", open: false });
+    expect(groups[0].compact).not.toBe(true);
+    expect(groups[0].documents).toHaveLength(3);
+    expect(
+      groups[0].documents.map(
+        ({ title, description, coverImage, previewHref, downloadHref }) => ({
+          title,
+          description,
+          coverImage,
+          previewHref,
+          downloadHref,
+        }),
+      ),
+    ).toEqual(
+      PUBLIC_HEARING_DOCUMENTS.map(({ code, title, href, coverImage }) => ({
+        title: `(ร่าง) ${code}`,
+        description: `(ร่าง) ${title}`,
+        coverImage,
+        previewHref: href,
+        downloadHref: href,
+      })),
+    );
+    expect(groups[0].documents.every(({ hasUsableTarget }) => hasUsableTarget)).toBe(
+      true,
+    );
+    expect(updated.contentHtml).not.toContain("SS-1001");
+    expect(targets).toEqual(
+      PUBLIC_HEARING_DOCUMENTS.map(({ href }) => ({
+        sourceHref: href,
+        inlineHref: `${href}?inline=1`,
+        downloadHref: href,
         title: "อ่านเพิ่มเติม",
         kind: "upload",
-      },
-    ]);
+      })),
+    );
   });
 
   it("is idempotent and leaves other pages unchanged", () => {
