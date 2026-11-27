@@ -7,10 +7,13 @@ const PROCUREMENT_PLAN_YEAR = "ปี 2569";
 const PROCUREMENT_PLAN_ROWS_2570 = [
   {
     date: "23 พฤศจิกายน 2569",
+    project: "เช่ารถยนต์ไฟฟ้า จำนวน 1 คัน",
     href: "/procurement-documents/procurement-plan-2570-25691123.pdf",
   },
   {
     date: "30 ตุลาคม 2569",
+    project:
+      "เช่าพื้นที่อาคารสถานที่สำนักงานสถาบันวิจัยและพัฒนาเทคโนโลยีระบบราง(องค์การมหาชน)",
     href: "/procurement-documents/procurement-plan-2570-25691030.pdf",
   },
 ];
@@ -71,14 +74,9 @@ export function applyProcurementPlanOverride(record: WpContentRecord): WpContent
     const newAccordion = accordion.clone();
     newAccordion.find("summary h1").first().text("ปี 2570");
     const body = newAccordion.find("tbody").first().empty();
-    PROCUREMENT_PLAN_ROWS_2570.forEach(({ date, href }, index) => {
+    PROCUREMENT_PLAN_ROWS_2570.forEach(({ date, project, href }, index) => {
       const row = $("<tr></tr>");
-      for (const value of [
-        String(index + 1),
-        date,
-        "เผยแพร่แผนการจัดซื้อจัดจ้าง ประจำปีงบประมาณ พ.ศ. 2570",
-        "เผยแพร่ขึ้นเว็บ",
-      ]) {
+      for (const value of [String(index + 1), date, project, "เผยแพร่ขึ้นเว็บ"]) {
         row.append($("<td></td>").text(value));
       }
       row.append(
@@ -94,6 +92,23 @@ export function applyProcurementPlanOverride(record: WpContentRecord): WpContent
     });
     accordion.before(newAccordion);
     changed = true;
+  } else {
+    const year2570 = $(".lightweight-accordion")
+      .filter((_, element) =>
+        $(element).find("summary").first().text().trim().includes("ปี 2570"),
+      )
+      .first();
+    for (const { date, project } of PROCUREMENT_PLAN_ROWS_2570) {
+      const existingRow = year2570
+        .find("tbody tr")
+        .filter((_, row) => $(row).find("td").eq(1).text().trim() === date)
+        .first();
+      const projectCell = existingRow.find("td").eq(2);
+      if (projectCell.length > 0 && projectCell.text().trim() !== project) {
+        projectCell.text(project);
+        changed = true;
+      }
+    }
   }
   for (const plan of [...PROCUREMENT_PLAN_ROWS_2569].reverse()) {
     const existingRow = rows
